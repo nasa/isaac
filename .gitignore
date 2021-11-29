@@ -1,0 +1,49 @@
+# ROS
+*.bag
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Emacs temporary
+
+# ViM swap files
+*.swp
+*.swo
+
+# Precompile python
+*.pyc
+
+# Zip files
+*.zip
+
+# catkin
+/*-build
+/*-devel
+/*-install
+/*-rootfs
+/*-kernel
+/*-logs
+/qped.sublime-workspace
+*.egg
+*.egg-info
+
+# Tags & config
+tags
+.ctags
+
+.vscode
+
+# Folders
+doc/html
+doc/latex

@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>vol_mapper</name>
+  <version>0.0.0</version>
+  <description>The vol_mapper package</description>
+  <license>
+    Apache License, Version 2.0
+  </license>
+  <author email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </author>
+  <maintainer email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>nodelet</build_depend>
+  <build_depend>isaac_util</build_depend>
+  <build_depend>isaac_hw_msgs</build_depend>
+  <build_depend>config_reader</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>nodelet</build_export_depend>
+  <build_export_depend>isaac_util</build_export_depend>
+  <build_export_depend>isaac_hw_msgs</build_export_depend>
+  <build_export_depend>config_reader</build_export_depend>
+  <build_export_depend>tf2_ros</build_export_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>nodelet</exec_depend>
+  <exec_depend>isaac_util</exec_depend>
+  <exec_depend>isaac_hw_msgs</exec_depend>
+  <exec_depend>config_reader</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+</package>

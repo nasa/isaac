@@ -1,0 +1,112 @@
+<!-- Copyright (c) 2021, United States Government, as represented by the     -->
+<!-- Administrator of the National Aeronautics and Space Administration.     -->
+<!--                                                                         -->
+<!-- All rights reserved.                                                    -->
+<!--                                                                         -->
+<!-- The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking   -->
+<!-- platform" software is licensed under the Apache License, Version 2.0    -->
+<!-- (the "License"); you may not use this file except in compliance with    -->
+<!-- the License. You may obtain a copy of the License at                    -->
+<!--                                                                         -->
+<!--     http://www.apache.org/licenses/LICENSE-2.0                          -->
+<!--                                                                         -->
+<!-- Unless required by applicable law or agreed to in writing, software     -->
+<!-- distributed under the License is distributed on an "AS IS" BASIS,       -->
+<!-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or         -->
+<!-- implied. See the License for the specific language governing            -->
+<!-- permissions and limitations under the License.                          -->
+
+<launch>
+
+  <!-- Additional options -->
+  <arg name="drivers"/>                          <!-- Should we launch drivers? -->
+  <arg name="spurn" default=""/>                 <!-- PRevent a specific node   -->
+  <arg name="nodes" default=""/>                 <!-- Launch specific nodes     -->
+  <arg name="extra" default=""/>                 <!-- Inject an additional node -->
+  <arg name="debug" default=""/>                 <!-- Debug a node set          -->
+  <arg name="output" default="log"/>             <!-- Where to log              -->
+  <arg name="sim_mode" default="false" />        <!-- If in sim mode            -->
+  <arg name="wifi" default="false" />            <!-- Enable Wifi               -->
+  <arg name="streaming_mapper" default="false" /><!-- Enable the streaming mapper -->
+  <arg name="acoustics_cam" default="false" />   <!-- Enable the acoustics cam -->
+
+  <!-- Launch all nodelet managers -->
+  <group if="$(eval optenv('ASTROBEE_NODEGRAPH','')=='')">
+    <node pkg="nodelet" type="nodelet" args="manager"
+          name="ilp_inspection" output="$(arg output)"/>
+    <node pkg="nodelet" type="nodelet" args="manager"
+          name="ilp_cargo" output="$(arg output)"/>
+    <node pkg="nodelet" type="nodelet" args="manager"
+          name="ilp_guest_science" output="$(arg output)" />
+  </group>
+
+  <!-- Launch inspection node -->
+  <include file="$(find ff_util)/launch/ff_nodelet.launch">
+    <arg name="class" value="inspection/InspectionNode" />
+    <arg name="name" value="inspection" />
+    <arg name="manager" value="ilp_inspection" />
+    <arg name="spurn" value="$(arg spurn)" />
+    <arg name="nodes" value="$(arg nodes)" />
+    <arg name="extra" value="$(arg extra)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="default" value="true" />
+  </include>
+
+  <!-- Launch cargo node -->
+  <include file="$(find ff_util)/launch/ff_nodelet.launch">
+    <arg name="class" value="cargo/CargoNode" />
+    <arg name="name" value="Cargo" />
+    <arg name="manager" value="ilp_cargo" />
+    <arg name="spurn" value="$(arg spurn)" />
+    <arg name="nodes" value="$(arg nodes)" />
+    <arg name="extra" value="$(arg extra)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="default" value="true" />
+  </include>
+
+  <!-- Launch driver nodes, if required -->
+  <group if="$(arg drivers)">
+
+    <!-- Launch Guest Science Action Helper -->
+    <include file="$(find ff_util)/launch/ff_nodelet.launch">
+      <arg name="class" value="gs_action_helper/GsActionHelper" />
+      <arg name="name" value="gs_action_helper" />
+      <arg name="manager" value="ilp_guest_science" />
+      <arg name="spurn" value="$(arg spurn)" />
+      <arg name="nodes" value="$(arg nodes)" />
+      <arg name="extra" value="$(arg extra)" />
+      <arg name="debug" value="$(arg debug)" />
+      <arg name="default" value="true" />
+    </include>
+
+    <!-- Wifi -->
+    <group if="$(eval wifi == 'station')">
+      <node pkg="nodelet" type="nodelet" args="manager"
+            name="hw_wifi" output="$(arg output)"/>
+      <include file="$(find ff_util)/launch/ff_nodelet.launch">
+        <arg name="class" value="wifi/WifiNode" />
+        <arg name="name" value="wifi" />
+        <arg name="manager" value="hw_wifi" />
+        <arg name="spurn" value="$(arg spurn)" />
+        <arg name="nodes" value="$(arg nodes)" />
+        <arg name="extra" value="$(arg extra)" />
+        <arg name="debug" value="$(arg debug)" />
+        <arg name="default" value="true" />
+      </include>
+    </group>
+    <group if="$(eval wifi == 'all')">
+      <node pkg="wifi" type="wifi_tool" name="wifi_tool"/>
+    </group>
+
+    <!-- Pico Proxy -->
+    <arg name="topic" default="/hw/depth_haz/extended"/>
+    <arg name="topic_type" default="extended"/>
+    <arg name="amplitude_factor" default="100.0"/>
+    <node name="$(anon pico_proxy)" pkg="pico_driver" type="pico_proxy" output="screen">
+      <param name="topic" type="string" value="$(arg topic)"/>
+      <param name="topic_type" type="string" value="$(arg topic_type)"/>
+      <param name="amplitude_factor" type="double" value="$(arg amplitude_factor)"/>
+    </node>
+  </group>
+
+</launch>

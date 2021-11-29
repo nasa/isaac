@@ -1,0 +1,31 @@
+version: "2.1"
+services:
+  rosmaster:
+    image: ros:kinetic
+    command: roscore
+    hostname: rosmaster
+    container_name: rosmaster
+    expose:
+      - 11311
+    environment:
+      - ROS_MASTER_URI=http://rosmaster:11311
+      - ROS_IP=172.19.0.5
+    networks:
+      isaac:
+        ipv4_address: 172.19.0.5
+
+
+
+
+# ----------------------------------------------------------------------------------------------------
+# Docker Compose Networks
+# ----------------------------------------------------------------------------------------------------
+networks:
+  isaac:
+    name: isaac
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.19.0.0/24
+        gateway: 172.19.0.1

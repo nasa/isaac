@@ -1,0 +1,59 @@
+{
+    "room_corners": 
+    [ 
+        [-20, -20, -20],
+        [ 20,  20,  20]
+    ],
+
+    "sound_sources":
+    [
+	{
+	    "label": "A",
+	    "comment": "the actual leak",
+	    "pos": [12.12, -7.1,  5.34],
+	    "file": "tone10533.wav",
+	    "strength": 2,
+	    "F": 10533
+	},
+	{
+	    "label": "B",
+	    "comment": "a source filtered by the non-leak filter (sounds like a non-leak)",
+	    "pos": [12.12, -8.4,  5.54],
+	    "file": "tone12333.wav",
+	    "strength": 3,
+	    "F": 12333
+	},
+	{
+	    "label": "C",
+	    "comment": "a source filtered by the baseline filter (appeared in a previous survey)",
+	    "pos": [12.12, -7.8,  4.30],
+	    "file": "tone10533.wav",
+	    "strength": 3,
+	    "F": 10533
+	}
+        
+    ],
+
+    "camera_to_body_transform": 
+      {
+         "translation": [0.1177, -0.0422, -0.0826],
+         "quat":        [0.500, 0.500, 0.500, 0.500]
+       },
+
+    "distance_between_updates": 0.1,
+    "continuous_picture_taking": 1,
+
+    "image_width": 512,
+    "image_height": 512,
+    "hfov": 2.0821,
+
+     "intensity_range": [0.0, 0.15],
+
+    "debug_robot_pose":
+      {
+         "translation": [11.2, -7.72, 5.0],
+         "quat":        [0, 0, 0, 1]
+       }
+
+}
+

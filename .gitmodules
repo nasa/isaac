@@ -1,0 +1,3 @@
+[submodule "isaac_msgs"]
+	path = isaac_msgs
+	url = https://github.com/nasa/isaac_msgs.git

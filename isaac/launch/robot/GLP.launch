@@ -1,0 +1,84 @@
+<!-- Copyright (c) 2021, United States Government, as represented by the     -->
+<!-- Administrator of the National Aeronautics and Space Administration.     -->
+<!--                                                                         -->
+<!-- All rights reserved.                                                    -->
+<!--                                                                         -->
+<!-- The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking   -->
+<!-- platform" software is licensed under the Apache License, Version 2.0    -->
+<!-- (the "License"); you may not use this file except in compliance with    -->
+<!-- the License. You may obtain a copy of the License at                    -->
+<!--                                                                         -->
+<!--     http://www.apache.org/licenses/LICENSE-2.0                          -->
+<!--                                                                         -->
+<!-- Unless required by applicable law or agreed to in writing, software     -->
+<!-- distributed under the License is distributed on an "AS IS" BASIS,       -->
+<!-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or         -->
+<!-- implied. See the License for the specific language governing            -->
+<!-- permissions and limitations under the License.                          -->
+
+<launch>
+
+  <!-- Additional options -->
+  <arg name="drivers"/>                       <!-- Should we launch drivers? -->
+  <arg name="spurn" default=""/>              <!-- PRevent a specific node   -->
+  <arg name="nodes" default=""/>              <!-- Launch specific nodes     -->
+  <arg name="extra" default=""/>              <!-- Inject an additional node -->
+  <arg name="debug" default=""/>              <!-- Debug a node set          -->
+  <arg name="output" default="log"/>          <!-- Where to log              -->
+  <arg name="sim_mode" default="false" />     <!-- If in sim mode            -->
+  <arg name="wifi" default="false" />         <!-- Enable Wifi               -->
+  <arg name="streaming_mapper" default="false" /><!-- Enable the streaming mapper -->
+  <arg name="acoustics_cam" default="false" /><!-- Enable the acoustics cam -->
+  <arg name="ros_gs_bridge" default="true" /><!-- Enable the ros guest science bridge -->
+
+  <!-- Launch all nodelet managers -->
+  <group if="$(eval optenv('ASTROBEE_NODEGRAPH','')=='')">
+    <node pkg="nodelet" type="nodelet" args="manager"
+          name="build_map" output="$(arg output)"/>
+    <node pkg="nodelet" type="nodelet" args="manager"
+          name="anomaly" output="$(arg output)"/>
+  </group>
+
+  <!-- Launch dense map nodes -->
+  <include file="$(find vol_mapper)/launch/air_quality_mapper.launch">
+    <arg name="output" value="$(arg output)" />
+  </include>
+  <include file="$(find vol_mapper)/launch/RFID_mapper.launch">
+    <arg name="output" value="$(arg output)" />
+  </include>
+  <include file="$(find vol_mapper)/launch/wifi_mapper.launch">
+    <arg name="output" value="$(arg output)" />
+  </include>
+
+  <!-- Launch the streaming mapper -->
+  <include if="$(arg streaming_mapper)" file="$(find geometry_mapper)/launch/streaming_mapper.launch">
+     <arg name="sim_mode" value="$(arg sim_mode)" />
+     <arg name="output" value="$(arg output)" />
+  </include>
+
+  <!-- Launch the acoustics cam -->
+  <include if="$(arg acoustics_cam)" file="$(find acoustics_cam)/launch/acoustics_cam.launch">
+     <arg name="output" value="$(arg output)" />
+  </include>
+
+  <!-- Launch anomaly nodes -->
+  <include file="$(find ff_util)/launch/ff_nodelet.launch">
+    <arg name="class" value="img_analysis/ImageAnalysisNode" />
+    <arg name="name" value="img_analysis" />
+    <arg name="manager" value="anomaly" />
+    <arg name="spurn" value="$(arg spurn)" />
+    <arg name="nodes" value="$(arg nodes)" />
+    <arg name="extra" value="$(arg extra)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="default" value="true" />
+  </include>
+
+  <!-- Launch driver nodes, if required -->
+  <group if="$(arg drivers)">
+    <!-- Launch the ros gs bridge -->
+    <include if="$(arg ros_gs_bridge)" file="$(find ros_gs_bridge)/launch/ros_gs_bridge.launch">
+      <arg name="output" value="$(arg output)" />
+    </include>
+  </group>
+
+</launch>

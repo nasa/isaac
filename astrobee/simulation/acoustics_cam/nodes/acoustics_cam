@@ -1,0 +1,970 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2021, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# TODO(oalexan1): See if it is enough to compute the impulse response just once.
+
+"""
+Use the pyroomacoustics library to simulate a microphone array. Publish
+the result as a camera image, called acoustics_cam.
+"""
+
+# python 2/3 compatibility
+from __future__ import print_function
+
+import copy, os, json, time, sys, cv2, math, re, threading
+import numpy as np
+import scipy.interpolate
+from scipy.io import wavfile
+from scipy.interpolate import RegularGridInterpolator
+import matplotlib.pyplot as plt
+import pyroomacoustics as pra
+
+# ROS
+import rospy
+import roslib
+import tf
+import geometry_msgs.msg
+import std_msgs.msg
+from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from ff_msgs.msg import CommandStamped
+
+# Making this larger computes the spatial response at a denser set of directions.
+NUM_ANGLES = 4 * 45 * 22 # 180 * 90
+
+def dosys(cmd):
+    print('executing:', cmd)
+    ret = os.system(cmd)
+    if ret != 0:
+        print('command exited with non-zero return value %s' % ret, file=sys.stderr)
+    return ret
+
+def ros_pose_to_matrix(msg):
+  """
+  Converts a geometry_msgs/Pose ROS message into a numpy array.
+  @type  msg: geometry_msgs/Pose
+  @param msg: The ROS message to be converted
+  @rtype: np.array
+  @return: The resulting numpy array
+  """
+  T = tf.transformations.quaternion_matrix(np.array([msg.orientation.x, msg.orientation.y,
+                                                     msg.orientation.z, msg.orientation.w]))
+  T[:3,3] = np.array([msg.position.x, msg.position.y, msg.position.z])
+  return T
+
+def matrix_to_geom_msg(T):
+  """
+  Converts a homogeneous transformation (4x4) into a geometry_msgs/Pose ROS message.
+  @type  T: np.array
+  @param T: The homogeneous transformation
+  @rtype: geometry_msgs/Pose
+  @return: The resulting ROS message
+  """
+  pos = geometry_msgs.msg.Point(*T[:3,3])
+  quat = geometry_msgs.msg.Quaternion(*tf.transformations.quaternion_from_matrix(T))
+  return geometry_msgs.msg.Pose(pos, quat)
+
+def q_t_to_matrix(q, t):
+    """
+    Given a quaterion and a translation vector, compute the 4 x 4 transform matrix.
+    """
+    T = tf.transformations.quaternion_matrix(q)
+    T[:3,3] = t
+    return T
+
+def q_t_to_geom_msg(q, t):
+    """
+    Encode a pose stored in numy arrays as a geometry_msgs.msg.PoseStamped object.
+    """
+    quat = geometry_msgs.msg.Quaternion(q[0], q[1], q[2], q[3])
+    pos  = geometry_msgs.msg.Point(t[0], t[1], t[2])
+
+    P = geometry_msgs.msg.PoseStamped()
+    P.pose = geometry_msgs.msg.Pose(pos, quat)
+    return P
+
+def get_spherical_coords(p):
+    """
+    Given p is an n x 3 array with columns for Cartesian
+    coordinates x, y, z, return the corresponding spherical
+    coordinates r, azimuth, colatitude.
+    
+    azimuth is in the range -pi .. pi
+    colatitude is in the range 0 .. pi
+    """
+    result = np.zeros(p.shape)
+    
+    # Establish convenient nicknames for columns. These are references,
+    # not copies.
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    
+    result[:, 0] = np.linalg.norm(p, axis=1, ord=2)  # r
+    result[:, 1] = np.arctan2(y, x)  # az
+    L = np.sqrt(x * x + y * y)
+    # L = sin(cl), z = cos(cl)
+    result[:, 2] = np.arctan2(L, z)  # cl
+    
+    return result
+
+def find_peaks(grid_x, grid_y, z, img,
+               max_peaks=4, min_distance=5, min_z_score=0.5):
+    """
+    Find peaks in an image.
+
+      peaks, scores = find_peaks(...)
+
+    @grid_x, @grid_y - x and y coordinates for cells of the @img grid
+    @z - scalar constant z coordinate for @img grid
+    @img - The image to look for peaks in
+    @max_peaks - Return up to this number of peaks
+    @min_distance - Merge peaks within this separation distance (px)
+    @min_z_score - Minimum z-score to be considered a peak
+    """
+
+    from skimage.feature import peak_local_max
+
+    mu = img.mean()
+    sigma = img.std()
+
+    px_coords = peak_local_max(img, min_distance=min_distance)
+    num_peaks = px_coords.shape[0]
+
+    # massage peaks into desired format
+    peaks = np.zeros((num_peaks, 3))
+    peaks[:, 0] = grid_x[px_coords[:, 1]]  # x
+    peaks[:, 1] = grid_y[px_coords[:, 0]]  # y
+    peaks[:, 2] = z  # z
+    scores = img[px_coords[:, 0], px_coords[:, 1]]  # value at (y, x)
+
+    # sort peaks by score (descending)
+    reorder = (-scores).argsort()
+    peaks = peaks[reorder]
+    scores = scores[reorder]
+
+    num_peaks_to_keep = min(num_peaks, max_peaks)
+
+    z_score = (scores - mu) / sigma
+    print('find_peaks: before truncating, z_score=%s' % (z_score,))
+    num_high_enough_peaks = np.count_nonzero(z_score > min_z_score)
+    num_peaks_to_keep = min(num_peaks_to_keep, num_high_enough_peaks)
+
+    # truncate, if needed
+    if num_peaks_to_keep < num_peaks:
+        peaks = peaks[:num_peaks_to_keep, :]
+        scores = scores[:num_peaks_to_keep]
+
+    return peaks, scores
+
+def map_value_and_confidence(value, confidence, background='white'):
+    """
+    Inputs @value and @confidence are 1-channel images. @background is
+    either 'white' or 'black'. Output @rgb is a corresponding RGB
+    image, mapped per pixel. For a pixel with confidence=1, as value
+    varies from 0..1, ramp color varies from blue..red.  For other
+    confidence values, the ramp color is mixed with @background
+    (i.e. confidence=0 is pure background, confidence=1 is the ramp
+    color).
+
+    Uses the fancy CIECAM02 JCh colorspace so that all ramp colors
+    have uniform lightness (as perceived by a person with normal
+    vision).
+
+    @value and @confidence have shape (w, h) and float values from 0..1
+    @rgb has shape (w, h, 3) and float values from 0..1
+
+    """
+    w, h = value.shape
+    jch = np.zeros((w, h, 3))
+
+    # Map confidence to lightness J and chroma C. The J and C
+    # values were chosen to roughly maximize the saliency of hue,
+    # without going outside the gamut of available colors. Used this
+    # tool to select values:
+    # http://bl.ocks.org/connorgr/0a299fe77d5c7feccd22e02f2ac5d69b
+    if background == 'black':
+        jch[:, :, 0] = confidence * 65  # J = lightness
+    else:
+        jch[:, :, 0] = 50 + (100 - 50) * (1 - confidence)  # J = lightness
+    jch[:, :, 1] = confidence * 45  # C = chroma
+
+    # Map value to CIECAM02 hue. 0 maps to blue=240; 1 maps to red=0
+    jch[:, :, 2] = 240 * (1 - value)  # h = hue
+
+    return jch
+
+def demo_value_and_confidence():
+    """
+    Save a demo image that shows the ramp colors and mixing for
+    map_value_and_confidence().
+    """
+    w = 50
+    h = 50
+    x = np.arange(w)
+    y = np.arange(h)
+    xx, yy = np.meshgrid(x, y)
+    rgb = map_value_and_confidence(xx / w, yy / h, background='white')
+    plt.figure()
+    plt.imshow(rgb, origin='lower')
+    plt.xlabel('value')
+    plt.ylabel('confidence')
+    plt.savefig('value_and_confidence.png')
+    plt.close()
+
+def rake_delay_and_sum_weights(bf, source_pos, interferer=None,
+                               R_n=None, attn=True, ff=False):
+    """
+    Modify Beamformer.rake_delay_and_sum_weights so that the
+    beamformer (1) calculates weights using a simple 'open air'
+    assumption, rather than taking advantage of perfect knowledge of
+    the room shape, and (2) takes the source position as input rather
+    than needing a SoundSource object.
+
+    Note: @interferer is actually ignored, as in the original.
+    """
+
+    bf.weights = np.zeros((bf.M, bf.frequencies.shape[0]),
+                          dtype=complex)
+    for i, f in enumerate(bf.frequencies):
+        W = bf.steering_vector_2D_from_point(f, source_pos, attn=attn,
+                                             ff=ff).ravel()
+        # print(i, f, source_pos,W)
+        bf.weights[:, i] = 1.0 / bf.M * W
+
+def get_mic_geometry(mic_array_center):
+    # The microphone array as a hexagon
+    radius = 37.5e-3
+    mic_pos = pra.circular_2D_array(center=mic_array_center[0:2],
+                                    M=6, phi0=0, radius=radius)
+
+    # append the center of the hexagon
+    mic_pos = np.append(mic_pos, np.vstack([mic_array_center[0], mic_array_center[1]]), 1)
+
+    # One layer
+    if False:
+        # Add the z coordinate of the mic_pos
+        mic_len = mic_pos[0].size
+        mic_pos = np.vstack((mic_pos, np.zeros(mic_len) + mic_array_center[2]))
+    else:
+        # Two layers
+        mic_len = mic_pos[0].size
+        mic_pos0 = np.vstack((mic_pos, np.zeros(mic_len)
+                              + mic_array_center[2] + radius / 2.0))
+        # Add a second layer
+        mic_pos1 = np.vstack((mic_pos, np.zeros(mic_len)
+                              + mic_array_center[2] - radius / 2.0))
+        mic_pos = np.hstack((mic_pos0, mic_pos1))
+
+    return mic_pos
+
+class SoundMapComp:
+    def __init__(self, json_data, data_path):
+        self.sound_sources = json_data["sound_sources"]
+        self.world_sound_sources = np.array([src['pos']
+                             for src in self.sound_sources])
+        self.source_data = [src['strength'] * self.read_sound(os.path.join(data_path,
+                                                                           'test_sounds',
+                                                                           src['file']))
+                                                              for src in self.sound_sources]
+
+        # Read the room corners. The precise room size does not
+        # matter, as there is no sound reflectance at the walls, but
+        # it must be big enough to encompass all sound sources and
+        # microphone locations. The smallest corner will be the origin
+        # in the pyroomacoustics coordinate system.
+        self.min_room_corner = np.array(json_data["room_corners"][0])
+        self.max_room_corner = np.array(json_data["room_corners"][1])
+        self.intensity_range = np.array(json_data["intensity_range"])
+        
+        self.T = 1.0  # Amount of time to sample (s)
+        self.fs = 32000  # sampling frequency (Hz)
+        self.c = 343.  # speed of sound (m/s)
+        self.nfft = 256  # FFT size
+        self.freq_range = [300, 3500]  # Hz
+        self.absorption = 1.0 # total absorbtion (no reflectance at the walls)
+
+        # signal-to-noise ratio
+        snr_db = 100.0  # TODO: Decrease this to 5.0. 
+        distance = [2.0]  # meters
+        self.sigma2 = 10 ** (-snr_db / 10) / (4. * np.pi * distance[0]) ** 2
+
+        # Create an anechoic room
+        self.room_dimensions = self.max_room_corner - self.min_room_corner
+
+        self.rng = np.random.RandomState(23)
+        self.duration_samples = int(self.fs * self.T)
+
+        #if False:
+        #    plt.figure(3)
+        #    plt.plot(source_signal, 'b')
+        #    plt.title('Input signal')
+        #    # plt.show()
+
+        self.n_grid = NUM_ANGLES
+        print("Number of grid points on sphere: ", self.n_grid)
+
+    @staticmethod
+    def read_sound(fname):
+        rate, signal = wavfile.read(fname)
+        return signal.astype('float64')
+
+    def get_room(self):
+        # TODO(oalean1): Test if simulation can be done just once!
+        return pra.ShoeBox(self.room_dimensions, fs=self.fs,
+                           absorption=self.absorption,
+                           max_order=0, sigma2_awgn=self.sigma2)
+
+    def get_mic_array(self, mic_pos):
+        return pra.Beamformer(mic_pos, self.fs)
+
+    def get_mic_signals(self, source_signals, pyroom_sound_sources, mic_array_center):
+        aroom = self.get_room()
+        for i, loc in enumerate(pyroom_sound_sources):
+            aroom.add_source(loc, signal=source_signals[i, :])
+
+        bf = self.get_mic_array(get_mic_geometry(mic_array_center))
+        aroom.add_microphone_array(bf)
+
+        # Run the simulation
+        aroom.simulate()
+
+        return bf.signals
+
+    def spatial_response(self, mic_signals, source_locations, mic_array_center):
+        '''
+        Compute the spatial response at location given by mic_array_center for specified sources.
+        '''
+
+        mic_pos = get_mic_geometry(mic_array_center)
+
+        X = np.array([pra.stft(signal, self.nfft, self.nfft // 2,
+                               transform=np.fft.rfft).T
+                      for signal in mic_signals])
+
+        algo_name = 'MUSIC'  # 'SRP', 'MUSIC', 'FRIDA', 'TOPS'
+
+        # Construct the new DOA object
+        # the max_four parameter is necessary for FRIDA only
+        num_src = source_locations.shape[0]
+        algo = pra.doa.algorithms[algo_name]
+        doa = algo(mic_pos, self.fs, self.nfft, c=self.c,
+                   num_src=num_src, max_four=4,
+                   n_grid=self.n_grid, dim=3)
+
+        # Perform localization on the frames in X
+        doa.locate_sources(X, num_src=num_src, freq_range=self.freq_range)
+
+        # print("The solved for azimuth is   ", doa.azimuth_recon[0:num_src] * 180 / np.pi)
+        # print("Known azimuth is            ", azimuth[0:num_src] * 180 / np.pi)
+        # print("The solved for colat is     ", doa.colatitude_recon[0:num_src] * 180 / np.pi)
+        # print("Known colat                 ", colat[0:num_src] * 180 / np.pi)
+
+        azimuth = doa.grid.azimuth
+
+        # if False:
+        #    # Plot the 3D spatial response
+        #    [x, y, z] = doa.grid.regrid()
+        #    plt.figure()
+        #    plt.pcolormesh((180 / np.pi) * x, (180 / np.pi) * y, z,
+        #                   cmap='seismic')
+        #    plt.title("Spatial response for microphone: %s" % mic_array_center)
+
+        [x, y, response] = doa.grid.regrid()
+
+        # Return the 1D grids in azimuth and colatitude, and
+        # response(azimuth, colatitude)
+        return [x[:, 0], y[0, :], response]
+
+    def update_sound_map(self, image_width, image_height, focal_length, cam_to_world_transform,
+                         plot = True):
+
+        # The center of the camera
+        camera_center = cam_to_world_transform[:3,3]
+
+        # Go to the pyroomacoustics coordinate system
+        pyroom_camera_center = camera_center             - self.min_room_corner
+        pyroom_sound_sources = self.world_sound_sources  - self.min_room_corner
+        
+        source_signals = np.zeros((len(self.source_data), self.duration_samples))
+        for i, sound in enumerate(self.source_data):
+            # sample a random chunk of the complete sound
+            start_ind = self.rng.randint(len(sound) - self.duration_samples)
+            sample = sound[start_ind:(start_ind + self.duration_samples)]
+            source_signals[i, :] = sample
+
+        mic_signals = self.get_mic_signals(source_signals, pyroom_sound_sources,
+                                           pyroom_camera_center)
+
+        # Compute the spatial response for given microphone
+        [azimuth, colatitude, response] = \
+            self.spatial_response(mic_signals, pyroom_sound_sources, pyroom_camera_center)
+
+        # Scale the spatial response for plotting purposes
+        # TODO(oalexan1): Think more about this!
+        s = np.sum(response)
+        response = (20.0 / s) * response
+
+        # Conver the spatial response (the values are on a sphere
+        # centered at the microphone center) to a camera image by
+        # seeing where rays from the sphere center to the sphere
+        # surface intersect the camera sensor.  For that, start by
+        # creating points in the camera coordinate system at which the
+        # response should be sampled.
+        # grid_x goes from -image_width/2 to image_width/2 -1, inclusive,
+        # with spacing of 1. Same for grid_y.
+        grid_x = np.linspace(0, image_width, image_width, endpoint = False) - image_width/2.0
+        grid_y = np.linspace(0, image_height, image_height, endpoint = False) - image_height/2.0
+        camera_coords = np.zeros((image_width * image_height, 4))
+        xmat, ymat = np.meshgrid(grid_x, grid_y, copy = False)
+        camera_coords[:, 0] = xmat.reshape((image_width * image_height,))
+        camera_coords[:, 1] = ymat.reshape((image_width * image_height,))
+        camera_coords[:, 2] = focal_length
+        camera_coords[:, 3] = 1.0 # corresponding to the translation
+        
+        # Convert to world coords by applying the camera to world transform
+        world_coords = np.transpose(np.dot(cam_to_world_transform, np.transpose(camera_coords)))
+        
+        # Make the micrphone center the origin
+        local_coords = world_coords[:, 0:3] - camera_center
+        
+        # Spherical coordinates
+        sph_coords = get_spherical_coords(local_coords)
+        
+        # The response is in spherical coordinates centered at the
+        # current microphone. By interpolating that response at the
+        # computed spherical coordinates, we find the response value
+        # at the acoustics camera pixels. Note how we ignore the
+        # radius (given by sph_coords[:, 0]) and only interpolate at
+        # the azimuth and colatitude.
+        sound_map = np.zeros((image_width, image_height))
+        interp_response = \
+            (scipy.interpolate.RegularGridInterpolator
+                 ((azimuth, colatitude), response, method='linear'))
+        sound_map = (interp_response(sph_coords[:, 1:])
+                                .reshape(sound_map.shape))
+        
+        #print("saving the map to: image.txt")
+        #np.savetxt("image.txt", sound_map, fmt="%0.18g")
+
+        mn = self.intensity_range[0]
+        mx = self.intensity_range[1]
+        if mn >= mx:
+            raise Exception("Invalid intensity range.")
+
+        # Normalize and cast to byte
+        sound_map = np.maximum(sound_map, mn)
+        sound_map = np.minimum(sound_map, mx)
+        sound_map = 255.0*(sound_map - mn)/(mx - mn)
+        sound_map = sound_map.astype(np.uint8)
+
+        # Colorize
+        colored_map = cv2.applyColorMap(sound_map, cv2.COLORMAP_JET)
+
+        if False:
+            # Plot as opencv image
+            print("Press a key on the keyboard to quit the image.")
+            cv2.imshow("Acoustics camera", colored_map)
+            cv2.waitKey(0)
+            return
+
+        if plot:
+            # Plot the sound map, the camera center, and the sound sources
+            plt.figure()
+            plt.pcolormesh(grid_x, grid_y, sound_map, cmap='seismic')
+
+            # Project the sound sources to the camera focal plane
+            # (where the grid is) and plot them.
+            world_to_cam_transform = np.linalg.inv(cam_to_world_transform)
+            for world_source in self.world_sound_sources:
+                world_point = np.concatenate((world_source, np.array([1.0])))
+                cam_point   = np.dot(world_to_cam_transform, world_point)
+                cam_point *= (focal_length/cam_point[2])
+                plt.scatter(cam_point[0], cam_point[1], marker='+', color='green')
+
+            # Plot the camera center
+            plt.scatter(0, 0, marker='*', color='yellow')
+            plt.gca().invert_yaxis() # set the origin in the upper-left corner
+            plt.show()
+            
+        return colored_map
+
+    def get_peak_signals(self, peaks, mic_samples):
+        """
+        peak_signals = get_peak_signals(...)
+
+        @peaks - N x 3 array, columns are x, y, z position of N peaks
+        @mic_samples - Array of tuples (@mic_array_center, @signals), where
+            @mic_array_center is a 3-vector representing the sample location
+            and @signals is an array of the signals picked up by the mics at
+            that location
+
+        @peak_signals - N x M array. Each row i is the best signal reconstructed
+            by beamforming in the direction of @peak[i, :]. (Beamforming using
+            the sample from @mic_samples with the minimum effective distance.)
+        """
+        N = peaks.shape[0]
+        # M = approx number of values in each output signal (seems to
+        #     vary, not clear why)
+        M = mic_samples[0][1].shape[1] - 1024
+        peak_signals = np.zeros((N, M))
+
+        for i, peak in enumerate(peaks):
+            closest_distance, closest_sample_index = \
+                min([(np.linalg.norm(peak - mic_array_center), x)
+                     for x, (mic_array_center, signals) in enumerate(mic_samples)])
+            mic_array_center, mic_signals = mic_samples[closest_sample_index]
+            print('get_peak_signals: peak %s %s - using sample at %s' % (i, peak, mic_array_center))
+            mic_pos = get_mic_geometry(mic_array_center)
+            mics = self.get_mic_array(mic_pos)
+            # set up weights for the beamformer
+            rake_delay_and_sum_weights(mics, peak)
+            # fill in recorded sample rather than calling simulate()
+            mics.signals = mic_signals
+            # calculate the processed signal
+            if True:
+                peak_signal = mics.process()
+            else:
+                # hack to factor out any delay-and-sum issues... just use center mic
+                #   (happens to be number 6 with current config)
+                peak_signal = mic_signals[6, :]
+            # truncate any signal beyond the uniform size we allocated above
+            peak_signals[i, :] = peak_signal[:M]
+
+        return peak_signals
+
+    def get_source_mix(self, signal):
+        """
+        Assume @signal is constructed as a mix of the source signals,
+        and each source signal is (white noise + pure tone) with a
+        known tone. Use the PSD value at the known tones to estimate the
+        relative weight of the source signals in the mix.
+        """
+        from scipy.signal import welch
+        F, Pxx = welch(signal, self.fs, nperseg=2048)
+        interp = RegularGridInterpolator([F], Pxx)
+        source_mix = np.array([interp([src['F']])[0]
+                               for src in self.sound_sources])
+        return source_mix / np.sum(source_mix)
+
+    def get_non_leak_confidences(self, peak_signals):
+        """
+        non_leak_confidences = get_non_leak_confidences(...)
+
+        @peak_signals - See get_peak_signals(). N peaks.
+
+        @non_leak_confidences - length N array of confidence values 0..1.
+            This represents the confidence that the reconstructed sound
+            is a familiar type of sound that is not a leak (e.g. a motor
+            buzzing).
+        """
+        return np.array([self.get_non_leak_confidence(signal)
+                         for signal in peak_signals])
+
+    def get_non_leak_confidence(self, signal):
+        """
+        Return the confidence 0..1 that the reconstructed sound is a
+        familiar type of sound that is not a leak (e.g. a motor
+        buzzing).
+        """
+        source_mix = self.get_source_mix(signal)
+        non_leak_weight = source_mix[1]
+        non_leak_threshold = 0.7
+        return np.clip(((non_leak_weight - non_leak_threshold)
+                        / (1.0 - non_leak_threshold)),
+                       0, 1)
+
+    def get_leak_confidences(self, peak_scores, non_leak_confidences, baseline_confidences):
+        """
+        leak_confidences, other_confidence = get_leak_confidences(...)
+
+        @peak_scores - Length N array of intensity values for the detected peaks,
+            as returned by find_peaks().
+        @non_leak_confidences - see get_non_leak_confidences()
+        @baseline_confidences - see get_baseline_confidences()
+
+        @leak_confidences - length N array of confidence values 0..1.
+            This represents the confidence that the peak is the leak.
+            The confidence is higher for louder peaks and lower for
+            peaks that trip the 'non-leak' and 'baseline' filters.
+        @other_confidence - scalar confidence that none of the detected peaks
+            is the leak. Should be 1 - sum(@leak_confidence).
+        """
+        print('peak_scores: %s' % (peak_scores,))
+        peak_reference = 0.15  # peaks considered strong if they exceed this threshold
+        raw_leak_confidences = (peak_scores / peak_reference
+                                * (1 - non_leak_confidences)
+                                * (1 - baseline_confidences))
+        total = np.sum(raw_leak_confidences) + 1.0
+        return (raw_leak_confidences / total, 1.0 / total)
+
+    def save_html(self, grid_x, grid_y, out_prefix, peaks, peak_scores,
+                  non_leak_confidences,
+                  baseline_confidences,
+                  leak_confidences):
+        png_path = out_prefix + '.png'
+        self.save_image(grid_x, grid_y, png_path)
+
+        html_path = out_prefix + '.html'
+        def rel_path(full_path):
+            return '%s/%s' % (os.path.basename(self.run_id),
+                              os.path.basename(full_path))
+        with open(html_path, 'w') as out:
+            def p(x):
+                print(x, file=out)
+            def td(x, bold=False):
+                if bold:
+                    p('    <td class="max">%.2f</td>' % x)
+                else:
+                    p('    <td>%.2f</td>' % x)
+            p('<!DOCTYPE html>')
+            p('<html>')
+            p('<body>')
+            p('<img src="%s" width="376" height="355"/>' % rel_path(png_path))
+            p('<table>')
+            p('  <tr>')
+            for label in ('Peak', 'Intensity', 'Non-leak', 'Baseline', 'Leak'):
+                p('    <th>%s</th>' % label)
+            p('  </tr>')
+            max_leak_ind = np.argmax(leak_confidences)
+            for i, peak in enumerate(peaks):
+                p('  <tr>')
+                p('    <td>%s</td>' % i)
+                td(peak_scores[i])
+                td(non_leak_confidences[i])
+                td(baseline_confidences[i])
+                td(leak_confidences[i], bold=(i == max_leak_ind))
+                p('  </tr>')
+            p('</table>')
+            p('</div>')
+            p('</body>')
+            p('</html>')
+        print('wrote to %s' % html_path)
+        dosys('ln -sf %s plots/latest_plots.html' % rel_path(html_path))
+
+    def save_image(self, grid_x, grid_y, out_path):
+
+        plt.figure()
+        fig = plt.gcf()
+        n = 1
+        i = 1
+
+        fig.set_size_inches(5 * n, 4)
+
+        def add_markers():
+            plt.scatter(source_locations[:, 0],
+                        source_locations[:, 1],
+                        marker='+', color='black')
+            num_samples = len(self.mic_samples)
+            mic_pos = np.zeros((num_samples, 3))
+            for i, (pos, mic_signals) in enumerate(self.mic_samples):
+                mic_pos[i, :] = pos
+            plt.scatter(mic_pos[:, 0],
+                        mic_pos[:, 1],
+                        marker='x', color='black')
+            plt.scatter(self.peaks[:, 0],
+                        self.peaks[:, 1],
+                        marker='o',
+                        facecolors='none',
+                        edgecolors='black')
+
+            label_offset = np.array([-0.02, 0.02])
+            ax = plt.gca()
+            for src, pos in zip(self.sound_sources, source_locations):
+                ax.annotate(src['label'],
+                            pos[:2] + label_offset)
+            for i, peak in enumerate(self.peaks):
+                ax.annotate(str(i),
+                            peak[:2] + label_offset)
+
+        plt.subplot(1, n, i)
+        i += 1
+
+        # Offset so pixel centers are aligned with scatter-plotted
+        # data, rather than pixel lower-left corners.
+        dx = (grid_x[1] - grid_x[0]) / 2.
+        dy = (grid_y[1] - grid_y[0]) / 2.
+        if False:
+            pc = plt.pcolormesh(grid_x - dx, grid_y - dy,
+                                response_map,
+                                cmap='seismic')
+            fig.colorbar(pc)
+        else:
+            extent = [grid_x[0] - dx, grid_x[-1] + dx,
+                      grid_y[0] - dy, grid_y[-1] + dy]
+            plt.imshow(self.rgb_map, origin='lower',
+                       extent=extent,
+                       #interpolation='lanczos'
+                       )
+
+        add_markers()
+
+        # this is screwy, but we need to invert the direction of the x axis
+        # if we want to match the RViz display
+        print('inverting x!')
+        ax = plt.gca()
+        left, right = ax.get_xlim()
+        ax.set_xlim(right, left)
+
+        plt.savefig(out_path, bbox_inches='tight')
+        print('Wrote output to %s' % out_path)
+        #plt.show()
+        plt.close()
+
+        #fig = plt.figure()
+        # slicing with ind gets a diagonal of the map that happens
+        # to go straight through both sound sources
+        #ind = np.arange(response_map.shape[0])
+        #plt.plot(grid_x, response_map[ind, ind])
+        #plt.legend(('response',))
+
+        #out_path = 'plot_3D_two_sources_xsection.png'
+        #plt.savefig(out_path)
+        #print('Wrote output to %s' % out_path)
+        #plt.close()
+
+# Launch the acoustics cam
+class SoundMapNode():
+    def __init__(self, data_path, debug_mode):
+
+        config_file = os.path.join(data_path, 'acoustics_cam.json')
+        self.sound_map = None
+        self.map_is_setup = False
+        self.prev_map_update_camera_center = None
+        self.dds_mutex = threading.Lock()
+
+        self.takeSinglePicture = False
+        self.continuousPictureTaking = False
+        
+        if debug_mode:
+            self.setup_sound_map(config_file, data_path, debug_mode)
+        else:
+            self.setup_sound_map(config_file, data_path, debug_mode)
+
+            # Subscribe to the bot pose. From there the camera pose will be inferred.
+            rospy.Subscriber('/loc/truth/pose', geometry_msgs.msg.PoseStamped,
+                             self.acoustics_cam_event)
+
+            # Subscribe to guest science commands
+            rospy.Subscriber('/comm/dds/command', CommandStamped,
+                             self.dds_cmd_callback)
+
+            # Publish the acoustic images
+            self.image_publisher = rospy.Publisher('/hw/cam_acoustics',
+                                                   Image, queue_size = 2)
+
+            # Publish the camera intrinsics
+            self.info_publisher = rospy.Publisher('/sim/acoustics_cam/info',
+                                                  CameraInfo, queue_size = 2)
+
+            # Publish the camera pose. 
+            self.pose_publisher = rospy.Publisher('/sim/acoustics_cam/pose',
+                                                  geometry_msgs.msg.PoseStamped,
+                                                  queue_size = 2)
+
+            rospy.init_node('acoustics_cam')
+            
+            print("Waiting on the robot pose ...")
+            rospy.spin()
+
+    def setup_sound_map(self, config_file, data_path, debug_mode):
+        print("Loading config file: " + config_file)
+        with open(config_file, 'r') as f:
+            self.json_data = json.load(f)
+
+        self.sound_map = SoundMapComp(self.json_data, data_path)
+        self.map_is_setup = True
+
+        self.continuousPictureTaking = (self.json_data["continuous_picture_taking"] != 0)
+        if self.continuousPictureTaking:
+            self.takeSinglePicture = False
+
+        # When in debug mode, compute the acoustics image at
+        # "debug_cam_center" and return. Else listen to the
+        # ros topic publishing this position and publish
+        # a sound map for each such instance. 
+        if not debug_mode:
+            print("The robot has been setup.")
+        else:
+            bot_pose_msg = q_t_to_geom_msg(self.json_data["debug_robot_pose"]["quat"],
+                                           self.json_data["debug_robot_pose"]["translation"])
+            self.acoustics_cam_event(bot_pose_msg, debug_mode = True)
+
+    def dds_cmd_callback(self, cmd):
+        # Process only guest science commands
+        if cmd.cmd_name != 'customGuestScience':
+            return
+
+        if len(cmd.args) != 2:
+            # Custom acoustics cam commands have two arguments
+            return
+
+        # Process only string commands
+        if cmd.args[0].data_type != 5 and cmd.args[1].data_type != 5:
+            return
+
+        app_name = cmd.args[0].s
+
+        # Process only acoustics cam commands
+        if app_name != "gov.nasa.arc.irg.astrobee.acoustics_cam_image":
+            return
+
+        json_str = cmd.args[1].s
+        
+        # Match things like {"name": "takeSinglePicture"} to extract takeSinglePicture
+        m = re.match("^.*?:.*?\"(.*?)\"", json_str)
+        if not m:
+            return
+        action = m.group(1)
+
+        # Need a mutex to process shared data
+        self.dds_mutex.acquire()
+        
+        if action == "takeSinglePicture":
+            self.takeSinglePicture = True
+            self.continuousPictureTaking = False
+        elif action == "turnOnContinuousPictureTaking":
+            self.takeSinglePicture = False
+            self.continuousPictureTaking = True
+        elif action == "turnOffContinuousPictureTaking":
+            self.takeSinglePicture = False
+            self.continuousPictureTaking = False
+        else:
+            raise Exception("Unknown acoustics_cam command: " + action)
+
+        self.dds_mutex.release() # must release the lock
+
+        print("takeSinglePicture is ",       self.takeSinglePicture)
+        print("continuousPictureTaking is ", self.continuousPictureTaking)
+        
+    # Compute the directional microphone measurement as an image
+    def acoustics_cam_event(self, bot_pose_msg, debug_mode = False):
+
+        if not self.map_is_setup:
+            # Wait until the robot is ready to go
+            return
+
+        # Do not publish the image unless specifically told to
+        if (not self.continuousPictureTaking) and (not self.takeSinglePicture):
+            return
+    
+        # From the bot pose determine the pose of the camera on the bot
+        # which is the transform from the camera to the world
+        cam_to_body_transform = q_t_to_matrix\
+                                (self.json_data["camera_to_body_transform"]["quat"],
+                                 self.json_data["camera_to_body_transform"]["translation"])
+        body_to_world_transform = ros_pose_to_matrix(bot_pose_msg.pose)
+        cam_to_world_transform = np.dot(body_to_world_transform, cam_to_body_transform)
+
+        # TODO(oalexan1): Must make the acoustics_cam transform the
+        # sound sources and the room to the camera coordinate system!
+        camera_center = cam_to_world_transform[:3,3]
+      
+        # TODO(oalexan1): Make this a function
+        # Update the map with given sampling distance
+        dist = self.json_data["distance_between_updates"]
+        
+        if self.prev_map_update_camera_center is None or \
+           np.linalg.norm(camera_center - self.prev_map_update_camera_center) >= dist:
+
+            print("Computing the acoustic response at time: ", bot_pose_msg.header.stamp)
+
+            image_width = int(self.json_data["image_width"])
+            image_height = int(self.json_data["image_height"])
+            hfov = float(self.json_data["hfov"])
+            focal_length = image_width/(2.0 * math.tan(hfov/2.0))
+            colored_map = self.sound_map.update_sound_map(image_width, image_height, focal_length,
+                                                          cam_to_world_transform, 
+                                                          plot = debug_mode)
+
+            if debug_mode:
+                return
+            
+            bridge = CvBridge()
+            image_message = bridge.cv2_to_imgmsg(colored_map, encoding = "bgr8")
+            image_message.header = bot_pose_msg.header
+            
+            self.image_publisher.publish(image_message)
+
+            camera_info_msg = CameraInfo()
+            camera_info_msg.header = bot_pose_msg.header # keep same timestamp
+            camera_info_msg.width  = image_width
+            camera_info_msg.height = image_height
+            camera_info_msg.distortion_model = "plumb_bob"
+
+            opitcal_center_x = image_width/2.0
+            optical_center_y = image_height/2.0
+
+            # Intrinsics matrix
+            camera_info_msg.K = [focal_length, 0.0, opitcal_center_x,
+                                 0.0, focal_length, optical_center_y,
+                                 0.0, 0.0, 1.0]
+
+            #  Projection matrix. We won't use this, but initalize it to something.
+            camera_info_msg.P = [1.0, 0.0, 0.0, 0.0,
+                                 0.0, 1.0, 0.0, 0.0,
+                                 0.0, 0.0, 1.0, 0.0]
+
+            # Rotation matrix. We won't use it.
+            camera_info_msg.R = [1.0, 0.0, 0.0,
+                                 0.0, 1.0, 0.0,
+                                 0.0, 0.0, 1.0]
+
+
+            camera_info_msg.D = [0.0, 0.0, 0.0, 0.0, 0.0]
+            self.info_publisher.publish(camera_info_msg)
+
+            # Publish the camera pose
+            cam_to_world_pose       = matrix_to_geom_msg(cam_to_world_transform)
+            cam_to_world_msg        = geometry_msgs.msg.PoseStamped()
+            cam_to_world_msg.pose   = cam_to_world_pose
+            cam_to_world_msg.header = bot_pose_msg.header  # use the same timestamp as the input
+            self.pose_publisher.publish(cam_to_world_msg)
+
+            # Update the position for next time
+            self.prev_map_update_camera_center = camera_center
+            
+            if self.takeSinglePicture:
+                # Done taking a single picture. Use a lock to change this flag.
+                self.dds_mutex.acquire()
+                print("No more picture-taking until commanded to do so.")
+                self.takeSinglePicture = False
+                self.dds_mutex.release() # must release the lock
+
+def main():
+    # See if running in debug mode, so without ROS
+    debug_mode = False
+    if len(sys.argv) >= 2 and sys.argv[1] == 'debug_mode':
+        debug_mode = True
+
+    # Try to get the data path from the launch file, if running as a ROS node.
+    # Otherwise infer it from the path to this program.
+    if not debug_mode:
+        param_name = '/acoustics_cam/data_path'
+        if rospy.has_param(param_name):
+            data_path = rospy.get_param(param_name)
+        else:
+            rospy.logfatal("Need to specify: " + param_name)
+    else:
+        data_path = os.path.dirname(os.path.dirname(sys.argv[0]))
+        
+    SoundMapNode(data_path, debug_mode)
+
+if __name__ == '__main__':
+    main()

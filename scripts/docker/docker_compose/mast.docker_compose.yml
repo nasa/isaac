@@ -1,0 +1,18 @@
+version: "2.1"
+services:
+  
+  mast:
+    build:
+      context: $MAST_PATH
+      dockerfile: isaac_demo_image/Dockerfile_MAST
+    hostname: mast
+    container_name: mast
+    command: "/run_mast.sh"
+    depends_on:
+      - rosmaster
+    environment:
+      - ROS_MASTER_URI=http://rosmaster:11311
+      - ROS_IP=172.19.0.10
+    networks:
+      isaac:
+        ipv4_address: 172.19.0.10

@@ -1,0 +1,8 @@
+opt/isaac
+opt/isaac/lib
+opt/isaac/lib/pkgconfig
+opt/isaac/lib/python2.7
+opt/isaac/lib/isaac
+opt/isaac/lib/inspection
+opt/isaac/lib/wifi
+opt/isaac/share

@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+
+<!-- Copyright (c) 2021, United States Government, as represented by the     -->
+<!-- Administrator of the National Aeronautics and Space Administration.     -->
+<!--                                                                         -->
+<!-- All rights reserved.                                                    -->
+<!--                                                                         -->
+<!-- The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking   -->
+<!-- platform" software is licensed under the Apache License, Version 2.0    -->
+<!-- (the "License"); you may not use this file except in compliance with    -->
+<!-- the License. You may obtain a copy of the License at                    -->
+<!--                                                                         -->
+<!--     http://www.apache.org/licenses/LICENSE-2.0                          -->
+<!--                                                                         -->
+<!-- Unless required by applicable law or agreed to in writing, software     -->
+<!-- distributed under the License is distributed on an "AS IS" BASIS,       -->
+<!-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or         -->
+<!-- implied. See the License for the specific language governing            -->
+<!-- permissions and limitations under the License.                          -->
+
+<robot name="iss" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <link name="body">
+    <inertial>
+      <mass value="183353"/>
+      <origin xyz="-6.03 0.31 3.59"/>
+      <inertia ixx="10276978" ixy="-1084837" ixz="597098"
+               iyy="31940398" iyz="-614081"  izz="40019058"/>
+    </inertial>
+    <!-- Cupola -->
+    <visual name="iss_cupola_visual">
+      <origin xyz="-4.4586144 -6.8356992 6.8434244" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/cupola.dae"/>
+      </geometry>
+    </visual>
+    <collision name="iss_cupola_collision">
+      <origin xyz="-4.4586144 -6.8356992 6.8434244" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/cupola.dae"/>
+      </geometry>
+      <gazebo>
+        <surface>
+          <contact>
+            <collide_bitmask>0x01</collide_bitmask>
+          </contact>
+        </surface>
+      </gazebo>
+    </collision>
+    <!-- EU Lab -->
+    <visual name="iss_eu_lab_visual">
+      <origin xyz="10.9325664  2.3509732 4.8505872" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/eu_lab.dae"/>
+      </geometry>
+    </visual>
+    <collision name="iss_eu_lab_collision">
+      <origin xyz="10.9325664  2.3509732 4.8505872" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/eu_lab.dae"/>
+      </geometry>
+      <gazebo>
+        <surface>
+          <contact>
+            <collide_bitmask>0x01</collide_bitmask>
+          </contact>
+        </surface>
+      </gazebo>
+    </collision>
+    <!-- JPM -->
+    <visual name="iss_jpm_visual">
+      <origin xyz="10.9358938 -2.3364698 4.8505872" rpy="3.1415 0 -1.570796" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/jpm.dae"/>
+      </geometry>
+    </visual>
+    <collision name="iss_jpm_collision">
+      <origin xyz="10.9358938 -2.3364698 4.8505872" rpy="3.1415 0 -1.570796" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/jpm.dae"/>
+      </geometry>
+      <gazebo>
+        <surface>
+          <contact>
+            <collide_bitmask>0x01</collide_bitmask>
+          </contact>
+        </surface>
+      </gazebo>
+    </collision>
+    <!-- Node 1 -->
+    <visual name="iss_node_1_visual">
+      <origin xyz="-4.4630848 -0.0027432 4.8508666" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/node_1.dae"/>
+      </geometry>
+    </visual>
+    <collision name="iss_node_1_collision">
+      <origin xyz="-4.4630848 -0.0027432 4.8508666" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/node_1.dae"/>
+      </geometry>
+      <gazebo>
+        <surface>
+          <contact>
+            <collide_bitmask>0x01</collide_bitmask>
+          </contact>
+        </surface>
+      </gazebo>
+    </collision>
+    <!-- Node 2 -->
+    <visual name="iss_node_2_visual">
+      <origin xyz="10.9344206  0.0107442 4.8558958" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/node_2.dae"/>
+      </geometry>
+    </visual>
+    <collision name="iss_node_2_collision">
+      <origin xyz="10.9344206  0.0107442 4.8558958" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/node_2.dae"/>
+      </geometry>
+      <gazebo>
+        <surface>
+          <contact>
+            <collide_bitmask>0x01</collide_bitmask>
+          </contact>
+        </surface>
+      </gazebo>
+    </collision>
+    <!-- Node 3 -->
+    <visual name="iss_node_3_visual">
+      <origin xyz="-4.4586144 -6.6356992 4.8434244" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/node_3.dae"/>
+      </geometry>
+    </visual>
+    <collision name="iss_node_3_collision">
+      <origin xyz="-4.4586144 -6.6356992 4.8434244" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://astrobee_iss/meshes/node_3.dae"/>
+      </geometry>
+      <gazebo>
+        <surface>
+          <contact>
+            <collide_bitmask>0x01</collide_bitmask>
+          </contact>
+        </surface>
+      </gazebo>
+    </collision>
+  </link>
+  <gazebo>
+    <static>true</static>
+  </gazebo>
+</robot>

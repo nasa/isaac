@@ -1,0 +1,32 @@
+Source: isaac
+Priority: optional
+Maintainer: Astrobee Flight Software <astrobee-fsw@nx.arc.nasa.gov>
+Build-Depends: debhelper (>=9)
+Standards-Version: 3.9.6
+Section: libs
+Homepage: http://github.com/nasa/isaac
+#Vcs-Git: git://anonscm.debian.org/collab-maint/astrobee.git
+#Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/astrobee.git
+
+Package: isaac-dev
+Section: libdevel
+Architecture: any
+Depends: isaac0 (= ${binary:Version}), ${misc:Depends}
+  astrobee0 (>=0.12.0)
+Description: ISAAC flight software development files.
+ The ISAAC flight software development files.
+
+Package: isaac-config
+Section: misc
+Architecture: all
+Depends: ${misc:Depends}
+Description: Astrobee flight software configuration.
+ The Astrobee flight software configuration files.
+
+Package: isaac0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+  isaac-config (>= ${binary:Version}),
+  astrobee0 (>=0.12.0)
+Description: ISAAC flight software.
+ The ISAAC flight software.

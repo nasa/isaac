@@ -1,0 +1,8 @@
+tmp
+isaac0
+isaac-dev
+isaac-config
+files
+debhelper-build-stamp
+*.substvars
+*.log
