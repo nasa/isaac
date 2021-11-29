@@ -16,7 +16,6 @@ import math
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-
 EPS = 1e-5
 ROLL, PITCH, YAW = 0, 1, 2
 
