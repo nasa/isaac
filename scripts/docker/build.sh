@@ -126,6 +126,8 @@ if [ $vm == 0 ]; then
 docker build ${astrobee_source}/ \
             -f ${astrobee_source}/scripts/docker/astrobee.Dockerfile \
             --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
+            --build-arg ROS_VERSION=${ROS_VERSION} \
+            --build-arg PYTHON=${PYTHON} \
             -t astrobee/astrobee:latest-ubuntu${UBUNTU_VERSION}
 
 # Build ISAAC
