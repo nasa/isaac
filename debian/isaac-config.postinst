@@ -1,8 +1,0 @@
-#!/bin/sh
-
-if [ "$1" = "configure" ]; then
-  chmod -R g+rwX /opt/isaac/config
-  if [ $(getent group users) ]; then
-    chgrp -R users /opt/isaac/config
-  fi
-fi

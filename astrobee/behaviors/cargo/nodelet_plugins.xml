@@ -1,6 +1,0 @@
-<library path="lib/libcargo">
-  <class name="cargo/CargoNode" type="cargo::CargoNode"
-         base_class_type="nodelet::Nodelet">
-    <description>Nodelet for cargo handling</description>
-  </class>
-</library>

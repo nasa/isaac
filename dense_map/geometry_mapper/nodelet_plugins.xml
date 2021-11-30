@@ -1,9 +1,0 @@
-<library path="lib/libgeometry_mapper">
-  <class name="geometry_mapper/StreamingMapperNodelet" 
-         type="geometry_mapper::StreamingMapperNodelet"
-         base_class_type="nodelet::Nodelet">
-    <description>
-       Streaming mapper nodelet
-    </description>
-  </class>
-</library>

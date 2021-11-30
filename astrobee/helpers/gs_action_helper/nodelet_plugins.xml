@@ -1,6 +1,0 @@
-<library path="lib/libgs_action_helper">
-  <class name="gs_action_helper/GsActionHelper" type="gs_action_helper::GsActionHelper"
-         base_class_type="nodelet::Nodelet">
-    <description>Nodelet for gs_action_helper</description>
-  </class>
-</library>

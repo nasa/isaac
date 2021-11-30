@@ -1,6 +1,0 @@
-<library path="lib/libinspection">
-  <class name="inspection/InspectionNode" type="inspection::InspectionNode"
-         base_class_type="nodelet::Nodelet">
-    <description>Nodelet for inspection detection</description>
-  </class>
-</library>

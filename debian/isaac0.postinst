@@ -1,8 +1,0 @@
-#!/bin/sh
-
-if [ "$1" = "configure" ]; then
-  chmod -R g+rwx /opt/isaac/env_wrapper.sh
-  if [ $(getent group users) ]; then
-    chgrp -R users /opt/isaac/env_wrapper.sh
-  fi
-fi

@@ -1,6 +1,0 @@
-<library path="lib/libimg_analysis">
-  <class name="img_analysis/ImageAnalysisNode" type="img_analysis::ImageAnalysisNode"
-         base_class_type="nodelet::Nodelet">
-    <description>Nodelet for image analysis</description>
-  </class>
-</library>

@@ -1,5 +1,0 @@
-<library path="lib/libwifi">
-  <class name="wifi/WifiNode" type="wifi::WifiNode" base_class_type="nodelet::Nodelet">
-    <description>Nodelet for Wifi reading</description>
-  </class>
-</library>

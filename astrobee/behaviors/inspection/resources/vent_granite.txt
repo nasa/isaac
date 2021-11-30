@@ -1,2 +1,0 @@
-# x y z roll pitch yaw
-0.0 -1.0 -0.7 90 0 180
