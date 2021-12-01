@@ -37,7 +37,7 @@ jobs:
 
     - name: Push Docker image
       run: |
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-ubuntu16.04; fi;
+        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu16.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu16.04; fi;
 
   build-bionic:
@@ -71,7 +71,7 @@ jobs:
 
     - name: Push Docker image
       run: |
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-ubuntu18.04; fi;
+        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu18.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu18.04; fi;
 
   build-focal:
@@ -105,5 +105,5 @@ jobs:
 
     - name: Push Docker image
       run: |
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-ubuntu20.04; fi;
+        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu20.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu20.04; fi;
