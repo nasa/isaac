@@ -23,9 +23,8 @@ project(cargo)
 add_compile_options(-std=c++14)
 
 ## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
+SET(catkin2_DIR "${CMAKE_SOURCE_DIR}/../../../cmake")
+find_package(catkin2 REQUIRED COMPONENTS
   roscpp
   std_msgs
   nodelet
@@ -96,11 +95,6 @@ install(DIRECTORY include/${PROJECT_NAME}/
 # Mark launch files for installation
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
-  PATTERN ".svn" EXCLUDE)
-
-# Mark resources files for installation
-install(DIRECTORY resources/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/resources
   PATTERN ".svn" EXCLUDE)
 
 # Required plugin descriptor file for nodelet
