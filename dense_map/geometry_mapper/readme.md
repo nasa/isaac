@@ -322,7 +322,7 @@ and, at full resolution, the corners of the calibration target are
 hard to detect. The calibrator also does not handle the color format
 in the bag, hence the switch to grayscale images.
 
-However, both the geometry and the streaming mapper, as well as
+However, the both the geometry and the streaming mapper, as well as
 camera_refiner, can handle both color and grayscale images, and both
 at reduced resolution and full-resolution. These tools can adjust for
 the fact that the calibration was done at reduced resolution.
