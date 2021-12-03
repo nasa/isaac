@@ -1474,8 +1474,8 @@ void localize_sci_cam_directly() {
                 "are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh "
                 "later (--max_hole_diameter).");
   DEFINE_double(reliability_weight_exponent, 2.0,
-                "A larger value will give more weight to depth points corresponding to pixels closer to depth image "
-                "center, which are considered more reliable.");
+                "A larger value will give more weight to depth points corresponding to "
+                "pixels closer to depth image center, which are considered more reliable.");
   DEFINE_bool(simulated_data, false,
               "If specified, use data recorded in simulation. "
               "Then haz and sci camera poses and intrinsics should be recorded in the bag file.");
