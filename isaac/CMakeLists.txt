@@ -39,7 +39,7 @@ catkin_package(
 #############
 
 install(DIRECTORY config/ DESTINATION config)
-install(FILES scripts/env_wrapper.sh DESTINATION . )
+install(PROGRAMS scripts/env_wrapper.sh DESTINATION . )
 install(PROGRAMS scripts/apk_print_version.sh
                  scripts/print_version.sh
                  scripts/cpu_print_version.sh
