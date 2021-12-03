@@ -158,7 +158,12 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
       found_time = stamp.toSec();
 
       // Sanity check: We must always travel forward in time
-      if (found_time < prev_image_time) LOG(FATAL) << "Time in the bag must be increasing.";
+      if (found_time < prev_image_time) {
+        LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                   << std::fixed << std::setprecision(17)
+                   << "Times in wrong order: " << prev_image_time << ' ' << found_time << ".\n";
+        continue;
+      }
       prev_image_time = found_time;
 
       if (found_time >= desired_time) {
@@ -187,7 +192,12 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
       found_time = stamp.toSec();
 
       // Sanity check: We must always travel forward in time
-      if (found_time < prev_image_time) LOG(FATAL) << "Time in the bag must be increasing.";
+      if (found_time < prev_image_time) {
+        LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                   << std::fixed << std::setprecision(17)
+                   << "Times in wrong order: " << prev_image_time << ' ' << found_time << ".\n";
+        continue;
+      }
       prev_image_time = found_time;
 
       if (found_time >= desired_time) {
@@ -232,7 +242,12 @@ bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const
     double curr_time = curr_pc_msg->header.stamp.toSec();
 
     // Sanity check: We must always travel forward in time
-    if (curr_time < prev_time) LOG(FATAL) << "Time in the bag must be increasing.";
+    if (curr_time < prev_time) {
+      LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                 << std::fixed << std::setprecision(17)
+                 << "Times in wrong order: " << prev_time << ' ' << curr_time << ".\n";
+      continue;
+    }
 
     // We are not yet at the stage where we can make decisions, so just keep on going
     if (curr_time <= desired_time) {
