@@ -535,7 +535,7 @@ void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 
   // Insert point
   geometry_msgs::Pose point;
-  panorama_relative.header.frame_id = "sci_cam";
+  panorama_relative.header.frame_id = points_panorama.header.frame_id.c_str();
   point.position.x = 0.0;
   point.position.y = 0.0;
   point.position.z = 0.0;
@@ -549,10 +549,12 @@ void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 
   // Read in distorted image size.
   config_reader::ConfigReader::Table camera(&cfg_cam_, points_panorama.header.frame_id.c_str());
-  if (!camera.GetInt("width", &W))
+  if (!camera.GetInt("width", &W)) {
     ROS_ERROR("Could not read camera width.");
-  if (!camera.GetInt("height", &H))
+  }
+  if (!camera.GetInt("height", &H)) {
     ROS_ERROR("Could not read camera height.");
+  }
   config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
   for (int i = 0; i < 9; i++) {
     if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
@@ -572,10 +574,17 @@ void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   double k_pan  = (pan_max_ - pan_min_) / std::ceil((pan_max_ - pan_min_) / (h_fov * (1 - overlap_)));
   double k_tilt = (tilt_max_ - tilt_min_) / std::ceil((tilt_max_ - tilt_min_) / (v_fov * (1 - overlap_)));
 
+  // Case where max and min is zero
+  if (std::isnan(k_pan)) k_pan = PI;
+  if (std::isnan(k_tilt)) k_tilt = PI;
+
   // If it's a full 360, skip the last one
-  if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= EPS;  // Go through all the points
+  if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= 2 * EPS;  // Go through all the points
+
+  // Generate all the pan/tilt values
   for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
-    for (double pan = pan_min_; pan <= pan_max_; pan += k_pan) {
+    for (double pan = pan_min_; pan <= pan_max_ + EPS; pan += k_pan) {
+      ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
       panorama_rotation.setRPY(0, tilt, pan);
       panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * vent_to_scicam_rot_;
       point.orientation.x = panorama_rotation.x();
