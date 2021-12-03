@@ -63,6 +63,8 @@ DEFINE_bool(geometry, false, "Send the inspection command");
 DEFINE_bool(panorama, false, "Send the inspection command");
 DEFINE_bool(volumetric, false, "Send the inspection command");
 
+DEFINE_string(camera, "sci_cam", "Camera to use");
+
 DEFINE_string(anomaly_poses, "/resources/vent_jpm.txt", "Vent pose list to inspect");
 DEFINE_string(geometry_poses, "/resources/survey_bay_6.txt", "Geometry poses list to map");
 DEFINE_string(panorama_poses, "/resources/panorama_jpm.txt", "Panorama poses list to map");
@@ -87,7 +89,7 @@ bool has_only_whitespace_or_comments(const std::string & str) {
 
 void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
     geometry_msgs::Pose pose;
-    goal.inspect_poses.header.frame_id = "world";
+    goal.inspect_poses.header.frame_id = FLAGS_camera;
     // Read file geometry
     std::ifstream ifs((file).c_str());
     if (!ifs.is_open()) {
