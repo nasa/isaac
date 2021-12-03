@@ -265,9 +265,9 @@ int main(int argc, char** argv) {
 
   // Write the images to disk
   bool save_grayscale = true;  // For feature matching need grayscale
-  double found_time = -1.0;    // won't be used, but expected by the api
-  int bag_pos = 0;      // reset this each time
   for (size_t nav_it = 0; nav_it < nav_cam_timestamps.size(); nav_it++) {
+    double found_time = -1.0;    // won't be used, but expected by the api
+    int bag_pos = 0;             // reset this each time
     cv::Mat image;
     if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs,
                                 save_grayscale, image, bag_pos,

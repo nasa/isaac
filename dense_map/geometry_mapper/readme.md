@@ -294,10 +294,10 @@ and, at full resolution, the corners of the calibration target are
 hard to detect. The calibrator also does not handle the color format
 in the bag, hence the switch to grayscale images.
 
-However, the both the geometry and the streaming mapper can handle
-both color and grayscale images, and both at reduced resolution and
-full-resolution. These tools can adjust for the fact that the
-calibration was done at reduced resolution.
+However, the both the geometry and the streaming mapper, as well as
+camera_refiner, can handle both color and grayscale images, and both
+at reduced resolution and full-resolution. These tools can adjust for
+the fact that the calibration was done at reduced resolution.
 
 To accomplish this processing, once the sci cam data is integrated
 into the bag, one can do the following: 
@@ -561,6 +561,8 @@ Nav cam images can be extracted from a bag as follows:
       -use_timestamp_as_image_name
 
 The last option, `-use_timestamp_as_image_name`, must not be missed.
+It makes it easy to look up the image acqusition based on image name,
+and this is used by the geometry mapper.
 
 Note that bags acquired on the ISS usually have the nav cam image topic
 as:
@@ -1084,12 +1086,14 @@ sci cam image using the tool:
     export ASTROBEE_ROBOT=bsharp2
     source $ASTROBEE_BUILD_PATH/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
-    $ISAAC_WS/devel/lib/geometry_mapper/image_picker        \
-      --ros_bag mybag.bag                                   \
-      --nav_cam_topic /mgt/img_sampler/nav_cam/image_record \
+    $ISAAC_WS/devel/lib/geometry_mapper/image_picker                 \
+      --ros_bag mybag.bag                                            \
+      --nav_cam_topic /mgt/img_sampler/nav_cam/image_record          \
+      --sci_cam_topic /hw/cam_sci/compressed                         \
+      --haz_cam_intensity_topic /hw/depth_haz/extended/amplitude_int \
       --bracket_len 2.0 --output_nav_cam_dir nav_images
 
-Setting up the correct bot name is very important.
+Setting up the correct robot name above is very important.
 
 The --bracket_len option brackets sci cam images by nav cam images so
 the length of time between these two nav cam images is at most this
@@ -1187,6 +1191,7 @@ and hence keeping its registration, as:
     $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/merge_maps \
       --fix_first_map                                        \
       --num_image_overlaps_at_endpoints 200                  \
+      --min_valid_angle 1.0                                  \
       registered_submap.map $surf_map                        \
       --output_map merged.map
 
@@ -1220,7 +1225,7 @@ point to that.
       --fix_map --skip_registration --float_scale           \
       --timestamp_interpolation --robust_threshold 3        \
       --sci_cam_intrinsics_to_float                         \
-        'focal_length optical center distortion'            \
+        'focal_length optical_center distortion'            \
       --mesh mesh.ply --mesh_weight 25                      \
       --mesh_robust_threshold 3
 
@@ -1302,7 +1307,7 @@ This program's options are:
     --sci_cam_intrinsics_to_float: Refine 0 or more of the following
       intrinsics for sci_cam: focal_length, optical_center,
       distortion. Specify as a quoted list. For example:
-      'focal_length optical center distortion'.
+      'focal_length optical_center distortion'.
     --timestamp_interpolation: If true, interpolate between timestamps. 
       May give better results if the robot is known to move uniformly, and 
       perhaps less so for stop-and-go robot motion.
