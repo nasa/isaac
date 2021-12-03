@@ -51,7 +51,7 @@
 
 #include <dense_map_ros_utils.h>
 #include <dense_map_utils.h>
-// #include <happly.h>  // for reading and writing ply files
+#include <happly.h>  // for reading and writing ply files
 
 #include <string>
 #include <map>
@@ -251,15 +251,18 @@ bool findInterpolatedPose(double desired_nav_cam_time, std::vector<double> const
   return false;
 }
 
-typedef cv::Vec<double, 4> Vec4d;
+// Store x, y, z, intensity, and weight.
+typedef cv::Vec<double, 5> Vec5d;
 
 // Check if first three coordinates of a vector are 0
-bool zeroXyz(Vec4d const& p) { return (p[0] == 0) && (p[1] == 0) && (p[2] == 0); }
+bool zeroXyz(Vec5d const& p) { return (p[0] == 0) && (p[1] == 0) && (p[2] == 0); }
 
 // Add a given vertex to the ply file unless already present
-inline void add_vertex(Vec4d const& V, std::pair<int, int> const& pix,
-                       std::map<std::pair<int, int>, size_t>& pix_to_vertex, size_t& vertex_count,
-                       std::vector<std::array<double, 3>>& vertices, std::vector<std::array<double, 3>>& colors) {
+inline void add_vertex(Vec5d const& V, std::pair<int, int> const& pix,        // NOLINT
+                       std::map<std::pair<int, int>, size_t>& pix_to_vertex,  // NOLINT
+                       size_t& vertex_count,                                  // NOLINT
+                       std::vector<std::array<double, 3>>& vertices,          // NOLINT
+                       std::vector<std::array<double, 3>>& colors) {          // NOLINT
   // Do not add the zero vertex
   if (zeroXyz(V)) return;
 
@@ -276,15 +279,17 @@ inline void add_vertex(Vec4d const& V, std::pair<int, int> const& pix,
   vertex_count++;
 }
 
-double seg_len(Vec4d const& A, Vec4d const& B) { return Eigen::Vector3d(A[0] - B[0], A[1] - B[1], A[2] - B[2]).norm(); }
+double seg_len(Vec5d const& A, Vec5d const& B) {
+  return Eigen::Vector3d(A[0] - B[0], A[1] - B[1], A[2] - B[2]).norm(); // NOLINT
+}
 
-void add_dist(Vec4d const& A, Vec4d const& B, std::vector<double>& distances) {
+void add_dist(Vec5d const& A, Vec5d const& B, std::vector<double>& distances) {
   if (!zeroXyz(A) && !zeroXyz(B)) distances.push_back(seg_len(A, B));
 }
 
 // If the distance between two points is more than this len,
 // add more points in between on the edge connecting them.
-void add_points(Vec4d const& A, Vec4d const& B, double min_len, std::vector<Vec4d>& points) {
+void add_points(Vec5d const& A, Vec5d const& B, double min_len, std::vector<Vec5d>& points) {
   if (zeroXyz(A) || zeroXyz(B)) return;
 
   double curr_len = seg_len(A, B);
@@ -293,11 +298,13 @@ void add_points(Vec4d const& A, Vec4d const& B, double min_len, std::vector<Vec4
   // Total number of points including the endpoints
   int num = round(curr_len / min_len) + 1;
 
-  // Insert points outside the endpoints
+  // Insert points outside the endpoints. Note that the colors and
+  // weights (positions 3 and 4) are also computed via the linear
+  // interpolation.
   for (int i = 1; i < num; i++) {
     double t = static_cast<double>(i) / static_cast<double>(num);
 
-    Vec4d C = (1.0 - t) * A + t * B;
+    Vec5d C = (1.0 - t) * A + t * B;
     points.push_back(C);
   }
 }
@@ -313,10 +320,10 @@ double median_mesh_edge(cv::Mat const& depthMat) {
       std::pair<int, int> pix_ur = std::make_pair(row + 1, col);
       std::pair<int, int> pix_ll = std::make_pair(row, col + 1);
       std::pair<int, int> pix_lr = std::make_pair(row + 1, col + 1);
-      Vec4d UL = depthMat.at<Vec4d>(pix_ul.first, pix_ul.second);
-      Vec4d UR = depthMat.at<Vec4d>(pix_ur.first, pix_ur.second);
-      Vec4d LL = depthMat.at<Vec4d>(pix_ll.first, pix_ll.second);
-      Vec4d LR = depthMat.at<Vec4d>(pix_lr.first, pix_lr.second);
+      Vec5d UL = depthMat.at<Vec5d>(pix_ul.first, pix_ul.second);
+      Vec5d UR = depthMat.at<Vec5d>(pix_ur.first, pix_ur.second);
+      Vec5d LL = depthMat.at<Vec5d>(pix_ll.first, pix_ll.second);
+      Vec5d LR = depthMat.at<Vec5d>(pix_lr.first, pix_lr.second);
 
       add_dist(UL, UR, distances);
       add_dist(UL, LL, distances);
@@ -338,13 +345,13 @@ double median_mesh_edge(cv::Mat const& depthMat) {
 // Add points on edges and inside triangles having distances longer
 // than the median edge length times a factor. Store the combined set
 // in depthMat by adding further rows to it.
-void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
+void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec5d const& Zero) {
   double median_len = median_mesh_edge(depthMat);
 
   // Add points if lengths are more than this
   double min_len = 1.3 * median_len;
 
-  std::vector<Vec4d> points;
+  std::vector<Vec5d> points;
 
   for (int row = 0; row < depthMat.rows - 1; row++) {
     for (int col = 0; col < depthMat.cols - 1; col++) {
@@ -352,13 +359,13 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
       std::pair<int, int> pix_ur = std::make_pair(row + 1, col);
       std::pair<int, int> pix_ll = std::make_pair(row, col + 1);
       std::pair<int, int> pix_lr = std::make_pair(row + 1, col + 1);
-      Vec4d UL = depthMat.at<Vec4d>(pix_ul.first, pix_ul.second);
-      Vec4d UR = depthMat.at<Vec4d>(pix_ur.first, pix_ur.second);
-      Vec4d LL = depthMat.at<Vec4d>(pix_ll.first, pix_ll.second);
-      Vec4d LR = depthMat.at<Vec4d>(pix_lr.first, pix_lr.second);
+      Vec5d UL = depthMat.at<Vec5d>(pix_ul.first, pix_ul.second);
+      Vec5d UR = depthMat.at<Vec5d>(pix_ur.first, pix_ur.second);
+      Vec5d LL = depthMat.at<Vec5d>(pix_ll.first, pix_ll.second);
+      Vec5d LR = depthMat.at<Vec5d>(pix_lr.first, pix_lr.second);
 
       // Add points on each edge
-      std::vector<Vec4d> points1;
+      std::vector<Vec5d> points1;
       add_points(UL, UR, min_len, points1);
       add_points(UL, LL, min_len, points1);
       add_points(UR, LL, min_len, points1);
@@ -369,7 +376,7 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
         // Valid face
 
         // See if to add the triangle center
-        Vec4d C = (UL + UR + LL) / 3.0;
+        Vec5d C = (UL + UR + LL) / 3.0;
         if (seg_len(UL, C) > min_len || seg_len(UR, C) > min_len || seg_len(LL, C) > min_len) points1.push_back(C);
 
         // Add points from triangle center to each point added so far
@@ -377,7 +384,7 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
       }
 
       // Add points on each edge of this triangle
-      std::vector<Vec4d> points2;
+      std::vector<Vec5d> points2;
       add_points(UR, LR, min_len, points2);
       add_points(UR, LL, min_len, points2);
       add_points(LR, LL, min_len, points2);
@@ -387,7 +394,7 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
 
         // See if to add the triangle center
         int curr_len2 = points2.size();
-        Vec4d C = (UR + LR + LL) / 3.0;
+        Vec5d C = (UR + LR + LL) / 3.0;
         if (seg_len(UR, C) > min_len || seg_len(LR, C) > min_len || seg_len(LL, C) > min_len) points2.push_back(C);
 
         // Add points from triangle center to each point added so far
@@ -414,12 +421,12 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
   depthMat.copyTo(workMat);
 
   // Resize depthMat, all info in it is now lost, and have only zeros
-  depthMat = cv::Mat(workMat.rows + num_new_rows, workMat.cols, CV_64FC4, Zero);
+  depthMat = cv::Mat_<Vec5d>(workMat.rows + num_new_rows, workMat.cols, Zero);
 
   // Copy the relevant chunk from workMat
   for (int row = 0; row < workMat.rows; row++) {
     for (int col = 0; col < workMat.cols; col++) {
-      depthMat.at<Vec4d>(row, col) = workMat.at<Vec4d>(row, col);
+      depthMat.at<Vec5d>(row, col) = workMat.at<Vec5d>(row, col);
     }
   }
 
@@ -431,8 +438,8 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
 
       if (count >= num_points) break;
 
-      depthMat.at<Vec4d>(row, col) = points[count];
-      depthMat.at<Vec4d>(row, col)[3] = -1;  // so that the mesh does not have it as a face
+      depthMat.at<Vec5d>(row, col) = points[count];
+      depthMat.at<Vec5d>(row, col)[3] = -1;  // so that the mesh does not have it as a face
     }
 
     // Need to make sure to break the outer loop too
@@ -442,9 +449,7 @@ void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero) {
   if (count != num_points) LOG(FATAL) << "Bookkeeping error. Did not add all the points to the depth map.";
 }
 
-#if 0  // Turning this off till it is decided if to include happly.h or not
-
-// Form a mesh. Ignore (x, y, z, i) values with (x, y, z) = (0, 0, 0).
+// Form a mesh. Ignore (x, y, z, i, w) values with (x, y, z) = (0, 0, 0).
 // Add a vertex but not a face if i is negative.
 void save_mesh(cv::Mat const& depthMat, std::string const& plyFileName) {
   size_t vertex_count = 0;
@@ -459,10 +464,10 @@ void save_mesh(cv::Mat const& depthMat, std::string const& plyFileName) {
       std::pair<int, int> pix_ur = std::make_pair(row + 1, col);
       std::pair<int, int> pix_ll = std::make_pair(row, col + 1);
       std::pair<int, int> pix_lr = std::make_pair(row + 1, col + 1);
-      Vec4d UL = depthMat.at<Vec4d>(pix_ul.first, pix_ul.second);
-      Vec4d UR = depthMat.at<Vec4d>(pix_ur.first, pix_ur.second);
-      Vec4d LL = depthMat.at<Vec4d>(pix_ll.first, pix_ll.second);
-      Vec4d LR = depthMat.at<Vec4d>(pix_lr.first, pix_lr.second);
+      Vec5d UL = depthMat.at<Vec5d>(pix_ul.first, pix_ul.second);
+      Vec5d UR = depthMat.at<Vec5d>(pix_ur.first, pix_ur.second);
+      Vec5d LL = depthMat.at<Vec5d>(pix_ll.first, pix_ll.second);
+      Vec5d LR = depthMat.at<Vec5d>(pix_lr.first, pix_lr.second);
 
       // Add a vertex even though no face has it as a corner
       add_vertex(UL, pix_ul, pix_to_vertex, vertex_count, vertices, colors);
@@ -502,7 +507,6 @@ void save_mesh(cv::Mat const& depthMat, std::string const& plyFileName) {
   std::cout << "Writing: " << plyFileName << std::endl;
   ply.write(plyFileName, happly::DataFormat::ASCII);
 }
-#endif
 
 // Find the median of a sorted vector
 // TODO(oalexan1): May need to put here a partial check that the vector is sorted
@@ -518,7 +522,7 @@ double find_median(std::vector<double> const& v) {
 // Throw out as outliers points whose x, y, or z values differs
 // from the median of such values by more than this distance.
 // This can be expensive for win >= 25.
-void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero, int win, double delta) {
+void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec5d const& Zero, int win, double delta) {
   // Copy it to workMat, with the latter not being modified below
   depthMat.copyTo(workMat);
 
@@ -527,7 +531,7 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero, int w
     for (int col = 0; col < workMat.cols; col++) {
       std::vector<double> dist_x, dist_y, dist_z;
 
-      Vec4d pt = workMat.at<Vec4d>(row, col);
+      Vec5d pt = workMat.at<Vec5d>(row, col);
 
       // Is an outlier already
       if (zeroXyz(pt)) continue;
@@ -538,7 +542,7 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero, int w
           if (row + irow < 0 || row + irow >= workMat.rows) continue;
           if (col + icol < 0 || col + icol >= workMat.cols) continue;
 
-          Vec4d curr_pt = workMat.at<Vec4d>(row + irow, col + icol);
+          Vec5d curr_pt = workMat.at<Vec5d>(row + irow, col + icol);
 
           if (zeroXyz(curr_pt)) continue;
 
@@ -550,7 +554,7 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero, int w
 
       if (dist_x.size() < std::max(2, std::min(5, win))) {
         // so few neighbors, could just toss it out
-        depthMat.at<Vec4d>(row, col) = Zero;
+        depthMat.at<Vec5d>(row, col) = Zero;
         continue;
       }
 
@@ -560,7 +564,7 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero, int w
 
       if (std::abs(find_median(dist_x) - pt[0]) > delta || std::abs(find_median(dist_y) - pt[1]) > delta ||
           std::abs(find_median(dist_z) - pt[2]) > delta) {
-        depthMat.at<Vec4d>(row, col) = Zero;
+        depthMat.at<Vec5d>(row, col) = Zero;
       }
     }
   }
@@ -571,7 +575,7 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec4d const& Zero, int w
 // ray from the existing point to the new point being almost parallel
 // to existing nearby rays (emanating from camera center) which is not
 // good.
-void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Zero, int radius1, int radius2,
+void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec5d const& Zero, int radius1, int radius2,
                double foreshortening_delta) {
   // Copy depthMat to workMat, with the latter unchanged below
   depthMat.copyTo(workMat);
@@ -581,8 +585,8 @@ void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Z
     for (int col = 0; col < depthMat.cols; col++) {
       // Points which do not need to be filled can be skipped
       // and let them keep their existing value
-      if (!zeroXyz(workMat.at<Vec4d>(row, col))) {
-        depthMat.at<Vec4d>(row, col) = workMat.at<Vec4d>(row, col);
+      if (!zeroXyz(workMat.at<Vec5d>(row, col))) {
+        depthMat.at<Vec5d>(row, col) = workMat.at<Vec5d>(row, col);
         continue;
       }
 
@@ -590,7 +594,7 @@ void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Z
       // A point on an axis counts towards both quadrants it touches.
       cv::Mat valid(cv::Size(2, 2), CV_8U, cv::Scalar(0));
 
-      Vec4d pt_sum = Zero;
+      Vec5d pt_sum = Zero;
       double wt_sum = 0.0;
 
       for (int irow = -radius1; irow <= radius1; irow++) {
@@ -604,7 +608,7 @@ void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Z
           // Look only within given radius
           if (dist > static_cast<double>(radius1)) continue;
 
-          Vec4d curr_pt = workMat.at<Vec4d>(row + irow, col + icol);
+          Vec5d curr_pt = workMat.at<Vec5d>(row + irow, col + icol);
 
           // Note that these are not exclusive, as points on axes
           // can be in multiple quadrants
@@ -653,11 +657,11 @@ void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Z
       if (num_good_quadrants < 4) will_accept = false;
 
       if (!will_accept || wt_sum == 0.0) {
-        depthMat.at<Vec4d>(row, col) = Zero;
+        depthMat.at<Vec5d>(row, col) = Zero;
         continue;
       }
 
-      Vec4d new_pt = pt_sum / wt_sum;
+      Vec5d new_pt = pt_sum / wt_sum;
       Eigen::Vector3d Z(0, 0, 1);
 
       // See if this point results in rays which are too parallel to existing rays
@@ -672,7 +676,7 @@ void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Z
           // Check only within given radius
           if (dist > static_cast<double>(radius2)) continue;
 
-          Vec4d curr_pt = workMat.at<Vec4d>(row + irow, col + icol);
+          Vec5d curr_pt = workMat.at<Vec5d>(row + irow, col + icol);
 
           if (zeroXyz(curr_pt)) continue;  // Not a valid point
 
@@ -696,18 +700,18 @@ void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Z
       }
 
       if (!will_accept) {
-        depthMat.at<Vec4d>(row, col) = Zero;
+        depthMat.at<Vec5d>(row, col) = Zero;
         continue;
       }
 
       // accept
-      depthMat.at<Vec4d>(row, col) = new_pt;
+      depthMat.at<Vec5d>(row, col) = new_pt;
     }
   }
 }
 
 // Smooth newly added points and also their immediate neighbors
-void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec4d const& Zero,
+void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec5d const& Zero,
                       int radius) {
   // Copy depthMat to workMat, with the latter not being changed below.
   // Note how we use origMat to keep track of points which did not
@@ -725,7 +729,7 @@ void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMa
           if (row + irow < 0 || row + irow >= depthMat.rows) continue;
           if (col + icol < 0 || col + icol >= depthMat.cols) continue;
 
-          if (zeroXyz(origMat.at<Vec4d>(row + irow, col + icol))) {
+          if (zeroXyz(origMat.at<Vec5d>(row + irow, col + icol))) {
             isNew = true;
             break;
           }
@@ -736,9 +740,9 @@ void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMa
       if (!isNew) continue;
 
       // Do not smooth points which have no good value to start with
-      if (zeroXyz(workMat.at<Vec4d>(row, col))) continue;
+      if (zeroXyz(workMat.at<Vec5d>(row, col))) continue;
 
-      Vec4d pt_sum = Zero;
+      Vec5d pt_sum = Zero;
       double wt_sum = 0.0;
 
       for (int irow = -radius; irow <= radius; irow++) {
@@ -751,7 +755,7 @@ void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMa
 
           if (dist > static_cast<double>(radius)) continue;
 
-          Vec4d curr_pt = workMat.at<Vec4d>(row + irow, col + icol);
+          Vec5d curr_pt = workMat.at<Vec5d>(row + irow, col + icol);
 
           if (zeroXyz(curr_pt)) continue;  // Not a valid point
 
@@ -764,8 +768,37 @@ void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMa
         }
       }
 
-      Vec4d new_pt = pt_sum / wt_sum;
-      depthMat.at<Vec4d>(row, col) = new_pt;
+      Vec5d new_pt = pt_sum / wt_sum;
+      depthMat.at<Vec5d>(row, col) = new_pt;
+    }
+  }
+}
+
+// Add weights which are higher at image center and decrease towards
+// boundary. This makes voxblox blend better.
+void calc_weights(cv::Mat& depthMat, double exponent) {
+  for (int row = 0; row < depthMat.rows; row++) {
+#pragma omp parallel for
+    for (int col = 0; col < depthMat.cols; col++) {
+      if (zeroXyz(depthMat.at<Vec5d>(row, col))) continue;
+
+      double drow = row - depthMat.rows / 2.0;
+      double dcol = col - depthMat.cols / 2.0;
+      double dist_sq = drow * drow + dcol * dcol;
+
+      // Some kind of function decaying from center
+      float weight = 1.0 / pow(1.0 + dist_sq, exponent/2.0);
+
+      // Also, points that are further in z are given less weight
+      double z = depthMat.at<Vec5d>(row, col)[2];
+      weight *= 1.0 / (0.001 + z * z);
+
+      // Make sure the weight does not get too small as voxblox
+      // will read it as a float. Here making the weights
+      // just a little bigger than what voxblox will accept.
+      weight = std::max(weight, static_cast<float>(1.1e-6));
+
+      depthMat.at<Vec5d>(row, col)[4] = weight;
     }
   }
 }
@@ -773,8 +806,9 @@ void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMa
 void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat const& haz_cam_intensity,
                            Eigen::Affine3d const& hazcam_depth_to_image_transform, int depth_exclude_columns,
                            int depth_exclude_rows, double foreshortening_delta, double depth_hole_fill_diameter,
-                           std::vector<double> const& median_filter_params, bool save_debug_data,
-                           const char* filename_buffer, Eigen::MatrixXd const& desired_cam_to_world_trans) {
+                           double reliability_weight_exponent, std::vector<double> const& median_filter_params,
+                           bool save_debug_data, const char* filename_buffer,
+                           Eigen::MatrixXd const& desired_cam_to_world_trans) {
   // Sanity checks
   if (static_cast<int>(haz_cam_intensity.cols) != static_cast<int>(pc_msg->width) ||
       static_cast<int>(haz_cam_intensity.rows) != static_cast<int>(pc_msg->height))
@@ -789,11 +823,13 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
 
   // Two constants
   float inf = std::numeric_limits<float>::infinity();
-  Vec4d Zero(0, 0, 0, 0);
+  Vec5d Zero(0, 0, 0, 0, 0);
 
-  // A matrix storing the depth cloud and a temporary work matrix
-  cv::Mat depthMat(haz_cam_intensity.rows, haz_cam_intensity.cols, CV_64FC4, Zero);
-  cv::Mat workMat(haz_cam_intensity.rows, haz_cam_intensity.cols, CV_64FC4, Zero);
+  // A matrix storing the depth cloud and a temporary work matrix.
+  // These have 5 channels: x, y, z, intensity, and weight. The weight
+  // determines the reliability of a point.
+  cv::Mat_<Vec5d> depthMat(haz_cam_intensity.rows, haz_cam_intensity.cols, Zero);
+  cv::Mat_<Vec5d> workMat(haz_cam_intensity.rows, haz_cam_intensity.cols, Zero);
 
   // Populate depthMat
   int count = -1;
@@ -809,9 +845,9 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
                    row < depth_exclude_rows || depthMat.rows - row < depth_exclude_rows);
 
       if ((x == 0 && y == 0 && z == 0) || skip)
-        depthMat.at<Vec4d>(row, col) = Zero;
+        depthMat.at<Vec5d>(row, col) = Zero;
       else
-        depthMat.at<Vec4d>(row, col) = Vec4d(x, y, z, i);
+        depthMat.at<Vec5d>(row, col) = Vec5d(x, y, z, i, 0);
     }
   }
 
@@ -838,20 +874,22 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
   int radius = depth_hole_fill_diameter / 4.0;
   if (depth_hole_fill_diameter > 0) smooth_additions(origMat, depthMat, workMat, sigma, Zero, radius);
 
+  // This is the right place at which to add weights, before adding
+  // extra points messes up with the number of rows in in depthMat.
+  calc_weights(depthMat, reliability_weight_exponent);
+
   // Add extra points, but only if we are committed to manipulating the
   // depth cloud to start with
   if (depth_hole_fill_diameter > 0) add_extra_pts(depthMat, workMat, Zero);
 
-#if 0
   if (save_debug_data) {
     // Save the updated depthMat as a mesh (for debugging)
     std::string plyFileName = filename_buffer + std::string(".ply");
     save_mesh(depthMat, plyFileName);
   }
-#endif
 
   // Initialize point cloud that we will pass to voxblox
-  pcl::PointCloud<pcl::PointXYZI> pci;
+  pcl::PointCloud<pcl::PointNormal> pci;
   pci.width = depthMat.cols;
   pci.height = depthMat.rows;
   pci.points.resize(pci.width * pci.height);
@@ -861,7 +899,7 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
     for (int col = 0; col < depthMat.cols; col++) {
       count++;
 
-      Vec4d pt = depthMat.at<Vec4d>(row, col);
+      Vec5d pt = depthMat.at<Vec5d>(row, col);
 
       // An outlier
       if (zeroXyz(pt)) {
@@ -869,7 +907,10 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
         pci.points[count].x = inf;
         pci.points[count].y = inf;
         pci.points[count].z = inf;
-        pci.points[count].intensity = 0;
+        pci.points[count].normal_x = 0;   // intensity
+        pci.points[count].normal_y = 0;   // weight
+        pci.points[count].normal_z = 0;   // ensure initialization
+        pci.points[count].curvature = 0;  // ensure initialization
         continue;
       }
 
@@ -880,8 +921,12 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
       pci.points[count].z = X[2];
 
       if (pt[3] <= 0) pt[3] = 100;  // Ensure a positive value for the color
+      if (pt[4] <  0) pt[4] = 0;    // Ensure a non-negative weight
 
-      pci.points[count].intensity = pt[3];
+      pci.points[count].normal_x = pt[3];  // intensity
+      pci.points[count].normal_y = pt[4];  // weight
+      pci.points[count].normal_z  = 0;     // ensure initialization
+      pci.points[count].curvature = 0;     // ensure initialization
     }
   }
 
@@ -893,11 +938,16 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
     // Find the image of distances in depthMat, for debugging.  Note
     // that we ignore the extra points we added as new rows depthMat in
     // add_extra_pts().
+
+    // The depthMat may have extra rows, but we assume the number of columns
+    // did not change.
+    if (haz_cam_intensity.cols != depthMat.cols) LOG(FATAL) << "Incorrect number of columns in depthMat\n";
+
     cv::Mat depthDist(haz_cam_intensity.rows, haz_cam_intensity.cols, CV_32FC1, cv::Scalar(0));
     count = -1;
     for (int row = 0; row < depthDist.rows; row++) {
       for (int col = 0; col < depthDist.cols; col++) {
-        Vec4d pt = depthMat.at<Vec4d>(row, col);
+        Vec5d pt = depthMat.at<Vec5d>(row, col);
         Eigen::Vector3d eigen_pt(pt[0], pt[1], pt[2]);
         double dist = eigen_pt.norm();
         depthDist.at<float>(row, col) = dist;
@@ -930,11 +980,10 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
     std::cout << "Writing: " << fileName << std::endl;
     cv::imwrite(fileName, 255.0 * (depthDist - min_dist) / (max_dist - min_dist));
 
-#if 0
     // Transform (modifies depthMat) and save the transformed mesh. For debugging.
     for (int row = 0; row < depthMat.rows; row++) {
       for (int col = 0; col < depthMat.cols; col++) {
-        Vec4d pt = depthMat.at<Vec4d>(row, col);
+        Vec5d pt = depthMat.at<Vec5d>(row, col);
 
         if (zeroXyz(pt))
           continue;
@@ -949,16 +998,14 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
         V = desired_cam_to_world_trans * V;
 
         for (size_t it = 0; it < 3; it++)
-          depthMat.at<Vec4d>(row, col)[it] = V[it];
+          depthMat.at<Vec5d>(row, col)[it] = V[it];
       }
     }
 
     std::string plyFileName = filename_buffer + std::string("_trans.ply");
     save_mesh(depthMat, plyFileName);
-#endif
   }
 }
-
 
 #if 0
 
@@ -1088,6 +1135,7 @@ void localize_sci_cam_directly() {
                        Eigen::Affine3d& hazcam_depth_to_image_transform,
                        int depth_exclude_columns, int depth_exclude_rows,
                        double foreshortening_delta, double depth_hole_fill_diameter,
+                       double reliability_weight_exponent,
                        std::vector<double> const& median_filter_params,
                        bool save_debug_data,
                        std::vector<rosbag::MessageInstance> const& nav_cam_msgs,
@@ -1282,8 +1330,9 @@ void localize_sci_cam_directly() {
 
         // Append the intensity to the point cloud and save it
         save_proc_depth_cloud(pc_msg, haz_cam_intensity, hazcam_depth_to_image_transform, depth_exclude_columns,
-                              depth_exclude_rows, foreshortening_delta, depth_hole_fill_diameter, median_filter_params,
-                              save_debug_data, filename_buffer, desired_cam_to_world_trans);
+                              depth_exclude_rows, foreshortening_delta, depth_hole_fill_diameter,
+                              reliability_weight_exponent, median_filter_params, save_debug_data, filename_buffer,
+                              desired_cam_to_world_trans);
 
         // Save the name of the point cloud to the index
         ofs << filename_buffer << "\n";
@@ -1424,6 +1473,9 @@ void localize_sci_cam_directly() {
                 "Fill holes in the depth point clouds with this diameter, in pixels. This happens before the clouds "
                 "are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh "
                 "later (--max_hole_diameter).");
+  DEFINE_double(reliability_weight_exponent, 2.0,
+                "A larger value will give more weight to depth points corresponding to pixels closer to depth image "
+                "center, which are considered more reliable.");
   DEFINE_bool(simulated_data, false,
               "If specified, use data recorded in simulation. "
               "Then haz and sci camera poses and intrinsics should be recorded in the bag file.");
@@ -1587,7 +1639,9 @@ void localize_sci_cam_directly() {
       double desired_cam_to_nav_cam_offset = -navcam_to_hazcam_timestamp_offset;
       saveCameraPoses(FLAGS_simulated_data, cam_type, desired_cam_to_nav_cam_offset, hazcam_to_navcam_trans,
                       hazcam_depth_to_image_transform, FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows,
-                      FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter, median_filter_params,
+                      FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter,
+                      FLAGS_reliability_weight_exponent,
+                      median_filter_params,
                       FLAGS_save_debug_data, nav_cam_handle.bag_msgs, sci_cam_handle.bag_msgs,
                       haz_cam_points_handle.bag_msgs, haz_cam_intensity_handle.bag_msgs, nav_cam_bag_timestamps,
                       sci_cam_exif, FLAGS_output_dir, "",  // not needed
@@ -1603,7 +1657,9 @@ void localize_sci_cam_directly() {
       double desired_cam_to_nav_cam_offset = scicam_to_hazcam_timestamp_offset - navcam_to_hazcam_timestamp_offset;
       saveCameraPoses(FLAGS_simulated_data, cam_type, desired_cam_to_nav_cam_offset, scicam_to_navcam_trans,
                       hazcam_depth_to_image_transform, FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows,
-                      FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter, median_filter_params,
+                      FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter,
+                      FLAGS_reliability_weight_exponent,
+                      median_filter_params,
                       FLAGS_save_debug_data, nav_cam_handle.bag_msgs, sci_cam_handle.bag_msgs,
                       haz_cam_points_handle.bag_msgs, haz_cam_intensity_handle.bag_msgs, nav_cam_bag_timestamps,
                       sci_cam_exif, FLAGS_output_dir, sci_cam_dir, FLAGS_start, FLAGS_duration,
@@ -1625,7 +1681,9 @@ void localize_sci_cam_directly() {
         dense_map::StampedPoseStorage sim_nav_cam_poses;  // won't be used
         saveCameraPoses(FLAGS_simulated_data, cam_type, desired_cam_to_nav_cam_offset, navcam_to_navcam_trans,
                         hazcam_depth_to_image_transform, FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows,
-                        FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter, median_filter_params,
+                        FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter,
+                        FLAGS_reliability_weight_exponent,
+                        median_filter_params,
                         FLAGS_save_debug_data, nav_cam_handle.bag_msgs, sci_cam_handle.bag_msgs,
                         haz_cam_points_handle.bag_msgs, haz_cam_intensity_handle.bag_msgs, nav_cam_bag_timestamps,
                         sci_cam_exif, FLAGS_output_dir, nav_cam_dir, FLAGS_start, FLAGS_duration,

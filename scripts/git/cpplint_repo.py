@@ -72,7 +72,7 @@ def main():
         ):
             continue
         for filename in filenames:
-            if "TinyEXIF" in filename:
+            if "TinyEXIF" or "happly" in filename:
                 continue
             if not filename.endswith(
                 (

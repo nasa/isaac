@@ -1392,7 +1392,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
         double nav_end =  sparse_map_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
 
-        std::cout << "nav haz nav time bracket "
+        std::cout << "nav_start haz nav_end times "
                   << nav_start << ' ' << haz_time << ' ' << nav_end  << std::endl;
         std::cout << "nav_end - nav_start " << nav_end - nav_start << std::endl;
 
@@ -1441,7 +1441,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
           - haz_cam_start_time;
         double nav_end = sparse_map_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
-        std::cout << "nav sci nav time bracket "
+        std::cout << "nav_start sci nav_end times "
                   << nav_start << ' ' << sci_time << ' ' << nav_end  << std::endl;
         std::cout << "nav_end - nav_start " << nav_end - nav_start << std::endl;
 

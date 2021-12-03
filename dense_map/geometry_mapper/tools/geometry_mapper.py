@@ -310,13 +310,13 @@ def process_args(args):
 
 def sanity_checks(geometry_mapper_path, batch_tsdf_path, args):
 
-    # Check if the environemnt was set
-    for var in (
+    # Check if the environment was set
+    for var in [
         "ASTROBEE_RESOURCE_DIR",
         "ASTROBEE_CONFIG_DIR",
         "ASTROBEE_WORLD",
         "ASTROBEE_ROBOT",
-    ):
+    ]:
         if var not in os.environ:
             raise Exception("Must set " + var)
 
