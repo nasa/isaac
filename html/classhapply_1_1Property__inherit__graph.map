@@ -1,0 +1,5 @@
+<map id="happly::Property" name="happly::Property">
+<area shape="rect" id="node1" title="A generic property, which is associated with some element. Can be plain Property or a ListProperty,..." alt="" coords="175,5,303,32"/>
+<area shape="rect" id="node2" href="$classhapply_1_1TypedListProperty.html" title="A property which is a list of value (eg, 3 doubles). Note that lists are always variable length per&#45;e..." alt="" coords="5,80,232,107"/>
+<area shape="rect" id="node3" href="$classhapply_1_1TypedProperty.html" title="A property which takes a single value (not a list)." alt="" coords="257,80,461,107"/>
+</map>

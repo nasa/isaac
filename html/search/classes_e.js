@@ -1,7 +1,5 @@
 var searchData=
 [
-  ['wifi_130',['Wifi',['../classwifi_1_1Wifi.html',1,'wifi']]],
-  ['wifimappernode_131',['WifiMapperNode',['../classwifi__mapper_1_1WifiMapperNode.html',1,'wifi_mapper']]],
-  ['wifinode_132',['WifiNode',['../classwifi_1_1WifiNode.html',1,'wifi']]],
-  ['wifitool_133',['WifiTool',['../classwifi_1_1WifiTool.html',1,'wifi']]]
+  ['vectorcompare_179',['VectorCompare',['../structdense__map_1_1VectorCompare.html',1,'dense_map']]],
+  ['volumetricmapper_180',['VolumetricMapper',['../classvolumetric__mapper_1_1VolumetricMapper.html',1,'volumetric_mapper']]]
 ];

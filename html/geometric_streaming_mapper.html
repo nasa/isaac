@@ -100,7 +100,7 @@ Overview</h2>
 <h2><a class="anchor" id="autotoc_md56"></a>
 Setting up the environment</h2>
 <p>The following environmental variables should be set up (please adjust them for your particular configuration): </p><pre class="fragment">export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
-export ASTROBEE_BUILD_PATH=$HOME/astrobee/build
+export ASTROBEE_BUILD_PATH=$HOME/astrobee
 export ISAAC_WS=$HOME/isaac
 </pre><h2><a class="anchor" id="autotoc_md57"></a>
 Robot sensors</h2>
@@ -133,7 +133,7 @@ Compiling the software</h2>
 <h3><a class="anchor" id="autotoc_md61"></a>
 Compiling VoxBlox</h3>
 <p>To compile Voxblox, clone </p><pre class="fragment">https://github.com/oleg-alexandrov/voxblox/
-</pre><p>(branch master). This fork differs from the main repository at <a href="https://github.com/ethz-asl/voxblox">https://github.com/ethz-asl/voxblox</a> by the introduction of a small tool named batch_tsdf.cc that reads the clouds to fuse and the transforms from disk and writes the output mesh back to disk, instead of using ROS.</p>
+</pre><p>(branch master). This fork differs from the main repository at <a href="https://github.com/ethz-asl/voxblox">https://github.com/ethz-asl/voxblox</a> by the introduction of a small tool named batch_tsdf.cc that reads the clouds to fuse and the transforms from disk and writes the output mesh back to disk, instead of using ROS. It also can take into account a point's reliability when fusing the clouds, which is computed by the geometry mapper.</p>
 <p>Compile it using the instructions at: </p><pre class="fragment">https://github.com/oleg-alexandrov/voxblox/blob/master/docs/pages/Installation.rst
 </pre><p>This should end up creating the program: </p><pre class="fragment">$HOME/catkin_ws/devel/lib/voxblox_ros/batch_tsdf
 </pre><h3><a class="anchor" id="autotoc_md62"></a>
@@ -398,19 +398,21 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   --camera_type all                                                     \
   --start 0                                                             \
   --duration 1e+10                                                      \
-  --sampling_spacing_seconds 2                                          \
+  --sampling_spacing_seconds 5                                          \
   --dist_between_processed_cams 0.1                                     \
   --depth_exclude_columns 0                                             \
   --depth_exclude_rows 0                                                \
   --foreshortening_delta 5.0                                            \
   --median_filters "7 0.1 25 0.1"                                       \
+  --reliability_weight_exponent 2                                       \
+  --voxblox_integrator merged                                           \
   --depth_hole_fill_diameter 30.0                                       \
-  --max_ray_length 2                                                    \
+  --max_ray_length 2.5                                                  \
   --voxel_size 0.01                                                     \
   --max_iso_times_exposure 5.1                                          \
-  --smoothing_time 1e-5                                                 \
-  --max_num_hole_edges 4000                                             \
-  --max_hole_diameter 0.8                                               \
+  --smoothing_time 5e-6                                                 \
+  --max_num_hole_edges 8000                                             \
+  --max_hole_diameter 1.8                                               \
   --num_min_faces_in_component 100                                      \
   --num_components_to_keep 100                                          \
   --edge_keep_ratio 0.2                                                 \
@@ -453,9 +455,16 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   are fused. It is suggested to not make this too big, as more
   hole-filling happens on the fused mesh later (see
   --max_hole_diameter). The default is 30.
+--reliability_weight_exponent: A larger value will give more
+  weight to depth points corresponding to pixels closer to depth
+  image center, which are considered more reliable. The default is
+  2.0.
 --max_ray_length_m: Dictates at what distance from the depth camera
   to truncate the rays (in meters). This can be small if the images
   are acquired close to walls and facing them.
+--voxblox_integrator: When fusing the depth point clouds use
+  this VoxBlox method. Options are: "merged", "simple", and
+  "fast". The default is "merged".
 --voxel_size is the grid size used for binning the points, in meters.
 --max_iso_times_exposure: Apply the inverse gamma transform to
   images, multiply them by max_iso_times_exposure/ISO/exposure_time
@@ -640,7 +649,7 @@ $ISAAC_WS/devel/lib/geometry_mapper/image_picker        \
 <p>One could start by running this tool with a smaller value of the &ndash;max_time_between_images option, wiping many redundant images while ensuring there is good overlap among them and keeping pairs of similar images, then running this tool one more time with a very large value of this option to ensure the bracketing images for each sci cam image are added back.</p>
 <h3><a class="anchor" id="autotoc_md80"></a>
 Map building and registration</h3>
-<p>Build a sparse map with these images. Use the same environemnt as above: </p><pre class="fragment">dir=nav_images
+<p>Build a sparse map with these images. Use the same environment as above: </p><pre class="fragment">dir=nav_images
 images=$(ls $dir/*jpg)
 surf_map=${dir}_surf.map
 $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/build_map         \
@@ -704,7 +713,7 @@ navscisci2: 0.42920106999360996 1.4522176781247396 3.4578275058146062
 Orthoprojecting images</h2>
 <p>Given a camera image, its pose, and a mesh, a useful operation is to create a textured mesh with this camera. While the geometry mapper can create textured meshes as well, this tool does so from individual images rather than fusing them. It uses the logic from the streaming mapper instead of texrecon which is used by the geometry mapper.</p>
 <p>A geometry mapper run directory has all the inputs this tool needs. It can be run as follows: </p><pre class="fragment">export ASTROBEE_SOURCE_PATH=$HOME/projects/astrobee/src
-export ASTROBEE_BUILD_PATH=$HOME/projects/astrobee/build
+export ASTROBEE_BUILD_PATH=$HOME/projects/astrobee
 export ISAAC_WS=$HOME/projects/isaac
 source $ASTROBEE_BUILD_PATH/devel/setup.bash
 source $ISAAC_WS/devel/setup.bash

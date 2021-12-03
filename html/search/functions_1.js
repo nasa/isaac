@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['operator_3c_136',['operator&lt;',['../structdense__map_1_1InterestPoint.html#a65ea8bc3c3e0a012b39e2375a1520c72',1,'dense_map::InterestPoint']]]
+  ['element_192',['Element',['../classhapply_1_1Element.html#af08fe995c4124e50f107556a7a654ded',1,'happly::Element']]]
 ];
