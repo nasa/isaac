@@ -20,7 +20,7 @@
 // Include inspection library header
 #include <inspection/inspection.h>
 #define PI 3.1415
-
+#define EPS 1e-5
 /**
  * \ingroup beh
  */
@@ -38,7 +38,14 @@ namespace inspection {
   It also constains functions that allow inspection visualization.
 */
 
-  Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer cfg) {
+  Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
+    // Setug config readers
+    cfg_ = cfg;
+
+    cfg_cam_.AddFile("cameras.config");
+    if (!cfg_cam_.ReadFiles())
+      ROS_FATAL("Failed to read config files.");
+
     // Create a transform buffer to listen for transforms
     tf_listener_ = std::shared_ptr<tf2_ros::TransformListener>(
       new tf2_ros::TransformListener(tf_buffer_));
@@ -62,23 +69,32 @@ namespace inspection {
     pub_map_check_ = nh->advertise<visualization_msgs::MarkerArray>(
                       "markers/map_check", 1, true);
 
-    // Parameters Anomaly survey
-    opt_distance_       = cfg.Get<double>("optimal_distance");
-    dist_resolution_    = cfg.Get<double>("distance_resolution");
-    angle_resolution_   = cfg.Get<double>("angle_resolution");
-    max_angle_          = cfg.Get<double>("max_angle");
-    max_distance_       = cfg.Get<double>("max_distance");
-    min_distance_       = cfg.Get<double>("min_distance");
-    horizontal_fov_     = cfg.Get<double>("horizontal_fov");
-    aspect_ratio_       = cfg.Get<double>("aspect_ratio");
-    vent_size_x_        = cfg.Get<double>("vent_size_x");
-    vent_size_y_        = cfg.Get<double>("vent_size_y");
-    vent_to_scicam_rot_ = tf2::Quaternion(cfg.Get<double>("vent_to_sci_cam_rotation_x"),
-                                          cfg.Get<double>("vent_to_sci_cam_rotation_y"),
-                                          cfg.Get<double>("vent_to_sci_cam_rotation_z"),
-                                          cfg.Get<double>("vent_to_sci_cam_rotation_w"));
+    ReadParam();
+  }
 
-  // Parameters Panorama survey
+  void Inspection::ReadParam() {
+    // Parameters Anomaly survey
+    opt_distance_       = cfg_->Get<double>("optimal_distance");
+    dist_resolution_    = cfg_->Get<double>("distance_resolution");
+    angle_resolution_   = cfg_->Get<double>("angle_resolution");
+    max_angle_          = cfg_->Get<double>("max_angle");
+    max_distance_       = cfg_->Get<double>("max_distance");
+    min_distance_       = cfg_->Get<double>("min_distance");
+    horizontal_fov_     = cfg_->Get<double>("horizontal_fov");
+    aspect_ratio_       = cfg_->Get<double>("aspect_ratio");
+    target_size_x_      = cfg_->Get<double>("target_size_x");
+    target_size_y_      = cfg_->Get<double>("target_size_y");
+    vent_to_scicam_rot_ = tf2::Quaternion(cfg_->Get<double>("vent_to_sci_cam_rotation_x"),
+                                          cfg_->Get<double>("vent_to_sci_cam_rotation_y"),
+                                          cfg_->Get<double>("vent_to_sci_cam_rotation_z"),
+                                          cfg_->Get<double>("vent_to_sci_cam_rotation_w"));
+
+    // Parameters Panorama survey
+    pan_min_  = cfg_->Get<double>("pan_min") * PI / 180.0;
+    pan_max_  = cfg_->Get<double>("pan_max") * PI / 180.0;
+    tilt_min_ = cfg_->Get<double>("tilt_min") * PI / 180.0;
+    tilt_max_ = cfg_->Get<double>("tilt_max") * PI / 180.0;
+    overlap_  = cfg_->Get<double>("overlap");
   }
 
   // Ensure all clients are connected
@@ -214,22 +230,76 @@ namespace inspection {
   // Checks the given points agains whether the target is visible
   // from a camera picture
   bool Inspection::VisibilityConstraint(geometry_msgs::PoseArray &points) {
+    // Get camera parameters
+    Eigen::Matrix3d cam_mat;
+    float fx, fy, s, cx, cy;
+    int W, H;
+
+    config_reader::ConfigReader::Table camera(&cfg_cam_, points.header.frame_id.c_str());
+    // Read in distorted image size.
+    if (!camera.GetInt("width", &W))
+      fprintf(stderr, "Could not read camera width.");
+    if (!camera.GetInt("height", &H))
+      fprintf(stderr, "Could not read camera height.");
+
+    config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
+    for (int i = 0; i < 9; i++) {
+      if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
+        fprintf(stderr, "Failed to read vector intrinsic_matrix.");
+        break;
+      }
+    }
+    // Read in focal length, optical offset and skew
+    fx = cam_mat(0, 0);
+    fy = cam_mat(1, 1);
+    s  = cam_mat(1, 0);
+    cx = cam_mat(2, 0);
+    cy = cam_mat(2, 1);
+
     // Build the matrix with the points to evaluate
     Eigen::MatrixXd p(4, 4);
-    p << vent_size_x_,  vent_size_x_, -vent_size_x_, -vent_size_x_,
-         vent_size_y_, -vent_size_y_,  vent_size_y_, -vent_size_y_,
+    p << target_size_x_,  target_size_x_, -target_size_x_, -target_size_x_,
+         target_size_y_, -target_size_y_,  target_size_y_, -target_size_y_,
          0,             0,             0,              0,
          1,             1,             1,              1;
 
-    // Build perspective matrix
+    // Build projection matrix
     float yScale = 1.0F / tan(horizontal_fov_ / 2);
     float xScale = yScale / aspect_ratio_;
     float farmnear = max_distance_ - min_distance_;
-    Eigen::Matrix4d P;
-    P << xScale, 0,      0,                                             0,
+    Eigen::Matrix4d P_old;
+    P_old << xScale, 0,      0,                                             0,
          0,      yScale, 0,                                             0,
          0,      0,      max_distance_ / (farmnear),                    1,
          0,      0,      -min_distance_ * (max_distance_ / (farmnear)), 1;
+    Eigen::Matrix4d P;
+    P << 2*fx/W,     0,       0,                                                0,
+         2*s/W,      2*fy/H,  0,                                                0,
+         2*(cx/W)-1, 2*(cy/H)-1, max_distance_ / (farmnear),                    1,
+         0,          0,          -min_distance_ * (max_distance_ / (farmnear)), 1;
+
+    ROS_ERROR_STREAM_ONCE(
+      "P_old \tx: " << P_old(0, 0) << " y: " << P_old(0, 1) << " z: " << P_old(0, 2) << " w: " << P_old(0, 3)
+                    << "\n"
+                       "\tx: "
+                    << P_old(1, 0) << " y: " << P_old(1, 1) << " z: " << P_old(1, 2) << " w: " << P_old(1, 3)
+                    << "\n"
+                       "\tx: "
+                    << P_old(2, 0) << " y: " << P_old(2, 1) << " z: " << P_old(2, 2) << " w: " << P_old(2, 3)
+                    << "\n"
+                       "\tx: "
+                    << P_old(3, 0) << " y: " << P_old(3, 1) << " z: " << P_old(3, 2) << " w: " << P_old(3, 3) << "\n");
+
+    ROS_ERROR_STREAM_ONCE("P \tx: " << P(0, 0) << " y: " << P(0, 1) << " z: " << P(0, 2) << " w: " << P(0, 3)
+                                    << "\n"
+                                       "\tx: "
+                                    << P(1, 0) << " y: " << P(1, 1) << " z: " << P(1, 2) << " w: " << P(1, 3)
+                                    << "\n"
+                                       "\tx: "
+                                    << P(2, 0) << " y: " << P(2, 1) << " z: " << P(2, 2) << " w: " << P(2, 3)
+                                    << "\n"
+                                       "\tx: "
+                                    << P(3, 0) << " y: " << P(3, 1) << " z: " << P(3, 2) << " w: " << P(3, 3) << "\n");
 
     // Go through all the points in sorted segment
     std::vector<geometry_msgs::Pose>::const_iterator it = points.poses.begin();
@@ -470,17 +540,50 @@ void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   point.position.y = 0.0;
   point.position.z = 0.0;
   tf2::Quaternion panorama_rotation;
-  // Go through all the points
-  for (double theta = -PI/2; theta <=PI/2; theta += PI/4) {
-    for (double phi = 0; phi < 2*PI; phi += PI/4) {
-      panorama_rotation.setRPY(0, theta, phi);
+
+
+  // Get camera parameters
+  Eigen::Matrix3d cam_mat;
+  float fx, fy;
+  int W, H;
+
+  // Read in distorted image size.
+  config_reader::ConfigReader::Table camera(&cfg_cam_, points_panorama.header.frame_id.c_str());
+  if (!camera.GetInt("width", &W))
+    ROS_ERROR("Could not read camera width.");
+  if (!camera.GetInt("height", &H))
+    ROS_ERROR("Could not read camera height.");
+  config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
+  for (int i = 0; i < 9; i++) {
+    if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
+      ROS_ERROR("Failed to read vector intrinsic_matrix.");
+      break;
+    }
+  }
+  // Read in focal length
+  fx = cam_mat(0, 0);
+  fy = cam_mat(1, 1);
+
+  // Calculate field of views
+  float h_fov = 2 * atan(W / (2 * fx));
+  float v_fov = 2 * atan(H / (2 * fy));
+
+  // Calculate spacing between pictures
+  double k_pan  = (pan_max_ - pan_min_) / std::ceil((pan_max_ - pan_min_) / (h_fov * (1 - overlap_)));
+  double k_tilt = (tilt_max_ - tilt_min_) / std::ceil((tilt_max_ - tilt_min_) / (v_fov * (1 - overlap_)));
+
+  // If it's a full 360, skip the last one
+  if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= EPS;  // Go through all the points
+  for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
+    for (double pan = pan_min_; pan <= pan_max_; pan += k_pan) {
+      panorama_rotation.setRPY(0, tilt, pan);
       panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * vent_to_scicam_rot_;
       point.orientation.x = panorama_rotation.x();
       point.orientation.y = panorama_rotation.y();
       point.orientation.z = panorama_rotation.z();
       point.orientation.w = panorama_rotation.w();
       panorama_relative.poses.push_back(point);
-      if (theta == -PI/2 || theta == PI/2)
+      if (tilt == -PI/2 || tilt == PI/2)
         break;
     }
   }

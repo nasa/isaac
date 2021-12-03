@@ -325,7 +325,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     max_motion_retry_number_= cfg_.Get<int>("max_motion_retry_number");
 
     // Initiate inspection library
-    inspection_ = new Inspection(nh, cfg_);
+    inspection_ = new Inspection(nh, &cfg_);
   }
 
   // Ensure all clients are connected
@@ -374,11 +374,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     bool validation = cfg_.Get<bool>("enable_validation");
     bool boostrapping = cfg_.Get<bool>("enable_bootstrapping");
     bool immediate = cfg_.Get<bool>("enable_immediate");
-    bool timesync = cfg_.Get<bool>("enable_timesync");
-    double desired_vel = cfg_.Get<double>("desired_vel");
-    double desired_accel = cfg_.Get<double>("desired_accel");
-    double desired_omega = cfg_.Get<double>("desired_omega");
-    double desired_alpha = cfg_.Get<double>("desired_alpha");
 
     // Reconfigure the choreographer
     ff_util::ConfigClient choreographer_cfg(GetPlatformHandle(), NODE_CHOREOGRAPHER);
@@ -398,11 +393,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     choreographer_cfg.Set<bool>("enable_validation", validation);
     choreographer_cfg.Set<bool>("enable_bootstrapping", boostrapping);
     choreographer_cfg.Set<bool>("enable_immediate", immediate);
-    choreographer_cfg.Set<bool>("enable_timesync", timesync);
-    choreographer_cfg.Set<double>("desired_vel", desired_vel);
-    choreographer_cfg.Set<double>("desired_accel", desired_accel);
-    choreographer_cfg.Set<double>("desired_omega", desired_omega);
-    choreographer_cfg.Set<double>("desired_alpha", desired_alpha);
     if (!choreographer_cfg.Reconfigure()) {
       NODELET_ERROR_STREAM("Failed to reconfigure choreographer");
       return false;
@@ -737,8 +727,10 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
   // Callback to handle reconfiguration requests
   bool ReconfigureCallback(dynamic_reconfigure::Config & config) {
-    if ( fsm_.GetState() == STATE::WAITING)
-      return cfg_.Reconfigure(config);
+    if (cfg_.Reconfigure(config)) {
+      inspection_->ReadParam();
+      return true;
+    }
     return false;
   }
 
