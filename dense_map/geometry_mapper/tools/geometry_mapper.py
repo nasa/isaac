@@ -168,6 +168,12 @@ def process_args(args):
         help="Fill holes in the depth point clouds with this diameter, in pixels. This happens before the clouds are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh later (--max_hole_diameter).",
     )
     parser.add_argument(
+        "--reliability_weight_exponent",
+        dest="reliability_weight_exponent",
+        default="2",
+        help="A larger value will give more weight to depth points corresponding to pixels closer to depth image center, which are considered more reliable.",
+    )
+    parser.add_argument(
         "--max_ray_length",
         dest="max_ray_length",
         default="2.0",
@@ -180,6 +186,13 @@ def process_args(args):
         default="0.01",
         help="When fusing the depth point clouds use a voxel of this size, "
         + "in meters.",
+    )
+    parser.add_argument(
+        "--voxblox_integrator",
+        dest="voxblox_integrator",
+        default="merged",
+        help="When fusing the depth point clouds use this VoxBlox method. "
+        + 'Options are: "merged", "simple", and "fast".',
     )
     parser.add_argument(
         "--max_iso_times_exposure",
@@ -310,13 +323,13 @@ def process_args(args):
 
 def sanity_checks(geometry_mapper_path, batch_tsdf_path, args):
 
-    # Check if the environemnt was set
-    for var in (
+    # Check if the environment was set
+    for var in [
         "ASTROBEE_RESOURCE_DIR",
         "ASTROBEE_CONFIG_DIR",
         "ASTROBEE_WORLD",
         "ASTROBEE_ROBOT",
-    ):
+    ]:
         if var not in os.environ:
             raise Exception("Must set " + var)
 
@@ -424,6 +437,8 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.foreshortening_delta,
         "--depth_hole_fill_diameter",
         args.depth_hole_fill_diameter,
+        "--reliability_weight_exponent",
+        args.reliability_weight_exponent,
         "--median_filters",
         args.median_filters,
     ] + args.localization_options.split(" ")
@@ -464,7 +479,14 @@ def fuse_clouds(batch_tsdf_path, mesh, args):
 
     haz_cam_index = os.path.join(args.output_dir, "haz_cam_index.txt")
 
-    cmd = [batch_tsdf_path, haz_cam_index, mesh, args.max_ray_length, args.voxel_size]
+    cmd = [
+        batch_tsdf_path,
+        haz_cam_index,
+        mesh,
+        args.max_ray_length,
+        args.voxel_size,
+        args.voxblox_integrator,
+    ]
 
     log_file = os.path.join(args.output_dir, "voxblox_log.txt")
     print(

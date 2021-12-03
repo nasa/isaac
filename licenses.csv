@@ -1,5 +1,6 @@
 Type,Name,URL,License,Modified?,Notes
 Library (external),MVS-Texturing, https://github.com/nmoehrle/mvs-texturing.git,BSD 3-Clause License,YES,for geometric mapper just awaiting pull request to be accepted
+Library (external),happly,https://github.com/nmwsharp/happly,MIT license,No,Utility for writing ply files
 Library (external),libgp,https://github.com/mblum/libgp,BSD-3-Clause License,NO,used for volumetric mapper
 Library (external),https://github.com/bmegli/wifi-scan,MPL-2.0 License,YES,modified to the point we refactored all their code
 Library (external),pytorch,https://github.com/pytorch/pytorch,Modified BSD license,NO,used for image classification

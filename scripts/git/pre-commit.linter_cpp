@@ -102,6 +102,7 @@ def main():
                 and not "debian" in filename
                 and not "build" in filename
                 and not "TinyEXIF" in filename
+                and not "happly" in filename
             ):
                 cpp_files_to_lint.append(filename)
 
