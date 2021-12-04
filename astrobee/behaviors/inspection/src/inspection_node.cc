@@ -520,37 +520,32 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Signal an imminent sci cam image
     sci_cam_req_ = true;
 
-    // If using the simulation
-    if (sim_mode_) {
-      // Take picture
-      ff_msgs::CommandArg arg;
-      std::vector<ff_msgs::CommandArg> cmd_args;
+    // Take picture
+    ff_msgs::CommandArg arg;
+    std::vector<ff_msgs::CommandArg> cmd_args;
 
-      // The command sends two strings. The first has the app name,
-      // and the second the command value, encoded as json.
+    // The command sends two strings. The first has the app name,
+    // and the second the command value, encoded as json.
 
-      arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-      arg.s = "gov.nasa.arc.irg.astrobee.sci_cam_image";
-      cmd_args.push_back(arg);
+    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
+    arg.s = "gov.nasa.arc.irg.astrobee.sci_cam_image";
+    cmd_args.push_back(arg);
 
-      arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-      arg.s = "{\"name\": \"takeSinglePicture\"}";
-      cmd_args.push_back(arg);
+    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
+    arg.s = "{\"name\": \"takePicture\"}";
+    cmd_args.push_back(arg);
 
-      ff_msgs::CommandStamped cmd;
-      cmd.header.stamp = ros::Time::now();
-      cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_CUSTOM_GUEST_SCIENCE;
-      cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
-      cmd.cmd_src = "guest science";
-      cmd.cmd_origin = "guest science";
-      cmd.args = cmd_args;
+    ff_msgs::CommandStamped cmd;
+    cmd.header.stamp = ros::Time::now();
+    cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_CUSTOM_GUEST_SCIENCE;
+    cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
+    cmd.cmd_src = "guest science";
+    cmd.cmd_origin = "guest science";
+    cmd.args = cmd_args;
 
 
-      pub_guest_sci_.publish(cmd);
-    } else {
-      // If using the real robot
-      FILE *f = popen("ssh -t -t llp /opt/astrobee/ops/sci_cam_img_control.bash single pub_ros", "r");
-    }
+    pub_guest_sci_.publish(cmd);
+
 
     // Timer for the sci cam camera
     ros::Timer sci_cam_timeout_ = nh_->createTimer(ros::Duration(5), &InspectionNode::SciCamTimeout, this, true, false);
