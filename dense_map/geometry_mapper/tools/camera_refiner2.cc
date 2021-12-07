@@ -895,14 +895,14 @@ void calc_median_residuals(std::vector<double> const& residuals,
    double navcam_to_hazcam_timestamp_offset,                            // NOLINT
    MATCH_PAIR                   const & match_pair,                     // NOLINT
    std::vector<double>          const & haz_cam_intensity_timestamps,   // NOLINT
-   std::vector<double>          const & ref_cam_timestamps,          // NOLINT
+   std::vector<double>          const & ref_cam_timestamps,             // NOLINT
    std::map<int, int>           const & haz_cam_to_left_nav_cam_index,  // NOLINT
    std::map<int, int>           const & haz_cam_to_right_nav_cam_index, // NOLINT
    camera::CameraParameters     const & nav_cam_params,                 // NOLINT
    camera::CameraParameters     const & haz_cam_params,                 // NOLINT
    std::vector<int>             const & depth_to_nav_block_sizes,       // NOLINT
    std::vector<int>             const & depth_to_haz_block_sizes,       // NOLINT
-   std::vector<Eigen::Affine3d> const & ref_cam_transforms,                // NOLINT
+   std::vector<Eigen::Affine3d> const & ref_cam_transforms,             // NOLINT
    std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
    // Outputs                                                           // NOLINT
    std::vector<std::string>           & residual_names,                 // NOLINT
@@ -1033,35 +1033,36 @@ void calc_median_residuals(std::vector<double> const& residuals,
   }
 
   // Prevent the linter from messing up with the beautiful formatting below
-  void add_haz_sci_cost(// Inputs                                                            // NOLINT
-                        int haz_it, int sci_it, int nav_cam_start,                           // NOLINT
-                        double navcam_to_hazcam_timestamp_offset,                            // NOLINT
-                        double scicam_to_hazcam_timestamp_offset,                            // NOLINT
-                        MATCH_PAIR                   const & match_pair,                     // NOLINT
-                        std::vector<double>          const & haz_cam_intensity_timestamps,   // NOLINT
-                        std::vector<double>          const & ref_cam_timestamps,          // NOLINT
-                        std::vector<double>          const & sci_cam_timestamps,             // NOLINT
-                        std::map<int, int>           const & haz_cam_to_left_nav_cam_index,  // NOLINT
-                        std::map<int, int>           const & haz_cam_to_right_nav_cam_index, // NOLINT
-                        std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
-                        std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
-                        camera::CameraParameters     const & sci_cam_params,                 // NOLINT
-                        camera::CameraParameters     const & haz_cam_params,                 // NOLINT
-                        std::vector<int>             const & depth_to_sci_block_sizes,       // NOLINT
-                        std::vector<int>             const & depth_to_haz_block_sizes,       // NOLINT
-                        std::vector<Eigen::Affine3d> const & ref_cam_transforms,                // NOLINT
-                        std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
-                        // Outputs                                                           // NOLINT
-                        std::vector<std::string>           & residual_names,                 // NOLINT
-                        double                             & hazcam_depth_to_image_scale,    // NOLINT
-                        std::vector<double>                & ref_cam_vec,                    // NOLINT
-                        std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
-                        std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
-                        std::vector<double>                & hazcam_depth_to_image_vec,      // NOLINT
-                        Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
-                        Eigen::Vector2d                    & sci_cam_optical_center,         // NOLINT
-                        Eigen::VectorXd                    & sci_cam_distortion,             // NOLINT
-                        ceres::Problem                     & problem) {                      // NOLINT
+  void add_haz_sci_cost
+  (// Inputs                                                            // NOLINT
+   int haz_it, int sci_it, int nav_cam_start,                           // NOLINT
+   double navcam_to_hazcam_timestamp_offset,                            // NOLINT
+   double scicam_to_hazcam_timestamp_offset,                            // NOLINT
+   MATCH_PAIR                   const & match_pair,                     // NOLINT
+   std::vector<double>          const & haz_cam_intensity_timestamps,   // NOLINT
+   std::vector<double>          const & ref_cam_timestamps,             // NOLINT
+   std::vector<double>          const & sci_cam_timestamps,             // NOLINT
+   std::map<int, int>           const & haz_cam_to_left_nav_cam_index,  // NOLINT
+   std::map<int, int>           const & haz_cam_to_right_nav_cam_index, // NOLINT
+   std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
+   std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
+   camera::CameraParameters     const & sci_cam_params,                 // NOLINT
+   camera::CameraParameters     const & haz_cam_params,                 // NOLINT
+   std::vector<int>             const & depth_to_sci_block_sizes,       // NOLINT
+   std::vector<int>             const & depth_to_haz_block_sizes,       // NOLINT
+   std::vector<Eigen::Affine3d> const & ref_cam_transforms,             // NOLINT
+   std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
+   // Outputs                                                           // NOLINT
+   std::vector<std::string>           & residual_names,                 // NOLINT
+   double                             & hazcam_depth_to_image_scale,    // NOLINT
+   std::vector<double>                & ref_cam_vec,                    // NOLINT
+   std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
+   std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
+   std::vector<double>                & hazcam_depth_to_image_vec,      // NOLINT
+   Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
+   Eigen::Vector2d                    & sci_cam_optical_center,         // NOLINT
+   Eigen::VectorXd                    & sci_cam_distortion,             // NOLINT
+   ceres::Problem                     & problem) {                      // NOLINT
     auto left_it  = haz_cam_to_left_nav_cam_index.find(haz_it);
     auto right_it = haz_cam_to_right_nav_cam_index.find(haz_it);
     if (left_it == haz_cam_to_left_nav_cam_index.end() ||
@@ -1197,38 +1198,39 @@ void calc_median_residuals(std::vector<double> const& residuals,
   }
 
   // Prevent the linter from messing up with the beautiful formatting below
-  void add_nav_sci_cost(// Inputs                                                            // NOLINT
-                        int nav_it, int sci_it, int nav_cam_start,                           // NOLINT
-                        double navcam_to_hazcam_timestamp_offset,                            // NOLINT
-                        double scicam_to_hazcam_timestamp_offset,                            // NOLINT
-                        MATCH_PAIR                   const & match_pair,                     // NOLINT
-                        std::vector<double>          const & ref_cam_timestamps,          // NOLINT
-                        std::vector<double>          const & sci_cam_timestamps,             // NOLINT
-                        std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
-                        std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
-                        Eigen::Affine3d              const & hazcam_to_navcam_aff_trans,     // NOLINT
-                        Eigen::Affine3d              const & scicam_to_hazcam_aff_trans,     // NOLINT
-                        camera::CameraParameters     const & nav_cam_params,                 // NOLINT
-                        camera::CameraParameters     const & sci_cam_params,                 // NOLINT
-                        std::vector<int>             const & nav_block_sizes,                // NOLINT
-                        std::vector<int>             const & sci_block_sizes,                // NOLINT
-                        std::vector<int>             const & mesh_block_sizes,               // NOLINT
-                        std::vector<Eigen::Affine3d> const & ref_cam_transforms,                // NOLINT
-                        std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
-                        mve::TriangleMesh::Ptr       const & mesh,                           // NOLINT
-                        std::shared_ptr<BVHTree>     const & bvh_tree,                       // NOLINT
-                        // Outputs                                                           // NOLINT
-                        int                                & nav_sci_xyz_count,              // NOLINT
-                        std::vector<std::string>           & residual_names,                 // NOLINT
-                        std::vector<double>                & ref_cam_vec,                    // NOLINT
-                        std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
-                        std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
-                        Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
-                        Eigen::Vector2d                    & sci_cam_optical_center,         // NOLINT
-                        Eigen::VectorXd                    & sci_cam_distortion,             // NOLINT
-                        std::vector<Eigen::Vector3d>       & initial_nav_sci_xyz,            // NOLINT
-                        std::vector<double>                & nav_sci_xyz,                    // NOLINT
-                        ceres::Problem                     & problem) {                      // NOLINT
+  void add_nav_sci_cost
+  (// Inputs                                                            // NOLINT
+   int nav_it, int sci_it, int nav_cam_start,                           // NOLINT
+   double navcam_to_hazcam_timestamp_offset,                            // NOLINT
+   double scicam_to_hazcam_timestamp_offset,                            // NOLINT
+   MATCH_PAIR                   const & match_pair,                     // NOLINT
+   std::vector<double>          const & ref_cam_timestamps,             // NOLINT
+   std::vector<double>          const & sci_cam_timestamps,             // NOLINT
+   std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
+   std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
+   Eigen::Affine3d              const & hazcam_to_navcam_aff_trans,     // NOLINT
+   Eigen::Affine3d              const & scicam_to_hazcam_aff_trans,     // NOLINT
+   camera::CameraParameters     const & nav_cam_params,                 // NOLINT
+   camera::CameraParameters     const & sci_cam_params,                 // NOLINT
+   std::vector<int>             const & nav_block_sizes,                // NOLINT
+   std::vector<int>             const & sci_block_sizes,                // NOLINT
+   std::vector<int>             const & mesh_block_sizes,               // NOLINT
+   std::vector<Eigen::Affine3d> const & ref_cam_transforms,             // NOLINT
+   std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
+   mve::TriangleMesh::Ptr       const & mesh,                           // NOLINT
+   std::shared_ptr<BVHTree>     const & bvh_tree,                       // NOLINT
+   // Outputs                                                           // NOLINT
+   int                                & nav_sci_xyz_count,              // NOLINT
+   std::vector<std::string>           & residual_names,                 // NOLINT
+   std::vector<double>                & ref_cam_vec,                    // NOLINT
+   std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
+   std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
+   Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
+   Eigen::Vector2d                    & sci_cam_optical_center,         // NOLINT
+   Eigen::VectorXd                    & sci_cam_distortion,             // NOLINT
+   std::vector<Eigen::Vector3d>       & initial_nav_sci_xyz,            // NOLINT
+   std::vector<double>                & nav_sci_xyz,                    // NOLINT
+   ceres::Problem                     & problem) {                      // NOLINT
     auto left_it  = sci_cam_to_left_nav_cam_index.find(sci_it);
     auto right_it = sci_cam_to_right_nav_cam_index.find(sci_it);
     if (left_it == sci_cam_to_left_nav_cam_index.end() ||
@@ -1831,6 +1833,11 @@ void calc_median_residuals(std::vector<double> const& residuals,
     cv::Mat depth_cloud;
   };
 
+  // Sort by timestamps in the ref camera clock
+  bool timestampLess(cameraImage i, cameraImage j) {
+    return (i.ref_timestamp < j.ref_timestamp);
+  }
+
 }  // namespace dense_map
 
 int main(int argc, char** argv) {
@@ -2086,6 +2093,7 @@ int main(int argc, char** argv) {
     std::cout.precision(18);
     for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
       dense_map::cameraImage cam;
+      bool success = false;
       if (cam_type == ref_cam_type) {
         cam.camera_type         = cam_type;
         cam.timestamp           = ref_cam_timestamps[ref_it];
@@ -2114,7 +2122,8 @@ int main(int argc, char** argv) {
         std::cout.precision(18);
         std::cout << "--add ref " << found_time << std::endl;
 
-        cams.push_back(cam);
+        success = true;
+
       } else {
         if (ref_it + 1 >= num_ref_cams) break;  // Arrived at the end, cannot do a bracket
 
@@ -2122,9 +2131,11 @@ int main(int argc, char** argv) {
         double left_timestamp = ref_cam_timestamps[ref_it] + ref_to_cam_timestamp_offsets[cam_type];
         double right_timestamp = ref_cam_timestamps[ref_it + 1] + ref_to_cam_timestamp_offsets[cam_type];
 
-        if (right_timestamp <= left_timestamp) LOG(FATAL) << "Ref timestamps must be in increasing order.\n";
+        if (right_timestamp <= left_timestamp)
+          LOG(FATAL) << "Ref timestamps must be in increasing order.\n";
 
-        if (right_timestamp - left_timestamp > FLAGS_bracket_len) continue;  // Must respect the bracket length
+        if (right_timestamp - left_timestamp > FLAGS_bracket_len)
+          continue;  // Must respect the bracket length
 
         std::cout.precision(18);
         std::cout << "---not ref " << left_timestamp << ' ' << right_timestamp << std::endl;
@@ -2203,9 +2214,12 @@ int main(int argc, char** argv) {
           std::cout << "--xxxsci after " << sci_time - nav_start << ' ' << nav_end - sci_time << ' '
                     << nav_end - nav_start << std::endl;
         }
+
+        success = true;
       }
 
-      // Must do clouds!
+      if (!success) continue;
+
       if (depth_topics[cam_type] != "") {
         double found_time = -1.0;
         cv::Mat cloud;
@@ -2213,23 +2227,26 @@ int main(int argc, char** argv) {
         if (!dense_map::lookupCloud(cam.timestamp, bag_map[depth_topics[cam_type]],
                                     FLAGS_max_haz_cam_image_to_depth_timestamp_diff,
                                     // Outputs
-                                    cloud,
+                                    cam.depth_cloud,
                                     cloud_start_positions[cam_type],  // care here
                                     found_time)) {
           std::cout << "--fail finding cloud " << std::endl;
         } else {
-          std::cout << "--success finding cloud with diff " << std::abs(cam.timestamp - found_time) << std::endl;
+          std::cout << "--success finding cloud with diff "
+                    << std::abs(cam.timestamp - found_time) << std::endl;
         }
       }
 
+      std::cout << "--success with cam of type " << cam.camera_type << std::endl;
+      cams.push_back(cam);
     }  // end loop over camera types
   }    // end loop over ref images
 
   for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
     if (cam_type == ref_cam_type) continue;  // bounds don't make sense here
 
-    std::cout << "Bounds for camera " << cam_type << ": " << left_bound[cam_type] << ' ' << right_bound[cam_type]
-              << std::endl;
+    std::cout << "Bounds for camera " << cam_type << ": " << left_bound[cam_type]
+              << ' ' << right_bound[cam_type] << std::endl;
   }
 
   std::cout << "--start selecting!" << std::endl;
