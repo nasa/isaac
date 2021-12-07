@@ -80,8 +80,6 @@ namespace inspection {
     max_angle_          = cfg_->Get<double>("max_angle");
     max_distance_       = cfg_->Get<double>("max_distance");
     min_distance_       = cfg_->Get<double>("min_distance");
-    horizontal_fov_     = cfg_->Get<double>("horizontal_fov");
-    aspect_ratio_       = cfg_->Get<double>("aspect_ratio");
     target_size_x_      = cfg_->Get<double>("target_size_x");
     target_size_y_      = cfg_->Get<double>("target_size_y");
     vent_to_scicam_rot_ = tf2::Quaternion(cfg_->Get<double>("vent_to_sci_cam_rotation_x"),
@@ -252,9 +250,9 @@ namespace inspection {
     // Read in focal length, optical offset and skew
     fx = cam_mat(0, 0);
     fy = cam_mat(1, 1);
-    s  = cam_mat(1, 0);
-    cx = cam_mat(2, 0);
-    cy = cam_mat(2, 1);
+    s  = cam_mat(0, 1);
+    cx = cam_mat(0, 2);
+    cy = cam_mat(1, 2);
 
     // Build the matrix with the points to evaluate
     Eigen::MatrixXd p(4, 4);
@@ -264,42 +262,12 @@ namespace inspection {
          1,             1,             1,              1;
 
     // Build projection matrix
-    float yScale = 1.0F / tan(horizontal_fov_ / 2);
-    float xScale = yScale / aspect_ratio_;
     float farmnear = max_distance_ - min_distance_;
-    Eigen::Matrix4d P_old;
-    P_old << xScale, 0,      0,                                             0,
-         0,      yScale, 0,                                             0,
-         0,      0,      max_distance_ / (farmnear),                    1,
-         0,      0,      -min_distance_ * (max_distance_ / (farmnear)), 1;
     Eigen::Matrix4d P;
     P << 2*fx/W,     0,       0,                                                0,
          2*s/W,      2*fy/H,  0,                                                0,
          2*(cx/W)-1, 2*(cy/H)-1, max_distance_ / (farmnear),                    1,
          0,          0,          -min_distance_ * (max_distance_ / (farmnear)), 1;
-
-    ROS_ERROR_STREAM_ONCE(
-      "P_old \tx: " << P_old(0, 0) << " y: " << P_old(0, 1) << " z: " << P_old(0, 2) << " w: " << P_old(0, 3)
-                    << "\n"
-                       "\tx: "
-                    << P_old(1, 0) << " y: " << P_old(1, 1) << " z: " << P_old(1, 2) << " w: " << P_old(1, 3)
-                    << "\n"
-                       "\tx: "
-                    << P_old(2, 0) << " y: " << P_old(2, 1) << " z: " << P_old(2, 2) << " w: " << P_old(2, 3)
-                    << "\n"
-                       "\tx: "
-                    << P_old(3, 0) << " y: " << P_old(3, 1) << " z: " << P_old(3, 2) << " w: " << P_old(3, 3) << "\n");
-
-    ROS_ERROR_STREAM_ONCE("P \tx: " << P(0, 0) << " y: " << P(0, 1) << " z: " << P(0, 2) << " w: " << P(0, 3)
-                                    << "\n"
-                                       "\tx: "
-                                    << P(1, 0) << " y: " << P(1, 1) << " z: " << P(1, 2) << " w: " << P(1, 3)
-                                    << "\n"
-                                       "\tx: "
-                                    << P(2, 0) << " y: " << P(2, 1) << " z: " << P(2, 2) << " w: " << P(2, 3)
-                                    << "\n"
-                                       "\tx: "
-                                    << P(3, 0) << " y: " << P(3, 1) << " z: " << P(3, 2) << " w: " << P(3, 3) << "\n");
 
     // Go through all the points in sorted segment
     std::vector<geometry_msgs::Pose>::const_iterator it = points.poses.begin();
