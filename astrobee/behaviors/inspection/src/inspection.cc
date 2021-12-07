@@ -68,8 +68,6 @@ namespace inspection {
                       "markers/zones_check", 1, true);
     pub_map_check_ = nh->advertise<visualization_msgs::MarkerArray>(
                       "markers/map_check", 1, true);
-
-    ReadParam();
   }
 
   void Inspection::ReadParam() {
@@ -130,6 +128,8 @@ namespace inspection {
   // MOVE ACTION CLIENT
   // Generate inspection segment
   bool Inspection::GenSegment(geometry_msgs::Pose goal) {
+    // Update parameters
+    ReadParam();
     // Insert Offset
     tf2::Transform vent_transform;
     vent_transform.setOrigin(tf2::Vector3(
@@ -492,100 +492,103 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
     publisher.publish(msg_visual);
   }
 
-void Inspection::DrawInspectionFrostum() {
-}
-
-// Generate the survey for panorama pictures
-void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama) {
-  geometry_msgs::PoseArray panorama_relative;
-  geometry_msgs::PoseArray panorama_transformed;
-  geometry_msgs::PoseArray panorama_survey;
-
-  // Insert point
-  geometry_msgs::Pose point;
-  panorama_relative.header.frame_id = points_panorama.header.frame_id.c_str();
-  point.position.x = 0.0;
-  point.position.y = 0.0;
-  point.position.z = 0.0;
-  tf2::Quaternion panorama_rotation;
-
-
-  // Get camera parameters
-  Eigen::Matrix3d cam_mat;
-  float fx, fy;
-  int W, H;
-
-  // Read in distorted image size.
-  config_reader::ConfigReader::Table camera(&cfg_cam_, points_panorama.header.frame_id.c_str());
-  if (!camera.GetInt("width", &W)) {
-    ROS_ERROR("Could not read camera width.");
+  void Inspection::DrawInspectionFrostum() {
   }
-  if (!camera.GetInt("height", &H)) {
-    ROS_ERROR("Could not read camera height.");
-  }
-  config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
-  for (int i = 0; i < 9; i++) {
-    if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
-      ROS_ERROR("Failed to read vector intrinsic_matrix.");
-      break;
+
+  // Generate the survey for panorama pictures
+  void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama) {
+    // Update parameters
+    ReadParam();
+
+    geometry_msgs::PoseArray panorama_relative;
+    geometry_msgs::PoseArray panorama_transformed;
+    geometry_msgs::PoseArray panorama_survey;
+
+    // Insert point
+    geometry_msgs::Pose point;
+    panorama_relative.header.frame_id = points_panorama.header.frame_id.c_str();
+    point.position.x = 0.0;
+    point.position.y = 0.0;
+    point.position.z = 0.0;
+    tf2::Quaternion panorama_rotation;
+
+
+    // Get camera parameters
+    Eigen::Matrix3d cam_mat;
+    float fx, fy;
+    int W, H;
+
+    // Read in distorted image size.
+    config_reader::ConfigReader::Table camera(&cfg_cam_, points_panorama.header.frame_id.c_str());
+    if (!camera.GetInt("width", &W)) {
+      ROS_ERROR("Could not read camera width.");
     }
-  }
-  // Read in focal length
-  fx = cam_mat(0, 0);
-  fy = cam_mat(1, 1);
-
-  // Calculate field of views
-  float h_fov = 2 * atan(W / (2 * fx));
-  float v_fov = 2 * atan(H / (2 * fy));
-
-  // Calculate spacing between pictures
-  double k_pan  = (pan_max_ - pan_min_) / std::ceil((pan_max_ - pan_min_) / (h_fov * (1 - overlap_)));
-  double k_tilt = (tilt_max_ - tilt_min_) / std::ceil((tilt_max_ - tilt_min_) / (v_fov * (1 - overlap_)));
-
-  // Case where max and min is zero
-  if (std::isnan(k_pan)) k_pan = PI;
-  if (std::isnan(k_tilt)) k_tilt = PI;
-
-  // If it's a full 360, skip the last one
-  if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= 2 * EPS;  // Go through all the points
-
-  // Generate all the pan/tilt values
-  for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
-    for (double pan = pan_min_; pan <= pan_max_ + EPS; pan += k_pan) {
-      ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
-      panorama_rotation.setRPY(0, tilt, pan);
-      panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * vent_to_scicam_rot_;
-      point.orientation.x = panorama_rotation.x();
-      point.orientation.y = panorama_rotation.y();
-      point.orientation.z = panorama_rotation.z();
-      point.orientation.w = panorama_rotation.w();
-      panorama_relative.poses.push_back(point);
-      if (tilt == -PI/2 || tilt == PI/2)
+    if (!camera.GetInt("height", &H)) {
+      ROS_ERROR("Could not read camera height.");
+    }
+    config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
+    for (int i = 0; i < 9; i++) {
+      if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
+        ROS_ERROR("Failed to read vector intrinsic_matrix.");
         break;
+      }
     }
+    // Read in focal length
+    fx = cam_mat(0, 0);
+    fy = cam_mat(1, 1);
+
+    // Calculate field of views
+    float h_fov = 2 * atan(W / (2 * fx));
+    float v_fov = 2 * atan(H / (2 * fy));
+
+    // Calculate spacing between pictures
+    double k_pan  = (pan_max_ - pan_min_) / std::ceil((pan_max_ - pan_min_) / (h_fov * (1 - overlap_)));
+    double k_tilt = (tilt_max_ - tilt_min_) / std::ceil((tilt_max_ - tilt_min_) / (v_fov * (1 - overlap_)));
+
+    // Case where max and min is zero
+    if (std::isnan(k_pan)) k_pan = PI;
+    if (std::isnan(k_tilt)) k_tilt = PI;
+
+    // If it's a full 360, skip the last one
+    if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= 2 * EPS;  // Go through all the points
+
+    // Generate all the pan/tilt values
+    for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
+      for (double pan = pan_min_; pan <= pan_max_ + EPS; pan += k_pan) {
+        ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
+        panorama_rotation.setRPY(0, tilt, pan);
+        panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * vent_to_scicam_rot_;
+        point.orientation.x = panorama_rotation.x();
+        point.orientation.y = panorama_rotation.y();
+        point.orientation.z = panorama_rotation.z();
+        point.orientation.w = panorama_rotation.w();
+        panorama_relative.poses.push_back(point);
+        if (tilt == -PI/2 || tilt == PI/2)
+          break;
+      }
+    }
+
+    // Go through all the panorama points
+    for (int i = 0; i < points_panorama.poses.size(); ++i) {
+      // Transform the points from the camera reference frame to the robot body
+
+      tf2::Transform panorama_pose;
+      panorama_pose.setOrigin(tf2::Vector3(
+                        points_panorama.poses[i].position.x,
+                        points_panorama.poses[i].position.y,
+                        points_panorama.poses[i].position.z));
+      panorama_pose.setRotation(tf2::Quaternion(
+                        points_panorama.poses[i].orientation.x,
+                        points_panorama.poses[i].orientation.y,
+                        points_panorama.poses[i].orientation.z,
+                        points_panorama.poses[i].orientation.w));
+      TransformList(panorama_relative, panorama_transformed, panorama_pose);
+
+      panorama_survey.poses.insert(std::end(panorama_survey.poses), std::begin(panorama_transformed.poses),
+                                    std::end(panorama_transformed.poses));
+    }
+    points_panorama = panorama_survey;
   }
-
-  // Go through all the panorama points
-  for (int i = 0; i < points_panorama.poses.size(); ++i) {
-    // Transform the points from the camera reference frame to the robot body
-
-    tf2::Transform panorama_pose;
-    panorama_pose.setOrigin(tf2::Vector3(
-                      points_panorama.poses[i].position.x,
-                      points_panorama.poses[i].position.y,
-                      points_panorama.poses[i].position.z));
-    panorama_pose.setRotation(tf2::Quaternion(
-                      points_panorama.poses[i].orientation.x,
-                      points_panorama.poses[i].orientation.y,
-                      points_panorama.poses[i].orientation.z,
-                      points_panorama.poses[i].orientation.w));
-    TransformList(panorama_relative, panorama_transformed, panorama_pose);
-
-    panorama_survey.poses.insert(std::end(panorama_survey.poses), std::begin(panorama_transformed.poses),
-                                  std::end(panorama_transformed.poses));
-  }
-  points_panorama = panorama_survey;
-}
 
 }  // namespace inspection
 

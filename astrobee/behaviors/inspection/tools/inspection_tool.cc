@@ -30,6 +30,8 @@
 #include <ff_util/ff_names.h>
 #include <isaac_util/isaac_names.h>
 #include <ff_util/ff_action.h>
+#include <ff_util/config_client.h>
+
 
 // Action
 #include <isaac_msgs/InspectionAction.h>
@@ -63,14 +65,21 @@ DEFINE_bool(geometry, false, "Send the inspection command");
 DEFINE_bool(panorama, false, "Send the inspection command");
 DEFINE_bool(volumetric, false, "Send the inspection command");
 
+// Configurable Parameters
 DEFINE_string(camera, "sci_cam", "Camera to use");
+DEFINE_double(tilt_max, 90.0, "Panorama: maximum tilt");
+DEFINE_double(tilt_min, -90.0, "Panorama: minimum tilt");
+DEFINE_double(pan_max, 180.0, "Panorama: maximum pan");
+DEFINE_double(pan_min, -180.0, "Panorama: minimum pan");
+DEFINE_double(overlap, 0.5, "Panorama: overlap between images");
 
+// Plan files
 DEFINE_string(anomaly_poses, "/resources/vent_jpm.txt", "Vent pose list to inspect");
 DEFINE_string(geometry_poses, "/resources/survey_bay_6.txt", "Geometry poses list to map");
 DEFINE_string(panorama_poses, "/resources/panorama_jpm.txt", "Panorama poses list to map");
 DEFINE_string(volumetric_poses, "/resources/wifi_jpm.txt", "Wifi poses list to map");
 
-// Timeout values
+// Timeout values for action
 DEFINE_double(connect, 10.0, "Action connect timeout");
 DEFINE_double(active, 10.0, "Action active timeout");
 DEFINE_double(response, 200.0, "Action response timeout");
@@ -305,9 +314,19 @@ int main(int argc, char *argv[]) {
     std::placeholders::_1, std::placeholders::_2));
   client.SetConnectedCallback(std::bind(ConnectedCallback, &client));
   client.Create(&nh, ACTION_BEHAVIORS_INSPECTION);
-  // Print out a status message
-  std::cout << "\r                                                   "
-            << "\rState: CONNECTING" << std::flush;
+  // Configure inspection parameters
+  if (FLAGS_panorama) {
+    ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
+    cfg.Set<double>("pan_min", FLAGS_pan_min);
+    cfg.Set<double>("pan_max", FLAGS_pan_max);
+    cfg.Set<double>("tilt_min", FLAGS_tilt_min);
+    cfg.Set<double>("tilt_max", FLAGS_tilt_max);
+    cfg.Set<double>("overlap", FLAGS_overlap);
+    if (!cfg.Reconfigure()) {
+      std::cout << "Could not reconfigure the inspection node " << std::endl;
+      ros::shutdown();
+    }
+  }
   // Synchronous mode
   ros::spin();
   // Finish commandline flags
