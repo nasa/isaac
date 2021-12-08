@@ -95,7 +95,7 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
     GOAL_UNPAUSE     = (1<<6),    // Resume an existing goal
     MOTION_SUCCESS   = (1<<7),    // Mobility motion action success
     MOTION_FAILED    = (1<<8),    // Mobility motion action problem
-    ARM_SUCCESS      = (1<<9),   // Arm motion action success
+    ARM_SUCCESS      = (1<<9),    // Arm motion action success
     ARM_FAILED       = (1<<10),   // Arm motion action problem
     DETECT_SUCCESS   = (1<<11),   // Detection AR tag success
     DETECT_FAILED    = (1<<12),   // Detection AR tag failed
@@ -442,7 +442,7 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
   }
 
   void GroundConnectedCallback() {
-    ROS_ERROR_STREAM("GroundConnectedCallback()");
+    NODELET_DEBUG_STREAM("GroundConnectedCallback()");
     if (!client_d_.IsConnected()) return;       // Detection action
     ground_active_ = true;
   }
