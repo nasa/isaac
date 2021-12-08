@@ -172,6 +172,52 @@ DEFINE_bool(verbose, false,
 
 namespace dense_map {
 
+  // Calculate interpolated world to camera trans
+  Eigen::Affine3d calc_world_to_cam_trans(const double* beg_world_to_ref_t,
+                                          const double* end_world_to_ref_t,
+                                          const double* ref_to_cam_trans,
+                                          double beg_ref_stamp,
+                                          double end_ref_stamp,
+                                          double ref_to_cam_offset,
+                                          double cam_stamp) {
+    Eigen::Affine3d beg_world_to_ref_aff;
+    array_to_rigid_transform(beg_world_to_ref_aff, beg_world_to_ref_t);
+
+    Eigen::Affine3d end_world_to_ref_aff;
+    array_to_rigid_transform(end_world_to_ref_aff, end_world_to_ref_t);
+
+    Eigen::Affine3d ref_to_cam_aff;
+    array_to_rigid_transform(ref_to_cam_aff, ref_to_cam_trans);
+
+    std::cout.precision(18);
+    std::cout << "--beg stamp " << beg_ref_stamp << std::endl;
+    std::cout << "--end stamp " << end_ref_stamp << std::endl;
+    std::cout << "cam stamp   " << cam_stamp << std::endl;
+    std::cout << "ref to cam off " << ref_to_cam_offset << std::endl;
+
+    std::cout << "--ref to cam trans\n" << ref_to_cam_aff.matrix() << std::endl;
+
+    // Covert from cam time to ref time and normalize
+    double alpha = (cam_stamp - ref_to_cam_offset - beg_ref_stamp)
+      / (end_ref_stamp - beg_ref_stamp);
+
+    if (beg_ref_stamp == end_ref_stamp)
+      alpha = 0.0;  // handle division by zero
+
+    std::cout << "--alpha " << alpha << std::endl;
+    if (alpha < 0.0 || alpha > 1.0) LOG(FATAL) << "Out of bounds in interpolation.\n";
+
+    // Interpolate at desired time
+    Eigen::Affine3d interp_world_to_ref_aff
+      = dense_map::linearInterp(alpha, beg_world_to_ref_aff, end_world_to_ref_aff);
+
+    Eigen::Affine3d interp_world_to_cam_afff = ref_to_cam_aff * interp_world_to_ref_aff;
+
+    std::cout << "final trans\n" << interp_world_to_cam_afff.matrix() << std::endl;
+
+    return interp_world_to_cam_afff;
+  }
+
   // TODO(oalexan1): Store separately matches which end up being
   // squashed in a pid_cid_to_fid.
 
@@ -212,33 +258,33 @@ struct BracketedCamError {
     m_cam_params(cam_params),
     m_num_focal_lengths(1) {
     // Sanity check
-    if (m_block_sizes.size() != 8               ||
-        m_block_sizes[0] != NUM_RIGID_PARAMS    ||
-        m_block_sizes[1] != NUM_RIGID_PARAMS    ||
-        m_block_sizes[2] != NUM_RIGID_PARAMS    ||
-        m_block_sizes[3] != NUM_XYZ_PARAMS      ||
-        m_block_sizes[4] != NUM_SCALAR_PARAMS   ||
-        m_block_sizes[5] != m_num_focal_lengths ||
-        m_block_sizes[6] != NUM_OPT_CTR_PARAMS  ||
-        m_block_sizes[7] != m_cam_params.GetDistortion().size()) {
+    if (m_block_sizes.size() != 8 || m_block_sizes[0] != NUM_RIGID_PARAMS ||
+        m_block_sizes[1] != NUM_RIGID_PARAMS || m_block_sizes[2] != NUM_RIGID_PARAMS ||
+        m_block_sizes[3] != NUM_XYZ_PARAMS || m_block_sizes[4] != NUM_SCALAR_PARAMS ||
+        m_block_sizes[5] != m_num_focal_lengths || m_block_sizes[6] != NUM_OPT_CTR_PARAMS ||
+        m_block_sizes[7] != 1  // This will be overwritten shortly
+    ) {
       LOG(FATAL) << "BracketedCamError: The block sizes were not set up properly.\n";
     }
+
+    // Set the correct distortion size. This cannot be done in the interface for now.
+    // TODO(oalexan1): Make individual block sizes for each camera, then this issue will go away.
+    m_block_sizes[7] = m_cam_params.GetDistortion().size();
   }
 
   // Call to work with ceres::DynamicNumericDiffCostFunction.
   bool operator()(double const* const* parameters, double* residuals) const {
-    Eigen::Affine3d left_world_to_ref_trans;
-    array_to_rigid_transform(left_world_to_ref_trans, parameters[0]);
+    Eigen::Affine3d world_to_cam_trans =
+      calc_world_to_cam_trans(parameters[0],  // beg_world_to_ref_t
+                              parameters[1],  // end_world_to_ref_t
+                              parameters[2],  // ref_to_cam_trans
+                              m_left_ref_stamp, m_right_ref_stamp,
+                              parameters[4][0],  // ref_to_cam_offset
+                              m_cam_stamp);
 
-    Eigen::Affine3d right_world_to_ref_trans;
-    array_to_rigid_transform(right_world_to_ref_trans, parameters[1]);
-
-    Eigen::Affine3d ref_to_cam_trans;
-    array_to_rigid_transform(ref_to_cam_trans, parameters[2]);
-
+    // World point
     Eigen::Vector3d X(parameters[3][0], parameters[3][1], parameters[3][2]);
-
-    double ref_to_cam_offset = parameters[4][0];
+    std::cout << "--X is " << X.transpose() << std::endl;
 
     // Make a deep copy which we will modify
     camera::CameraParameters cam_params = m_cam_params;
@@ -250,24 +296,14 @@ struct BracketedCamError {
     cam_params.SetOpticalOffset(optical_center);
     cam_params.SetDistortion(distortion);
 
-    // Covert from cam time to ref time and normalize
-    double alpha = (m_cam_stamp - ref_to_cam_offset - m_left_ref_stamp)
-      / (m_right_ref_stamp - m_left_ref_stamp);
+    std::cout << "--focal vector " << focal_vector.transpose() << std::endl;
+    std::cout << "--opt ctr " << optical_center.transpose() << std::endl;
+    std::cout << "-dist " << distortion.transpose() << std::endl;
 
-    if (m_left_ref_stamp == m_right_ref_stamp)
-      alpha = 0.0;  // handle division by zero
+    // Convert world point to given cam coordinates
+    X = world_to_cam_trans * X;
 
-    if (alpha < 0.0 || alpha > 1.0) LOG(FATAL) << "Out of bounds in interpolation.\n";
-
-    // Interpolate at desired time
-    Eigen::Affine3d interp_world_to_ref_trans
-      = dense_map::linearInterp(alpha, left_world_to_ref_trans, right_world_to_ref_trans);
-
-    // Convert point to ref cam coordinates
-    X = interp_world_to_ref_trans * X;
-
-    // Convert point to given cam coordinates
-    X = ref_to_cam_trans * X;
+    std::cout << "--trans X " << X.transpose() << std::endl;
 
     // Project into the image
     Eigen::Vector2d undist_pix = cam_params.GetFocalVector().cwiseProduct(X.hnormalized());
@@ -278,6 +314,7 @@ struct BracketedCamError {
     residuals[0] = curr_dist_pix[0] - m_meas_dist_pix[0];
     residuals[1] = curr_dist_pix[1] - m_meas_dist_pix[1];
 
+    std::cout << "--residuals " << residuals[0] << ' ' << residuals[1] << std::endl;
     return true;
   }
 
@@ -287,16 +324,20 @@ struct BracketedCamError {
          double cam_stamp, std::vector<int> const& block_sizes,
          camera::CameraParameters const& cam_params) {
     ceres::DynamicNumericDiffCostFunction<BracketedCamError>* cost_function =
-      new ceres::DynamicNumericDiffCostFunction<BracketedCamError>(
-        new BracketedCamError(meas_dist_pix, left_ref_stamp, right_ref_stamp, cam_stamp, block_sizes, cam_params));
+      new ceres::DynamicNumericDiffCostFunction<BracketedCamError>
+      (new BracketedCamError(meas_dist_pix, left_ref_stamp, right_ref_stamp,
+                             cam_stamp, block_sizes, cam_params));
 
     // The residual size is always the same.
     cost_function->SetNumResiduals(NUM_RESIDUALS);
 
-    // The camera wrapper knows all of the block sizes to add.
-    for (size_t i = 0; i < block_sizes.size(); i++) {
+    // The camera wrapper knows all of the block sizes to add, except for distortion, which is last
+    for (size_t i = 0; i + 1 < block_sizes.size(); i++)
       cost_function->AddParameterBlock(block_sizes[i]);
-    }
+
+    // The distortion block size is added separately as it is variable
+    cost_function->AddParameterBlock(cam_params.GetDistortion().size());
+
     return cost_function;
   }
 
@@ -682,10 +723,15 @@ struct SciError {
         m_sci_cam_params(sci_cam_params),
         m_num_focal_lengths(1) {
     // Sanity check.
-    if (m_block_sizes.size() != 8 || m_block_sizes[0] != NUM_RIGID_PARAMS || m_block_sizes[1] != NUM_RIGID_PARAMS ||
-        m_block_sizes[2] != NUM_RIGID_PARAMS || m_block_sizes[3] != NUM_RIGID_PARAMS ||
-        m_block_sizes[4] != NUM_XYZ_PARAMS || m_block_sizes[5] != m_num_focal_lengths ||
-        m_block_sizes[6] != NUM_OPT_CTR_PARAMS || m_block_sizes[7] != m_sci_cam_params.GetDistortion().size()) {
+    if (m_block_sizes.size() != 8 ||
+        m_block_sizes[0] != NUM_RIGID_PARAMS ||
+        m_block_sizes[1] != NUM_RIGID_PARAMS ||
+        m_block_sizes[2] != NUM_RIGID_PARAMS ||
+        m_block_sizes[3] != NUM_RIGID_PARAMS ||
+        m_block_sizes[4] != NUM_XYZ_PARAMS ||
+        m_block_sizes[5] != m_num_focal_lengths ||
+        m_block_sizes[6] != NUM_OPT_CTR_PARAMS ||
+        m_block_sizes[7] != m_sci_cam_params.GetDistortion().size()) {
       LOG(FATAL) << "SciError: The block sizes were not set up properly.\n";
     }
   }
@@ -895,19 +941,19 @@ void calc_median_residuals(std::vector<double> const& residuals,
    double navcam_to_hazcam_timestamp_offset,                            // NOLINT
    MATCH_PAIR                   const & match_pair,                     // NOLINT
    std::vector<double>          const & haz_cam_intensity_timestamps,   // NOLINT
-   std::vector<double>          const & ref_cam_timestamps,             // NOLINT
+   std::vector<double>          const & ref_timestamps,             // NOLINT
    std::map<int, int>           const & haz_cam_to_left_nav_cam_index,  // NOLINT
    std::map<int, int>           const & haz_cam_to_right_nav_cam_index, // NOLINT
    camera::CameraParameters     const & nav_cam_params,                 // NOLINT
    camera::CameraParameters     const & haz_cam_params,                 // NOLINT
    std::vector<int>             const & depth_to_nav_block_sizes,       // NOLINT
    std::vector<int>             const & depth_to_haz_block_sizes,       // NOLINT
-   std::vector<Eigen::Affine3d> const & ref_cam_transforms,             // NOLINT
+   std::vector<Eigen::Affine3d> const & world_to_ref_t,             // NOLINT
    std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
    // Outputs                                                           // NOLINT
    std::vector<std::string>           & residual_names,                 // NOLINT
    double                             & hazcam_depth_to_image_scale,    // NOLINT
-   std::vector<double>                & ref_cam_vec,                    // NOLINT
+   std::vector<double>                & world_to_ref_vec,                    // NOLINT
    std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
    std::vector<double>                & hazcam_depth_to_image_vec,      // NOLINT
    ceres::Problem                     & problem) {                      // NOLINT
@@ -916,7 +962,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // which must be < next sparse_map_timestamp + navcam_to_hazcam_timestamp_offset.
     bool match_left = false;
     if (haz_cam_intensity_timestamps[haz_it] >=
-        ref_cam_timestamps[nav_cam_start + nav_it] + navcam_to_hazcam_timestamp_offset) {
+        ref_timestamps[nav_cam_start + nav_it] + navcam_to_hazcam_timestamp_offset) {
       match_left = true;
     } else {
       match_left = false;  // match right then
@@ -931,14 +977,14 @@ void calc_median_residuals(std::vector<double> const& residuals,
     int left_nav_it   = left_it->second;
     int right_nav_it  = right_it->second;
 
-    if (nav_cam_start + right_nav_it >= static_cast<int>(ref_cam_timestamps.size()) ||
+    if (nav_cam_start + right_nav_it >= static_cast<int>(ref_timestamps.size()) ||
         haz_it >= static_cast<int>(haz_cam_intensity_timestamps.size()))
       LOG(FATAL) << "Book-keeping error 2.";
 
     // Left and right nav cam image time, in haz_cam's time measurement
-    double left_time = ref_cam_timestamps[nav_cam_start + left_nav_it]
+    double left_time = ref_timestamps[nav_cam_start + left_nav_it]
       + navcam_to_hazcam_timestamp_offset;
-    double right_time = ref_cam_timestamps[nav_cam_start + right_nav_it]
+    double right_time = ref_timestamps[nav_cam_start + right_nav_it]
       + navcam_to_hazcam_timestamp_offset;
     double haz_time = haz_cam_intensity_timestamps[haz_it];
 
@@ -950,8 +996,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
     if (nav_it != left_nav_it && nav_it != right_nav_it) LOG(FATAL) << "Book-keeping error 4.";
 
     // Find the transform from the world to nav cam at the haz cam time
-    Eigen::Affine3d left_nav_trans = ref_cam_transforms[nav_cam_start + left_nav_it];
-    Eigen::Affine3d right_nav_trans = ref_cam_transforms[nav_cam_start + right_nav_it];
+    Eigen::Affine3d left_nav_trans = world_to_ref_t[nav_cam_start + left_nav_it];
+    Eigen::Affine3d right_nav_trans = world_to_ref_t[nav_cam_start + right_nav_it];
     double alpha = (haz_time - left_time) / (right_time - left_time);
     if (right_time == left_time) alpha = 0.0;  // handle division by zero
 
@@ -1016,16 +1062,16 @@ void calc_median_residuals(std::vector<double> const& residuals,
       int left_nav_index  = NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it);
       int right_nav_index = NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it);
       problem.AddResidualBlock(depth_to_nav_cost_function, depth_to_nav_loss_function,
-                               &ref_cam_vec[left_nav_index],
-                               &ref_cam_vec[right_nav_index],
+                               &world_to_ref_vec[left_nav_index],
+                               &world_to_ref_vec[right_nav_index],
                                &hazcam_to_navcam_vec[0], &hazcam_depth_to_image_vec[0],
                                &hazcam_depth_to_image_scale);
       residual_names.push_back("haznavnav1");
       residual_names.push_back("haznavnav2");
 
       if (FLAGS_fix_map) {
-        problem.SetParameterBlockConstant(&ref_cam_vec[left_nav_index]);
-        problem.SetParameterBlockConstant(&ref_cam_vec[right_nav_index]);
+        problem.SetParameterBlockConstant(&world_to_ref_vec[left_nav_index]);
+        problem.SetParameterBlockConstant(&world_to_ref_vec[right_nav_index]);
       }
     }
 
@@ -1040,7 +1086,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
    double scicam_to_hazcam_timestamp_offset,                            // NOLINT
    MATCH_PAIR                   const & match_pair,                     // NOLINT
    std::vector<double>          const & haz_cam_intensity_timestamps,   // NOLINT
-   std::vector<double>          const & ref_cam_timestamps,             // NOLINT
+   std::vector<double>          const & ref_timestamps,             // NOLINT
    std::vector<double>          const & sci_cam_timestamps,             // NOLINT
    std::map<int, int>           const & haz_cam_to_left_nav_cam_index,  // NOLINT
    std::map<int, int>           const & haz_cam_to_right_nav_cam_index, // NOLINT
@@ -1050,12 +1096,12 @@ void calc_median_residuals(std::vector<double> const& residuals,
    camera::CameraParameters     const & haz_cam_params,                 // NOLINT
    std::vector<int>             const & depth_to_sci_block_sizes,       // NOLINT
    std::vector<int>             const & depth_to_haz_block_sizes,       // NOLINT
-   std::vector<Eigen::Affine3d> const & ref_cam_transforms,             // NOLINT
+   std::vector<Eigen::Affine3d> const & world_to_ref_t,             // NOLINT
    std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
    // Outputs                                                           // NOLINT
    std::vector<std::string>           & residual_names,                 // NOLINT
    double                             & hazcam_depth_to_image_scale,    // NOLINT
-   std::vector<double>                & ref_cam_vec,                    // NOLINT
+   std::vector<double>                & world_to_ref_vec,                    // NOLINT
    std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
    std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
    std::vector<double>                & hazcam_depth_to_image_vec,      // NOLINT
@@ -1072,7 +1118,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
     int left_nav_it   = left_it->second;
     int right_nav_it  = right_it->second;
 
-    if (nav_cam_start + right_nav_it >= static_cast<int>(ref_cam_timestamps.size()) ||
+    if (nav_cam_start + right_nav_it >= static_cast<int>(ref_timestamps.size()) ||
         haz_it >= static_cast<int>(haz_cam_intensity_timestamps.size()))
       LOG(FATAL) << "Book-keeping error 2 in add_haz_sci_cost.";
 
@@ -1091,9 +1137,9 @@ void calc_median_residuals(std::vector<double> const& residuals,
         LOG(FATAL) << "Book-keeping error 4 in add_haz_sci_cost.";
     }
     // Left and right nav cam image time, in haz_cam's time measurement
-    double left_time = ref_cam_timestamps[nav_cam_start + left_nav_it]
+    double left_time = ref_timestamps[nav_cam_start + left_nav_it]
       + navcam_to_hazcam_timestamp_offset;
-    double right_time = ref_cam_timestamps[nav_cam_start + right_nav_it]
+    double right_time = ref_timestamps[nav_cam_start + right_nav_it]
       + navcam_to_hazcam_timestamp_offset;
 
     // Find the haz and sci time and convert them to haz cam's clock
@@ -1107,8 +1153,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
     if (!good2) LOG(FATAL) << "Book-keeping error 6 in add_haz_sci_cost.";
 
     // Find the transform from the world to nav cam at the haz cam time
-    Eigen::Affine3d left_nav_trans = ref_cam_transforms[nav_cam_start + left_nav_it];
-    Eigen::Affine3d right_nav_trans = ref_cam_transforms[nav_cam_start + right_nav_it];
+    Eigen::Affine3d left_nav_trans = world_to_ref_t[nav_cam_start + left_nav_it];
+    Eigen::Affine3d right_nav_trans = world_to_ref_t[nav_cam_start + right_nav_it];
 
     double alpha_haz = (haz_time - left_time) / (right_time - left_time);
     if (right_time == left_time) alpha_haz = 0.0;  // handle division by zero
@@ -1179,8 +1225,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
       ceres::LossFunction* depth_to_sci_loss_function
         = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
       problem.AddResidualBlock(depth_to_sci_cost_function, depth_to_sci_loss_function,
-                               &ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)],
-                               &ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)],
+                               &world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)],
+                               &world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)],
                                &hazcam_to_navcam_vec[0], &scicam_to_hazcam_vec[0], &hazcam_depth_to_image_vec[0],
                                &hazcam_depth_to_image_scale, &sci_cam_focal_vector[0], &sci_cam_optical_center[0],
                                &sci_cam_distortion[0]);
@@ -1189,8 +1235,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
       residual_names.push_back("hazscisci2");
 
       if (FLAGS_fix_map) {
-        problem.SetParameterBlockConstant(&ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)]);
-        problem.SetParameterBlockConstant(&ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)]);
+        problem.SetParameterBlockConstant(&world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)]);
+        problem.SetParameterBlockConstant(&world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)]);
       }
     }
 
@@ -1204,7 +1250,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
    double navcam_to_hazcam_timestamp_offset,                            // NOLINT
    double scicam_to_hazcam_timestamp_offset,                            // NOLINT
    MATCH_PAIR                   const & match_pair,                     // NOLINT
-   std::vector<double>          const & ref_cam_timestamps,             // NOLINT
+   std::vector<double>          const & ref_timestamps,             // NOLINT
    std::vector<double>          const & sci_cam_timestamps,             // NOLINT
    std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
    std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
@@ -1215,14 +1261,14 @@ void calc_median_residuals(std::vector<double> const& residuals,
    std::vector<int>             const & nav_block_sizes,                // NOLINT
    std::vector<int>             const & sci_block_sizes,                // NOLINT
    std::vector<int>             const & mesh_block_sizes,               // NOLINT
-   std::vector<Eigen::Affine3d> const & ref_cam_transforms,             // NOLINT
+   std::vector<Eigen::Affine3d> const & world_to_ref_t,             // NOLINT
    std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
    mve::TriangleMesh::Ptr       const & mesh,                           // NOLINT
    std::shared_ptr<BVHTree>     const & bvh_tree,                       // NOLINT
    // Outputs                                                           // NOLINT
    int                                & nav_sci_xyz_count,              // NOLINT
    std::vector<std::string>           & residual_names,                 // NOLINT
-   std::vector<double>                & ref_cam_vec,                    // NOLINT
+   std::vector<double>                & world_to_ref_vec,                    // NOLINT
    std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
    std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
    Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
@@ -1240,21 +1286,21 @@ void calc_median_residuals(std::vector<double> const& residuals,
     int left_nav_it   = left_it->second;
     int right_nav_it  = right_it->second;
 
-    if (nav_cam_start + right_nav_it >= static_cast<int>(ref_cam_timestamps.size()))
+    if (nav_cam_start + right_nav_it >= static_cast<int>(ref_timestamps.size()))
       LOG(FATAL) << "Book-keeping error 1 in add_nav_sci_cost.";
 
     // Figure out the two nav cam indices bounding the current sci cam
     bool match_left = false;
     if (sci_cam_timestamps[sci_it] + scicam_to_hazcam_timestamp_offset >=
-        ref_cam_timestamps[nav_cam_start + nav_it] + navcam_to_hazcam_timestamp_offset) {
+        ref_timestamps[nav_cam_start + nav_it] + navcam_to_hazcam_timestamp_offset) {
       match_left = true;
     } else {
       match_left = false;  // match right then
     }
 
     // Left and right nav cam image time, and sci cam time, in haz_cam's time measurement
-    double left_time = ref_cam_timestamps[nav_cam_start + left_nav_it] + navcam_to_hazcam_timestamp_offset;
-    double right_time = ref_cam_timestamps[nav_cam_start + right_nav_it] + navcam_to_hazcam_timestamp_offset;
+    double left_time = ref_timestamps[nav_cam_start + left_nav_it] + navcam_to_hazcam_timestamp_offset;
+    double right_time = ref_timestamps[nav_cam_start + right_nav_it] + navcam_to_hazcam_timestamp_offset;
     double sci_time = sci_cam_timestamps[sci_it] + scicam_to_hazcam_timestamp_offset;
 
     bool good = (left_time <= sci_time && sci_time < right_time);
@@ -1262,8 +1308,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
     if (!good) LOG(FATAL) << "Book-keeping 2 in add_nav_sci_cost.";
 
     // Find the transform from the world to nav cam at the sci cam time
-    Eigen::Affine3d left_nav_trans = ref_cam_transforms[nav_cam_start + left_nav_it];
-    Eigen::Affine3d right_nav_trans = ref_cam_transforms[nav_cam_start + right_nav_it];
+    Eigen::Affine3d left_nav_trans = world_to_ref_t[nav_cam_start + left_nav_it];
+    Eigen::Affine3d right_nav_trans = world_to_ref_t[nav_cam_start + right_nav_it];
     double alpha = (sci_time - left_time) / (right_time - left_time);
     if (right_time == left_time) alpha = 0.0;  // handle division by zero
 
@@ -1332,8 +1378,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
       ceres::LossFunction* sci_loss_function = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
       problem.AddResidualBlock(sci_cost_function, sci_loss_function,
-                               &ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)],
-                               &ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)],
+                               &world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)],
+                               &world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)],
                                &hazcam_to_navcam_vec[0], &scicam_to_hazcam_vec[0],
                                &nav_sci_xyz[dense_map::NUM_XYZ_PARAMS * nav_sci_xyz_count], &sci_cam_focal_vector[0],
                                &sci_cam_optical_center[0], &sci_cam_distortion[0]);
@@ -1342,8 +1388,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
       residual_names.push_back("navscisci2");
 
       if (FLAGS_fix_map) {
-        problem.SetParameterBlockConstant(&ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)]);
-        problem.SetParameterBlockConstant(&ref_cam_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)]);
+        problem.SetParameterBlockConstant(&world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + left_nav_it)]);
+        problem.SetParameterBlockConstant(&world_to_ref_vec[NUM_RIGID_PARAMS * (nav_cam_start + right_nav_it)]);
       }
 
       // The nav cam cost function
@@ -1353,13 +1399,13 @@ void calc_median_residuals(std::vector<double> const& residuals,
         dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
       problem.AddResidualBlock(nav_cost_function, nav_loss_function,
-                               &ref_cam_vec[(nav_cam_start + nav_it) * NUM_RIGID_PARAMS],
+                               &world_to_ref_vec[(nav_cam_start + nav_it) * NUM_RIGID_PARAMS],
                                &nav_sci_xyz[dense_map::NUM_XYZ_PARAMS * nav_sci_xyz_count]);
       residual_names.push_back("navscinav1");
       residual_names.push_back("navscinav2");
 
       if (FLAGS_fix_map)
-        problem.SetParameterBlockConstant(&ref_cam_vec[(nav_cam_start + nav_it)
+        problem.SetParameterBlockConstant(&world_to_ref_vec[(nav_cam_start + nav_it)
                                                        * NUM_RIGID_PARAMS]);
 
       if (have_mesh_intersection) {
@@ -1418,7 +1464,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
                               double haz_cam_start_time,                               // NOLINT
                               double navcam_to_hazcam_timestamp_offset,                // NOLINT
                               double scicam_to_hazcam_timestamp_offset,                // NOLINT
-                              std::vector<double> const& ref_cam_timestamps,        // NOLINT
+                              std::vector<double> const& ref_timestamps,        // NOLINT
                               std::vector<double> const& all_haz_cam_inten_timestamps, // NOLINT
                               std::vector<double> const& all_sci_cam_timestamps,       // NOLINT
                               std::set<double> const& sci_cam_timestamps_to_use,       // NOLINT
@@ -1453,34 +1499,34 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // traversal forward in time they need to be reset.
     int nav_cam_pos = 0, haz_cam_intensity_pos = 0, haz_cam_cloud_pos = 0, sci_cam_pos = 0;
 
-    for (size_t map_it = 0; map_it + 1 < ref_cam_timestamps.size(); map_it++) {
+    for (size_t map_it = 0; map_it + 1 < ref_timestamps.size(); map_it++) {
       if (FLAGS_start >= 0.0 && FLAGS_duration > 0.0) {
         // The case when we would like to start later. Note the second
         // comparison after "&&".  When FLAG_start is 0, we want to
         // make sure if the first nav image from the bag is in the map
         // we use it, so we don't skip it even if based on
         // navcam_to_hazcam_timestamp_offset we should.
-        if (ref_cam_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
+        if (ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
             < FLAGS_start + haz_cam_start_time &&
-            ref_cam_timestamps[map_it] < FLAGS_start + haz_cam_start_time)
+            ref_timestamps[map_it] < FLAGS_start + haz_cam_start_time)
           continue;
       }
 
       if (nav_cam_start < 0) nav_cam_start = map_it;
 
       images.push_back(cv::Mat());
-      if (!dense_map::lookupImage(ref_cam_timestamps[map_it], nav_cam_handle.bag_msgs,
+      if (!dense_map::lookupImage(ref_timestamps[map_it], nav_cam_handle.bag_msgs,
                                   save_grayscale, images.back(),
                                   nav_cam_pos, found_time)) {
         LOG(FATAL) << std::fixed << std::setprecision(17)
-                   << "Cannot look up nav cam at time " << ref_cam_timestamps[map_it] << ".\n";
+                   << "Cannot look up nav cam at time " << ref_timestamps[map_it] << ".\n";
       }
       cid_to_image_type.push_back(dense_map::NAV_CAM);
 
       if (FLAGS_start >= 0.0 && FLAGS_duration > 0.0) {
         // If we would like to end earlier, then save the last nav cam image so far
         // and quit
-        if (ref_cam_timestamps[map_it] + navcam_to_hazcam_timestamp_offset >
+        if (ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset >
             FLAGS_start + FLAGS_duration + haz_cam_start_time) {
           stop_early = true;
           break;
@@ -1488,24 +1534,24 @@ void calc_median_residuals(std::vector<double> const& residuals,
       }
 
       // Do not look up sci cam and haz cam images in time intervals bigger than this
-      if (std::abs(ref_cam_timestamps[map_it + 1] - ref_cam_timestamps[map_it]) > FLAGS_bracket_len) continue;
+      if (std::abs(ref_timestamps[map_it + 1] - ref_timestamps[map_it]) > FLAGS_bracket_len) continue;
 
       // Append at most two haz cam images between consecutive sparse
       // map timestamps, close to these sparse map timestamps.
       std::vector<double> local_haz_timestamps;
       dense_map::pickTimestampsInBounds(all_haz_cam_inten_timestamps,
-                                        ref_cam_timestamps[map_it],
-                                        ref_cam_timestamps[map_it + 1],
+                                        ref_timestamps[map_it],
+                                        ref_timestamps[map_it + 1],
                                         -navcam_to_hazcam_timestamp_offset,
                                         local_haz_timestamps);
 
       for (size_t samp_it = 0; samp_it < local_haz_timestamps.size(); samp_it++) {
         haz_cam_intensity_timestamps.push_back(local_haz_timestamps[samp_it]);
 
-        double nav_start = ref_cam_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
+        double nav_start = ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
         double haz_time = local_haz_timestamps[samp_it] - haz_cam_start_time;
-        double nav_end =  ref_cam_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
+        double nav_end =  ref_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
 
         std::cout << "nav_start haz nav_end times "
@@ -1538,8 +1584,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
       // map timestamps, close to these sparse map timestamps.
 
       std::vector<double> local_sci_timestamps;
-      dense_map::pickTimestampsInBounds(all_sci_cam_timestamps, ref_cam_timestamps[map_it],
-                                        ref_cam_timestamps[map_it + 1],
+      dense_map::pickTimestampsInBounds(all_sci_cam_timestamps, ref_timestamps[map_it],
+                                        ref_timestamps[map_it + 1],
                                         -navcam_to_scicam_timestamp_offset,
                                         local_sci_timestamps);
 
@@ -1553,11 +1599,11 @@ void calc_median_residuals(std::vector<double> const& residuals,
 
         sci_cam_timestamps.push_back(local_sci_timestamps[samp_it]);
 
-        double nav_start = ref_cam_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
+        double nav_start = ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
         double sci_time = local_sci_timestamps[samp_it] + scicam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
-        double nav_end = ref_cam_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
+        double nav_end = ref_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
           - haz_cam_start_time;
         std::cout << "nav_start sci nav_end times "
                   << nav_start << ' ' << sci_time << ' ' << nav_end  << std::endl;
@@ -1588,14 +1634,14 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // Add the last nav cam image from the map, unless we stopped early and this was done
     if (!stop_early) {
       images.push_back(cv::Mat());
-      if (!dense_map::lookupImage(ref_cam_timestamps.back(), nav_cam_handle.bag_msgs,
+      if (!dense_map::lookupImage(ref_timestamps.back(), nav_cam_handle.bag_msgs,
                                   save_grayscale, images.back(),
                                   nav_cam_pos, found_time))
         LOG(FATAL) << "Cannot look up nav cam image at given time.";
       cid_to_image_type.push_back(dense_map::NAV_CAM);
     }
 
-    if (images.size() > ref_cam_timestamps.size() + haz_cam_intensity_timestamps.size()
+    if (images.size() > ref_timestamps.size() + haz_cam_intensity_timestamps.size()
         + sci_cam_timestamps.size())
       LOG(FATAL) << "Book-keeping error in select_images_to_match.";
 
@@ -1820,11 +1866,11 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // reference camera time
     double ref_timestamp;
 
-    // Indices to look up the left and right reference cameras bracketing this camera
-    // in time. The two indices will have same value if and only if this is a reference
-    // camera.
-    int left_ref_cam_index;
-    int right_ref_cam_index;
+    // Indices to look up the reference cameras bracketing this camera
+    // in time. The two indices will have same value if and only if
+    // this is a reference camera.
+    int beg_ref_cam_index;
+    int end_ref_cam_index;
 
     // The image for this camera, in grayscale
     cv::Mat image;
@@ -1947,16 +1993,16 @@ int main(int argc, char** argv) {
   // Find the minimum and maximum timestamps in the sparse map
   double min_map_timestamp = std::numeric_limits<double>::max();
   double max_map_timestamp = -min_map_timestamp;
-  std::vector<double> ref_cam_timestamps;
+  std::vector<double> ref_timestamps;
   const std::vector<std::string>& sparse_map_images = sparse_map->cid_to_filename_;
-  ref_cam_timestamps.resize(sparse_map_images.size());
+  ref_timestamps.resize(sparse_map_images.size());
   for (size_t cid = 0; cid < sparse_map_images.size(); cid++) {
     double timestamp = dense_map::fileNameToTimestamp(sparse_map_images[cid]);
-    ref_cam_timestamps[cid] = timestamp;
-    min_map_timestamp = std::min(min_map_timestamp, ref_cam_timestamps[cid]);
-    max_map_timestamp = std::max(max_map_timestamp, ref_cam_timestamps[cid]);
+    ref_timestamps[cid] = timestamp;
+    min_map_timestamp = std::min(min_map_timestamp, ref_timestamps[cid]);
+    max_map_timestamp = std::max(max_map_timestamp, ref_timestamps[cid]);
   }
-  if (ref_cam_timestamps.empty()) LOG(FATAL) << "No sparse map timestamps found.";
+  if (ref_timestamps.empty()) LOG(FATAL) << "No sparse map timestamps found.";
 
   // Read the haz cam timestamps
   std::vector<rosbag::MessageInstance> const& haz_cam_intensity_msgs
@@ -1996,16 +2042,16 @@ int main(int argc, char** argv) {
   }
 
   // Will optimize the nav cam poses as part of the process
-  std::vector<Eigen::Affine3d>& ref_cam_transforms = sparse_map->cid_to_cam_t_global_;  // alias
+  std::vector<Eigen::Affine3d>& world_to_ref_t = sparse_map->cid_to_cam_t_global_;  // alias
 
   // Put transforms of the reference cameras in a vector. We will optimize them.
-  int num_ref_cams = ref_cam_transforms.size();
-  if (ref_cam_transforms.size() != ref_cam_timestamps.size())
+  int num_ref_cams = world_to_ref_t.size();
+  if (world_to_ref_t.size() != ref_timestamps.size())
     LOG(FATAL) << "Must have as many ref cam timestamps as ref cameras.\n";
-  std::vector<double> ref_cam_vec(num_ref_cams * dense_map::NUM_RIGID_PARAMS);
+  std::vector<double> world_to_ref_vec(num_ref_cams * dense_map::NUM_RIGID_PARAMS);
   for (int cid = 0; cid < num_ref_cams; cid++)
-    dense_map::rigid_transform_to_array(ref_cam_transforms[cid],
-                                        &ref_cam_vec[dense_map::NUM_RIGID_PARAMS * cid]);
+    dense_map::rigid_transform_to_array(world_to_ref_t[cid],
+                                        &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
 
 
   // We assume our camera rig has n camera types. Each can be image or
@@ -2047,6 +2093,10 @@ int main(int argc, char** argv) {
               << ref_to_cam_timestamp_offsets[it] << std::endl;
   }
 
+  std::vector<camera::CameraParameters> cam_params = {nav_cam_params,
+                                                      haz_cam_params,
+                                                      sci_cam_params};
+
   // The transform from ref to given cam
   std::vector<Eigen::Affine3d> ref_to_cam_trans;
   ref_to_cam_trans.push_back(Eigen::Affine3d::Identity());
@@ -2054,9 +2104,25 @@ int main(int argc, char** argv) {
   ref_to_cam_trans.push_back(scicam_to_hazcam_aff_trans.inverse()
                              * hazcam_to_navcam_aff_trans.inverse());
 
+  // Put in arrays, so we can optimize them
+  std::vector<double> ref_to_cam_vec(num_cam_types * dense_map::NUM_RIGID_PARAMS);
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
+    dense_map::rigid_transform_to_array
+      (ref_to_cam_trans[cam_type],
+       &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+
   std::cout << "--test here!" << std::endl;
   for (size_t it = 0; it < ref_to_cam_trans.size(); it++) {
     std::cout << "--trans is\n" << ref_to_cam_trans[it].matrix() << std::endl;
+  }
+
+  std::vector<double> focal_lengths(num_cam_types);
+  std::vector<Eigen::Vector2d> optical_centers(num_cam_types);
+  std::vector<Eigen::VectorXd> distortions(num_cam_types);
+  for (int it = 0; it < num_cam_types; it++) {
+    focal_lengths[it] = cam_params[it].GetFocalLength();  // average the two focal lengths
+    optical_centers[it] = cam_params[it].GetOpticalOffset();
+    distortions[it] = cam_params[it].GetDistortion();
   }
 
   // Build a map for quick access for all the messages we may need
@@ -2095,11 +2161,11 @@ int main(int argc, char** argv) {
       dense_map::cameraImage cam;
       bool success = false;
       if (cam_type == ref_cam_type) {
-        cam.camera_type         = cam_type;
-        cam.timestamp           = ref_cam_timestamps[ref_it];
-        cam.ref_timestamp = cam.timestamp;  // the time offset is 0 between ref and itself
-        cam.left_ref_cam_index  = ref_it;
-        cam.right_ref_cam_index = ref_it;
+        cam.camera_type       = cam_type;
+        cam.timestamp         = ref_timestamps[ref_it];
+        cam.ref_timestamp     = cam.timestamp;  // the time offset is 0 between ref and itself
+        cam.beg_ref_cam_index = ref_it;
+        cam.end_ref_cam_index = ref_it;
 
         // Search the whole set of timestamps, so set start_pos =
         // 0. This is slower but more robust than keeping track of how
@@ -2128,8 +2194,8 @@ int main(int argc, char** argv) {
         if (ref_it + 1 >= num_ref_cams) break;  // Arrived at the end, cannot do a bracket
 
         // Convert the bracketing timestamps to current cam's time
-        double left_timestamp = ref_cam_timestamps[ref_it] + ref_to_cam_timestamp_offsets[cam_type];
-        double right_timestamp = ref_cam_timestamps[ref_it + 1] + ref_to_cam_timestamp_offsets[cam_type];
+        double left_timestamp = ref_timestamps[ref_it] + ref_to_cam_timestamp_offsets[cam_type];
+        double right_timestamp = ref_timestamps[ref_it + 1] + ref_to_cam_timestamp_offsets[cam_type];
 
         if (right_timestamp <= left_timestamp)
           LOG(FATAL) << "Ref timestamps must be in increasing order.\n";
@@ -2190,27 +2256,27 @@ int main(int argc, char** argv) {
         left_bound[cam_type] = std::min(left_bound[cam_type], best_time - left_timestamp);
         right_bound[cam_type] = std::min(right_bound[cam_type], right_timestamp - best_time);
 
-        cam.camera_type         = cam_type;
-        cam.timestamp           = best_time;
-        cam.ref_timestamp       = best_time - ref_to_cam_timestamp_offsets[cam_type];
-        cam.left_ref_cam_index  = ref_it;
-        cam.right_ref_cam_index = ref_it + 1;
-        cam.image               = best_image;
+        cam.camera_type       = cam_type;
+        cam.timestamp         = best_time;
+        cam.ref_timestamp     = best_time - ref_to_cam_timestamp_offsets[cam_type];
+        cam.beg_ref_cam_index = ref_it;
+        cam.end_ref_cam_index = ref_it + 1;
+        cam.image             = best_image;
 
         if (cam_type == 1) {
           // Must compare raw big timestamps before and after!
           // Must compare residuals!
 
-          double nav_start = ref_cam_timestamps[ref_it];
+          double nav_start = ref_timestamps[ref_it];
           double haz_time = cam.ref_timestamp;
-          double nav_end = ref_cam_timestamps[ref_it + 1];
+          double nav_end = ref_timestamps[ref_it + 1];
           std::cout << "--xxxhaz after " << haz_time - nav_start << ' ' << nav_end - haz_time << ' '
                     << nav_end - nav_start << std::endl;
         }
         if (cam_type == 2) {
-          double nav_start = ref_cam_timestamps[ref_it];
+          double nav_start = ref_timestamps[ref_it];
           double sci_time = cam.ref_timestamp;
-          double nav_end = ref_cam_timestamps[ref_it + 1];
+          double nav_end = ref_timestamps[ref_it + 1];
           std::cout << "--xxxsci after " << sci_time - nav_start << ' ' << nav_end - sci_time << ' '
                     << nav_end - nav_start << std::endl;
         }
@@ -2249,278 +2315,256 @@ int main(int argc, char** argv) {
               << ' ' << right_bound[cam_type] << std::endl;
   }
 
-  std::cout << "--start selecting!" << std::endl;
-  std::vector<camera::CameraParameters> cam_params = {nav_cam_params, haz_cam_params, sci_cam_params};
+  std::cout << "--deal with adjustment!" << std::endl;
+  for (size_t it = 0; it < cams.size(); it++) {
+    if (cams[it].camera_type == 2) {
+      dense_map::adjustImageSize(cam_params[2], cams[it].image);
+    }
+  }
 
-  int nav_cam_start = -1;   // Record the first nav cam image used
-  std::vector<dense_map::imgType> cid_to_image_type;
-  std::vector<double> haz_cam_intensity_timestamps, sci_cam_timestamps;  // timestamps we will use
-  std::vector<cv::Mat> images;
-  std::vector<cv::Mat> depth_clouds;
-  // Find nav images close in time. Match sci and haz images in between to each
-  // other and to these nave images
-  // TODO(oalexan1): This selects haz cam images outside of bracket.
-  // TODO(oalexan1): No check for bracket size either.
-  select_images_to_match(  // Inputs                        // NOLINT
-    haz_cam_start_time, navcam_to_hazcam_timestamp_offset,  // NOLINT
-    scicam_to_hazcam_timestamp_offset,                      // NOLINT
-    ref_cam_timestamps, all_haz_cam_inten_timestamps,    // NOLINT
-    all_sci_cam_timestamps, sci_cam_timestamps_to_use,      // NOLINT
-    nav_cam_handle, sci_cam_handle, haz_cam_points_handle,  // NOLINT
-    haz_cam_intensity_handle,                               // NOLINT
-    sci_cam_params,                                         // NOLINT
-    // Outputs                                              // NOLINT
-    nav_cam_start, cid_to_image_type,                       // NOLINT
-    haz_cam_intensity_timestamps, sci_cam_timestamps,       // NOLINT
-    images, depth_clouds);                                  // NOLINT 
+  std::sort(cams.begin(), cams.end(), dense_map::timestampLess);
 
-  // If an image in the vector of images is of nav_cam type, see where its index is
-  // in the list of nav cam images
-  std::map<int, int> image_to_nav_it, image_to_haz_it, image_to_sci_it;
+  if (FLAGS_verbose) {
+  int count = 10000;
+  std::vector<std::string> image_files;
+  for (size_t it = 0; it < cams.size(); it++) {
+    std::ostringstream oss;
+    oss << count << "_" << cams[it].camera_type << ".jpg";
+    std::string name = oss.str();
+    std::cout << "--writing " << name << std::endl;
+    cv::imwrite(name, cams[it].image);
+    count++;
+    image_files.push_back(name);
+  }
+  }
 
-  // Given the index of a haz cam or sci cam image, find the index of the left and right
-  // nav cam images bounding it in time.
-  std::map<int, int> haz_cam_to_left_nav_cam_index, haz_cam_to_right_nav_cam_index;
-  std::map<int, int> sci_cam_to_left_nav_cam_index, sci_cam_to_right_nav_cam_index;
+  std::cout << "--start detect" << std::endl;
 
-  // Map haz cam and nav cam index to the vectors of haz cam to nav cam matches
-  dense_map::MATCH_MAP matches;
+  // Detect features using multiple threads
+  std::vector<cv::Mat> cid_to_descriptor_map;
+  std::vector<Eigen::Matrix2Xd> cid_to_keypoint_map;
+  cid_to_descriptor_map.resize(cams.size());
+  cid_to_keypoint_map.resize(cams.size());
+  ff_common::ThreadPool thread_pool1;
+  for (size_t it = 0; it < cams.size(); it++) {
+    // dense_map::detectFeatures(cams[it].image, FLAGS_verbose,
+    //                          &cid_to_descriptor_map[it], &cid_to_keypoint_map[it]);
+    // std::cout << "--detect " << it << '/' << cams.size() << std::endl;
+    thread_pool1.AddTask(&dense_map::detectFeatures, cams[it].image, FLAGS_verbose,
+                         &cid_to_descriptor_map[it], &cid_to_keypoint_map[it]);
+  }
+  thread_pool1.Join();
 
-  // TODO(oalexan1): Add explanation here
-  detect_match_features(// Inputs                         // NOLINT
-                        images, cid_to_image_type,        // NOLINT
-                        // Outputs                        // NOLINT
-                        image_to_nav_it, image_to_haz_it, // NOLINT
-                        image_to_sci_it,                  // NOLINT
-                        haz_cam_to_left_nav_cam_index,    // NOLINT
-                        haz_cam_to_right_nav_cam_index,   // NOLINT
-                        sci_cam_to_left_nav_cam_index,    // NOLINT
-                        sci_cam_to_right_nav_cam_index,   // NOLINT
-                        matches);                         // NOLINT
+  dense_map::MATCH_MAP matches2;
 
-  double hazcam_depth_to_image_scale = pow(hazcam_depth_to_image_transform.matrix().determinant(), 1.0 / 3.0);
+  std::cout << "--expose the num overlap!" << std::endl;
+  size_t num_overlap = 1;
+  std::cout << "--overlap is " << num_overlap << std::endl;
+  std::cout << "--must be >= 1" << std::endl;
 
-  // Since we will keep the scale fixed, vary the part of the transform without
-  // the scale, while adding the scale each time before the transform is applied
-  Eigen::Affine3d hazcam_depth_to_image_noscale = hazcam_depth_to_image_transform;
-  hazcam_depth_to_image_noscale.linear() /= hazcam_depth_to_image_scale;
+  std::cout << "--temporary!!!" << std::endl;
+  std::vector<std::pair<int, int> > image_pairs;
+  for (size_t it1 = 0; it1 < cams.size(); it1++) {
+    for (size_t it2 = it1 + 1; it2 < std::min(cams.size(), it1 + num_overlap + 1); it2++) {
+      // std::cout << "--temporary!" << std::endl;
+      bool is_good = (cams[it1].camera_type == 2 && cams[it2].camera_type == 0 ||
+                      cams[it1].camera_type == 0 && cams[it2].camera_type == 2);
+      if (!is_good) {
+        continue;
+      }
 
-  // Form the optimization vector for hazcam_depth_to_image_transform
-  std::vector<double> hazcam_depth_to_image_vec(dense_map::NUM_RIGID_PARAMS);
-  dense_map::rigid_transform_to_array(hazcam_depth_to_image_noscale, &hazcam_depth_to_image_vec[0]);
+      std::cout << "--matching " << it1 << ' ' << it2 << std::endl;
+      std::cout << "type is " << cams[it1].camera_type << ' ' << cams[it2].camera_type << std::endl;
+      image_pairs.push_back(std::make_pair(it1, it2));
+    }
+  }
 
-  // Go back from the array to the original transform. This will make it into a pure
-  // scale*rotation + translation, removing the artifacts of it having been read
-  // from disk where it was stored with just a few digits of precision
-  dense_map::array_to_rigid_transform(hazcam_depth_to_image_transform, &hazcam_depth_to_image_vec[0]);
-  hazcam_depth_to_image_transform.linear() *= hazcam_depth_to_image_scale;
+  // Find the matches using multiple threads
+  ff_common::ThreadPool thread_pool2;
+  std::mutex match_mutex;
 
-  // Form the optimization vector for hazcam_to_navcam_aff_trans
-  std::vector<double> hazcam_to_navcam_vec(dense_map::NUM_RIGID_PARAMS);
-  dense_map::rigid_transform_to_array(hazcam_to_navcam_aff_trans, &hazcam_to_navcam_vec[0]);
+  for (size_t pair_it = 0; pair_it < image_pairs.size(); pair_it++) {
+    auto pair = image_pairs[pair_it];
+    int left_image_it = pair.first, right_image_it = pair.second;
+    // thread_pool2.AddTask(&dense_map::matchFeatures, &match_mutex,
+    // std::cout << "--matching 2 " << left_image_it << ' ' << right_image_it << std::endl;
+    dense_map::matchFeatures(&match_mutex,
+                             left_image_it, right_image_it,
+                             cid_to_descriptor_map[left_image_it],
+                             cid_to_descriptor_map[right_image_it],
+                             cid_to_keypoint_map[left_image_it],
+                             cid_to_keypoint_map[right_image_it],
+                             FLAGS_verbose, &matches2[pair]);
+  }
+  // thread_pool2.Join();
 
-  // Recreate hazcam_to_navcam_aff_trans as above
-  dense_map::array_to_rigid_transform(hazcam_to_navcam_aff_trans, &hazcam_to_navcam_vec[0]);
-
-  // Form the optimization vector for scicam_to_hazcam_aff_trans
-  std::vector<double> scicam_to_hazcam_vec(dense_map::NUM_RIGID_PARAMS);
-  dense_map::rigid_transform_to_array(scicam_to_hazcam_aff_trans, &scicam_to_hazcam_vec[0]);
-
-  // Recreate scicam_to_hazcam_aff_trans as above
-  dense_map::array_to_rigid_transform(scicam_to_hazcam_aff_trans, &scicam_to_hazcam_vec[0]);
-
-  // See how many nav to sci matches we have and allocate space for their xyz
-  // TODO(oalexan1): This must be factored out as a function
-  int num_nav_sci_xyz = 0;
-  for (auto it = matches.begin(); it != matches.end(); it++) {
+  if (FLAGS_verbose) {
+  for (auto it = matches2.begin(); it != matches2.end(); it++) {
     std::pair<int, int> index_pair = it->first;
     dense_map::MATCH_PAIR const& match_pair = it->second;
 
-    std::map<int, int>::iterator image_haz_it, image_nav_it, image_sci_it;
+    int left_index = index_pair.first;
+    int right_index = index_pair.second;
 
-    image_sci_it = image_to_sci_it.find(index_pair.first);
-    image_nav_it = image_to_nav_it.find(index_pair.second);
-    if (image_sci_it != image_to_sci_it.end() && image_nav_it != image_to_nav_it.end()) {
-      int sci_it = image_sci_it->second;
-      int nav_it = image_nav_it->second;
+    std::cout << "--indices " << left_index << ' ' << right_index << std::endl;
 
-      // Add to the number of xyz
-      num_nav_sci_xyz += match_pair.first.size();
+    std::ostringstream oss1;
+    oss1 << (10000 + left_index) << "_" << cams[left_index].camera_type;
 
-      if (FLAGS_verbose) saveImagesAndMatches("sci", "nav", index_pair, match_pair, images);
-    }
+    std::string left_stem = oss1.str();
+    std::string left_image = left_stem + ".jpg";
 
-    image_haz_it = image_to_haz_it.find(index_pair.first);
-    image_sci_it = image_to_sci_it.find(index_pair.second);
-    if (image_haz_it != image_to_haz_it.end() && image_sci_it != image_to_sci_it.end()) {
-      if (FLAGS_verbose) saveImagesAndMatches("haz", "sci", index_pair, match_pair, images);
-    }
+    std::ostringstream oss2;
+    oss2 << (10000 + right_index) << "_" << cams[right_index].camera_type;
 
-    image_haz_it = image_to_haz_it.find(index_pair.first);
-    image_nav_it = image_to_nav_it.find(index_pair.second);
-    if (image_haz_it != image_to_haz_it.end() && image_nav_it != image_to_nav_it.end()) {
-      if (FLAGS_verbose) saveImagesAndMatches("haz", "nav", index_pair, match_pair, images);
-    }
+    std::string right_stem = oss2.str();
+    std::string right_image = right_stem + ".jpg";
+
+    std::string match_file = left_stem + "__" + right_stem + ".match";
+
+    std::cout << "Writing: " << left_image << ' ' << right_image << ' ' << match_file << std::endl;
+    dense_map::writeMatchFile(match_file, match_pair.first, match_pair.second);
+  }
   }
 
-  // Prepare for floating sci cam params
-  int num_scicam_focal_lengths = 1;  // Same focal length in x and y
-  std::set<std::string> sci_cam_intrinsics_to_float;
-  dense_map::parse_intrinsics_to_float(FLAGS_sci_cam_intrinsics_to_float, sci_cam_intrinsics_to_float);
-  Eigen::Vector2d sci_cam_focal_vector = sci_cam_params.GetFocalVector();
-  if (num_scicam_focal_lengths == 1) {
-    sci_cam_focal_vector[0] = sci_cam_params.GetFocalLength();  // average the two focal lengths
-    sci_cam_focal_vector[1] = sci_cam_focal_vector[0];
-  }
-  std::cout << std::endl;
-  std::cout << "Initial focal length for sci cam: " << sci_cam_focal_vector.transpose() << std::endl;
-  Eigen::Vector2d sci_cam_optical_center = sci_cam_params.GetOpticalOffset();
-  std::cout << "Initial optical center for sci_cam: " << sci_cam_optical_center.transpose() << std::endl;
-  Eigen::VectorXd sci_cam_distortion = sci_cam_params.GetDistortion();
-  std::cout << "Initial distortion for sci_cam: " << sci_cam_distortion.transpose() << std::endl;
+  std::cout << "--start selecting!" << std::endl;
 
-  std::vector<int> depth_to_haz_block_sizes, nav_block_sizes;
-  std::vector<int> depth_to_nav_block_sizes, depth_to_sci_block_sizes;
-  std::vector<int> sci_block_sizes, mesh_block_sizes;
-  dense_map::set_up_block_sizes(// Inputs                                            // NOLINT
-                                num_scicam_focal_lengths, sci_cam_distortion.size(), // NOLINT
-                                // Outputs                                           // NOLINT
-                                depth_to_haz_block_sizes, nav_block_sizes,           // NOLINT
-                                depth_to_nav_block_sizes, depth_to_sci_block_sizes,  // NOLINT
-                                sci_block_sizes,  mesh_block_sizes);                 // NOLINT
-
-  // Storage for the residual names and xyz
-  std::vector<std::string> residual_names;
-  std::vector<double> nav_sci_xyz(dense_map::NUM_XYZ_PARAMS * num_nav_sci_xyz, 0);
-  std::vector<Eigen::Vector3d> initial_nav_sci_xyz(num_nav_sci_xyz, Eigen::Vector3d(0, 0, 0));
-
-  int nav_sci_xyz_count = 0;
-
-  ceres::Problem problem;
+  // Set up the variable blocks to optimize for BracketedCamError
+  std::vector<int> bracketed_cam_block_sizes;
+  int num_focal_lengths = 1;
+  bracketed_cam_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_cam_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_cam_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_cam_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
+  bracketed_cam_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
+  bracketed_cam_block_sizes.push_back(num_focal_lengths);
+  bracketed_cam_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);
+  std::cout << "--make bracketed block sizes individual!" << std::endl;
+  bracketed_cam_block_sizes.push_back(1);  // must be last, will be modified later
 
   // Form the problem
-  for (auto it = matches.begin(); it != matches.end(); it++) {
+  int num_xyz = 0;
+  for (auto it = matches2.begin(); it != matches2.end(); it++) {
     std::pair<int, int> const& index_pair = it->first;     // alias
     dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
 
-    std::map<int, int>::iterator image_haz_it, image_nav_it, image_sci_it;
-
-    // Doing haz cam to nav cam matches
-    image_haz_it = image_to_haz_it.find(index_pair.first);
-    image_nav_it = image_to_nav_it.find(index_pair.second);
-    if (image_haz_it != image_to_haz_it.end() && image_nav_it != image_to_nav_it.end()) {
-      int haz_it = image_haz_it->second;
-      int nav_it = image_nav_it->second;
-      dense_map::add_haz_nav_cost(// Inputs                                             // NOLINT
-                                  haz_it, nav_it, nav_cam_start,                        // NOLINT
-                                  navcam_to_hazcam_timestamp_offset,                    // NOLINT
-                                  match_pair, haz_cam_intensity_timestamps,             // NOLINT
-                                  ref_cam_timestamps, haz_cam_to_left_nav_cam_index, // NOLINT
-                                  haz_cam_to_right_nav_cam_index, nav_cam_params,       // NOLINT
-                                  haz_cam_params, depth_to_nav_block_sizes,             // NOLINT
-                                  depth_to_haz_block_sizes,                             // NOLINT
-                                  ref_cam_transforms, depth_clouds,                        // NOLINT
-                                  // Outputs                                            // NOLINT
-                                  residual_names, hazcam_depth_to_image_scale,          // NOLINT
-                                  ref_cam_vec, hazcam_to_navcam_vec,                    // NOLINT
-                                  hazcam_depth_to_image_vec,                            // NOLINT
-                                  problem);                                             // NOLINT
-    }
-
-    // Doing haz cam to sci cam matches
-    image_haz_it = image_to_haz_it.find(index_pair.first);
-    image_sci_it = image_to_sci_it.find(index_pair.second);
-    if (image_haz_it != image_to_haz_it.end() && image_sci_it != image_to_sci_it.end()) {
-      int haz_it = image_haz_it->second;
-      int sci_it = image_sci_it->second;
-      add_haz_sci_cost(  // Inputs                                                       // NOLINT
-                       haz_it, sci_it, nav_cam_start, navcam_to_hazcam_timestamp_offset, // NOLINT
-                       scicam_to_hazcam_timestamp_offset, match_pair,                    // NOLINT
-                       haz_cam_intensity_timestamps, ref_cam_timestamps,              // NOLINT
-                       sci_cam_timestamps, haz_cam_to_left_nav_cam_index,                // NOLINT
-                       haz_cam_to_right_nav_cam_index, sci_cam_to_left_nav_cam_index,    // NOLINT
-                       sci_cam_to_right_nav_cam_index, sci_cam_params,                   // NOLINT
-                       haz_cam_params, depth_to_sci_block_sizes,                         // NOLINT
-                       depth_to_haz_block_sizes, ref_cam_transforms,                        // NOLINT
-                       depth_clouds,                                                     // NOLINT
-                       // Outputs                                                        // NOLINT
-                       residual_names, hazcam_depth_to_image_scale, ref_cam_vec,         // NOLINT
-                       hazcam_to_navcam_vec, scicam_to_hazcam_vec,                       // NOLINT
-                       hazcam_depth_to_image_vec, sci_cam_focal_vector,                  // NOLINT
-                       sci_cam_optical_center, sci_cam_distortion, problem);             // NOLINT
-    }
-
-    // Doing sci cam to nav cam matches
-    image_nav_it = image_to_nav_it.find(index_pair.second);
-    image_sci_it = image_to_sci_it.find(index_pair.first);
-    if (image_nav_it != image_to_nav_it.end() && image_sci_it != image_to_sci_it.end()) {
-      int nav_it = image_nav_it->second;
-      int sci_it = image_sci_it->second;
-
-      add_nav_sci_cost(// Inputs                                                      // NOLINT
-                       nav_it, sci_it, nav_cam_start,                                 // NOLINT
-                       navcam_to_hazcam_timestamp_offset,                             // NOLINT
-                       scicam_to_hazcam_timestamp_offset,                             // NOLINT
-                       match_pair,                                                    // NOLINT
-                       ref_cam_timestamps, sci_cam_timestamps,                     // NOLINT
-                       sci_cam_to_left_nav_cam_index, sci_cam_to_right_nav_cam_index, // NOLINT
-                       hazcam_to_navcam_aff_trans, scicam_to_hazcam_aff_trans,        // NOLINT
-                       nav_cam_params, sci_cam_params,                                // NOLINT
-                       nav_block_sizes, sci_block_sizes, mesh_block_sizes,            // NOLINT
-                       ref_cam_transforms, depth_clouds, mesh,                           // NOLINT
-                       bvh_tree,                                                      // NOLINT
-                       // Outputs                                                     // NOLINT
-                       nav_sci_xyz_count, residual_names,                             // NOLINT
-                       ref_cam_vec, hazcam_to_navcam_vec,                             // NOLINT
-                       scicam_to_hazcam_vec, sci_cam_focal_vector,                    // NOLINT
-                       sci_cam_optical_center, sci_cam_distortion,                    // NOLINT
-                       initial_nav_sci_xyz, nav_sci_xyz,                              // NOLINT
-                       problem);                                                      // NOLINT
-    }
-  }  // end iterating over matches
-
-  if (nav_sci_xyz_count != num_nav_sci_xyz) LOG(FATAL) << "nav sci xyz book-keeping error.";
-
-  if (sparse_map->pid_to_cid_fid_.size() != sparse_map->pid_to_xyz_.size())
-    LOG(FATAL) << "Book-keeping error 1 in the sparse map.";
-
-  for (size_t pid = 0; pid < sparse_map->pid_to_cid_fid_.size(); pid++) {
-    // Note that xyz is an alias. This is very important as we optimize these
-    // xyz in-place.
-    Eigen::Vector3d& xyz = sparse_map->pid_to_xyz_[pid];
-
-    for (auto cid_fid = sparse_map->pid_to_cid_fid_[pid].begin();
-         cid_fid != sparse_map->pid_to_cid_fid_[pid].end();
-         cid_fid++) {
-      int cid = cid_fid->first;
-      int fid = cid_fid->second;
-
-      Eigen::Matrix2Xd& keypoints = sparse_map->cid_to_keypoint_map_[cid];  // alias
-
-      if (fid > keypoints.cols()) LOG(FATAL) << "Book-keeping error 2 in the sparse map.";
-
-      Eigen::Vector2d undist_nav_ip = keypoints.col(fid);
-
-      ceres::CostFunction* nav_cost_function =
-        dense_map::NavError::Create(undist_nav_ip, nav_block_sizes, nav_cam_params);
-      ceres::LossFunction* nav_loss_function
-        = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
-      problem.AddResidualBlock(nav_cost_function, nav_loss_function,
-                               &ref_cam_vec[dense_map::NUM_RIGID_PARAMS * cid],
-                               &xyz[0]);
-      residual_names.push_back("nav1");
-      residual_names.push_back("nav2");
-
-      if (FLAGS_fix_map)
-        problem.SetParameterBlockConstant(&ref_cam_vec[dense_map::NUM_RIGID_PARAMS * cid]);
+    std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
+    std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
+    for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
+      num_xyz++;
     }
   }
 
-  if (FLAGS_opt_map_only) {
-    problem.SetParameterBlockConstant(&hazcam_depth_to_image_vec[0]);
-    problem.SetParameterBlockConstant(&hazcam_depth_to_image_scale);
-    problem.SetParameterBlockConstant(&hazcam_to_navcam_vec[0]);
-    problem.SetParameterBlockConstant(&scicam_to_hazcam_vec[0]);
+  std::cout << "--num xyz is " << num_xyz << std::endl;
+
+  std::vector<Eigen::Vector3d> xyz_vec(num_xyz);
+
+  ceres::Problem problem;
+  std::vector<std::string> residual_names;
+
+  // Form the problem
+  int xyz_pos = -1;
+  for (auto it = matches2.begin(); it != matches2.end(); it++) {
+    std::pair<int, int> const& index_pair = it->first;     // alias
+    dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
+
+    std::cout << "--add cost " << index_pair.first << ' ' << index_pair.second << std::endl;
+
+    std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
+    std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
+
+    int left_index = index_pair.first;
+    int right_index = index_pair.second;
+
+    std::cout << "--left type is " << cams[left_index].camera_type << std::endl;
+    std::cout.precision(18);
+    std::cout << "beg timestamp " << ref_timestamps[cams[left_index].beg_ref_cam_index] << std::endl;
+    std::cout << "end timestamp " << ref_timestamps[cams[left_index].end_ref_cam_index] << std::endl;
+
+    int left_beg_index = cams[left_index].beg_ref_cam_index;
+    int left_end_index = cams[left_index].end_ref_cam_index;
+    int left_cam_type = cams[left_index].camera_type;
+    std::cout << "--left indices " << left_beg_index << ' ' << left_end_index << std::endl;
+    std::cout << "--left cam type " << left_cam_type << std::endl;
+    Eigen::Affine3d left_world_to_cam_trans = dense_map::calc_world_to_cam_trans(
+      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
+      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_end_index],
+      &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * left_cam_type], ref_timestamps[left_beg_index],
+      ref_timestamps[left_end_index], ref_to_cam_timestamp_offsets[left_cam_type],
+      cams[left_index].timestamp);
+
+    int right_beg_index = cams[right_index].beg_ref_cam_index;
+    int right_end_index = cams[right_index].end_ref_cam_index;
+    int right_cam_type = cams[right_index].camera_type;
+    std::cout << "--right indices " << right_beg_index << ' ' << right_end_index << std::endl;
+    std::cout << "--right cam type " << right_cam_type << std::endl;
+    Eigen::Affine3d right_world_to_cam_trans = dense_map::calc_world_to_cam_trans(
+      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * right_beg_index],
+      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * right_end_index],
+      &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * right_cam_type],
+      ref_timestamps[right_beg_index], ref_timestamps[right_end_index],
+      ref_to_cam_timestamp_offsets[right_cam_type], cams[right_index].timestamp);
+
+    for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
+      xyz_pos++;
+      Eigen::Vector2d dist_left_ip(left_ip_vec[ip_it].x,   left_ip_vec[ip_it].y);
+      Eigen::Vector2d dist_right_ip(right_ip_vec[ip_it].x, right_ip_vec[ip_it].y);
+
+      Eigen::Vector2d undist_left_ip, undist_right_ip;
+
+      cam_params[cams[left_index].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+        (dist_left_ip, &undist_left_ip);
+
+      cam_params[cams[right_index].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+        (dist_right_ip, &undist_right_ip);
+
+      xyz_vec[xyz_pos] =
+        dense_map::TriangulatePair(cam_params[cams[left_index].camera_type].GetFocalLength(),
+                                   cam_params[cams[right_index].camera_type].GetFocalLength(),
+                                   left_world_to_cam_trans,
+                                   right_world_to_cam_trans,
+                                   undist_left_ip, undist_right_ip);
+
+      std::cout << "--left undist dist " << dist_left_ip.transpose() << ' ' << undist_left_ip.transpose() << std::endl;
+      std::cout << "--right undist dist " << dist_right_ip.transpose() << ' '
+                << undist_right_ip.transpose() << std::endl;
+      std::cout << "--X is " << xyz_vec[xyz_pos] << std::endl;
+
+      std::cout << "--temporary22!" << std::endl;
+
+      if (cams[right_index].camera_type == 2) {
+        // The cost function of projecting in the bracketed cam. Note
+        // that we use distorted ip, as in the cost function below we
+        // will do differences of distorted pixels.
+        ceres::CostFunction* right_bracketed_cost_function =
+          dense_map::BracketedCamError::Create(dist_right_ip,
+                                               ref_timestamps[right_beg_index],
+                                               ref_timestamps[right_end_index],
+                                               cams[right_index].timestamp,
+                                               bracketed_cam_block_sizes,
+                                               cam_params[cams[right_index].camera_type]);
+        ceres::LossFunction* right_bracketed_loss_function
+          = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
+
+        std::cout << "--add block" << std::endl;
+        residual_names.push_back("sciscisci1");
+        residual_names.push_back("sciscisci2");
+        problem.AddResidualBlock(right_bracketed_cost_function, right_bracketed_loss_function,
+                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * right_beg_index],
+                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * right_end_index],
+                                 &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * right_cam_type],
+                                 &xyz_vec[xyz_pos][0],
+                                 &ref_to_cam_timestamp_offsets[right_cam_type],
+                                 &focal_lengths[cams[right_index].camera_type],
+                                 &optical_centers[cams[right_index].camera_type][0],
+                                 &distortions[cams[right_index].camera_type][0]);
+      }
+    }
+  }
+
+  std::cout << "--pos and num " << xyz_pos << ' ' << num_xyz << std::endl;
+  if (xyz_pos + 1 != num_xyz) {
+    LOG(FATAL) << "Book-keeping error.\n";
   }
 
   // Evaluate the residual before optimization
@@ -2533,151 +2577,13 @@ int main(int argc, char** argv) {
   if (residuals.size() != residual_names.size())
     LOG(FATAL) << "Book-keeping error in the number of residuals.";
 
-  if (FLAGS_verbose) {
-    for (size_t it = 0; it < residuals.size(); it++)
-      std::cout << "initial res " << residual_names[it] << " " << residuals[it] << std::endl;
-  }
-
-  // Want the RMSE residual with loss, to understand what all residuals contribute,
-  // but without getting distracted by the outliers
-  eval_options.apply_loss_function = false;
-  problem.Evaluate(eval_options, &total_cost, &residuals, NULL, NULL);
   dense_map::calc_median_residuals(residuals, residual_names, "before opt");
 
-  // Experimentally it was found that it was better to keep the scale
-  // constant and optimize everything else. Later registration will
-  // happen to correct any drift in the nav cam poses.
-  if (!FLAGS_float_scale) problem.SetParameterBlockConstant(&hazcam_depth_to_image_scale);
-
-  // See which sci cam intrinsics values to float or keep fixed
-  if (sci_cam_intrinsics_to_float.find("focal_length") == sci_cam_intrinsics_to_float.end()) {
-    // std::cout << "For " << sci_cam << " not floating focal_length." << std::endl;
-    problem.SetParameterBlockConstant(&sci_cam_focal_vector[0]);
-  } else {
-    // std::cout << "For " << sci_cam << " floating focal_length." << std::endl;
-  }
-  if (sci_cam_intrinsics_to_float.find("optical_center") == sci_cam_intrinsics_to_float.end()) {
-    // std::cout << "For " << sci_cam << " not floating optical_center." << std::endl;
-    problem.SetParameterBlockConstant(&sci_cam_optical_center[0]);
-  } else {
-    // std::cout << "For " << sci_cam << " floating optical_center." << std::endl;
-  }
-  if (sci_cam_intrinsics_to_float.find("distortion") == sci_cam_intrinsics_to_float.end()) {
-    // std::cout << "For " << sci_cam << " not floating distortion." << std::endl;
-    problem.SetParameterBlockConstant(&sci_cam_distortion[0]);
-  } else {
-    // std::cout << "For " << sci_cam << " floating distortion." << std::endl;
-  }
-
-  // Solve the problem
-  ceres::Solver::Options options;
-  ceres::Solver::Summary summary;
-  options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-  options.num_threads = FLAGS_num_opt_threads;  // The result is more predictable with one thread
-  options.max_num_iterations = FLAGS_num_iterations;
-  options.minimizer_progress_to_stdout = true;
-  options.gradient_tolerance = 1e-16;
-  options.function_tolerance = 1e-16;
-  options.parameter_tolerance = FLAGS_parameter_tolerance;
-  ceres::Solve(options, &problem, &summary);
-
-  // Copy back the optimized intrinsics
-  sci_cam_params.SetFocalLength(Eigen::Vector2d(sci_cam_focal_vector[0], sci_cam_focal_vector[0]));
-  sci_cam_params.SetOpticalOffset(sci_cam_optical_center);
-  sci_cam_params.SetDistortion(sci_cam_distortion);
-
-  // Update with the optimized results
-  dense_map::array_to_rigid_transform(hazcam_depth_to_image_transform, &hazcam_depth_to_image_vec[0]);
-  hazcam_depth_to_image_transform.linear() *= hazcam_depth_to_image_scale;
-  dense_map::array_to_rigid_transform(hazcam_to_navcam_aff_trans, &hazcam_to_navcam_vec[0]);
-  dense_map::array_to_rigid_transform(scicam_to_hazcam_aff_trans, &scicam_to_hazcam_vec[0]);
-  for (int cid = 0; cid < num_ref_cams; cid++)
-    dense_map::array_to_rigid_transform(ref_cam_transforms[cid], &ref_cam_vec[dense_map::NUM_RIGID_PARAMS * cid]);
-
-  // Compute the residuals without loss, want to see the outliers too
-  problem.Evaluate(eval_options, &total_cost, &residuals, NULL, NULL);
-  if (residuals.size() != residual_names.size())
-    LOG(FATAL) << "Book-keeping error in the number of residuals.";
-
   if (FLAGS_verbose) {
-    for (size_t it = 0; it < residuals.size(); it++)
-      std::cout << "final res " << residual_names[it] << " " << residuals[it] << std::endl;
+      for (size_t it = 0; it < residuals.size(); it++)
+        std::cout << "initial res " << residual_names[it] << " " << residuals[it] << std::endl;
   }
 
-  // Want the RMSE residual with loss, to understand what all residuals contribute,
-  // but without getting distracted by the outliers
-  eval_options.apply_loss_function = false;
-  problem.Evaluate(eval_options, &total_cost, &residuals, NULL, NULL);
-  dense_map::calc_median_residuals(residuals, residual_names, "after opt");
-
-  // Re-register the map, and keep track of what scale was used.
-  // Note that we do not update the positions of the sci and haz
-  // images. We don't need those any more.
-  if (!FLAGS_skip_registration) {
-    std::vector<std::string> data_files;
-    data_files.push_back(FLAGS_hugin_file);
-    data_files.push_back(FLAGS_xyz_file);
-    bool verification = false;
-    double map_scale
-      = sparse_mapping::RegistrationOrVerification(data_files, verification, sparse_map.get());
-
-    // Apply the scale
-    hazcam_depth_to_image_scale *= map_scale;
-    // This transform is affine, so both the linear and translation parts need a scale
-    hazcam_depth_to_image_transform.linear() *= map_scale;
-    hazcam_depth_to_image_transform.translation() *= map_scale;
-    // These two are rotation + translation, so only the translation needs the scale
-    hazcam_to_navcam_aff_trans.translation() *= map_scale;
-    scicam_to_hazcam_aff_trans.translation() *= map_scale;
-  }
-
-  std::cout << "Writing: " << FLAGS_output_map << std::endl;
-  sparse_map->Save(FLAGS_output_map);
-
-  if (!FLAGS_opt_map_only) {
-    // update nav and haz
-    bool update_cam1 = true, update_cam2 = true;
-    std::string cam1_name = "nav_cam", cam2_name = "haz_cam";
-    boost::shared_ptr<camera::CameraParameters>
-      cam1_params(new camera::CameraParameters(nav_cam_params));
-    boost::shared_ptr<camera::CameraParameters>
-      cam2_params(new camera::CameraParameters(haz_cam_params));
-    bool update_depth_to_image_transform = true;
-    bool update_extrinsics = true;
-    bool update_timestamp_offset = true;
-    std::string cam1_to_cam2_timestamp_offset_str = "navcam_to_hazcam_timestamp_offset";
-    // Modify in-place the robot config file
-    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
-                                  update_cam2, cam2_name, cam2_params,
-                                  update_depth_to_image_transform,
-                                  hazcam_depth_to_image_transform, update_extrinsics,
-                                  hazcam_to_navcam_aff_trans, update_timestamp_offset,
-                                  cam1_to_cam2_timestamp_offset_str,
-                                  navcam_to_hazcam_timestamp_offset);
-  }
-  if (!FLAGS_opt_map_only) {
-    // update sci and haz
-    // TODO(oalexan1): Write a single function to update all 3 of them
-    bool update_cam1 = true, update_cam2 = true;
-    std::string cam1_name = "sci_cam", cam2_name = "haz_cam";
-    boost::shared_ptr<camera::CameraParameters>
-      cam1_params(new camera::CameraParameters(sci_cam_params));
-    boost::shared_ptr<camera::CameraParameters>
-      cam2_params(new camera::CameraParameters(haz_cam_params));
-    bool update_depth_to_image_transform = true;
-    bool update_extrinsics = true;
-    bool update_timestamp_offset = true;
-    std::string cam1_to_cam2_timestamp_offset_str = "scicam_to_hazcam_timestamp_offset";
-    // Modify in-place the robot config file
-    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
-                                  update_cam2, cam2_name, cam2_params,
-                                  update_depth_to_image_transform,
-                                  hazcam_depth_to_image_transform, update_extrinsics,
-                                  scicam_to_hazcam_aff_trans.inverse(),
-                                  update_timestamp_offset,
-                                  cam1_to_cam2_timestamp_offset_str,
-                                  scicam_to_hazcam_timestamp_offset);
-  }
   return 0;
 } // NOLINT
 
