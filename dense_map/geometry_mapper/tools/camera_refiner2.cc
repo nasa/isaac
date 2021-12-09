@@ -27,6 +27,18 @@
 
 // TODO(oalexan1): Must test the DepthError with no bracketing.
 
+// TODO(oalexan1): Move this to utils
+// Get rid of warning beyond our control
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic push
+#include <openMVG/multiview/projection.hpp>
+#include <openMVG/multiview/rotation_averaging_l1.hpp>
+#include <openMVG/multiview/triangulation_nview.hpp>
+#include <openMVG/numeric/numeric.h>
+#include <openMVG/tracks/tracks.hpp>
+#pragma GCC diagnostic pop
+
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
 #include <ceres/problem.h>
@@ -194,13 +206,12 @@ namespace dense_map {
     Eigen::Affine3d ref_to_cam_aff;
     array_to_rigid_transform(ref_to_cam_aff, ref_to_cam_trans);
 
-    std::cout.precision(18);
-    std::cout << "--beg stamp " << beg_ref_stamp << std::endl;
-    std::cout << "--end stamp " << end_ref_stamp << std::endl;
-    std::cout << "cam stamp   " << cam_stamp << std::endl;
-    std::cout << "ref to cam off " << ref_to_cam_offset << std::endl;
-
-    std::cout << "--ref to cam trans\n" << ref_to_cam_aff.matrix() << std::endl;
+    // std::cout.precision(18);
+    // std::cout << "--beg stamp " << beg_ref_stamp << std::endl;
+    // std::cout << "--end stamp " << end_ref_stamp << std::endl;
+    // std::cout << "cam stamp   " << cam_stamp << std::endl;
+    // std::cout << "ref to cam off " << ref_to_cam_offset << std::endl;
+    // std::cout << "--ref to cam trans\n" << ref_to_cam_aff.matrix() << std::endl;
 
     // Covert from cam time to ref time and normalize
     double alpha = (cam_stamp - ref_to_cam_offset - beg_ref_stamp)
@@ -209,7 +220,7 @@ namespace dense_map {
     if (beg_ref_stamp == end_ref_stamp)
       alpha = 0.0;  // handle division by zero
 
-    std::cout << "--alpha " << alpha << std::endl;
+    // std::cout << "--alpha " << alpha << std::endl;
     if (alpha < 0.0 || alpha > 1.0) LOG(FATAL) << "Out of bounds in interpolation.\n";
 
     // Interpolate at desired time
@@ -218,7 +229,7 @@ namespace dense_map {
 
     Eigen::Affine3d interp_world_to_cam_afff = ref_to_cam_aff * interp_world_to_ref_aff;
 
-    std::cout << "final trans\n" << interp_world_to_cam_afff.matrix() << std::endl;
+    // std::cout << "final trans\n" << interp_world_to_cam_afff.matrix() << std::endl;
 
     return interp_world_to_cam_afff;
   }
@@ -289,7 +300,7 @@ struct BracketedCamError {
 
     // World point
     Eigen::Vector3d X(parameters[3][0], parameters[3][1], parameters[3][2]);
-    std::cout << "--bracketX is " << X.transpose() << std::endl;
+    // std::cout << "--bracketX is " << X.transpose() << std::endl;
 
     // Make a deep copy which we will modify
     camera::CameraParameters cam_params = m_cam_params;
@@ -301,14 +312,14 @@ struct BracketedCamError {
     cam_params.SetOpticalOffset(optical_center);
     cam_params.SetDistortion(distortion);
 
-    std::cout << "--focal vector " << focal_vector.transpose() << std::endl;
-    std::cout << "--opt ctr " << optical_center.transpose() << std::endl;
-    std::cout << "-dist " << distortion.transpose() << std::endl;
+    // std::cout << "--focal vector " << focal_vector.transpose() << std::endl;
+    // std::cout << "--opt ctr " << optical_center.transpose() << std::endl;
+    // std::cout << "-dist " << distortion.transpose() << std::endl;
 
     // Convert world point to given cam coordinates
     X = world_to_cam_trans * X;
 
-    std::cout << "--trans X " << X.transpose() << std::endl;
+    // std::cout << "--trans X " << X.transpose() << std::endl;
 
     // Project into the image
     Eigen::Vector2d undist_pix = cam_params.GetFocalVector().cwiseProduct(X.hnormalized());
@@ -319,7 +330,7 @@ struct BracketedCamError {
     residuals[0] = curr_dist_pix[0] - m_meas_dist_pix[0];
     residuals[1] = curr_dist_pix[1] - m_meas_dist_pix[1];
 
-    std::cout << "--residuals " << residuals[0] << ' ' << residuals[1] << std::endl;
+    // std::cout << "--residuals " << residuals[0] << ' ' << residuals[1] << std::endl;
     return true;
   }
 
@@ -394,7 +405,7 @@ struct RefCamError {
     // World point
     Eigen::Vector3d X;
     for (int it = 0; it < NUM_XYZ_PARAMS; it++) X[it] = parameters[1][it];
-    std::cout << "--refX is " << X.transpose() << std::endl;
+    // std::cout << "--refX is " << X.transpose() << std::endl;
 
     // Make a deep copy which we will modify
     camera::CameraParameters cam_params = m_cam_params;
@@ -406,14 +417,14 @@ struct RefCamError {
     cam_params.SetOpticalOffset(optical_center);
     cam_params.SetDistortion(distortion);
 
-    std::cout << "--focal vector " << focal_vector.transpose() << std::endl;
-    std::cout << "--opt ctr " << optical_center.transpose() << std::endl;
-    std::cout << "-dist " << distortion.transpose() << std::endl;
+    // std::cout << "--focal vector " << focal_vector.transpose() << std::endl;
+    // std::cout << "--opt ctr " << optical_center.transpose() << std::endl;
+    // std::cout << "-dist " << distortion.transpose() << std::endl;
 
     // Convert world point to given cam coordinates
     X = world_to_ref_t * X;
 
-    std::cout << "--trans X " << X.transpose() << std::endl;
+    // std::cout << "--trans X " << X.transpose() << std::endl;
 
     // Project into the image
     Eigen::Vector2d undist_pix = cam_params.GetFocalVector().cwiseProduct(X.hnormalized());
@@ -424,7 +435,7 @@ struct RefCamError {
     residuals[0] = curr_dist_pix[0] - m_meas_dist_pix[0];
     residuals[1] = curr_dist_pix[1] - m_meas_dist_pix[1];
 
-    std::cout << "--residuals " << residuals[0] << ' ' << residuals[1] << std::endl;
+    // std::cout << "--residuals " << residuals[0] << ' ' << residuals[1] << std::endl;
     return true;
   }
 
@@ -504,29 +515,29 @@ struct BracketedDepthError {
     // Apply the scale
     double depth_to_image_scale = parameters[4][0];
     depth_to_image.linear() *= depth_to_image_scale;
-    std::cout << "--depth to image:\n" << depth_to_image.matrix() << std::endl;
+    // std::cout << "--depth to image:\n" << depth_to_image.matrix() << std::endl;
 
-    std::cout << "--meas pt " << m_meas_depth_xyz.transpose() << std::endl;
+    // std::cout << "--meas pt " << m_meas_depth_xyz.transpose() << std::endl;
 
     // Convert from depth cloud coordinates to cam coordinates
     Eigen::Vector3d M = depth_to_image * m_meas_depth_xyz;
 
-    std::cout << "--image meas pt " << M.transpose() << std::endl;
+    // std::cout << "--image meas pt " << M.transpose() << std::endl;
 
     // Convert to world coordinates
     M = world_to_cam_trans.inverse() * M;
-    std::cout << "--depth in world coords " << M.transpose() << std::endl;
+    // std::cout << "--depth in world coords " << M.transpose() << std::endl;
 
     // Triangulated world point
     Eigen::Vector3d X(parameters[5][0], parameters[5][1], parameters[5][2]);
-    std::cout << "--triangulated X is " << X.transpose() << std::endl;
+    // std::cout << "--triangulated X is " << X.transpose() << std::endl;
 
-    std::cout << "--weight " << m_weight << std::endl;
+    // std::cout << "--weight " << m_weight << std::endl;
 
     // Compute the residuals
     for (size_t it = 0; it < NUM_XYZ_PARAMS; it++) {
       residuals[it] = m_weight * (X[it] - M[it]);
-      std::cout << "--residual " << residuals[it] << std::endl;
+      // std::cout << "--residual " << residuals[it] << std::endl;
     }
 
     return true;
@@ -1096,16 +1107,18 @@ void calc_median_residuals(std::vector<double> const& residuals,
     int it3 = static_cast<int>(0.75 * len);
 
     if (len = 0)
-      std::cout << name << ": "
-                << "none" << std::endl;
+      std::cout << name << ": " << "none" << std::endl;
     else
-      std::cout << name << ": " << vals[it1] << ' ' << vals[it2] << ' ' << vals[it3] << std::endl;
+      std::cout << name << ": " << vals[it1] << ' ' << vals[it2] << ' '
+                << vals[it3] << std::endl;
   }
 }
 
   // Intersect ray with mesh. Return true on success.
-  bool ray_mesh_intersect(Eigen::Vector2d const& undist_pix, camera::CameraParameters const& cam_params,
-                          Eigen::Affine3d const& world_to_cam, mve::TriangleMesh::Ptr const& mesh,
+  bool ray_mesh_intersect(Eigen::Vector2d const& undist_pix,
+                          camera::CameraParameters const& cam_params,
+                          Eigen::Affine3d const& world_to_cam,
+                          mve::TriangleMesh::Ptr const& mesh,
                           std::shared_ptr<BVHTree> const& bvh_tree,
                           double min_ray_dist, double max_ray_dist,
                           // Output
@@ -2500,15 +2513,15 @@ int main(int argc, char** argv) {
           double nav_start = ref_timestamps[ref_it];
           double haz_time = cam.ref_timestamp;
           double nav_end = ref_timestamps[ref_it + 1];
-          std::cout << "--xxxhaz after " << haz_time - nav_start << ' ' << nav_end - haz_time << ' '
-                    << nav_end - nav_start << std::endl;
+          // std::cout << "--xxxhaz after " << haz_time - nav_start << ' ' << nav_end - haz_time <<
+          // ' ' << nav_end - nav_start << std::endl;
         }
         if (cam_type == 2) {
           double nav_start = ref_timestamps[ref_it];
           double sci_time = cam.ref_timestamp;
           double nav_end = ref_timestamps[ref_it + 1];
-          std::cout << "--xxxsci after " << sci_time - nav_start << ' ' << nav_end - sci_time << ' '
-                    << nav_end - nav_start << std::endl;
+          // std::cout << "--xxxsci after " << sci_time - nav_start << ' ' << nav_end - sci_time <<
+          // ' ' << nav_end - nav_start << std::endl;
         }
 
         success = true;
@@ -2585,7 +2598,7 @@ int main(int argc, char** argv) {
   }
   thread_pool1.Join();
 
-  dense_map::MATCH_MAP matches2;
+  dense_map::MATCH_MAP matches;
 
   std::cout << "--expose the num overlap!" << std::endl;
   size_t num_overlap = 1;
@@ -2624,12 +2637,218 @@ int main(int argc, char** argv) {
                              cid_to_descriptor_map[right_image_it],
                              cid_to_keypoint_map[left_image_it],
                              cid_to_keypoint_map[right_image_it],
-                             FLAGS_verbose, &matches2[pair]);
+                             FLAGS_verbose, &matches[pair]);
   }
   // thread_pool2.Join();
 
+  // If feature A in image I matches feather B in image J, which matches feature C in image K,
+  // then (A, B, C) belong together into a track. Build such a track.
+
+  std::vector<std::map<std::pair<float, float>, int>> keypoint_map(cams.size());
+
+  int num_total_matches = 0;  // temporary
+
+  // Give all interest points in a given image a unique id
+  for (auto it = matches.begin(); it != matches.end(); it++) {
+    std::pair<int, int> const& index_pair = it->first;     // alias
+
+    int left_index = index_pair.first;
+    int right_index = index_pair.second;
+
+    dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
+    std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
+    std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
+    for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
+      auto dist_left_ip  = std::make_pair(left_ip_vec[ip_it].x,  left_ip_vec[ip_it].y);
+      auto dist_right_ip = std::make_pair(right_ip_vec[ip_it].x, right_ip_vec[ip_it].y);
+      keypoint_map[left_index][dist_left_ip] = 0;
+      keypoint_map[right_index][dist_right_ip] = 0;
+      num_total_matches++;
+    }
+  }
+
+  std::cout << "--bbb num total matches " << num_total_matches << std::endl;
+  std::cout << "--why so many more matches than pid?" << std::endl;
+  std::cout << "--test adding missing pairs!" << std::endl;
+  std::cout << "--must do two passes!" << std::endl;
+
+  // Give all interest points in a given image a unique id
+  // And put them in a vector with the id corresponding to the interest point
+  std::vector<std::vector<std::pair<float, float>>> keypoint_vec(cams.size());
+  for (size_t cam_it = 0; cam_it < cams.size(); cam_it++) {
+    int count = 0;
+    for (auto ip_it = keypoint_map[cam_it].begin(); ip_it != keypoint_map[cam_it].end(); ip_it++) {
+      ip_it->second = count;
+      count++;
+      std::cout << "--value " << (ip_it->first).first << ' ' << (ip_it->first).second << ' '
+                << ip_it->second << std::endl;
+      keypoint_vec[cam_it].push_back(ip_it->first);
+      std::cout << "--size is " << keypoint_vec[cam_it].size() << std::endl;
+    }
+  }
+
+  std::cout << "--write my own function! It should just remove conflicts!" << std::endl;
+
+  openMVG::matching::PairWiseMatches match_map;
+  for (auto it = matches.begin(); it != matches.end(); it++) {
+    std::pair<int, int> const& index_pair = it->first;     // alias
+
+    int left_index = index_pair.first;
+    int right_index = index_pair.second;
+
+    dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
+    std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
+    std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
+
+    std::vector<openMVG::matching::IndMatch> mvg_matches;
+
+    for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
+      auto dist_left_ip  = std::make_pair(left_ip_vec[ip_it].x,  left_ip_vec[ip_it].y);
+      auto dist_right_ip = std::make_pair(right_ip_vec[ip_it].x, right_ip_vec[ip_it].y);
+
+      // std::cout << "zzz1 " << left_index << ' ' << dist_left_ip.first << ' ' <<
+      // dist_left_ip.second << ' '  << right_index << ' ' << dist_right_ip.first << ' ' <<
+      // dist_right_ip.second << std::endl;
+
+      int left_id = keypoint_map[left_index][dist_left_ip];
+      int right_id = keypoint_map[right_index][dist_right_ip];
+      mvg_matches.push_back(openMVG::matching::IndMatch(left_id, right_id));
+    }
+    match_map[index_pair] = mvg_matches;
+  }
+
+  // Build tracks
+  openMVG::tracks::TracksBuilder trackBuilder;
+  trackBuilder.Build(match_map);  // Build:  Efficient fusion of correspondences
+  trackBuilder.Filter();          // Filter: Remove tracks that have conflict
+  // trackBuilder.ExportToStream(std::cout);
+  openMVG::tracks::STLMAPTracks map_tracks;
+  // Export tracks as a map (each entry is a sequence of imageId and featureIndex):
+  //  {TrackIndex => {(imageIndex, featureIndex), ... ,(imageIndex, featureIndex)}
+  trackBuilder.ExportToSTL(map_tracks);
+
+  // TODO(oalexan1): Print how many pairwise matches were there before
+  // and after filtering tracks.
+
+  if (map_tracks.empty())
+    LOG(FATAL) << "No tracks left after filtering. Perhaps images are too dis-similar?\n";
+
+  size_t num_elems = map_tracks.size();
+  // Populate back the filtered tracks.
+  std::vector<std::map<int, int> > pid_to_cid_fid;
+  pid_to_cid_fid.clear();
+  pid_to_cid_fid.resize(num_elems);
+  size_t curr_id = 0;
+  for (auto itr = map_tracks.begin(); itr != map_tracks.end(); itr++) {
+    for (auto itr2 = (itr->second).begin(); itr2 != (itr->second).end(); itr2++) {
+      pid_to_cid_fid[curr_id][itr2->first] = itr2->second;
+    }
+    curr_id++;
+  }
+
+  // The transform from every camera to the world
+  std::vector<Eigen::Affine3d> world_to_cam(cams.size());
+  for (size_t it = 0; it < cams.size(); it++) {
+    int beg_index = cams[it].beg_ref_cam_index;
+    int end_index = cams[it].end_ref_cam_index;
+    int cam_type = cams[it].camera_type;
+    // std::cout << "--ref indices " << beg_index << ' ' << end_index << std::endl;
+    // std::cout << "--cam type " << cam_type << std::endl;
+    world_to_cam[it] = dense_map::calc_world_to_cam_trans
+      (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_index],
+       &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_index],
+       &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+       ref_timestamps[beg_index], ref_timestamps[end_index],
+       ref_to_cam_timestamp_offsets[cam_type],
+       cams[it].timestamp);
+
+    // std::cout << "--trans for camera: " << it << ' ' << world_to_cam[it].matrix() << std::endl;
+  }
+
+  for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+    std::cout << std::endl;
+    // std::cout << "pid is " << pid << std::endl;
+    // std::cout << "---aaa pid size is " << pid_to_cid_fid[pid].size() << std::endl;
+    // std::cout << "zzz2 ";
+    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+      int cid = cid_fid->first;
+      int fid = cid_fid->second;
+      // std::cout  << cid << ' ' << keypoint_vec[cid][fid].first << ' ';
+      // std::cout << keypoint_vec[cid][fid].second << " ";
+    }
+    // std::cout << std::endl;
+  }
+
+  // Do multiview triangulation
+  std::vector<Eigen::Vector3d> xyz_vec(pid_to_cid_fid.size());
+
+  for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+    Eigen::Vector3d xyz(0, 0, 0);
+    int num = 0;
+
+    for (auto cid_fid1 = pid_to_cid_fid[pid].begin();
+         cid_fid1 != pid_to_cid_fid[pid].end(); cid_fid1++) {
+      int cid1 = cid_fid1->first;
+      int fid1 = cid_fid1->second;
+
+      Eigen::Vector2d dist_ip1(keypoint_vec[cid1][fid1].first, keypoint_vec[cid1][fid1].second);
+      Eigen::Vector2d undist_ip1;
+      cam_params[cams[cid1].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+        (dist_ip1, &undist_ip1);
+
+      // std::cout << "--dist undist1 " << dist_ip1.transpose() << ' ' << undist_ip1.transpose()
+      //          << std::endl;
+
+      for (auto cid_fid2 = pid_to_cid_fid[pid].begin();
+           cid_fid2 != pid_to_cid_fid[pid].end(); cid_fid2++) {
+        int cid2 = cid_fid2->first;
+        int fid2 = cid_fid2->second;
+        if (cid2 <= cid1) continue;
+
+        Eigen::Vector2d dist_ip2(keypoint_vec[cid2][fid2].first, keypoint_vec[cid2][fid2].second);
+        Eigen::Vector2d undist_ip2;
+        cam_params[cams[cid2].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+          (dist_ip2, &undist_ip2);
+
+        // std::cout << "--dist undist2 " << dist_ip2.transpose() << ' ' << undist_ip2.transpose()
+        //          << std::endl;
+        // std::cout << "cids are " << cid1 << ' ' << cid2 << std::endl;
+        // std::cout << "--" << std::endl;
+        // std::cout << "---cam1\n" << world_to_cam[cid1].matrix() << std::endl;
+        // std::cout << "---cam2\n" << world_to_cam[cid2].matrix() << std::endl;
+
+        Eigen::Vector3d xyz0
+          = dense_map::TriangulatePair(cam_params[cams[cid1].camera_type].GetFocalLength(),
+                                       cam_params[cams[cid2].camera_type].GetFocalLength(),
+                                       world_to_cam[cid1], world_to_cam[cid2],
+                                       undist_ip1, undist_ip2);
+
+        // std::cout << "---X0 " << xyz0.transpose() << std::endl;
+
+        xyz += xyz0;
+        // std::cout << "------X " << xyz.transpose() << std::endl;
+        num++;
+      }
+    }
+
+    // std::cout << "---num is " << num << std::endl;
+    if (num > 0) xyz /= num;
+
+    // std::cout << "---xyz now " << xyz.transpose() << std::endl;
+
+    xyz_vec[pid] = xyz;
+    std::cout << "--xyz1 " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
+    // std::cout << "---done here!" << std::endl;
+  }
+
+  std::cout << "--must do two passes!" << std::endl;
+  std::cout << "--must filter by min triangulation angle and points behind camera" << std::endl;
+
+  // std::vector<std::map<int, int>> cid_fid_to_pid;
+  // sparse_mapping::InitializeCidFidToPid(cams.size(), pid_to_cid_fid, &cid_fid_to_pid);
+
   if (FLAGS_verbose) {
-  for (auto it = matches2.begin(); it != matches2.end(); it++) {
+  for (auto it = matches.begin(); it != matches.end(); it++) {
     std::pair<int, int> index_pair = it->first;
     dense_map::MATCH_PAIR const& match_pair = it->second;
 
@@ -2694,7 +2913,7 @@ int main(int argc, char** argv) {
 
   // Form the problem
   int num_xyz = 0;
-  for (auto it = matches2.begin(); it != matches2.end(); it++) {
+  for (auto it = matches.begin(); it != matches.end(); it++) {
     std::pair<int, int> const& index_pair = it->first;     // alias
     dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
 
@@ -2707,14 +2926,14 @@ int main(int argc, char** argv) {
 
   std::cout << "--num xyz is " << num_xyz << std::endl;
 
-  std::vector<Eigen::Vector3d> xyz_vec(num_xyz);
+  xyz_vec.resize(num_xyz);
 
   ceres::Problem problem;
   std::vector<std::string> residual_names;
 
   // Form the problem
   int xyz_pos = -1;
-  for (auto it = matches2.begin(); it != matches2.end(); it++) {
+  for (auto it = matches.begin(); it != matches.end(); it++) {
     std::pair<int, int> const& index_pair = it->first;     // alias
     dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
 
@@ -2775,12 +2994,11 @@ int main(int argc, char** argv) {
                                    right_world_to_cam_trans,
                                    undist_left_ip, undist_right_ip);
 
-      std::cout << "--left undist dist " << dist_left_ip.transpose() << ' ' << undist_left_ip.transpose() << std::endl;
-      std::cout << "--right undist dist " << dist_right_ip.transpose() << ' '
-                << undist_right_ip.transpose() << std::endl;
-      std::cout << "--X is " << xyz_vec[xyz_pos] << std::endl;
-
-      std::cout << "--temporary22!" << std::endl;
+      // std::cout << "--left undist dist " << dist_left_ip.transpose() << ' ' <<
+      // undist_left_ip.transpose() << std::endl; std::cout << "--right undist dist " <<
+      // dist_right_ip.transpose() << ' '<< undist_right_ip.transpose() << std::endl;
+      std::cout << "--xyz2 is " << xyz_vec[xyz_pos].transpose() << std::endl;
+      // std::cout << "--temporary22!" << std::endl;
 
       if (true && cams[left_index].camera_type == 1) {
         // The cost function of projecting in the bracketed cam. Note
@@ -2796,7 +3014,7 @@ int main(int argc, char** argv) {
         ceres::LossFunction* left_bracketed_loss_function
           = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-        std::cout << "--add block" << std::endl;
+        // std::cout << "--add block" << std::endl;
         residual_names.push_back("navhazhaz1");
         residual_names.push_back("navhazhaz2");
         problem.AddResidualBlock(left_bracketed_cost_function, left_bracketed_loss_function,
@@ -2845,7 +3063,7 @@ int main(int argc, char** argv) {
           ceres::LossFunction* left_bracketed_depth_loss_function
             = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-          std::cout << "--add block" << std::endl;
+          // std::cout << "--add block" << std::endl;
           residual_names.push_back("navhazdepth1");
           residual_names.push_back("navhazdepth2");
           residual_names.push_back("navhazdepth3");
@@ -2874,15 +3092,16 @@ int main(int argc, char** argv) {
         ceres::LossFunction* left_ref_loss_function
           = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-        std::cout << "--add block" << std::endl;
+        // std::cout << "--add block" << std::endl;
         residual_names.push_back("navhaznav1");
         residual_names.push_back("navhaznav2");
-        problem.AddResidualBlock(left_ref_cost_function, left_ref_loss_function,
-                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
-                                 &xyz_vec[xyz_pos][0],
-                                 &focal_lengths[cams[left_index].camera_type],
-                                 &optical_centers[cams[left_index].camera_type][0],
-                                 &distortions[cams[left_index].camera_type][0]);
+        problem.AddResidualBlock
+          (left_ref_cost_function, left_ref_loss_function,
+           &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
+           &xyz_vec[xyz_pos][0],
+           &focal_lengths[cams[left_index].camera_type],
+           &optical_centers[cams[left_index].camera_type][0],
+           &distortions[cams[left_index].camera_type][0]);
       }
     }
   }
