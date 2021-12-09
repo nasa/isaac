@@ -1276,7 +1276,7 @@ int main(int argc, char** argv) {
               << ' ' << right_bound[cam_type] << std::endl;
   }
 
-  std::cout << "--deal with adjustment!" << std::endl;
+  std::cout << "--Deal with adjustment!" << std::endl;
   for (size_t it = 0; it < cams.size(); it++) {
     if (cams[it].camera_type == 2) {
       dense_map::adjustImageSize(cam_params[2], cams[it].image);
