@@ -1089,7 +1089,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
     LOG(FATAL) << "There must be as many residuals as residual names.";
 
   std::map<std::string, std::vector<double> > stats;
-  for (size_t it = 0; it < residuals.size(); it++) stats[residual_names[it]] = std::vector<double>();  // initialize
+  for (size_t it = 0; it < residuals.size(); it++)
+    stats[residual_names[it]] = std::vector<double>();  // initialize
 
   for (size_t it = 0; it < residuals.size(); it++)
     stats[residual_names[it]].push_back(std::abs(residuals[it]));
@@ -2090,8 +2091,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // Indices to look up the reference cameras bracketing this camera
     // in time. The two indices will have same value if and only if
     // this is a reference camera.
-    int beg_ref_cam_index;
-    int end_ref_cam_index;
+    int beg_ref_index;
+    int end_ref_index;
 
     // The image for this camera, in grayscale
     cv::Mat image;
@@ -2103,6 +2104,37 @@ void calc_median_residuals(std::vector<double> const& residuals,
   // Sort by timestamps in the ref camera clock
   bool timestampLess(cameraImage i, cameraImage j) {
     return (i.ref_timestamp < j.ref_timestamp);
+  }
+
+  // Find the haz cam depth measurement. Use nearest neighbor interpolation
+  // to look into the depth cloud.
+  bool depthValue(  // Inputs
+    cv::Mat const& depth_cloud, Eigen::Vector2d const& dist_ip,
+    // Output
+    Eigen::Vector3d& depth_xyz) {
+    depth_xyz = Eigen::Vector3d(0, 0, 0);  // initialize
+
+    if (depth_cloud.cols == 0 && depth_cloud.rows == 0) return false;  // empty cloud
+
+    int col = round(dist_ip[0]);
+    int row = round(dist_ip[1]);
+
+    if (col < 0 || row < 0 || col > depth_cloud.cols || row > depth_cloud.rows)
+      LOG(FATAL) << "Out of range in depth cloud.";
+
+    // After rounding one may hit the bound
+    if (col == depth_cloud.cols || row == depth_cloud.rows)
+      return false;
+
+    cv::Vec3f cv_depth_xyz = depth_cloud.at<cv::Vec3f>(row, col);
+
+    // Skip invalid measurements
+    if (cv_depth_xyz == cv::Vec3f(0, 0, 0))
+      return false;
+
+    depth_xyz = Eigen::Vector3d(cv_depth_xyz[0], cv_depth_xyz[1], cv_depth_xyz[2]);
+
+    return true;
   }
 
 }  // namespace dense_map
@@ -2400,6 +2432,10 @@ int main(int argc, char** argv) {
   std::vector<dense_map::cameraImage> cams;
   for (int ref_it = 0; ref_it < num_ref_cams; ref_it++) {
     std::cout.precision(18);
+
+    if (ref_cam_type != 0)
+      LOG(FATAL) << "It is assumed that the ref cam type is 0.";
+
     for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
       dense_map::cameraImage cam;
       bool success = false;
@@ -2407,8 +2443,8 @@ int main(int argc, char** argv) {
         cam.camera_type       = cam_type;
         cam.timestamp         = ref_timestamps[ref_it];
         cam.ref_timestamp     = cam.timestamp;  // the time offset is 0 between ref and itself
-        cam.beg_ref_cam_index = ref_it;
-        cam.end_ref_cam_index = ref_it;
+        cam.beg_ref_index = ref_it;
+        cam.end_ref_index = ref_it;
 
         // Search the whole set of timestamps, so set start_pos =
         // 0. This is slower but more robust than keeping track of how
@@ -2502,8 +2538,8 @@ int main(int argc, char** argv) {
         cam.camera_type       = cam_type;
         cam.timestamp         = best_time;
         cam.ref_timestamp     = best_time - ref_to_cam_timestamp_offsets[cam_type];
-        cam.beg_ref_cam_index = ref_it;
-        cam.end_ref_cam_index = ref_it + 1;
+        cam.beg_ref_index = ref_it;
+        cam.end_ref_index = ref_it + 1;
         cam.image             = best_image;
 
         if (cam_type == 1) {
@@ -2749,8 +2785,8 @@ int main(int argc, char** argv) {
   // The transform from every camera to the world
   std::vector<Eigen::Affine3d> world_to_cam(cams.size());
   for (size_t it = 0; it < cams.size(); it++) {
-    int beg_index = cams[it].beg_ref_cam_index;
-    int end_index = cams[it].end_ref_cam_index;
+    int beg_index = cams[it].beg_ref_index;
+    int end_index = cams[it].end_ref_index;
     int cam_type = cams[it].camera_type;
     // std::cout << "--ref indices " << beg_index << ' ' << end_index << std::endl;
     // std::cout << "--cam type " << cam_type << std::endl;
@@ -2911,204 +2947,125 @@ int main(int argc, char** argv) {
   bracketed_depth_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
   bracketed_depth_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
 
+//   // Form the problem
+//   int num_xyz = 0;
+//   for (auto it = matches.begin(); it != matches.end(); it++) {
+//     std::pair<int, int> const& index_pair = it->first;     // alias
+//     dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
+
+//     std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
+//     std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
+//     for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
+//       num_xyz++;
+//     }
+//   }
+
+//   std::cout << "--num xyz is " << num_xyz << std::endl;
+
+//   xyz_vec.resize(num_xyz);
+
+  std::cout << "must test with the ref cam having depth!" << std::endl;
+
   // Form the problem
-  int num_xyz = 0;
-  for (auto it = matches.begin(); it != matches.end(); it++) {
-    std::pair<int, int> const& index_pair = it->first;     // alias
-    dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
-
-    std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
-    std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
-    for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
-      num_xyz++;
-    }
-  }
-
-  std::cout << "--num xyz is " << num_xyz << std::endl;
-
-  xyz_vec.resize(num_xyz);
-
   ceres::Problem problem;
   std::vector<std::string> residual_names;
+  std::vector<double> residual_scales;
+  for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+    for (auto cid_fid = pid_to_cid_fid[pid].begin();
+         cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+      int cid = cid_fid->first;
+      int fid = cid_fid->second;
 
-  // Form the problem
-  int xyz_pos = -1;
-  for (auto it = matches.begin(); it != matches.end(); it++) {
-    std::pair<int, int> const& index_pair = it->first;     // alias
-    dense_map::MATCH_PAIR const& match_pair = it->second;  // alias
+      int cam_type = cams[cid].camera_type;
+      int beg_ref_index = cams[cid].beg_ref_index;
+      int end_ref_index = cams[cid].end_ref_index;
 
-    std::cout << "--add cost " << index_pair.first << ' ' << index_pair.second << std::endl;
+      Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
 
-    std::vector<dense_map::InterestPoint> const& left_ip_vec = match_pair.first;
-    std::vector<dense_map::InterestPoint> const& right_ip_vec = match_pair.second;
-
-    int left_index = index_pair.first;
-    int right_index = index_pair.second;
-
-    std::cout << "--left type is " << cams[left_index].camera_type << std::endl;
-    std::cout.precision(18);
-    std::cout << "beg timestamp " << ref_timestamps[cams[left_index].beg_ref_cam_index] << std::endl;
-    std::cout << "end timestamp " << ref_timestamps[cams[left_index].end_ref_cam_index] << std::endl;
-
-    int left_beg_index = cams[left_index].beg_ref_cam_index;
-    int left_end_index = cams[left_index].end_ref_cam_index;
-    int left_cam_type = cams[left_index].camera_type;
-    std::cout << "--left indices " << left_beg_index << ' ' << left_end_index << std::endl;
-    std::cout << "--left cam type " << left_cam_type << std::endl;
-    Eigen::Affine3d left_world_to_cam_trans = dense_map::calc_world_to_cam_trans(
-      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
-      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_end_index],
-      &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * left_cam_type], ref_timestamps[left_beg_index],
-      ref_timestamps[left_end_index], ref_to_cam_timestamp_offsets[left_cam_type],
-      cams[left_index].timestamp);
-
-    int right_beg_index = cams[right_index].beg_ref_cam_index;
-    int right_end_index = cams[right_index].end_ref_cam_index;
-    int right_cam_type = cams[right_index].camera_type;
-    std::cout << "--right indices " << right_beg_index << ' ' << right_end_index << std::endl;
-    std::cout << "--right cam type " << right_cam_type << std::endl;
-    Eigen::Affine3d right_world_to_cam_trans = dense_map::calc_world_to_cam_trans(
-      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * right_beg_index],
-      &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * right_end_index],
-      &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * right_cam_type],
-      ref_timestamps[right_beg_index], ref_timestamps[right_end_index],
-      ref_to_cam_timestamp_offsets[right_cam_type], cams[right_index].timestamp);
-
-    for (size_t ip_it = 0; ip_it < left_ip_vec.size(); ip_it++) {
-      xyz_pos++;
-      Eigen::Vector2d dist_left_ip(left_ip_vec[ip_it].x,   left_ip_vec[ip_it].y);
-      Eigen::Vector2d dist_right_ip(right_ip_vec[ip_it].x, right_ip_vec[ip_it].y);
-
-      Eigen::Vector2d undist_left_ip, undist_right_ip;
-
-      cam_params[cams[left_index].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
-        (dist_left_ip, &undist_left_ip);
-
-      cam_params[cams[right_index].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
-        (dist_right_ip, &undist_right_ip);
-
-      xyz_vec[xyz_pos] =
-        dense_map::TriangulatePair(cam_params[cams[left_index].camera_type].GetFocalLength(),
-                                   cam_params[cams[right_index].camera_type].GetFocalLength(),
-                                   left_world_to_cam_trans,
-                                   right_world_to_cam_trans,
-                                   undist_left_ip, undist_right_ip);
-
-      // std::cout << "--left undist dist " << dist_left_ip.transpose() << ' ' <<
-      // undist_left_ip.transpose() << std::endl; std::cout << "--right undist dist " <<
-      // dist_right_ip.transpose() << ' '<< undist_right_ip.transpose() << std::endl;
-      std::cout << "--xyz2 is " << xyz_vec[xyz_pos].transpose() << std::endl;
-      // std::cout << "--temporary22!" << std::endl;
-
-      if (true && cams[left_index].camera_type == 1) {
-        // The cost function of projecting in the bracketed cam. Note
-        // that we use distorted ip, as in the cost function below we
-        // will do differences of distorted pixels.
-        ceres::CostFunction* left_bracketed_cost_function =
-          dense_map::BracketedCamError::Create(dist_left_ip,
-                                               ref_timestamps[left_beg_index],
-                                               ref_timestamps[left_end_index],
-                                               cams[left_index].timestamp,
-                                               bracketed_cam_block_sizes,
-                                               cam_params[cams[left_index].camera_type]);
-        ceres::LossFunction* left_bracketed_loss_function
+      if (cam_type == ref_cam_type) {
+        // The cost function of projecting in the ref cam.
+        ceres::CostFunction* ref_cost_function =
+          dense_map::RefCamError::Create(dist_ip, ref_cam_block_sizes,
+                                         cam_params[cam_type]);
+        ceres::LossFunction* ref_loss_function
           = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
         // std::cout << "--add block" << std::endl;
-        residual_names.push_back("navhazhaz1");
-        residual_names.push_back("navhazhaz2");
-        problem.AddResidualBlock(left_bracketed_cost_function, left_bracketed_loss_function,
-                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
-                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_end_index],
-                                 &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * left_cam_type],
-                                 &xyz_vec[xyz_pos][0],
-                                 &ref_to_cam_timestamp_offsets[left_cam_type],
-                                 &focal_lengths[cams[left_index].camera_type],
-                                 &optical_centers[cams[left_index].camera_type][0],
-                                 &distortions[cams[left_index].camera_type][0]);
-
-        // Find the haz cam depth measurement. Use nearest neighbor interpolation
-        // to look into the depth cloud.
-        int col = round(dist_left_ip[0]);
-        int row = round(dist_left_ip[1]);
-
-        cv::Mat const& depth_cloud = cams[left_index].depth_cloud;
-        if (col < 0 || row < 0 || col >= depth_cloud.cols || row >= depth_cloud.rows)
-          LOG(FATAL) << "Book-keeping error in BracketedDepthError.";
-
-        // Skip any point that goes out of bounds due to rounding
-        bool is_good = false;
-        Eigen::Vector3d depth_xyz;
-        if (col < depth_cloud.cols && row < depth_cloud.rows) {
-          cv::Vec3f cv_depth_xyz = depth_cloud.at<cv::Vec3f>(row, col);
-          // Skip invalid measurements
-          if (cv_depth_xyz != cv::Vec3f(0, 0, 0)) {
-            is_good = true;
-            // Convert to Eigen
-            depth_xyz = Eigen::Vector3d(cv_depth_xyz[0], cv_depth_xyz[1], cv_depth_xyz[2]);
-            std::cout << "--depth xyz " << depth_xyz.transpose() << std::endl;
-          }
-        }
-
-        if (is_good) {
-          // Ensure that the depth points agree with triangulated points
-          ceres::CostFunction* left_bracketed_depth_cost_function
-            = dense_map::BracketedDepthError::Create(FLAGS_depth_weight,
-                                                     depth_xyz,
-                                                     ref_timestamps[left_beg_index],
-                                                     ref_timestamps[left_end_index],
-                                                     cams[left_index].timestamp,
-                                                     bracketed_depth_block_sizes);
-
-          ceres::LossFunction* left_bracketed_depth_loss_function
-            = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
-
-          // std::cout << "--add block" << std::endl;
-          residual_names.push_back("navhazdepth1");
-          residual_names.push_back("navhazdepth2");
-          residual_names.push_back("navhazdepth3");
-
-          problem.AddResidualBlock
-            (left_bracketed_depth_cost_function,
-             left_bracketed_depth_loss_function,
-             &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
-             &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_end_index],
-             &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * left_cam_type],
-             &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * left_cam_type],
-             &depth_to_image_scales[left_cam_type],
-             &xyz_vec[xyz_pos][0],
-             &ref_to_cam_timestamp_offsets[left_cam_type]);
-        }
-      }
-
-      if (true && cams[left_index].camera_type == 0) {
-        // The cost function of projecting in the ref cam. Note
-        // that we use distorted ip, as in the cost function below we
-        // will do differences of distorted pixels.
-        ceres::CostFunction* left_ref_cost_function =
-          dense_map::RefCamError::Create(dist_left_ip,
-                                         ref_cam_block_sizes,
-                                         cam_params[cams[left_index].camera_type]);
-        ceres::LossFunction* left_ref_loss_function
-          = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
-
-        // std::cout << "--add block" << std::endl;
-        residual_names.push_back("navhaznav1");
-        residual_names.push_back("navhaznav2");
+        residual_names.push_back(cam_names[cam_type] + "_pix_x");
+        residual_names.push_back(cam_names[cam_type] + "_pix_y");
+        residual_scales.push_back(1.0);
+        residual_scales.push_back(1.0);
         problem.AddResidualBlock
-          (left_ref_cost_function, left_ref_loss_function,
-           &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * left_beg_index],
-           &xyz_vec[xyz_pos][0],
-           &focal_lengths[cams[left_index].camera_type],
-           &optical_centers[cams[left_index].camera_type][0],
-           &distortions[cams[left_index].camera_type][0]);
+          (ref_cost_function, ref_loss_function,
+           &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
+           &xyz_vec[pid][0],
+           &focal_lengths[cam_type],
+           &optical_centers[cam_type][0],
+           &distortions[cam_type][0]);
+
+      } else {
+        // Other cameras, which need bracketing
+        ceres::CostFunction* bracketed_cost_function =
+          dense_map::BracketedCamError::Create(dist_ip,
+                                               ref_timestamps[beg_ref_index],
+                                               ref_timestamps[end_ref_index],
+                                               cams[cid].timestamp,
+                                               bracketed_cam_block_sizes,
+                                               cam_params[cam_type]);
+        ceres::LossFunction* bracketed_loss_function
+          = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
+
+        // std::cout << "--add block" << std::endl;
+        residual_names.push_back(cam_names[cam_type] + "_pix_x");
+        residual_names.push_back(cam_names[cam_type] + "_pix_y");
+        residual_scales.push_back(1.0);
+        residual_scales.push_back(1.0);
+        problem.AddResidualBlock(bracketed_cost_function, bracketed_loss_function,
+                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
+                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index],
+                                 &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+                                 &xyz_vec[pid][0],
+                                 &ref_to_cam_timestamp_offsets[cam_type],
+                                 &focal_lengths[cam_type],
+                                 &optical_centers[cam_type][0],
+                                 &distortions[cam_type][0]);
+
+
+        Eigen::Vector3d depth_xyz(0, 0, 0);
+        if (!dense_map::depthValue(cams[cid].depth_cloud, dist_ip, depth_xyz))
+          continue;  // could not look up the depth value
+
+        std::cout << "--depth xyz is " << depth_xyz.transpose() << std::endl;
+
+        // Ensure that the depth points agree with triangulated points
+        ceres::CostFunction* bracketed_depth_cost_function
+          = dense_map::BracketedDepthError::Create(FLAGS_depth_weight,
+                                                   depth_xyz,
+                                                   ref_timestamps[beg_ref_index],
+                                                   ref_timestamps[end_ref_index],
+                                                   cams[cid].timestamp,
+                                                   bracketed_depth_block_sizes);
+
+        ceres::LossFunction* bracketed_depth_loss_function
+          = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
+
+        residual_names.push_back(cam_names[cam_type] + "_depth_x_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_y_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_z_m");
+        residual_scales.push_back(FLAGS_depth_weight);
+        residual_scales.push_back(FLAGS_depth_weight);
+        residual_scales.push_back(FLAGS_depth_weight);
+        problem.AddResidualBlock(bracketed_depth_cost_function,
+                                 bracketed_depth_loss_function,
+                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
+                                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index],
+                                 &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+                                 &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+                                 &depth_to_image_scales[cam_type],
+                                 &xyz_vec[pid][0],
+                                 &ref_to_cam_timestamp_offsets[cam_type]);
       }
     }
-  }
-
-  std::cout << "--pos and num " << xyz_pos << ' ' << num_xyz << std::endl;
-  if (xyz_pos + 1 != num_xyz) {
-    LOG(FATAL) << "Book-keeping error.\n";
   }
 
   // Evaluate the residual before optimization
@@ -3119,7 +3076,11 @@ int main(int argc, char** argv) {
   eval_options.apply_loss_function = false;  // want raw residuals
   problem.Evaluate(eval_options, &total_cost, &residuals, NULL, NULL);
   if (residuals.size() != residual_names.size())
-    LOG(FATAL) << "Book-keeping error in the number of residuals.";
+    LOG(FATAL) << "There must be as many residual names as residual values.";
+  if (residuals.size() != residual_scales.size())
+    LOG(FATAL) << "There must be as many residual values as residual scales.";
+  for (size_t it = 0; it < residuals.size(); it++)  // compensate for the scale
+    residuals[it] /= residual_scales[it];
 
   dense_map::calc_median_residuals(residuals, residual_names, "before opt");
 
