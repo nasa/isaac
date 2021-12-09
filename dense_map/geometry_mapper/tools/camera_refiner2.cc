@@ -107,9 +107,8 @@ DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
 
 DEFINE_string(sci_cam_topic, "/hw/cam_sci/compressed", "The sci cam topic in the bag file.");
 
-DEFINE_double(start, 0.0, "How many seconds into the bag to start processing the data.");
-
-DEFINE_double(duration, -1.0, "For how many seconds to do the processing.");
+DEFINE_int32(num_overlaps, 20, "How many images (of all camera types) close and forward in "
+             "time to match to given image.");
 
 DEFINE_double(max_haz_cam_image_to_depth_timestamp_diff, 0.2,
               "Use depth haz cam clouds that are within this distance in "
@@ -344,12 +343,11 @@ struct BracketedCamError {
       (new BracketedCamError(meas_dist_pix, left_ref_stamp, right_ref_stamp,
                              cam_stamp, block_sizes, cam_params));
 
-    // The residual size is always the same.
     cost_function->SetNumResiduals(NUM_RESIDUALS);
 
     // The camera wrapper knows all of the block sizes to add, except
     // for distortion, which is last
-    for (size_t i = 0; i + 1 < block_sizes.size(); i++)  //  note the i + 1
+    for (size_t i = 0; i + 1 < block_sizes.size(); i++)  // note the i + 1
       cost_function->AddParameterBlock(block_sizes[i]);
 
     // The distortion block size is added separately as it is variable
@@ -380,12 +378,12 @@ struct RefCamError {
     m_cam_params(cam_params),
     m_num_focal_lengths(1) {
     // Sanity check
-    if (m_block_sizes.size() != 5 ||
-        m_block_sizes[0] != NUM_RIGID_PARAMS ||
-        m_block_sizes[1] != NUM_XYZ_PARAMS ||
-        m_block_sizes[2] != m_num_focal_lengths ||
-        m_block_sizes[3] != NUM_OPT_CTR_PARAMS ||
-        m_block_sizes[4] != 1  // This will be overwritten shortly
+    if (m_block_sizes.size() != 5                   ||
+        m_block_sizes[0]     != NUM_RIGID_PARAMS    ||
+        m_block_sizes[1]     != NUM_XYZ_PARAMS      ||
+        m_block_sizes[2]     != m_num_focal_lengths ||
+        m_block_sizes[3]     != NUM_OPT_CTR_PARAMS  ||
+        m_block_sizes[4]     != 1  // This will be overwritten shortly
     ) {
       LOG(FATAL) << "RefCamError: The block sizes were not set up properly.\n";
     }
@@ -721,14 +719,15 @@ void calc_median_residuals(std::vector<double> const& residuals,
     int len = vals.size();
 
     int it1 = static_cast<int>(0.25 * len);
-    int it2 = static_cast<int>(0.5 * len);
+    int it2 = static_cast<int>(0.50 * len);
     int it3 = static_cast<int>(0.75 * len);
 
-    if (len = 0)
-      std::cout << name << ": " << "none" << std::endl;
+    if (len == 0)
+      std::cout << name << ": " << "none";
     else
-      std::cout << name << ": " << vals[it1] << ' ' << vals[it2] << ' '
-                << vals[it3] << std::endl;
+      std::cout << std::setprecision(8)
+                << name << ": " << vals[it1] << ' ' << vals[it2] << ' ' << vals[it3];
+    std::cout << " (" << len << " residuals)" << std::endl;
   }
 }
 
@@ -801,396 +800,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
       LOG(FATAL) << "Sci cam images have the wrong size.";
   }
 
-  void select_images_to_match(// Inputs                                                // NOLINT
-                              double haz_cam_start_time,                               // NOLINT
-                              double navcam_to_hazcam_timestamp_offset,                // NOLINT
-                              double scicam_to_hazcam_timestamp_offset,                // NOLINT
-                              std::vector<double> const& ref_timestamps,        // NOLINT
-                              std::vector<double> const& all_haz_cam_inten_timestamps, // NOLINT
-                              std::vector<double> const& all_sci_cam_timestamps,       // NOLINT
-                              std::set<double> const& sci_cam_timestamps_to_use,       // NOLINT
-                              dense_map::RosBagHandle const& nav_cam_handle,           // NOLINT
-                              dense_map::RosBagHandle const& sci_cam_handle,           // NOLINT
-                              dense_map::RosBagHandle const& haz_cam_points_handle,    // NOLINT
-                              dense_map::RosBagHandle const& haz_cam_intensity_handle, // NOLINT
-                              camera::CameraParameters const& sci_cam_params,          // NOLINT
-                              // Outputs                                               // NOLINT
-                              int& nav_cam_start,                                      // NOLINT
-                              std::vector<imgType>& cid_to_image_type,                 // NOLINT
-                              std::vector<double>& haz_cam_intensity_timestamps,       // NOLINT
-                              std::vector<double>& sci_cam_timestamps,                 // NOLINT
-                              std::vector<cv::Mat>& images,                            // NOLINT
-                              std::vector<cv::Mat>& depth_clouds) {                    // NOLINT
-    // Wipe the outputs
-    nav_cam_start = -1;
-    cid_to_image_type.clear();
-    haz_cam_intensity_timestamps.clear();
-    sci_cam_timestamps.clear();
-    images.clear();
-    depth_clouds.clear();
-
-    bool stop_early = false;
-    double found_time = -1.0;
-    bool save_grayscale = true;  // feature detection needs grayscale
-
-    double navcam_to_scicam_timestamp_offset
-      = navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
-
-    // Use these to keep track where in the bags we are. After one
-    // traversal forward in time they need to be reset.
-    int nav_cam_pos = 0, haz_cam_intensity_pos = 0, haz_cam_cloud_pos = 0, sci_cam_pos = 0;
-
-    for (size_t map_it = 0; map_it + 1 < ref_timestamps.size(); map_it++) {
-      if (FLAGS_start >= 0.0 && FLAGS_duration > 0.0) {
-        // The case when we would like to start later. Note the second
-        // comparison after "&&".  When FLAG_start is 0, we want to
-        // make sure if the first nav image from the bag is in the map
-        // we use it, so we don't skip it even if based on
-        // navcam_to_hazcam_timestamp_offset we should.
-        if (ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
-            < FLAGS_start + haz_cam_start_time &&
-            ref_timestamps[map_it] < FLAGS_start + haz_cam_start_time)
-          continue;
-      }
-
-      if (nav_cam_start < 0) nav_cam_start = map_it;
-
-      images.push_back(cv::Mat());
-      if (!dense_map::lookupImage(ref_timestamps[map_it], nav_cam_handle.bag_msgs,
-                                  save_grayscale, images.back(),
-                                  nav_cam_pos, found_time)) {
-        LOG(FATAL) << std::fixed << std::setprecision(17)
-                   << "Cannot look up nav cam at time " << ref_timestamps[map_it] << ".\n";
-      }
-      cid_to_image_type.push_back(dense_map::NAV_CAM);
-
-      if (FLAGS_start >= 0.0 && FLAGS_duration > 0.0) {
-        // If we would like to end earlier, then save the last nav cam image so far
-        // and quit
-        if (ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset >
-            FLAGS_start + FLAGS_duration + haz_cam_start_time) {
-          stop_early = true;
-          break;
-        }
-      }
-
-      // Do not look up sci cam and haz cam images in time intervals bigger than this
-      if (std::abs(ref_timestamps[map_it + 1] - ref_timestamps[map_it]) > FLAGS_bracket_len) continue;
-
-      // Append at most two haz cam images between consecutive sparse
-      // map timestamps, close to these sparse map timestamps.
-      std::vector<double> local_haz_timestamps;
-      dense_map::pickTimestampsInBounds(all_haz_cam_inten_timestamps,
-                                        ref_timestamps[map_it],
-                                        ref_timestamps[map_it + 1],
-                                        -navcam_to_hazcam_timestamp_offset,
-                                        local_haz_timestamps);
-
-      for (size_t samp_it = 0; samp_it < local_haz_timestamps.size(); samp_it++) {
-        haz_cam_intensity_timestamps.push_back(local_haz_timestamps[samp_it]);
-
-        double nav_start = ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
-          - haz_cam_start_time;
-        double haz_time = local_haz_timestamps[samp_it] - haz_cam_start_time;
-        double nav_end =  ref_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
-          - haz_cam_start_time;
-
-        std::cout << "nav_start haz nav_end times "
-                  << nav_start << ' ' << haz_time << ' ' << nav_end  << std::endl;
-        std::cout << "xxxhaz before " << haz_time - nav_start << ' ' << nav_end - haz_time << ' ' << nav_end - nav_start
-                  << std::endl;
-        std::cout << "nav_end - nav_start " << nav_end - nav_start << std::endl;
-
-        // Read the image
-        images.push_back(cv::Mat());
-        if (!dense_map::lookupImage(haz_cam_intensity_timestamps.back(),
-                                    haz_cam_intensity_handle.bag_msgs,
-                                    save_grayscale, images.back(), haz_cam_intensity_pos,
-                                    found_time))
-          LOG(FATAL) << "Cannot look up haz cam image at given time";
-        cid_to_image_type.push_back(dense_map::HAZ_CAM);
-
-        double cloud_time = -1.0;
-        depth_clouds.push_back(cv::Mat());
-        if (!dense_map::lookupCloud(haz_cam_intensity_timestamps.back(),
-                                    haz_cam_points_handle.bag_msgs,
-                                    FLAGS_max_haz_cam_image_to_depth_timestamp_diff,
-                                    depth_clouds.back(),
-                                    haz_cam_cloud_pos, cloud_time)) {
-          // This need not succeed always
-        }
-      }
-
-      // Append at most two sci cam images between consecutive sparse
-      // map timestamps, close to these sparse map timestamps.
-
-      std::vector<double> local_sci_timestamps;
-      dense_map::pickTimestampsInBounds(all_sci_cam_timestamps, ref_timestamps[map_it],
-                                        ref_timestamps[map_it + 1],
-                                        -navcam_to_scicam_timestamp_offset,
-                                        local_sci_timestamps);
-
-      // Append to the vector of sampled timestamps
-      for (size_t samp_it = 0; samp_it < local_sci_timestamps.size(); samp_it++) {
-        // See if to use only specified timestamps
-        if (!sci_cam_timestamps_to_use.empty() &&
-            sci_cam_timestamps_to_use.find(local_sci_timestamps[samp_it]) ==
-            sci_cam_timestamps_to_use.end())
-          continue;
-
-        sci_cam_timestamps.push_back(local_sci_timestamps[samp_it]);
-
-        double nav_start = ref_timestamps[map_it] + navcam_to_hazcam_timestamp_offset
-          - haz_cam_start_time;
-        double sci_time = local_sci_timestamps[samp_it] + scicam_to_hazcam_timestamp_offset
-          - haz_cam_start_time;
-        double nav_end = ref_timestamps[map_it + 1] + navcam_to_hazcam_timestamp_offset
-          - haz_cam_start_time;
-        std::cout << "nav_start sci nav_end times "
-                  << nav_start << ' ' << sci_time << ' ' << nav_end  << std::endl;
-        std::cout << "xxxsci before " << sci_time - nav_start << ' ' << nav_end - sci_time << ' ' << nav_end - nav_start
-                  << std::endl;
-
-        std::cout << "nav_end - nav_start " << nav_end - nav_start << std::endl;
-
-        // Read the sci cam image, and perhaps adjust its size
-        images.push_back(cv::Mat());
-        cv::Mat local_img;
-        if (!dense_map::lookupImage(sci_cam_timestamps.back(), sci_cam_handle.bag_msgs,
-                                    save_grayscale, local_img,
-                                    sci_cam_pos, found_time))
-          LOG(FATAL) << "Cannot look up sci cam image at given time.";
-        adjustImageSize(sci_cam_params, local_img);
-        local_img.copyTo(images.back());
-
-        // Sanity check
-        Eigen::Vector2i sci_cam_size = sci_cam_params.GetDistortedSize();
-        if (images.back().cols != sci_cam_size[0] || images.back().rows != sci_cam_size[1])
-            LOG(FATAL) << "Sci cam images have the wrong size.";
-
-        cid_to_image_type.push_back(dense_map::SCI_CAM);
-      }
-    }  // End iterating over nav cam timestamps
-
-    // Add the last nav cam image from the map, unless we stopped early and this was done
-    if (!stop_early) {
-      images.push_back(cv::Mat());
-      if (!dense_map::lookupImage(ref_timestamps.back(), nav_cam_handle.bag_msgs,
-                                  save_grayscale, images.back(),
-                                  nav_cam_pos, found_time))
-        LOG(FATAL) << "Cannot look up nav cam image at given time.";
-      cid_to_image_type.push_back(dense_map::NAV_CAM);
-    }
-
-    if (images.size() > ref_timestamps.size() + haz_cam_intensity_timestamps.size()
-        + sci_cam_timestamps.size())
-      LOG(FATAL) << "Book-keeping error in select_images_to_match.";
-
-    return;
-  }
-
-  void set_up_block_sizes(int num_scicam_focal_lengths, int num_scicam_distortions,
-                          std::vector<int> & depth_to_haz_block_sizes,
-                          std::vector<int> & nav_block_sizes,
-                          std::vector<int> & depth_to_nav_block_sizes,
-                          std::vector<int> & depth_to_sci_block_sizes,
-                          std::vector<int> & sci_block_sizes,
-                          std::vector<int> & mesh_block_sizes) {
-    // Wipe the outputs
-    depth_to_haz_block_sizes.clear();
-    nav_block_sizes.clear();
-    depth_to_nav_block_sizes.clear();
-    depth_to_sci_block_sizes.clear();
-    sci_block_sizes.clear();
-    mesh_block_sizes.clear();
-
-    // Set up the variable blocks to optimize for DepthToHazError
-    depth_to_haz_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_haz_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
-
-    // Set up the variable blocks to optimize for NavError
-    nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    nav_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
-
-    // Set up the variable blocks to optimize for DepthToNavError
-    depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_nav_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
-
-    // Set up the variable blocks to optimize for DepthToSciError
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
-    depth_to_sci_block_sizes.push_back(num_scicam_focal_lengths);       // focal length
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);  // optical center
-    depth_to_sci_block_sizes.push_back(num_scicam_distortions);         // distortion
-
-    // Set up the variable blocks to optimize for SciError
-    sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    sci_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
-    sci_block_sizes.push_back(num_scicam_focal_lengths);       // focal length
-    sci_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);  // optical center
-    sci_block_sizes.push_back(num_scicam_distortions);         // distortion
-
-    // Set up the variable blocks to optimize for the mesh xyz error
-    mesh_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
-  }
-
   typedef std::map<std::pair<int, int>, dense_map::MATCH_PAIR> MATCH_MAP;
-
-  // Wrapper to find the value of a const map at a given key
-  int mapVal(std::map<int, int> const& map, int key) {
-    auto ptr = map.find(key);
-    if (ptr == map.end())
-      LOG(FATAL) << "Cannot find map value for given index.";
-    return ptr->second;
-  }
-
-  // Find nav images close in time. Match sci and haz images in between to each
-  // other and to these nave images
-  // TODO(oalexan1): Reword the above explanation
-  void detect_match_features(// Inputs                                            // NOLINT
-                             std::vector<cv::Mat> const& images,                  // NOLINT
-                             std::vector<imgType> const& cid_to_image_type,       // NOLINT
-                             // Outputs                                           // NOLINT
-                             std::map<int, int> & image_to_nav_it,                // NOLINT
-                             std::map<int, int> & image_to_haz_it,                // NOLINT
-                             std::map<int, int> & image_to_sci_it,                // NOLINT
-                             std::map<int, int> & haz_cam_to_left_nav_cam_index,  // NOLINT
-                             std::map<int, int> & haz_cam_to_right_nav_cam_index, // NOLINT
-                             std::map<int, int> & sci_cam_to_left_nav_cam_index,  // NOLINT
-                             std::map<int, int> & sci_cam_to_right_nav_cam_index, // NOLINT
-                             MATCH_MAP          & matches) {                      // NOLINT
-    // Wipe the outputs
-    image_to_nav_it.clear();
-    image_to_haz_it.clear();
-    image_to_sci_it.clear();
-    haz_cam_to_left_nav_cam_index.clear();
-    haz_cam_to_right_nav_cam_index.clear();
-    sci_cam_to_left_nav_cam_index.clear();
-    sci_cam_to_right_nav_cam_index.clear();
-    matches.clear();
-
-    int nav_it = 0, haz_it = 0, sci_it = 0;
-    for (int image_it = 0; image_it < static_cast<int>(images.size()); image_it++) {
-      if (cid_to_image_type[image_it] == dense_map::NAV_CAM) {
-        image_to_nav_it[image_it] = nav_it;
-        nav_it++;
-      } else if (cid_to_image_type[image_it] == dense_map::HAZ_CAM) {
-        image_to_haz_it[image_it] = haz_it;
-        haz_it++;
-      } else if (cid_to_image_type[image_it] == dense_map::SCI_CAM) {
-        image_to_sci_it[image_it] = sci_it;
-        sci_it++;
-      }
-    }
-
-    std::vector<std::pair<int, int> > image_pairs;
-
-    // Look at two neighboring nav images. Find left_img_it and
-    // right_img_it so cid_to_image_type for these are nav images.
-    for (int left_img_it = 0; left_img_it < static_cast<int>(images.size()); left_img_it++) {
-      if (cid_to_image_type[left_img_it] != dense_map::NAV_CAM) continue;  // Not nav cam
-
-      // now find right_img_it
-      int right_img_it = -1;
-      for (int local_it = left_img_it + 1; local_it < static_cast<int>(images.size()); local_it++) {
-        if (cid_to_image_type[local_it] == dense_map::NAV_CAM) {
-          right_img_it = local_it;
-          break;
-        }
-      }
-
-      if (right_img_it < 0) continue;
-
-      // Now look at sci and haz images in between
-      std::vector<int> nav_cam_indices, haz_cam_indices, sci_cam_indices;
-
-      nav_cam_indices.push_back(left_img_it);
-      nav_cam_indices.push_back(right_img_it);
-
-      for (int local_img_it = left_img_it + 1; local_img_it < right_img_it; local_img_it++) {
-        int left_nav_it  = mapVal(image_to_nav_it, left_img_it);
-        int right_nav_it = mapVal(image_to_nav_it, right_img_it);
-
-        if (cid_to_image_type[local_img_it] == dense_map::HAZ_CAM) {
-          int haz_it = mapVal(image_to_haz_it, local_img_it);
-          haz_cam_indices.push_back(local_img_it);
-          haz_cam_to_left_nav_cam_index[haz_it]  = left_nav_it;
-          haz_cam_to_right_nav_cam_index[haz_it] = right_nav_it;
-
-        } else if (cid_to_image_type[local_img_it] == dense_map::SCI_CAM) {
-          int sci_it = mapVal(image_to_sci_it, local_img_it);
-          sci_cam_indices.push_back(local_img_it);
-          sci_cam_to_left_nav_cam_index[image_to_sci_it[local_img_it]] = left_nav_it;
-          sci_cam_to_right_nav_cam_index[image_to_sci_it[local_img_it]] = right_nav_it;
-        }
-      }
-
-      // Match haz to nav
-      for (size_t haz_it = 0; haz_it < haz_cam_indices.size(); haz_it++) {
-        for (size_t nav_it = 0; nav_it < nav_cam_indices.size(); nav_it++) {
-          image_pairs.push_back(std::make_pair(haz_cam_indices[haz_it], nav_cam_indices[nav_it]));
-        }
-      }
-
-      // Match haz to sci
-      for (size_t haz_it = 0; haz_it < haz_cam_indices.size(); haz_it++) {
-        for (size_t sci_it = 0; sci_it < sci_cam_indices.size(); sci_it++) {
-          image_pairs.push_back(std::make_pair(haz_cam_indices[haz_it], sci_cam_indices[sci_it]));
-        }
-      }
-
-      // Match sci to nav
-      for (size_t nav_it = 0; nav_it < nav_cam_indices.size(); nav_it++) {
-        for (size_t sci_it = 0; sci_it < sci_cam_indices.size(); sci_it++) {
-          image_pairs.push_back(std::make_pair(sci_cam_indices[sci_it], nav_cam_indices[nav_it]));
-        }
-      }
-    }
-
-    // Detect features using multiple threads
-    std::vector<cv::Mat> cid_to_descriptor_map;
-    std::vector<Eigen::Matrix2Xd> cid_to_keypoint_map;
-    cid_to_descriptor_map.resize(images.size());
-    cid_to_keypoint_map.resize(images.size());
-    ff_common::ThreadPool thread_pool1;
-    for (size_t it = 0; it < images.size(); it++)
-      thread_pool1.AddTask(&dense_map::detectFeatures, images[it], FLAGS_verbose,
-                           &cid_to_descriptor_map[it], &cid_to_keypoint_map[it]);
-    thread_pool1.Join();
-
-    // Create the matches among nav, haz, and sci images. Note that we
-    // have a starting and ending nav cam images, and match all the
-    // haz and sci images to these two nav cam images and to each
-    // other.
-
-    // Find the matches using multiple threads
-    ff_common::ThreadPool thread_pool2;
-    std::mutex match_mutex;
-    for (size_t pair_it = 0; pair_it < image_pairs.size(); pair_it++) {
-      auto pair = image_pairs[pair_it];
-      int left_image_it = pair.first, right_image_it = pair.second;
-      thread_pool2.AddTask(&dense_map::matchFeatures, &match_mutex,
-                           left_image_it, right_image_it,
-                           cid_to_descriptor_map[left_image_it],
-                           cid_to_descriptor_map[right_image_it],
-                           cid_to_keypoint_map[left_image_it],
-                           cid_to_keypoint_map[right_image_it],
-                           FLAGS_verbose, &matches[pair]);
-    }
-    thread_pool2.Join();
-
-    return;
-  }
 
   // A class to encompass all known information about a camera
   // This is work in progress and will replace some of the logic further down.
@@ -1285,6 +895,10 @@ int main(int argc, char** argv) {
   if (FLAGS_robust_threshold <= 0.0)
     LOG(FATAL) << "The robust threshold must be positive.\n";
 
+  if (FLAGS_bracket_len <= 0.0) LOG(FATAL) << "Bracket length must be positive.";
+
+  if (FLAGS_num_overlaps < 1) LOG(FATAL) << "Number of overlaps must be positive.";
+
   // Set up handles for reading data at given time stamp without
   // searching through the whole bag each time.
   dense_map::RosBagHandle nav_cam_handle(FLAGS_ros_bag, FLAGS_nav_cam_topic);
@@ -1370,56 +984,16 @@ int main(int argc, char** argv) {
 
   // TODO(oalexan1): All this timestamp reading logic below should be in a function
 
-  // Find the minimum and maximum timestamps in the sparse map
-  double min_map_timestamp = std::numeric_limits<double>::max();
-  double max_map_timestamp = -min_map_timestamp;
+  // Parse the ref timestamps from the sparse map
+  // We assume the sparse map image names are the timestamps.
   std::vector<double> ref_timestamps;
   const std::vector<std::string>& sparse_map_images = sparse_map->cid_to_filename_;
   ref_timestamps.resize(sparse_map_images.size());
   for (size_t cid = 0; cid < sparse_map_images.size(); cid++) {
     double timestamp = dense_map::fileNameToTimestamp(sparse_map_images[cid]);
     ref_timestamps[cid] = timestamp;
-    min_map_timestamp = std::min(min_map_timestamp, ref_timestamps[cid]);
-    max_map_timestamp = std::max(max_map_timestamp, ref_timestamps[cid]);
   }
   if (ref_timestamps.empty()) LOG(FATAL) << "No sparse map timestamps found.";
-
-  // Read the haz cam timestamps
-  std::vector<rosbag::MessageInstance> const& haz_cam_intensity_msgs
-    = haz_cam_intensity_handle.bag_msgs;
-  if (haz_cam_intensity_msgs.empty()) LOG(FATAL) << "No haz cam messages are present.";
-  double haz_cam_start_time = -1.0;
-  std::vector<double> all_haz_cam_inten_timestamps;
-  for (size_t it = 0; it < haz_cam_intensity_msgs.size(); it++) {
-    sensor_msgs::Image::ConstPtr image_msg
-      = haz_cam_intensity_msgs[it].instantiate<sensor_msgs::Image>();
-    if (image_msg) {
-      double haz_cam_time = image_msg->header.stamp.toSec();
-      all_haz_cam_inten_timestamps.push_back(haz_cam_time);
-      if (haz_cam_start_time < 0) haz_cam_start_time = haz_cam_time;
-    }
-  }
-
-  // Read the sci cam timestamps from the bag
-  std::vector<rosbag::MessageInstance> const& sci_cam_msgs = sci_cam_handle.bag_msgs;
-  std::vector<double> all_sci_cam_timestamps;
-  for (size_t sci_it = 0; sci_it < sci_cam_msgs.size(); sci_it++) {
-    sensor_msgs::Image::ConstPtr sci_image_msg = sci_cam_msgs[sci_it].instantiate<sensor_msgs::Image>();
-    sensor_msgs::CompressedImage::ConstPtr comp_sci_image_msg =
-      sci_cam_msgs[sci_it].instantiate<sensor_msgs::CompressedImage>();
-    if (sci_image_msg)
-      all_sci_cam_timestamps.push_back(sci_image_msg->header.stamp.toSec());
-    else if (comp_sci_image_msg)
-      all_sci_cam_timestamps.push_back(comp_sci_image_msg->header.stamp.toSec());
-  }
-
-  // If desired to process only specific timestamps
-  std::set<double> sci_cam_timestamps_to_use;
-  if (FLAGS_sci_cam_timestamps != "") {
-    std::ifstream ifs(FLAGS_sci_cam_timestamps.c_str());
-    double val;
-    while (ifs >> val) sci_cam_timestamps_to_use.insert(val);
-  }
 
   // Will optimize the nav cam poses as part of the process
   std::vector<Eigen::Affine3d>& world_to_ref_t = sparse_map->cid_to_cam_t_global_;  // alias
@@ -1467,9 +1041,8 @@ int main(int argc, char** argv) {
      navcam_to_hazcam_timestamp_offset,
      navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset};
 
-  std::cout << "--test here again!" << std::endl;
   for (size_t it = 0; it < ref_to_cam_timestamp_offsets.size(); it++) {
-    std::cout << "--ref to cam offset for " << cam_names[it] << ' '
+    std::cout << "Ref to cam offset for " << cam_names[it] << ' '
               << ref_to_cam_timestamp_offsets[it] << std::endl;
   }
 
@@ -1491,9 +1064,9 @@ int main(int argc, char** argv) {
       (ref_to_cam_trans[cam_type],
        &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
 
-  std::cout << "--test here!" << std::endl;
   for (size_t it = 0; it < ref_to_cam_trans.size(); it++) {
-    std::cout << "--trans is\n" << ref_to_cam_trans[it].matrix() << std::endl;
+    std::cout << "Ref to cam transform for " << cam_names[it] << ":\n"
+              << ref_to_cam_trans[it].matrix() << std::endl;
   }
 
   // Depth to image transforms and scales
@@ -1583,8 +1156,6 @@ int main(int argc, char** argv) {
         if (found_time != cam.timestamp)
           LOG(FATAL) << std::fixed << std::setprecision(17)
                      << "Cannot look up camera at time " << cam.timestamp << ".\n";
-        std::cout.precision(18);
-        std::cout << "--add ref " << found_time << std::endl;
 
         success = true;
 
@@ -1600,9 +1171,6 @@ int main(int argc, char** argv) {
 
         if (right_timestamp - left_timestamp > FLAGS_bracket_len)
           continue;  // Must respect the bracket length
-
-        std::cout.precision(18);
-        std::cout << "---not ref " << left_timestamp << ' ' << right_timestamp << std::endl;
 
         // Find the image timestamp closest to the midpoint of the brackets. This will give
         // more room to vary the timestamp later.
@@ -1688,20 +1256,15 @@ int main(int argc, char** argv) {
         double found_time = -1.0;
         cv::Mat cloud;
         // Look up the closest cloud in time (either before or after cam.timestamp)
-        if (!dense_map::lookupCloud(cam.timestamp, bag_map[depth_topics[cam_type]],
-                                    FLAGS_max_haz_cam_image_to_depth_timestamp_diff,
-                                    // Outputs
-                                    cam.depth_cloud,
-                                    cloud_start_positions[cam_type],  // care here
-                                    found_time)) {
-          std::cout << "--fail finding cloud " << std::endl;
-        } else {
-          std::cout << "--success finding cloud with diff "
-                    << std::abs(cam.timestamp - found_time) << std::endl;
-        }
+        // This need not succeed.
+        dense_map::lookupCloud(cam.timestamp, bag_map[depth_topics[cam_type]],
+                               FLAGS_max_haz_cam_image_to_depth_timestamp_diff,
+                               // Outputs
+                               cam.depth_cloud,
+                               cloud_start_positions[cam_type],  // care here
+                               found_time);
       }
 
-      std::cout << "--success with cam of type " << cam.camera_type << std::endl;
       cams.push_back(cam);
     }  // end loop over camera types
   }    // end loop over ref images
@@ -1736,7 +1299,7 @@ int main(int argc, char** argv) {
   }
   }
 
-  std::cout << "--start detect" << std::endl;
+  std::cout << "Detecting features." << std::endl;
 
   // Detect features using multiple threads
   std::vector<cv::Mat> cid_to_descriptor_map;
@@ -1745,9 +1308,6 @@ int main(int argc, char** argv) {
   cid_to_keypoint_map.resize(cams.size());
   ff_common::ThreadPool thread_pool1;
   for (size_t it = 0; it < cams.size(); it++) {
-    // dense_map::detectFeatures(cams[it].image, FLAGS_verbose,
-    //                          &cid_to_descriptor_map[it], &cid_to_keypoint_map[it]);
-    // std::cout << "--detect " << it << '/' << cams.size() << std::endl;
     thread_pool1.AddTask(&dense_map::detectFeatures, cams[it].image, FLAGS_verbose,
                          &cid_to_descriptor_map[it], &cid_to_keypoint_map[it]);
   }
@@ -1755,46 +1315,29 @@ int main(int argc, char** argv) {
 
   dense_map::MATCH_MAP matches;
 
-  std::cout << "--expose the num overlap!" << std::endl;
-  size_t num_overlap = 1;
-  std::cout << "--overlap is " << num_overlap << std::endl;
-  std::cout << "--must be >= 1" << std::endl;
-
-  std::cout << "--temporary!!!" << std::endl;
   std::vector<std::pair<int, int> > image_pairs;
   for (size_t it1 = 0; it1 < cams.size(); it1++) {
-    for (size_t it2 = it1 + 1; it2 < std::min(cams.size(), it1 + num_overlap + 1); it2++) {
-      // std::cout << "--temporary!" << std::endl;
-      bool is_good = (cams[it1].camera_type == 1 && cams[it2].camera_type == 0 ||
-                      cams[it1].camera_type == 0 && cams[it2].camera_type == 1);
-      if (!is_good) {
-        continue;
-      }
-
-      std::cout << "--matching " << it1 << ' ' << it2 << std::endl;
-      std::cout << "type is " << cams[it1].camera_type << ' ' << cams[it2].camera_type << std::endl;
+    for (size_t it2 = it1 + 1; it2 < std::min(cams.size(), it1 + FLAGS_num_overlaps + 1); it2++) {
       image_pairs.push_back(std::make_pair(it1, it2));
     }
   }
 
-  // Find the matches using multiple threads
+  std::cout << "Matching features." << std::endl;
   ff_common::ThreadPool thread_pool2;
   std::mutex match_mutex;
-
   for (size_t pair_it = 0; pair_it < image_pairs.size(); pair_it++) {
     auto pair = image_pairs[pair_it];
     int left_image_it = pair.first, right_image_it = pair.second;
-    // thread_pool2.AddTask(&dense_map::matchFeatures, &match_mutex,
-    // std::cout << "--matching 2 " << left_image_it << ' ' << right_image_it << std::endl;
-    dense_map::matchFeatures(&match_mutex,
-                             left_image_it, right_image_it,
-                             cid_to_descriptor_map[left_image_it],
-                             cid_to_descriptor_map[right_image_it],
-                             cid_to_keypoint_map[left_image_it],
-                             cid_to_keypoint_map[right_image_it],
-                             FLAGS_verbose, &matches[pair]);
+    bool verbose = true;
+    thread_pool2.AddTask(&dense_map::matchFeatures, &match_mutex,
+                         left_image_it, right_image_it,
+                         cid_to_descriptor_map[left_image_it],
+                         cid_to_descriptor_map[right_image_it],
+                         cid_to_keypoint_map[left_image_it],
+                         cid_to_keypoint_map[right_image_it],
+                         verbose, &matches[pair]);
   }
-  // thread_pool2.Join();
+  thread_pool2.Join();
 
   // If feature A in image I matches feather B in image J, which matches feature C in image K,
   // then (A, B, C) belong together into a track. Build such a track.
@@ -1835,10 +1378,10 @@ int main(int argc, char** argv) {
     for (auto ip_it = keypoint_map[cam_it].begin(); ip_it != keypoint_map[cam_it].end(); ip_it++) {
       ip_it->second = count;
       count++;
-      std::cout << "--value " << (ip_it->first).first << ' ' << (ip_it->first).second << ' '
-                << ip_it->second << std::endl;
+      // std::cout << "--value " << (ip_it->first).first << ' ' << (ip_it->first).second << ' '
+      //          << ip_it->second << std::endl;
       keypoint_vec[cam_it].push_back(ip_it->first);
-      std::cout << "--size is " << keypoint_vec[cam_it].size() << std::endl;
+      // std::cout << "--size is " << keypoint_vec[cam_it].size() << std::endl;
     }
   }
 
@@ -1921,7 +1464,7 @@ int main(int argc, char** argv) {
   }
 
   for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
-    std::cout << std::endl;
+    // std::cout << std::endl;
     // std::cout << "pid is " << pid << std::endl;
     // std::cout << "---aaa pid size is " << pid_to_cid_fid[pid].size() << std::endl;
     // std::cout << "zzz2 ";
@@ -1992,8 +1535,7 @@ int main(int argc, char** argv) {
     // std::cout << "---xyz now " << xyz.transpose() << std::endl;
 
     xyz_vec[pid] = xyz;
-    std::cout << "--xyz1 " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
-    // std::cout << "---done here!" << std::endl;
+    // std::cout << "--xyz1 " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
   }
 
   std::cout << "--must do two passes!" << std::endl;
@@ -2112,11 +1654,16 @@ int main(int argc, char** argv) {
            &optical_centers[cam_type][0],
            &distortions[cam_type][0]);
 
+        if (FLAGS_fix_map) {
+          problem.SetParameterBlockConstant
+            (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
+        }
+
         Eigen::Vector3d depth_xyz(0, 0, 0);
         if (!dense_map::depthValue(cams[cid].depth_cloud, dist_ip, depth_xyz))
           continue;  // could not look up the depth value
 
-        std::cout << "--depth xyz is " << depth_xyz.transpose() << std::endl;
+        // std::cout << "--depth xyz is " << depth_xyz.transpose() << std::endl;
 
         // The constraint that the depth points agree with triangulated points
         ceres::CostFunction* ref_depth_cost_function
@@ -2140,6 +1687,11 @@ int main(int argc, char** argv) {
            &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
            &depth_to_image_scales[cam_type],
            &xyz_vec[pid][0]);
+
+        if (FLAGS_fix_map) {
+          problem.SetParameterBlockConstant
+            (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
+        }
 
       } else {
         // Other cameras, which need bracketing
@@ -2169,11 +1721,18 @@ int main(int argc, char** argv) {
            &optical_centers[cam_type][0],
            &distortions[cam_type][0]);
 
+        if (FLAGS_fix_map) {
+          problem.SetParameterBlockConstant
+            (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
+          problem.SetParameterBlockConstant
+            (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index]);
+        }
+
         Eigen::Vector3d depth_xyz(0, 0, 0);
         if (!dense_map::depthValue(cams[cid].depth_cloud, dist_ip, depth_xyz))
           continue;  // could not look up the depth value
 
-        std::cout << "--depth xyz is " << depth_xyz.transpose() << std::endl;
+        // std::cout << "--depth xyz is " << depth_xyz.transpose() << std::endl;
 
         // Ensure that the depth points agree with triangulated points
         ceres::CostFunction* bracketed_depth_cost_function
@@ -2203,6 +1762,13 @@ int main(int argc, char** argv) {
            &depth_to_image_scales[cam_type],
            &xyz_vec[pid][0],
            &ref_to_cam_timestamp_offsets[cam_type]);
+
+        if (FLAGS_fix_map) {
+          problem.SetParameterBlockConstant
+            (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
+          problem.SetParameterBlockConstant
+            (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index]);
+        }
       }
     }
   }
