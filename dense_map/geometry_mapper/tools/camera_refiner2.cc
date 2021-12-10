@@ -138,7 +138,7 @@ DEFINE_bool(float_sparse_map, false, "Optimize the sparse map, hence only the ca
 
 DEFINE_bool(float_scale, false,
             "If to optimize the scale of the clouds (use it if the "
-            "sparse map is kept fixed).");
+            "sparse map is kept fixed), or else rescaling and registration is needed.");
 
 DEFINE_bool(float_timestamp_offsets, false,
             "If to optimize the timestamp offsets among the cameras.");
@@ -210,11 +210,16 @@ namespace dense_map {
     // std::cout << "--beg stamp " << beg_ref_stamp << std::endl;
     // std::cout << "--end stamp " << end_ref_stamp << std::endl;
     // std::cout << "cam stamp   " << cam_stamp << std::endl;
+    // std::cout.precision(18);
     // std::cout << "ref to cam off " << ref_to_cam_offset << std::endl;
     // std::cout << "--ref to cam trans\n" << ref_to_cam_aff.matrix() << std::endl;
 
-    // Covert from cam time to ref time and normalize
-    double alpha = (cam_stamp - ref_to_cam_offset - beg_ref_stamp)
+    // Covert from cam time to ref time and normalize.  It is very
+    // important that below we subtract the big numbers from each
+    // other first, which are the timestamps, then subtract whatever
+    // else is necessary. Otherwise we get problems with numerical
+    // precision with CERES.
+    double alpha = ((cam_stamp - beg_ref_stamp) - ref_to_cam_offset)
       / (end_ref_stamp - beg_ref_stamp);
 
     if (beg_ref_stamp == end_ref_stamp)
@@ -867,13 +872,76 @@ void calc_median_residuals(std::vector<double> const& residuals,
     return true;
   }
 
+  // Rebuild the map.
+  // TODO(oalexan1): This must be integrated in astrobee.
+  void RebuildMap(std::string const& map_file,  // Will be used for temporary saving of aux data
+                  camera::CameraParameters const& cam_params,
+                  boost::shared_ptr<sparse_mapping::SparseMap> sparse_map) {
+    std::string rebuild_detector = "SURF";
+    std::cout << "Rebuilding map with " << rebuild_detector << " detector.";
+
+    // Copy some data to make sure it does not get lost on resetting things below
+    std::vector<Eigen::Affine3d>    world_to_ref_t = sparse_map->cid_to_cam_t_global_;
+    std::vector<std::map<int, int>> pid_to_cid_fid = sparse_map->pid_to_cid_fid_;
+
+    // Ensure the new camera parameters are set
+    sparse_map->SetCameraParameters(cam_params);
+
+    std::cout << "Detecting features.";
+    sparse_map->DetectFeatures();
+
+    std::cout << "Matching features.";
+    // Borrow from the original map which images should be matched with which.
+    sparse_map->cid_to_cid_.clear();
+    for (size_t p = 0; p < pid_to_cid_fid.size(); p++) {
+      std::map<int, int> const& track = pid_to_cid_fid[p];  // alias
+      for (std::map<int, int>::const_iterator it1 = track.begin();
+           it1 != track.end() ; it1++) {
+        for (std::map<int, int>::const_iterator it2 = it1;
+             it2 != track.end() ; it2++) {
+          if (it1->first != it2->first) {
+            // Never match an image with itself
+            sparse_map->cid_to_cid_[it1->first].insert(it2->first);
+          }
+        }
+      }
+    }
+
+    sparse_mapping::MatchFeatures(sparse_mapping::EssentialFile(map_file),
+                                  sparse_mapping::MatchesFile(map_file), sparse_map.get());
+    for (size_t i = 0; i < world_to_ref_t.size(); i++)
+      sparse_map->SetFrameGlobalTransform(i, world_to_ref_t[i]);
+
+    // Wipe file that is no longer needed
+    try {
+      std::remove(sparse_mapping::EssentialFile(map_file).c_str());
+    }catch(...) {}
+
+    std::cout << "Building tracks.";
+    bool rm_invalid_xyz = true;  // by now cameras are good, so filter out bad stuff
+    sparse_mapping::BuildTracks(rm_invalid_xyz,
+                                sparse_mapping::MatchesFile(map_file),
+                                sparse_map.get());
+
+    // It is essential that during re-building we do not vary the
+    // cameras. Those were usually computed with a lot of SURF features,
+    // while rebuilding is usually done with many fewer ORGBRISK
+    // features.
+    bool fix_cameras = true;
+    if (fix_cameras)
+      std::cout << "Performing bundle adjustment with fixed cameras.";
+    else
+      std::cout << "Performing bundle adjustment while floating cameras.";
+
+    sparse_mapping::BundleAdjust(fix_cameras, sparse_map.get());
+  }
+
 }  // namespace dense_map
 
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  std::cout << "--now in main!" << std::endl;
   std::cout.precision(17);  // to be able to print timestamps
 
   if (FLAGS_ros_bag.empty())
@@ -1260,13 +1328,6 @@ int main(int argc, char** argv) {
       cams.push_back(cam);
     }  // end loop over camera types
   }    // end loop over ref images
-
-  std::cout << "Timestamp offset from " << cam_names[ref_cam_type] << " to: \n";
-  for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
-    if (cam_type == ref_cam_type) continue;  // bounds don't make sense here
-    std::cout << std::setprecision(8) << cam_names[cam_type] << ": [" << lower_bound[cam_type]
-              << ", " << ref_to_cam_timestamp_offsets[cam_type] << "]\n";
-  }
 
   std::cout << "Allowed timestamp offset range while respecting the bracket for given cameras:\n";
   for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
@@ -1862,6 +1923,11 @@ int main(int argc, char** argv) {
         std::cout << "initial res " << residual_names[it] << " " << residuals[it] << std::endl;
   }
 
+  // Copy the offsets to specific cameras
+  std::cout.precision(18);
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
+    std::cout << "--offset before " << ref_to_cam_timestamp_offsets[cam_type] << std::endl;
+
   // Solve the problem
   ceres::Solver::Options options;
   ceres::Solver::Summary summary;
@@ -1902,21 +1968,39 @@ int main(int argc, char** argv) {
     cam_params[it].SetDistortion(distortions[it]);
   }
 
+  // Copy back the optimized extrinsics
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
+    dense_map::array_to_rigid_transform
+      (ref_to_cam_trans[cam_type],
+       &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+
   // Copy back the depth to image transforms without scales
   for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
     dense_map::array_to_rigid_transform
       (depth_to_image_noscale[cam_type],
        &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
 
-  // Copy to the specific cameras
+  // Copy extrinsics to specific cameras
+  hazcam_to_navcam_aff_trans = ref_to_cam_trans[1].inverse();
+  scicam_to_hazcam_aff_trans = hazcam_to_navcam_aff_trans.inverse() * ref_to_cam_trans[2].inverse();
+
+  // Copy intrinsics to the specific cameras
   if (FLAGS_nav_cam_intrinsics_to_float != "") nav_cam_params = cam_params[0];
   if (FLAGS_haz_cam_intrinsics_to_float != "") haz_cam_params = cam_params[1];
   if (FLAGS_sci_cam_intrinsics_to_float != "") sci_cam_params = cam_params[2];
 
-  // Copy back the offsets
+  // Copy the offsets to specific cameras
+  std::cout.precision(18);
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
+    std::cout << "--offset after " << ref_to_cam_timestamp_offsets[cam_type] << std::endl;
+
   navcam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1];
-  scicam_to_hazcam_timestamp_offset = navcam_to_hazcam_timestamp_offset
+  scicam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1]
     - ref_to_cam_timestamp_offsets[2];
+
+  std::cout.precision(18);
+  std::cout << "--navcam_to_hazcam_timestamp_offset " << navcam_to_hazcam_timestamp_offset << std::endl;
+  std::cout << "--scicam_to_hazcam_timestamp_offset " << scicam_to_hazcam_timestamp_offset << std::endl;
 
   // Update the optimized depth to image (for haz cam only)
   int cam_type = 1;  // haz cam
@@ -1972,10 +2056,11 @@ int main(int argc, char** argv) {
 
   std::cout << "Writing: " << FLAGS_output_map << std::endl;
   if (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != "") {
-    std::cout
-      << "Either the sparse map intrinsics or cameras got modified. The map must be rebuilt."
-      << std::endl;
-    LOG(FATAL) << "Not implemented yet.\n";
+    std::cout << "Either the sparse map intrinsics or cameras got modified. "
+              << "The map must be rebuilt." << std::endl;
+
+    dense_map::RebuildMap(FLAGS_output_map,  // Will be used for temporary saving of aux data
+                          nav_cam_params, sparse_map);
   }
 
   sparse_map->Save(FLAGS_output_map);
