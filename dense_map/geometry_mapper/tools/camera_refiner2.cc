@@ -130,31 +130,32 @@ DEFINE_double(bracket_len, 2.0,
 
 DEFINE_int32(num_opt_threads, 16, "How many threads to use in the optimization.");
 
-DEFINE_string(hugin_file, "", "The path to the hugin .pto file used for sparse map registration.");
-
-DEFINE_string(xyz_file, "", "The path to the xyz file used for sparse map registration.");
-
-DEFINE_bool(timestamp_interpolation, false,
-            "If true, interpolate between "
-            "timestamps. May give better results if the robot is known to move "
-            "uniformly, and perhaps less so for stop-and-go robot motion.");
-
 DEFINE_string(sci_cam_timestamps, "",
               "Use only these sci cam timestamps. Must be "
               "a file with one timestamp per line.");
 
-DEFINE_bool(skip_registration, false,
-            "If true, do not re-register the optimized map. "
-            "Then the hugin and xyz file options need not be provided. "
-            "This may result in the scale not being correct if the sparse map is not fixed.");
-
-DEFINE_bool(opt_map_only, false, "If to optimize only the map and not the camera params.");
-
-DEFINE_bool(fix_map, false, "Do not optimize the sparse map, hence only the camera params.");
+DEFINE_bool(float_sparse_map, false, "Optimize the sparse map, hence only the camera params.");
 
 DEFINE_bool(float_scale, false,
             "If to optimize the scale of the clouds (use it if the "
             "sparse map is kept fixed).");
+
+DEFINE_bool(float_timestamp_offsets, false,
+            "If to optimize the timestamp offsets among the cameras.");
+
+DEFINE_double(timestamp_offsets_max_change, 1.0,
+              "If floating the timestamp offsets, do not let them change by more than this "
+              "(measured in seconds). Existing image bracketing acts as an additional constraint.");
+
+DEFINE_string(nav_cam_intrinsics_to_float, "",
+              "Refine 0 or more of the following intrinsics for nav_cam: focal_length, "
+              "optical_center, distortion. Specify as a quoted list. "
+              "For example: 'focal_length optical_center'.");
+
+DEFINE_string(haz_cam_intrinsics_to_float, "",
+              "Refine 0 or more of the following intrinsics for haz_cam: focal_length, "
+              "optical_center, distortion. Specify as a quoted list. "
+              "For example: 'focal_length optical_center'.");
 
 DEFINE_string(sci_cam_intrinsics_to_float, "",
               "Refine 0 or more of the following intrinsics for sci_cam: focal_length, "
@@ -873,7 +874,6 @@ int main(int argc, char** argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   std::cout << "--now in main!" << std::endl;
-  std::cout << "--start and duration not supported!" << std::endl;
   std::cout.precision(17);  // to be able to print timestamps
 
   if (FLAGS_ros_bag.empty())
@@ -884,14 +884,6 @@ int main(int argc, char** argv) {
   if (FLAGS_output_map.empty())
     LOG(FATAL) << "The output sparse map was not specified.";
 
-  if (!FLAGS_skip_registration) {
-    if (FLAGS_xyz_file.empty() || FLAGS_hugin_file.empty())
-      LOG(FATAL) << "Either the hugin or xyz file was not specified.";
-  }
-
-  if (FLAGS_opt_map_only && FLAGS_fix_map)
-    LOG(FATAL) << "Cannot both float the sparse map and keep it fixed.";
-
   if (FLAGS_robust_threshold <= 0.0)
     LOG(FATAL) << "The robust threshold must be positive.\n";
 
@@ -899,16 +891,8 @@ int main(int argc, char** argv) {
 
   if (FLAGS_num_overlaps < 1) LOG(FATAL) << "Number of overlaps must be positive.";
 
-  // Set up handles for reading data at given time stamp without
-  // searching through the whole bag each time.
-  dense_map::RosBagHandle nav_cam_handle(FLAGS_ros_bag, FLAGS_nav_cam_topic);
-  dense_map::RosBagHandle sci_cam_handle(FLAGS_ros_bag, FLAGS_sci_cam_topic);
-  dense_map::RosBagHandle haz_cam_points_handle(FLAGS_ros_bag, FLAGS_haz_cam_points_topic);
-  dense_map::RosBagHandle haz_cam_intensity_handle(FLAGS_ros_bag, FLAGS_haz_cam_intensity_topic);
-
-  if (nav_cam_handle.bag_msgs.empty()) LOG(FATAL) << "No nav cam images found.";
-  if (sci_cam_handle.bag_msgs.empty()) LOG(FATAL) << "No sci cam images found.";
-  if (haz_cam_intensity_handle.bag_msgs.empty()) LOG(FATAL) << "No haz cam images found.";
+  if (FLAGS_timestamp_offsets_max_change < 0)
+    LOG(FATAL) << "The timestamp offsets must be non-negative.";
 
   // Read the config file
   double navcam_to_hazcam_timestamp_offset = 0.0, scicam_to_hazcam_timestamp_offset = 0.0;
@@ -1007,7 +991,6 @@ int main(int argc, char** argv) {
     dense_map::rigid_transform_to_array(world_to_ref_t[cid],
                                         &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
 
-
   // We assume our camera rig has n camera types. Each can be image or
   // depth + image.  Just one camera must be the reference camera. In
   // this code it will be nav_cam.  Every camera object (class
@@ -1049,6 +1032,12 @@ int main(int argc, char** argv) {
   std::vector<camera::CameraParameters> cam_params = {nav_cam_params,
                                                       haz_cam_params,
                                                       sci_cam_params};
+
+  // Which intrinsics from which cameras to float
+  std::vector<std::set<std::string>> intrinsics_to_float(num_cam_types);
+  dense_map::parse_intrinsics_to_float(FLAGS_nav_cam_intrinsics_to_float, intrinsics_to_float[0]);
+  dense_map::parse_intrinsics_to_float(FLAGS_haz_cam_intrinsics_to_float, intrinsics_to_float[1]);
+  dense_map::parse_intrinsics_to_float(FLAGS_sci_cam_intrinsics_to_float, intrinsics_to_float[2]);
 
   // The transform from ref to given cam
   std::vector<Eigen::Affine3d> ref_to_cam_trans;
@@ -1111,12 +1100,15 @@ int main(int argc, char** argv) {
   std::vector<int> image_start_positions(num_cam_types, 0);
   std::vector<int> cloud_start_positions(num_cam_types, 0);
 
-  //  Can subtract no more than this from ref_to_cam_timestamp_offsets[cam_type]
-  //  before getting out of the bracket.
-  std::vector<double> left_bound(num_cam_types, 1.0e+100);
-  //  Can add no more than this from ref_to_cam_timestamp_offsets[cam_type]
-  //  before getting out of the bracket.
-  std::vector<double> right_bound(num_cam_types, 1.0e+100);
+  //  Cannot add a (positive) value more this to
+  //  ref_to_cam_timestamp_offsets[cam_type] before getting out of the
+  //  bracket.
+  std::vector<double> upper_bound(num_cam_types, 1.0e+100);
+
+  //  Cannot add a (negative) value less than this to
+  //  ref_to_cam_timestamp_offsets[cam_type] before getting out of the
+  //  bracket.
+  std::vector<double> lower_bound(num_cam_types, -1.0e+100);
 
   std::cout << "Bracketing the images in time." << std::endl;
 
@@ -1219,15 +1211,15 @@ int main(int argc, char** argv) {
         // Note how we allow best_time == left_timestamp if there's no other choice
         if (best_time < left_timestamp || best_time >= right_timestamp) continue;  // no luck
 
-        left_bound[cam_type] = std::min(left_bound[cam_type], best_time - left_timestamp);
-        right_bound[cam_type] = std::min(right_bound[cam_type], right_timestamp - best_time);
-
-        cam.camera_type       = cam_type;
-        cam.timestamp         = best_time;
-        cam.ref_timestamp     = best_time - ref_to_cam_timestamp_offsets[cam_type];
+        cam.camera_type   = cam_type;
+        cam.timestamp     = best_time;
+        cam.ref_timestamp = best_time - ref_to_cam_timestamp_offsets[cam_type];
         cam.beg_ref_index = ref_it;
         cam.end_ref_index = ref_it + 1;
-        cam.image             = best_image;
+        cam.image         = best_image;
+
+        upper_bound[cam_type] = std::min(upper_bound[cam_type], best_time - left_timestamp);
+        lower_bound[cam_type] = std::max(lower_bound[cam_type], best_time - right_timestamp);
 
         if (cam_type == 1) {
           // Must compare raw big timestamps before and after!
@@ -1269,11 +1261,48 @@ int main(int argc, char** argv) {
     }  // end loop over camera types
   }    // end loop over ref images
 
+  std::cout << "Timestamp offset from " << cam_names[ref_cam_type] << " to: \n";
+  for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
+    if (cam_type == ref_cam_type) continue;  // bounds don't make sense here
+    std::cout << std::setprecision(8) << cam_names[cam_type] << ": [" << lower_bound[cam_type]
+              << ", " << ref_to_cam_timestamp_offsets[cam_type] << "]\n";
+  }
+
+  std::cout << "Allowed timestamp offset range while respecting the bracket for given cameras:\n";
   for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
     if (cam_type == ref_cam_type) continue;  // bounds don't make sense here
 
-    std::cout << "Bounds for camera " << cam_type << ": " << left_bound[cam_type]
-              << ' ' << right_bound[cam_type] << std::endl;
+    // So far we had the relative change. Now add the actual offset to get the max allowed offset.
+    lower_bound[cam_type] += ref_to_cam_timestamp_offsets[cam_type];
+    upper_bound[cam_type] += ref_to_cam_timestamp_offsets[cam_type];
+
+    std::cout << std::setprecision(8) << cam_names[cam_type] << ": [" << lower_bound[cam_type]
+              << ", " << upper_bound[cam_type] << "]\n";
+  }
+
+  if (FLAGS_float_timestamp_offsets) {
+    std::cout << "Given the user constraint the timestamp offsets will float in these ranges:\n";
+    for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
+      if (cam_type == ref_cam_type) continue;  // bounds don't make sense here
+
+      lower_bound[cam_type] = std::max(lower_bound[cam_type],
+                                       ref_to_cam_timestamp_offsets[cam_type]
+                                       - FLAGS_timestamp_offsets_max_change);
+
+      upper_bound[cam_type] = std::min(upper_bound[cam_type],
+                                       ref_to_cam_timestamp_offsets[cam_type]
+                                       + FLAGS_timestamp_offsets_max_change);
+
+      // Tighten a bit to ensure we don't exceed things when we add
+      // and subtract timestamps later.  Note that timestamps are
+      // measured in seconds and fractions of a second since epoch and
+      // can be quite large so precision loss can easily happen.
+      lower_bound[cam_type] += 1.0e-5;
+      upper_bound[cam_type] -= 1.0e-5;
+
+      std::cout << std::setprecision(8) << cam_names[cam_type] << ": [" << lower_bound[cam_type]
+                << ", " << upper_bound[cam_type] << "]\n";
+    }
   }
 
   std::cout << "--Deal with adjustment!" << std::endl;
@@ -1654,7 +1683,7 @@ int main(int argc, char** argv) {
            &optical_centers[cam_type][0],
            &distortions[cam_type][0]);
 
-        if (FLAGS_fix_map) {
+        if (!FLAGS_float_sparse_map) {
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
         }
@@ -1688,10 +1717,11 @@ int main(int argc, char** argv) {
            &depth_to_image_scales[cam_type],
            &xyz_vec[pid][0]);
 
-        if (FLAGS_fix_map) {
+        if (!FLAGS_float_sparse_map)
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
-        }
+        if (!FLAGS_float_scale)
+          problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
 
       } else {
         // Other cameras, which need bracketing
@@ -1721,11 +1751,19 @@ int main(int argc, char** argv) {
            &optical_centers[cam_type][0],
            &distortions[cam_type][0]);
 
-        if (FLAGS_fix_map) {
+        if (!FLAGS_float_sparse_map) {
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index]);
+        }
+        if (!FLAGS_float_timestamp_offsets) {
+          problem.SetParameterBlockConstant(&ref_to_cam_timestamp_offsets[cam_type]);
+        } else {
+          problem.SetParameterLowerBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
+                                         lower_bound[cam_type]);
+          problem.SetParameterUpperBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
+                                         upper_bound[cam_type]);
         }
 
         Eigen::Vector3d depth_xyz(0, 0, 0);
@@ -1763,13 +1801,45 @@ int main(int argc, char** argv) {
            &xyz_vec[pid][0],
            &ref_to_cam_timestamp_offsets[cam_type]);
 
-        if (FLAGS_fix_map) {
+        if (!FLAGS_float_sparse_map) {
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index]);
         }
+        if (!FLAGS_float_scale)
+          problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
+        if (!FLAGS_float_timestamp_offsets) {
+          problem.SetParameterBlockConstant(&ref_to_cam_timestamp_offsets[cam_type]);
+        } else {
+          problem.SetParameterLowerBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
+                                         lower_bound[cam_type]);
+          problem.SetParameterUpperBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
+                                         upper_bound[cam_type]);
+        }
       }
+    }
+  }
+
+  // See which intrinsics from which cam to float or keep fixed
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
+    if (intrinsics_to_float[cam_type].find("focal_length") == intrinsics_to_float[cam_type].end()) {
+      std::cout << "For " << cam_names[cam_type] << " not floating focal_length." << std::endl;
+      problem.SetParameterBlockConstant(&focal_lengths[cam_type]);
+    } else {
+      std::cout << "For " << cam_names[cam_type] << " floating focal_length." << std::endl;
+    }
+    if (intrinsics_to_float[cam_type].find("optical_center") == intrinsics_to_float[cam_type].end()) {
+      std::cout << "For " << cam_names[cam_type] << " not floating optical_center." << std::endl;
+      problem.SetParameterBlockConstant(&optical_centers[cam_type][0]);
+    } else {
+      std::cout << "For " << cam_names[cam_type] << " floating optical_center." << std::endl;
+    }
+    if (intrinsics_to_float[cam_type].find("distortion") == intrinsics_to_float[cam_type].end()) {
+      std::cout << "For " << cam_names[cam_type] << " not floating distortion." << std::endl;
+      problem.SetParameterBlockConstant(&distortions[cam_type][0]);
+    } else {
+      std::cout << "For " << cam_names[cam_type] << " floating distortion." << std::endl;
     }
   }
 
@@ -1786,13 +1856,129 @@ int main(int argc, char** argv) {
     LOG(FATAL) << "There must be as many residual values as residual scales.";
   for (size_t it = 0; it < residuals.size(); it++)  // compensate for the scale
     residuals[it] /= residual_scales[it];
-
   dense_map::calc_median_residuals(residuals, residual_names, "before opt");
-
   if (FLAGS_verbose) {
       for (size_t it = 0; it < residuals.size(); it++)
         std::cout << "initial res " << residual_names[it] << " " << residuals[it] << std::endl;
   }
+
+  // Solve the problem
+  ceres::Solver::Options options;
+  ceres::Solver::Summary summary;
+  options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+  options.num_threads = FLAGS_num_opt_threads;  // The result is more predictable with one thread
+  options.max_num_iterations = FLAGS_num_iterations;
+  options.minimizer_progress_to_stdout = true;
+  options.gradient_tolerance = 1e-16;
+  options.function_tolerance = 1e-16;
+  options.parameter_tolerance = FLAGS_parameter_tolerance;
+  ceres::Solve(options, &problem, &summary);
+
+  // Evaluate the residual after optimization
+  eval_options.num_threads = 1;
+  eval_options.apply_loss_function = false;  // want raw residuals
+  problem.Evaluate(eval_options, &total_cost, &residuals, NULL, NULL);
+  if (residuals.size() != residual_names.size())
+    LOG(FATAL) << "There must be as many residual names as residual values.";
+  if (residuals.size() != residual_scales.size())
+    LOG(FATAL) << "There must be as many residual values as residual scales.";
+  for (size_t it = 0; it < residuals.size(); it++)  // compensate for the scale
+    residuals[it] /= residual_scales[it];
+  dense_map::calc_median_residuals(residuals, residual_names, "after opt");
+  if (FLAGS_verbose) {
+      for (size_t it = 0; it < residuals.size(); it++)
+        std::cout << "final res " << residual_names[it] << " " << residuals[it] << std::endl;
+  }
+
+  // Copy back the reference transforms
+  for (int cid = 0; cid < num_ref_cams; cid++)
+    dense_map::array_to_rigid_transform(world_to_ref_t[cid],
+                                        &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
+
+  // Copy back the optimized intrinsics
+  for (int it = 0; it < num_cam_types; it++) {
+    cam_params[it].SetFocalLength(Eigen::Vector2d(focal_lengths[it], focal_lengths[it]));
+    cam_params[it].SetOpticalOffset(optical_centers[it]);
+    cam_params[it].SetDistortion(distortions[it]);
+  }
+
+  // Copy back the depth to image transforms without scales
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
+    dense_map::array_to_rigid_transform
+      (depth_to_image_noscale[cam_type],
+       &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+
+  // Copy to the specific cameras
+  if (FLAGS_nav_cam_intrinsics_to_float != "") nav_cam_params = cam_params[0];
+  if (FLAGS_haz_cam_intrinsics_to_float != "") haz_cam_params = cam_params[1];
+  if (FLAGS_sci_cam_intrinsics_to_float != "") sci_cam_params = cam_params[2];
+
+  // Copy back the offsets
+  navcam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1];
+  scicam_to_hazcam_timestamp_offset = navcam_to_hazcam_timestamp_offset
+    - ref_to_cam_timestamp_offsets[2];
+
+  // Update the optimized depth to image (for haz cam only)
+  int cam_type = 1;  // haz cam
+  hazcam_depth_to_image_scale = depth_to_image_scales[cam_type];
+  hazcam_depth_to_image_transform = depth_to_image_noscale[cam_type];
+  hazcam_depth_to_image_transform.linear() *= hazcam_depth_to_image_scale;
+
+  // Update the config file
+  {
+    // update nav and haz
+    bool update_cam1 = true, update_cam2 = true;
+    std::string cam1_name = "nav_cam", cam2_name = "haz_cam";
+    boost::shared_ptr<camera::CameraParameters>
+      cam1_params(new camera::CameraParameters(nav_cam_params));
+    boost::shared_ptr<camera::CameraParameters>
+      cam2_params(new camera::CameraParameters(haz_cam_params));
+    bool update_depth_to_image_transform = true;
+    bool update_extrinsics = true;
+    bool update_timestamp_offset = true;
+    std::string cam1_to_cam2_timestamp_offset_str = "navcam_to_hazcam_timestamp_offset";
+    // Modify in-place the robot config file
+    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
+                                  update_cam2, cam2_name, cam2_params,
+                                  update_depth_to_image_transform,
+                                  hazcam_depth_to_image_transform, update_extrinsics,
+                                  hazcam_to_navcam_aff_trans, update_timestamp_offset,
+                                  cam1_to_cam2_timestamp_offset_str,
+                                  navcam_to_hazcam_timestamp_offset);
+  }
+  {
+    // update sci and haz
+    // TODO(oalexan1): Write a single function to update all 3 of them
+    bool update_cam1 = true, update_cam2 = true;
+    std::string cam1_name = "sci_cam", cam2_name = "haz_cam";
+    boost::shared_ptr<camera::CameraParameters>
+      cam1_params(new camera::CameraParameters(sci_cam_params));
+    boost::shared_ptr<camera::CameraParameters>
+      cam2_params(new camera::CameraParameters(haz_cam_params));
+    bool update_depth_to_image_transform = true;
+    bool update_extrinsics = true;
+    bool update_timestamp_offset = true;
+    std::string cam1_to_cam2_timestamp_offset_str = "scicam_to_hazcam_timestamp_offset";
+    // Modify in-place the robot config file
+    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
+                                  update_cam2, cam2_name, cam2_params,
+                                  update_depth_to_image_transform,
+                                  hazcam_depth_to_image_transform, update_extrinsics,
+                                  scicam_to_hazcam_aff_trans.inverse(),
+                                  update_timestamp_offset,
+                                  cam1_to_cam2_timestamp_offset_str,
+                                  scicam_to_hazcam_timestamp_offset);
+  }
+
+  std::cout << "Writing: " << FLAGS_output_map << std::endl;
+  if (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != "") {
+    std::cout
+      << "Either the sparse map intrinsics or cameras got modified. The map must be rebuilt."
+      << std::endl;
+    LOG(FATAL) << "Not implemented yet.\n";
+  }
+
+  sparse_map->Save(FLAGS_output_map);
 
   return 0;
 } // NOLINT
