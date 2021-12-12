@@ -2031,7 +2031,7 @@ int main(int argc, char** argv) {
                                   navcam_to_hazcam_timestamp_offset);
   }
   {
-    // update sci and haz
+    // update sci and haz cams
     // TODO(oalexan1): Write a single function to update all 3 of them
     bool update_cam1 = true, update_cam2 = true;
     std::string cam1_name = "sci_cam", cam2_name = "haz_cam";
