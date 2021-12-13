@@ -1,15 +1,14 @@
-# Copyright (c) 2021, United States Government, as represented by the
+# Copyright (c) 2017, United States Government, as represented by the
 # Administrator of the National Aeronautics and Space Administration.
-#
+# 
 # All rights reserved.
-#
-# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
-# platform" software is licensed under the Apache License, Version 2.0
+# 
+# The Astrobee platform is licensed under the Apache License, Version 2.0
 # (the "License"); you may not use this file except in compliance with the
 # License. You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -28,6 +27,7 @@
 # :outvar <comp>_INCLUDE_DIRS/_LIBRARY_DIRS/_LIBRARY:
 #    contains the include dirs / library dirs / libraries of the searched component <comp>.
 
+find_package(catkin REQUIRED)  # defines catkin_DIR
 if(CATKIN_TOPLEVEL_FIND_PACKAGE OR NOT CATKIN_TOPLEVEL)
   set(catkin_EXTRAS_DIR "${catkin_DIR}")
 
@@ -117,8 +117,8 @@ if(catkin2_FIND_COMPONENTS)
       # paths. This makes it impossible to cross compile unless we fix
       # the paths like so below.
       if (USE_CTC)
-        if (${component}_LIBRARIES)
-          set(temp_LIBRARIES)
+      	if (${component}_LIBRARIES)
+	        set(temp_LIBRARIES)
           foreach(library ${${component}_LIBRARIES})
             string(REGEX REPLACE "^/usr/lib" "${ARM_CHROOT_DIR}/usr/lib" library ${library})
             string(REPLACE "i386-linux-gnu" "arm-linux-gnueabihf" library ${library})

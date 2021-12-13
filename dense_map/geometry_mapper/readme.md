@@ -20,7 +20,7 @@ The following environmental variables should be set up (please adjust
 them for your particular configuration):
 
     export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
-    export ASTROBEE_BUILD_PATH=$HOME/astrobee/build
+    export ASTROBEE_BUILD_PATH=$HOME/astrobee
     export ISAAC_WS=$HOME/isaac
 
 ## Robot sensors
@@ -110,7 +110,8 @@ To compile Voxblox, clone
 https://github.com/ethz-asl/voxblox by the introduction of a small
 tool named batch_tsdf.cc that reads the clouds to fuse and the
 transforms from disk and writes the output mesh back to disk, instead
-of using ROS.
+of using ROS. It also can take into account a point's reliability when
+fusing the clouds, which is computed by the geometry mapper.
 
 Compile it using the instructions at:
 
@@ -645,19 +646,21 @@ Ensure that the bot name is correct below. Set `ASTROBEE_SOURCE_PATH`,
       --camera_type all                                                     \
       --start 0                                                             \
       --duration 1e+10                                                      \
-      --sampling_spacing_seconds 2                                          \
+      --sampling_spacing_seconds 5                                          \
       --dist_between_processed_cams 0.1                                     \
       --depth_exclude_columns 0                                             \
       --depth_exclude_rows 0                                                \
       --foreshortening_delta 5.0                                            \
       --median_filters "7 0.1 25 0.1"                                       \
+      --reliability_weight_exponent 2                                       \
+      --voxblox_integrator merged                                           \
       --depth_hole_fill_diameter 30.0                                       \
-      --max_ray_length 2                                                    \
+      --max_ray_length 2.5                                                  \
       --voxel_size 0.01                                                     \
       --max_iso_times_exposure 5.1                                          \
-      --smoothing_time 1e-5                                                 \
-      --max_num_hole_edges 4000                                             \
-      --max_hole_diameter 0.8                                               \
+      --smoothing_time 5e-6                                                 \
+      --max_num_hole_edges 8000                                             \
+      --max_hole_diameter 1.8                                               \
       --num_min_faces_in_component 100                                      \
       --num_components_to_keep 100                                          \
       --edge_keep_ratio 0.2                                                 \
@@ -703,9 +706,16 @@ Parameters:
       are fused. It is suggested to not make this too big, as more
       hole-filling happens on the fused mesh later (see
       --max_hole_diameter). The default is 30.
+    --reliability_weight_exponent: A larger value will give more
+      weight to depth points corresponding to pixels closer to depth
+      image center, which are considered more reliable. The default is
+      2.0.
     --max_ray_length_m: Dictates at what distance from the depth camera
       to truncate the rays (in meters). This can be small if the images
       are acquired close to walls and facing them.
+    --voxblox_integrator: When fusing the depth point clouds use
+      this VoxBlox method. Options are: "merged", "simple", and
+      "fast". The default is "merged".
     --voxel_size is the grid size used for binning the points, in meters.
     --max_iso_times_exposure: Apply the inverse gamma transform to
       images, multiply them by max_iso_times_exposure/ISO/exposure_time
@@ -1121,7 +1131,7 @@ are added back.
 
 ### Map building and registration
 
-Build a sparse map with these images. Use the same environemnt as
+Build a sparse map with these images. Use the same environment as
 above:
 
     dir=nav_images
@@ -1333,7 +1343,7 @@ A geometry mapper run directory has all the inputs this tool needs. It
 can be run as follows:
 
     export ASTROBEE_SOURCE_PATH=$HOME/projects/astrobee/src
-    export ASTROBEE_BUILD_PATH=$HOME/projects/astrobee/build
+    export ASTROBEE_BUILD_PATH=$HOME/projects/astrobee
     export ISAAC_WS=$HOME/projects/isaac
     source $ASTROBEE_BUILD_PATH/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash

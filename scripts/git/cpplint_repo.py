@@ -24,12 +24,14 @@ import os
 
 num_errors = 0
 
+
 def get_cpplint_path():
     return os.path.dirname(os.path.realpath(__file__)) + "/cpplint.py"
 
 
 def get_repo_path():
     return os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + "/../..")
+
 
 def run_cpplint(filename, cpplint_path):
     cpplint = importlib.machinery.SourceFileLoader(
@@ -47,9 +49,11 @@ def run_cpplint(filename, cpplint_path):
     cpplint.ProcessFile(filename, cpplint._cpplint_state.verbose_level)
     return cpplint.output
 
+
 def print_objection():
     print("Code formatting errors were found.")
     print("==================================")
+
 
 def main():
     num_errors = 0
@@ -68,7 +72,7 @@ def main():
         ):
             continue
         for filename in filenames:
-            if "TinyEXIF" in filename:
+            if "TinyEXIF" or "happly" in filename:
                 continue
             if not filename.endswith(
                 (

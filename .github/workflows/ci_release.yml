@@ -14,22 +14,22 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Checkout submodule
-      run: git submodule update --init --depth 1 description/media
+      run: git submodule update --init --depth 1 isaac_msgs
 
     - name: Build code for isaac:astrobee Ubuntu 16
-      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile \
-                          --build-arg UBUNTU_VERSION=16.04 \
-                          --build-arg ROS_VERSION=kinetic \
-                          --build-arg PYTHON='' \
-                          --build-arg REMOTE=ghcr.io/nasa \
+      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile
+                          --build-arg UBUNTU_VERSION=16.04
+                          --build-arg ROS_VERSION=kinetic
+                          --build-arg PYTHON=''
+                          --build-arg REMOTE=ghcr.io/nasa
                           -t isaac/isaac:latest-astrobee-ubuntu16.04
 
     - name: Build code for isaac:latest Ubuntu 16
-      run: docker build . -f ./scripts/docker/isaac.Dockerfile \
-                          --build-arg UBUNTU_VERSION=16.04 \
-                          --build-arg ROS_VERSION=kinetic \
-                          --build-arg PYTHON='' \
-                          --build-arg REMOTE=isaac \
+      run: docker build . -f ./scripts/docker/isaac.Dockerfile
+                          --build-arg UBUNTU_VERSION=16.04
+                          --build-arg ROS_VERSION=kinetic
+                          --build-arg PYTHON=''
+                          --build-arg REMOTE=isaac
                           -t isaac/isaac:latest-ubuntu16.04
 
     - name: Log in to registry
@@ -51,22 +51,22 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Checkout submodule
-      run: git submodule update --init --depth 1 description/media
+      run: git submodule update --init --depth 1 isaac_msgs
 
     - name: Build code for isaac:astrobee Ubuntu 18
-      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile \
-                          --build-arg UBUNTU_VERSION=18.04 \
-                          --build-arg ROS_VERSION=melodic \
-                          --build-arg PYTHON=3 \
-                          --build-arg REMOTE=ghcr.io/nasa \
-                          -t isaac/isaac:astrobee-ubuntu18.04
+      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile
+                          --build-arg UBUNTU_VERSION=18.04
+                          --build-arg ROS_VERSION=melodic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=ghcr.io/nasa
+                          -t isaac/isaac:latest-astrobee-ubuntu18.04
 
     - name: Build code for isaac:latest Ubuntu 18
-      run: docker build . -f ./scripts/docker/isaac.Dockerfile \
-                          --build-arg UBUNTU_VERSION=18.04 \
-                          --build-arg ROS_VERSION=melodic \
-                          --build-arg PYTHON=3 \
-                          --build-arg REMOTE=isaac \
+      run: docker build . -f ./scripts/docker/isaac.Dockerfile
+                          --build-arg UBUNTU_VERSION=18.04
+                          --build-arg ROS_VERSION=melodic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=isaac
                           -t isaac/isaac:latest-ubuntu18.04
 
     - name: Log in to registry
@@ -88,22 +88,22 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Checkout submodule
-      run: git submodule update --init --depth 1 description/media
+      run: git submodule update --init --depth 1 isaac_msgs
 
     - name: Build code for isaac:astrobee Ubuntu 20
-      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile \
-                          --build-arg UBUNTU_VERSION=20.04 \
-                          --build-arg ROS_VERSION=noetic \
-                          --build-arg PYTHON=3 \
-                          --build-arg REMOTE=ghcr.io/nasa \
-                          -t isaac/isaac:astrobee-ubuntu20.04
+      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=ghcr.io/nasa
+                          -t isaac/isaac:latest-astrobee-ubuntu20.04
 
     - name: Build code for isaac:latest Ubuntu 20
-      run: docker build . -f ./scripts/docker/isaac.Dockerfile \
-                          --build-arg UBUNTU_VERSION=20.04 \
-                          --build-arg ROS_VERSION=noetic \
-                          --build-arg PYTHON=3 \
-                          --build-arg REMOTE=isaac \
+      run: docker build . -f ./scripts/docker/isaac.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=isaac
                           -t isaac/isaac:latest-ubuntu20.04
 
     - name: Log in to registry

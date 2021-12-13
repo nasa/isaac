@@ -21,7 +21,7 @@ The ISAAC project has three main technical thrusts:
    changes on the system during critical faults and emergencies.
 
 This `isaac` repo serves as a master for integrating an end-to-end
-demo that draws on code from the other repos (as well as directly
+demo that draws on code from the other repos as well as directly
 including a significant amount of the ISAAC code, mostly relating to
 the Astrobee robot). This repository includes:
 
@@ -57,12 +57,13 @@ There are two main ways to install and run `isaac`:
    in your native OS, and you don't need to install for development
    prior to installing for demo.
 
-[Instructions on installing and using the ISAAC Software](INSTALL.md). [For running
-the demos](DEMO_INSTALL.md)
+[Instructions on installing and using the ISAAC Software](https://nasa.github.io/isaac/html/md_INSTALL.html). For running the [docker demos](https://nasa.github.io/isaac/html/md_DEMO_INSTALL.html)
 
 ### Documentation
 
-There are Doxygen comments in the header files. To compile (make sure you have the latest doxygen installed):
+[The documentation is auto-generated from the contents of this repository.](https://nasa.github.io/isaac/documentation.html)
+
+To compile the documentation locally (make sure you have the latest doxygen installed):
 
     doxygen isaac.doxyfile
 
@@ -70,8 +71,8 @@ There are Doxygen comments in the header files. To compile (make sure you have t
 
 The ISAAC Software is open source, and we welcome contributions from the public.
 Please submit pull requests to the `develop` branch. For us to merge any pull
-requests, we must request that contributors sign and submit a Contributor License
-Agreement due to NASA legal requirements. Thank you for your understanding.
+requests, we must request that contributors sign and submit either an [Individual Contributor License Agreement](https://github.com/nasa/isaac/blob/94996bc1a20fa090336e67b3db5c10a9bb30f0f7/doc/cla/ISAAC_Individual%20CLA.pdf) or a [Corporate Contributor License
+Agreement](https://github.com/nasa/isaac/blob/94996bc1a20fa090336e67b3db5c10a9bb30f0f7/doc/cla/ISAAC_Corporate%20CLA.pdf) due to NASA legal requirements. Thank you for your understanding.
 
 ### License
 

@@ -325,7 +325,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     max_motion_retry_number_= cfg_.Get<int>("max_motion_retry_number");
 
     // Initiate inspection library
-    inspection_ = new Inspection(nh, cfg_);
+    inspection_ = new Inspection(nh, &cfg_);
   }
 
   // Ensure all clients are connected
@@ -374,11 +374,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     bool validation = cfg_.Get<bool>("enable_validation");
     bool boostrapping = cfg_.Get<bool>("enable_bootstrapping");
     bool immediate = cfg_.Get<bool>("enable_immediate");
-    bool timesync = cfg_.Get<bool>("enable_timesync");
-    double desired_vel = cfg_.Get<double>("desired_vel");
-    double desired_accel = cfg_.Get<double>("desired_accel");
-    double desired_omega = cfg_.Get<double>("desired_omega");
-    double desired_alpha = cfg_.Get<double>("desired_alpha");
 
     // Reconfigure the choreographer
     ff_util::ConfigClient choreographer_cfg(GetPlatformHandle(), NODE_CHOREOGRAPHER);
@@ -398,11 +393,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     choreographer_cfg.Set<bool>("enable_validation", validation);
     choreographer_cfg.Set<bool>("enable_bootstrapping", boostrapping);
     choreographer_cfg.Set<bool>("enable_immediate", immediate);
-    choreographer_cfg.Set<bool>("enable_timesync", timesync);
-    choreographer_cfg.Set<double>("desired_vel", desired_vel);
-    choreographer_cfg.Set<double>("desired_accel", desired_accel);
-    choreographer_cfg.Set<double>("desired_omega", desired_omega);
-    choreographer_cfg.Set<double>("desired_alpha", desired_alpha);
     if (!choreographer_cfg.Reconfigure()) {
       NODELET_ERROR_STREAM("Failed to reconfigure choreographer");
       return false;
@@ -530,37 +520,32 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Signal an imminent sci cam image
     sci_cam_req_ = true;
 
-    // If using the simulation
-    if (sim_mode_) {
-      // Take picture
-      ff_msgs::CommandArg arg;
-      std::vector<ff_msgs::CommandArg> cmd_args;
+    // Take picture
+    ff_msgs::CommandArg arg;
+    std::vector<ff_msgs::CommandArg> cmd_args;
 
-      // The command sends two strings. The first has the app name,
-      // and the second the command value, encoded as json.
+    // The command sends two strings. The first has the app name,
+    // and the second the command value, encoded as json.
 
-      arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-      arg.s = "gov.nasa.arc.irg.astrobee.sci_cam_image";
-      cmd_args.push_back(arg);
+    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
+    arg.s = "gov.nasa.arc.irg.astrobee.sci_cam_image";
+    cmd_args.push_back(arg);
 
-      arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-      arg.s = "{\"name\": \"takeSinglePicture\"}";
-      cmd_args.push_back(arg);
+    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
+    arg.s = "{\"name\": \"takePicture\"}";
+    cmd_args.push_back(arg);
 
-      ff_msgs::CommandStamped cmd;
-      cmd.header.stamp = ros::Time::now();
-      cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_CUSTOM_GUEST_SCIENCE;
-      cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
-      cmd.cmd_src = "guest science";
-      cmd.cmd_origin = "guest science";
-      cmd.args = cmd_args;
+    ff_msgs::CommandStamped cmd;
+    cmd.header.stamp = ros::Time::now();
+    cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_CUSTOM_GUEST_SCIENCE;
+    cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
+    cmd.cmd_src = "guest science";
+    cmd.cmd_origin = "guest science";
+    cmd.args = cmd_args;
 
 
-      pub_guest_sci_.publish(cmd);
-    } else {
-      // If using the real robot
-      FILE *f = popen("ssh -t -t llp /opt/astrobee/ops/sci_cam_img_control.bash single pub_ros", "r");
-    }
+    pub_guest_sci_.publish(cmd);
+
 
     // Timer for the sci cam camera
     ros::Timer sci_cam_timeout_ = nh_->createTimer(ros::Duration(5), &InspectionNode::SciCamTimeout, this, true, false);
@@ -737,8 +722,10 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
   // Callback to handle reconfiguration requests
   bool ReconfigureCallback(dynamic_reconfigure::Config & config) {
-    if ( fsm_.GetState() == STATE::WAITING)
-      return cfg_.Reconfigure(config);
+    if (cfg_.Reconfigure(config)) {
+      inspection_->ReadParam();
+      return true;
+    }
     return false;
   }
 

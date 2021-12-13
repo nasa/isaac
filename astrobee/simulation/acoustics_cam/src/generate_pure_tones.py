@@ -19,16 +19,17 @@
 # under the License.
 
 import numpy as np
+from matplotlib import pyplot as plt
+from scipy.interpolate import RegularGridInterpolator
 from scipy.io import wavfile
 from scipy.signal import welch
-from scipy.interpolate import RegularGridInterpolator
-from matplotlib import pyplot as plt
 
 fs = 32000  # sample rate, Hz
-T = 30.  # sample duration, seconds
+T = 30.0  # sample duration, seconds
 freqs = [12333, 10533]  # Hz
 
 rng = np.random.RandomState(23)
+
 
 def get_signal(F, fs, T):
     t = np.arange(fs * T) / fs
@@ -43,32 +44,33 @@ def get_signal(F, fs, T):
     weight_sum += weight
     signal += weight * np.clip(1.0 / 3 * rng.normal(size=t.shape), -1, 1)
 
-    return (32768 / weight_sum * signal).astype('int16')
+    return (32768 / weight_sum * signal).astype("int16")
+
 
 for F in freqs:
     signal = get_signal(F, fs, T)
-    fname = 'test_sounds/tone%s.wav' % F
+    fname = "test_sounds/tone%s.wav" % F
     wavfile.write(fname, fs, signal)
-    print('wrote %s' % fname)
+    print("wrote %s" % fname)
 
 for F in freqs:
-    fname = 'test_sounds/tone%s.wav' % F
+    fname = "test_sounds/tone%s.wav" % F
     fs, signal = wavfile.read(fname)
 
-    welch_F, Pxx = welch(signal, fs, nperseg=8192, average='median')
+    welch_F, Pxx = welch(signal, fs, nperseg=8192, average="median")
     plt.semilogy(welch_F, Pxx)
 
     interp = RegularGridInterpolator([welch_F], Pxx)
 
-    print('PSD for %s:' % fname)
+    print("PSD for %s:" % fname)
     for F in freqs:
-        print('  @ %s Hz: %s' % (F, interp([F])))
+        print("  @ %s Hz: %s" % (F, interp([F])))
 
 plt.legend([str(F) for F in freqs])
-plt.xlabel('Frequency (Hz)')
-plt.ylabel('PSD ($V^2$ / Hz)')
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("PSD ($V^2$ / Hz)")
 
-fname = 'tones.png'
+fname = "tones.png"
 plt.savefig(fname)
-print('wrote %s' % fname)
+print("wrote %s" % fname)
 plt.close()

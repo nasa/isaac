@@ -36,6 +36,7 @@
 #include <ff_util/ff_fsm.h>
 #include <ff_util/config_server.h>
 #include <ff_util/config_client.h>
+#include <config_reader/config_reader.h>
 #include <ff_util/ff_flight.h>
 #include <isaac_util/isaac_names.h>
 
@@ -87,7 +88,9 @@ namespace inspection {
 class Inspection {
  public:
   // Constructor
-  Inspection(ros::NodeHandle* nh, ff_util::ConfigServer cfg);
+  Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg);
+  // Read parameters from config server
+  void ReadParam();
   // Generate inspection segment
   bool GenSegment(geometry_msgs::Pose goal);
   // Remove head of segment if planing failed
@@ -134,6 +137,10 @@ class Inspection {
 
   geometry_msgs::PoseArray points_;    // Vector containing inspection poses
 
+  // Parameter clients
+  ff_util::ConfigServer *cfg_;
+  config_reader::ConfigReader cfg_cam_;
+
   // Inspection parameters
   double opt_distance_;
   double dist_resolution_;
@@ -143,8 +150,15 @@ class Inspection {
   double min_distance_;
   double horizontal_fov_;
   double aspect_ratio_;
-  double vent_size_x_;
-  double vent_size_y_;
+  double target_size_x_;
+  double target_size_y_;
+
+  // Panorame parameters
+  double pan_min_;
+  double pan_max_;
+  double tilt_min_;
+  double tilt_max_;
+  double overlap_;
 
   // Publish Markers
   ros::Publisher pub_no_filter_;

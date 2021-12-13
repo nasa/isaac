@@ -23,7 +23,11 @@
 
 DEP_LOC=$(dirname "$(readlink -f "$0")")/dependencies
 
-#sudo apt-get install -y 
+sudo apt-get install -y libgtest-dev
+cd /usr/src/gtest
+sudo cmake CMakeLists.txt
+sudo make
+sudo cp *.a /usr/lib
 
 cd ${DEP_LOC}
 ./build_install_gp.sh || exit 1
