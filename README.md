@@ -1,15 +1,47 @@
-# ISAAC Software
+# ISAAC (Integrated System for Autonomous and Adaptive Caretaking)
 
-### About
+The ISAAC project has three main technical thrusts:
 
-The ISAAC project actively develops in a variety of repos hosted at
-Ames and JSC, as described on the (collaboration tools wiki
-page)[https://babelfish.arc.nasa.gov/confluence/display/astrosoft/Astrosoft+Collaboration+Tools]
+1. **Integrated data**: The current state of the art is that data from sensors associated with different facility
+   subsystems (Structures, GN&C, and ECLSS, etc.) remain siloed. ISAAC technology unifies facility data and models with
+   autonomous robotics, linking data streams from facility subsystems, sensor networks, and robots, as well as linking 3D
+   geometry and sensor data map layers, and detecting changes and anomalies.
+2. **Integrated control interface**: Current state of the art manages facilities with largely independent interface tools
+   for different subsystems. Interfaces have different heritage, design assumptions and operator interface styles. Subsystem
+   interactions are hard to analyze due to poor connectivity between separate tools. ISAAC technology combines interface
+   tools for facility subsystems and autonomous robots; improves system-level situation awareness, situation understanding,
+   and operator productivity; enables linking and embedding between tools to improve subsystem interaction analysis; and
+   supports the entire activity life cycle from planning through execution and analysis.
+3. **Coordinated execution**: The current state of the art for executing facility activities that require coordination
+   between subsystems is either manual commanding (operator tracks dependencies between subsystems) or simple sequencing
+   that can be brittle to even minor contingencies during execution. ISAAC technology models dependencies, uses automated
+   planning to translate a high-level task definition to a plan that can work given the current system state (e.g. include
+   actions to open hatches so that a robot can move where needed), and leverages ISAAC’s integrated data technology to
+   watch for execution contingencies and trigger replanning as needed. This technology will reduce the time to effect
+   changes on the system during critical faults and emergencies.
 
 This `isaac` repo serves as a master for integrating an end-to-end
 demo that draws on code from the other repos (as well as directly
 including a significant amount of the ISAAC code, mostly relating to
-the Astrobee robot).
+the Astrobee robot). This repository includes:
+
+- [Astrobee software](astrobee/) for inspection, cargo transport, and measuring wifi signal strength
+- [Dense mapping](dense_map/geometry_mapper) to create a textured 3D map
+- [Wifi mapping](dense_map/volumetric_mapper) to map WIFI signals
+- [Image analysis](img_analysis) module to train a neural network to detect anomalies
+
+You may also be interested in the separate repository for the [ISAAC User Interface](https://github.com/nasa/isaac_user_interface),
+which enables monitoring of multiple robots through a web browser.
+
+### System requirements
+
+The `isaac` repo depends on the `astrobee` repo, therefore it inherits
+the same system requirements. You must use Ubuntu 16.04 to 20.04 64-bit. When
+running in simulation, certain Gazebo plugins require appropriate
+graphics drivers. See INSTALL.md in that repository for more
+information.
+
+### Usage
 
 There are two main ways to install and run `isaac`:
 
@@ -24,16 +56,6 @@ There are two main ways to install and run `isaac`:
    is managed by the Dockerfile and completely separate from any build
    in your native OS, and you don't need to install for development
    prior to installing for demo.
-
-### System requirements
-
-The `isaac` repo depends on the `astrobee` repo, therefore it inherits
-the same system requirements. You must use Ubuntu 16.04 to 20.04 64-bit. When
-running in simulation, certain Gazebo plugins require appropriate
-graphics drivers. See INSTALL.md in that repository for more
-information.
-
-### Usage
 
 [Instructions on installing and using the ISAAC Software](INSTALL.md). [For running
 the demos](DEMO_INSTALL.md)
