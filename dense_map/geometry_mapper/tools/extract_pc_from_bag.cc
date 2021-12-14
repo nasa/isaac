@@ -118,10 +118,11 @@ int main(int argc, char** argv) {
       // Convert to an opencv image
       cv::Mat image;
       try {
-        image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+        // Do a copy as the message is temporary
+        (cv_bridge::toCvShare(image_msg, "bgr8")->image).copyTo(image);
       } catch (cv_bridge::Exception const& e) {
         try {
-          image = cv_bridge::toCvShare(image_msg, "32FC1")->image;
+          (cv_bridge::toCvShare(image_msg, "32FC1")->image).copyTo(image);
         } catch (cv_bridge::Exception const& e) {
           LOG(ERROR) << "Unable to convert " << image_msg->encoding.c_str() << " image to bgr8 or 32FC1";
           continue;
@@ -133,13 +134,15 @@ int main(int argc, char** argv) {
     }
 
     // Extract a compressed image
-    sensor_msgs::CompressedImage::ConstPtr comp_image_msg = m.instantiate<sensor_msgs::CompressedImage>();
+    sensor_msgs::CompressedImage::ConstPtr comp_image_msg
+      = m.instantiate<sensor_msgs::CompressedImage>();
     if (comp_image_msg) {
       ros::Time stamp = comp_image_msg->header.stamp;
       curr_time = stamp.toSec();
 
       // Set up the output filename
-      form_filename(comp_image_msg->header.seq, curr_time, filename_buffer, sizeof(filename_buffer));
+      form_filename(comp_image_msg->header.seq, curr_time, filename_buffer,
+                    sizeof(filename_buffer));
       std::string name(filename_buffer);
       name = output_directory + "/" + name + ".jpg";
 

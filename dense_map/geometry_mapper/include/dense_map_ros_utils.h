@@ -50,6 +50,13 @@ void readBagPoses(std::string const& bag_file, std::string const& topic, Stamped
 
 void readBagImageTimestamps(std::string const& bag_file, std::string const& topic, std::vector<double>& timestamps);
 
+// Given a bag view, for each topic in the view read the vector of
+// messages for that topic, sorted by message header timestamp. Only
+// the following sensor types are supported: sensor_msgs::Image,
+// sensor_msgs::CompressedImage, and sensor_msgs::PointCloud2.
+void indexMessages(rosbag::View& view,  // view can't be made const
+                   std::map<std::string, std::vector<rosbag::MessageInstance>>& bag_map);
+
 void readExifFromBag(std::vector<rosbag::MessageInstance> const& bag_msgs, std::map<double, std::vector<double>>& exif);
 
 // Find an image at the given timestamp or right after it. We assume

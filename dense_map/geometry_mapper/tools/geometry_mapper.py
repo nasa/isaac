@@ -94,7 +94,7 @@ def process_args(args):
         dest="camera_type",
         default="all",
         help="Specify which cameras to process. By default, process all. "
-        + "Options: nav_cam, sci_cam.",
+        + "Options: nav_cam, haz_cam, sci_cam.",
     )
     parser.add_argument(
         "--start",
@@ -352,6 +352,10 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, args):
         )
         sys.exit(1)
 
+    if args.camera_type == "haz_cam" and args.simulated_data:
+        print("Texturing haz cam with simulated data was not tested.")
+        sys.exit(1)
+
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
 
@@ -477,11 +481,11 @@ def fuse_clouds(batch_tsdf_path, mesh, args):
     Invoke the voxblox batch_tsdf tool to fuse the depth images.
     """
 
-    haz_cam_index = os.path.join(args.output_dir, "haz_cam_index.txt")
+    depth_cam_index = os.path.join(args.output_dir, "depth_cam_index.txt")
 
     cmd = [
         batch_tsdf_path,
-        haz_cam_index,
+        depth_cam_index,
         mesh,
         args.max_ray_length,
         args.voxel_size,
@@ -723,6 +727,10 @@ def texture_mesh(src_path, cam_type, mesh, args):
         if cam_type == "nav_cam":
             scale = 1.0
             undist_crop_win = "1100 776"
+        elif cam_type == "haz_cam":
+            scale = 1.0
+            undist_crop_win = "210 160"
+
         elif cam_type == "sci_cam":
             # Deal with the fact that the robot config file may assume
             # a different resolution than what is in the bag
@@ -889,6 +897,7 @@ if __name__ == "__main__":
         simplified_mesh = args.external_mesh
 
     nav_textured_mesh = ""
+    haz_textured_mesh = ""
     sci_textured_mesh = ""
     if start_step <= 9:
         # For simulated data texturing nav cam images is not supported
@@ -896,6 +905,12 @@ if __name__ == "__main__":
             args.camera_type == "all" or args.camera_type == "nav_cam"
         ):
             nav_textured_mesh = texture_mesh(src_path, "nav_cam", simplified_mesh, args)
+
+        # For simulated data texturing haz cam images is not supported
+        if (not args.simulated_data) and (
+            args.camera_type == "all" or args.camera_type == "haz_cam"
+        ):
+            haz_textured_mesh = texture_mesh(src_path, "haz_cam", simplified_mesh, args)
 
         if args.camera_type == "all" or args.camera_type == "sci_cam":
             sci_textured_mesh = texture_mesh(src_path, "sci_cam", simplified_mesh, args)
@@ -914,6 +929,9 @@ if __name__ == "__main__":
 
     if nav_textured_mesh != "":
         print("Nav cam textured mesh:              " + nav_textured_mesh)
+
+    if haz_textured_mesh != "":
+        print("Haz cam textured mesh:              " + haz_textured_mesh)
 
     if sci_textured_mesh != "":
         print("Sci cam textured mesh:              " + sci_textured_mesh)
