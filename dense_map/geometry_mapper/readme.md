@@ -287,14 +287,14 @@ robots using some established infrastructure. Alternatively, one can
 use `adb pull`. After this tool is used, the data can be manually
 deleted from HLP by first connecting to it with `adb shell`.)
 
-In order to perform calibration, the sci cam data in the bag needs to
+In order to run camera_calibrator, the sci cam data in the bag needs to
 be decompressed, resized to 1/4 of the resolution, and made to be
 grayscale. This is needed since the sci cam images are a little blurry
 and, at full resolution, the corners of the calibration target are
 hard to detect. The calibrator also does not handle the color format
 in the bag, hence the switch to grayscale images.
 
-However, the both the geometry and the streaming mapper, as well as
+However, both the geometry and the streaming mapper, as well as
 camera_refiner, can handle both color and grayscale images, and both
 at reduced resolution and full-resolution. These tools can adjust for
 the fact that the calibration was done at reduced resolution.

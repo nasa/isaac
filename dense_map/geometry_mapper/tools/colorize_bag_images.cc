@@ -17,12 +17,12 @@
  * under the License.
  */
 
-// A test tool to make the bag images in color, for testing purposes.
-// The chosen colors are rather arbitrary. If the images are already
-// in color, their colors will be altered as one can't tell if the
-// image read in is color or grayscale, since it will have 3 channels
-// either way. Compressed images will be decompressed and won't
-// be compressed back.
+// A tool to make the bag images in color, for testing purposes.  The
+// chosen colors are rather arbitrary. If the images are already in
+// color, their colors will be altered as one can't tell if the image
+// read in is color or grayscale, since it will have 3 channels either
+// way. Compressed images will be decompressed and won't be compressed
+// back.
 
 #include <ff_common/init.h>
 #include <ff_common/utils.h>
@@ -136,14 +136,6 @@ int main(int argc, char** argv) {
     cv_bridge::CvImage cv_image;
     cv_image.image = image;
     cv_image.encoding = "bgr8";
-
-//     std::ostringstream oss;
-//     oss << "image_" << tmp_count << ".jpg";
-//     std::string name = oss.str();
-//     cv::imwrite(name, image);
-//     tmp_count++;
-//     std::cout << "--Writing: " << name << std::endl;
-
     sensor_msgs::Image out_image_msg;
     cv_image.toImageMsg(out_image_msg);
 

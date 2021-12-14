@@ -120,7 +120,7 @@ void readBagImageTimestamps(std::string const& bag_file, std::string const& topi
 
 // Given a bag view, for each topic in the view read the vector of
 // messages for that topic, sorted by message header timestamp. Only
-// the following sensor types are supported: //sensor_msgs::Image,
+// the following sensor types are supported: sensor_msgs::Image,
 // sensor_msgs::CompressedImage, and sensor_msgs::PointCloud2.
 void indexMessages(rosbag::View& view,  // view can't be made const
                    std::map<std::string, std::vector<rosbag::MessageInstance>>& bag_map) {
@@ -156,7 +156,7 @@ void indexMessages(rosbag::View& view,  // view can't be made const
   }
 
   // Add the data in sorted order
-  for (auto topic_it = local_map.begin(); topic_it != local_map.end() ; topic_it++) {
+  for (auto topic_it = local_map.begin(); topic_it != local_map.end(); topic_it++) {
     auto& topic_name = topic_it->first;  // alias
     auto& topic_map = topic_it->second;  // alias
 

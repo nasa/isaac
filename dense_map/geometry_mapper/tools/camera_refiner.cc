@@ -20,7 +20,6 @@
 // TODO(oalexan1): Consider adding a haz cam to haz cam
 // reprojection error in the camera refiner. There will be more
 // haz to haz matches than haz to nav or haz to sci.
-
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
 #include <ceres/problem.h>
@@ -168,38 +167,8 @@ DEFINE_bool(verbose, false,
 
 namespace dense_map {
 
-  // TODO(oalexan1): Store separately matches which end up being
-  // squashed in a pid_cid_to_fid.
-
-  // A class to encompass all known information about a camera
-  // This is work in progress and will replace some of the logic further down.
-  struct cameraImage {
-    // An index to look up the type of camera. This will equal
-    // the value ref_camera_type if and only if this is a reference camera.
-    int camera_type;
-
-    // The timestamp for this camera (in floating point seconds since epoch)
-    double timestamp;
-
-    // Indices to look up the left and right reference cameras bracketing this camera
-    // in time. The two indices will have same value if and only if this is a reference
-    // camera.
-    int left_ref_cam_index;
-    int right_ref_ca_index;
-
-    // Indices to the reference camera timestamps bracketing this timestamp in time.
-    // The two indices will have the same value if and only if this is a reference
-    // camera.
-    int left_ref_timestamp_index;
-    int right_ref_timestamp_index;
-
-    // Index used to look up the reference camera to given camera rigid transform.
-    // That transform is the identity if and only if this is a reference camera.
-    int ref_cam_to_cam_index;
-
-    // The image for this camera, in grayscale
-    cv::Mat image;
-  };
+// TODO(oalexan1): Store separately matches which end up being
+// squashed in a pid_cid_to_fid.
 
 ceres::LossFunction* GetLossFunction(std::string cost_fun, double th) {
   // Convert to lower-case
@@ -228,7 +197,7 @@ struct DepthToHazError {
                   camera::CameraParameters const& haz_cam_params)
       : m_haz_pix(haz_pix), m_depth_xyz(depth_xyz), m_block_sizes(block_sizes), m_haz_cam_params(haz_cam_params) {
     // Sanity check.
-    if (m_block_sizes.size() != 2 || m_block_sizes[0] != NUM_RIGID_PARAMS || m_block_sizes[1] != NUM_SCALE_PARAMS) {
+    if (m_block_sizes.size() != 2 || m_block_sizes[0] != NUM_RIGID_PARAMS || m_block_sizes[1] != NUM_SCALAR_PARAMS) {
       LOG(FATAL) << "DepthToHazError: The block sizes were not set up properly.\n";
     }
   }
@@ -369,7 +338,7 @@ struct DepthToNavError {
     // Sanity check.
     if (m_block_sizes.size() != 5 || m_block_sizes[0] != NUM_RIGID_PARAMS || m_block_sizes[1] != NUM_RIGID_PARAMS ||
         m_block_sizes[2] != NUM_RIGID_PARAMS || m_block_sizes[3] != NUM_RIGID_PARAMS ||
-        m_block_sizes[4] != NUM_SCALE_PARAMS) {
+        m_block_sizes[4] != NUM_SCALAR_PARAMS) {
       LOG(FATAL) << "DepthToNavError: The block sizes were not set up properly.\n";
     }
   }
@@ -473,7 +442,7 @@ struct DepthToSciError {
     // Sanity check.
     if (m_block_sizes.size() != 9 || m_block_sizes[0] != NUM_RIGID_PARAMS || m_block_sizes[1] != NUM_RIGID_PARAMS ||
         m_block_sizes[2] != NUM_RIGID_PARAMS || m_block_sizes[3] != NUM_RIGID_PARAMS ||
-        m_block_sizes[4] != NUM_RIGID_PARAMS || m_block_sizes[5] != NUM_SCALE_PARAMS ||
+        m_block_sizes[4] != NUM_RIGID_PARAMS || m_block_sizes[5] != NUM_SCALAR_PARAMS ||
         m_block_sizes[6] != m_num_focal_lengths || m_block_sizes[7] != NUM_OPT_CTR_PARAMS ||
         m_block_sizes[8] != m_sci_cam_params.GetDistortion().size()) {
       LOG(FATAL) << "DepthToSciError: The block sizes were not set up properly.\n";
@@ -916,7 +885,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
       residual_names.push_back("haznavhaz1");
       residual_names.push_back("haznavhaz2");
 
-      // Ensure that the the depth points projects well in the nav cam interest point
+      // Ensure that the depth points projects well in the nav cam interest point
       ceres::CostFunction* depth_to_nav_cost_function
         = dense_map::DepthToNavError::Create(undist_nav_ip, depth_xyz, alpha, match_left,
                                              depth_to_nav_block_sizes, nav_cam_params);
@@ -1078,7 +1047,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
       residual_names.push_back("hazscihaz1");
       residual_names.push_back("hazscihaz2");
 
-      // Ensure that the the depth points projects well in the sci cam interest point.
+      // Ensure that the depth points projects well in the sci cam interest point.
       // Note how we pass a distorted sci cam pix, as in that error function we will
       // take the difference of distorted pixels.
       ceres::CostFunction* depth_to_sci_cost_function
@@ -1106,38 +1075,39 @@ void calc_median_residuals(std::vector<double> const& residuals,
   }
 
   // Prevent the linter from messing up with the beautiful formatting below
-  void add_nav_sci_cost(// Inputs                                                            // NOLINT
-                        int nav_it, int sci_it, int nav_cam_start,                           // NOLINT
-                        double navcam_to_hazcam_timestamp_offset,                            // NOLINT
-                        double scicam_to_hazcam_timestamp_offset,                            // NOLINT
-                        MATCH_PAIR                   const & match_pair,                     // NOLINT
-                        std::vector<double>          const & sparse_map_timestamps,          // NOLINT
-                        std::vector<double>          const & sci_cam_timestamps,             // NOLINT
-                        std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
-                        std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
-                        Eigen::Affine3d              const & hazcam_to_navcam_aff_trans,     // NOLINT
-                        Eigen::Affine3d              const & scicam_to_hazcam_aff_trans,     // NOLINT
-                        camera::CameraParameters     const & nav_cam_params,                 // NOLINT
-                        camera::CameraParameters     const & sci_cam_params,                 // NOLINT
-                        std::vector<int>             const & nav_block_sizes,                // NOLINT
-                        std::vector<int>             const & sci_block_sizes,                // NOLINT
-                        std::vector<int>             const & mesh_block_sizes,               // NOLINT
-                        std::vector<Eigen::Affine3d> const & nav_cam_affines,                // NOLINT
-                        std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
-                        mve::TriangleMesh::Ptr       const & mesh,                           // NOLINT
-                        std::shared_ptr<BVHTree>     const & bvh_tree,                       // NOLINT
-                        // Outputs                                                           // NOLINT
-                        int                                & nav_sci_xyz_count,              // NOLINT
-                        std::vector<std::string>           & residual_names,                 // NOLINT
-                        std::vector<double>                & nav_cam_vec,                    // NOLINT
-                        std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
-                        std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
-                        Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
-                        Eigen::Vector2d                    & sci_cam_optical_center,         // NOLINT
-                        Eigen::VectorXd                    & sci_cam_distortion,             // NOLINT
-                        std::vector<Eigen::Vector3d>       & initial_nav_sci_xyz,            // NOLINT
-                        std::vector<double>                & nav_sci_xyz,                    // NOLINT
-                        ceres::Problem                     & problem) {                      // NOLINT
+  void add_nav_sci_cost
+  (// Inputs                                                            // NOLINT
+   int nav_it, int sci_it, int nav_cam_start,                           // NOLINT
+   double navcam_to_hazcam_timestamp_offset,                            // NOLINT
+   double scicam_to_hazcam_timestamp_offset,                            // NOLINT
+   MATCH_PAIR                   const & match_pair,                     // NOLINT
+   std::vector<double>          const & sparse_map_timestamps,          // NOLINT
+   std::vector<double>          const & sci_cam_timestamps,             // NOLINT
+   std::map<int, int>           const & sci_cam_to_left_nav_cam_index,  // NOLINT
+   std::map<int, int>           const & sci_cam_to_right_nav_cam_index, // NOLINT
+   Eigen::Affine3d              const & hazcam_to_navcam_aff_trans,     // NOLINT
+   Eigen::Affine3d              const & scicam_to_hazcam_aff_trans,     // NOLINT
+   camera::CameraParameters     const & nav_cam_params,                 // NOLINT
+   camera::CameraParameters     const & sci_cam_params,                 // NOLINT
+   std::vector<int>             const & nav_block_sizes,                // NOLINT
+   std::vector<int>             const & sci_block_sizes,                // NOLINT
+   std::vector<int>             const & mesh_block_sizes,               // NOLINT
+   std::vector<Eigen::Affine3d> const & nav_cam_affines,                // NOLINT
+   std::vector<cv::Mat>         const & depth_clouds,                   // NOLINT
+   mve::TriangleMesh::Ptr       const & mesh,                           // NOLINT
+   std::shared_ptr<BVHTree>     const & bvh_tree,                       // NOLINT
+   // Outputs                                                           // NOLINT
+   int                                & nav_sci_xyz_count,              // NOLINT
+   std::vector<std::string>           & residual_names,                 // NOLINT
+   std::vector<double>                & nav_cam_vec,                    // NOLINT
+   std::vector<double>                & hazcam_to_navcam_vec,           // NOLINT
+   std::vector<double>                & scicam_to_hazcam_vec,           // NOLINT
+   Eigen::Vector2d                    & sci_cam_focal_vector,           // NOLINT
+   Eigen::Vector2d                    & sci_cam_optical_center,         // NOLINT
+   Eigen::VectorXd                    & sci_cam_distortion,             // NOLINT
+   std::vector<Eigen::Vector3d>       & initial_nav_sci_xyz,            // NOLINT
+   std::vector<double>                & nav_sci_xyz,                    // NOLINT
+   ceres::Problem                     & problem) {                      // NOLINT
     auto left_it  = sci_cam_to_left_nav_cam_index.find(sci_it);
     auto right_it = sci_cam_to_right_nav_cam_index.find(sci_it);
     if (left_it == sci_cam_to_left_nav_cam_index.end() ||
@@ -1521,7 +1491,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
 
     // Set up the variable blocks to optimize for DepthToHazError
     depth_to_haz_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_haz_block_sizes.push_back(dense_map::NUM_SCALE_PARAMS);
+    depth_to_haz_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
 
     // Set up the variable blocks to optimize for NavError
     nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
@@ -1532,7 +1502,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
     depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
     depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
     depth_to_nav_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_nav_block_sizes.push_back(dense_map::NUM_SCALE_PARAMS);
+    depth_to_nav_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
 
     // Set up the variable blocks to optimize for DepthToSciError
     depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
@@ -1540,7 +1510,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
     depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
     depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
     depth_to_sci_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-    depth_to_sci_block_sizes.push_back(dense_map::NUM_SCALE_PARAMS);
+    depth_to_sci_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
     depth_to_sci_block_sizes.push_back(num_scicam_focal_lengths);       // focal length
     depth_to_sci_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);  // optical center
     depth_to_sci_block_sizes.push_back(num_scicam_distortions);         // distortion
@@ -1788,11 +1758,11 @@ int main(int argc, char** argv) {
 #if 0
   std::cout << "hazcam_to_navcam_trans\n" << hazcam_to_navcam_trans << std::endl;
   std::cout << "scicam_to_hazcam_trans\n" << scicam_to_hazcam_trans << std::endl;
-  std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
-  std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
   std::cout << "hazcam_depth_to_image_transform\n"   << hazcam_depth_to_image_transform.matrix()
             << "\n";
 #endif
+  std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
+  std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
 
   // Convert hazcam_to_navcam_trans to Affine3d
   Eigen::Affine3d hazcam_to_navcam_aff_trans;
@@ -2217,7 +2187,8 @@ int main(int argc, char** argv) {
   ceres::Solve(options, &problem, &summary);
 
   // Copy back the optimized intrinsics
-  sci_cam_params.SetFocalLength(Eigen::Vector2d(sci_cam_focal_vector[0], sci_cam_focal_vector[0]));
+  sci_cam_params.SetFocalLength(Eigen::Vector2d(sci_cam_focal_vector[0],
+                                                sci_cam_focal_vector[0]));
   sci_cam_params.SetOpticalOffset(sci_cam_optical_center);
   sci_cam_params.SetDistortion(sci_cam_distortion);
 
