@@ -353,9 +353,7 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, args):
         sys.exit(1)
 
     if args.camera_type == "haz_cam" and args.simulated_data:
-        print(
-            "Texturing haz cam with simulated data was not tested."
-        )
+        print("Texturing haz cam with simulated data was not tested.")
         sys.exit(1)
 
     if args.output_dir == "":
@@ -732,7 +730,7 @@ def texture_mesh(src_path, cam_type, mesh, args):
         elif cam_type == "haz_cam":
             scale = 1.0
             undist_crop_win = "210 160"
-            
+
         elif cam_type == "sci_cam":
             # Deal with the fact that the robot config file may assume
             # a different resolution than what is in the bag
