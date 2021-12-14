@@ -1,5 +1,5 @@
 <map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
-<area shape="rect" id="node1" href="$classhapply_1_1Property.html" title="A generic property, which is associated with some element. Can be plain Property or a ListProperty,..." alt="" coords="5,31,133,57"/>
-<area shape="rect" id="node2" href="$classhapply_1_1TypedListProperty.html" title="A property which is a list of value (eg, 3 doubles). Note that lists are always variable length per&#45;e..." alt="" coords="181,5,408,32"/>
-<area shape="rect" id="node3" href="$classhapply_1_1TypedProperty.html" title="A property which takes a single value (not a list)." alt="" coords="193,56,397,83"/>
+<area shape="rect" id="node1" title=" " alt="" coords="5,46,165,73"/>
+<area shape="rect" id="node2" href="$classgazebo_1_1GazeboModelPluginAirQuality.html" title=" " alt="" coords="213,5,419,47"/>
+<area shape="rect" id="node3" href="$classgazebo_1_1GazeboModelPluginCargo.html" title=" " alt="" coords="213,71,419,112"/>
 </map>

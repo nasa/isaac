@@ -142,49 +142,56 @@ $(document).ready(function(){initNavTree('dense__map__ros__utils_8h_source.html'
 <div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160; </div>
 <div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;<span class="keywordtype">void</span> readBagImageTimestamps(std::string <span class="keyword">const</span>&amp; bag_file, std::string <span class="keyword">const</span>&amp; topic, std::vector&lt;double&gt;&amp; timestamps);</div>
 <div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160; </div>
-<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;<span class="keywordtype">void</span> readExifFromBag(std::vector&lt;rosbag::MessageInstance&gt; <span class="keyword">const</span>&amp; bag_msgs, std::map&lt;<span class="keywordtype">double</span>, std::vector&lt;double&gt;&gt;&amp; exif);</div>
-<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160; </div>
-<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;<span class="comment">// Find an image at the given timestamp or right after it. We assume</span></div>
-<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;<span class="comment">// that during repeated calls to this function we always travel</span></div>
-<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;<span class="comment">// forward in time, and we keep track of where we are in the bag using</span></div>
-<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;<span class="comment">// the variable bag_pos that we update as we go.</span></div>
-<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;<span class="keywordtype">bool</span> lookupImage(<span class="keywordtype">double</span> desired_time, std::vector&lt;rosbag::MessageInstance&gt; <span class="keyword">const</span>&amp; bag_msgs, <span class="keywordtype">bool</span> save_grayscale,</div>
-<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;                 cv::Mat&amp; image, <span class="keywordtype">int</span>&amp; bag_pos, <span class="keywordtype">double</span>&amp; found_time);</div>
+<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;<span class="comment">// Given a bag view, for each topic in the view read the vector of</span></div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;<span class="comment">// messages for that topic, sorted by message header timestamp. Only</span></div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;<span class="comment">// the following sensor types are supported: sensor_msgs::Image,</span></div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;<span class="comment">// sensor_msgs::CompressedImage, and sensor_msgs::PointCloud2.</span></div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;<span class="keywordtype">void</span> indexMessages(rosbag::View&amp; view,  <span class="comment">// view can&#39;t be made const</span></div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;                   std::map&lt;std::string, std::vector&lt;rosbag::MessageInstance&gt;&gt;&amp; bag_map);</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160; </div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;<span class="keywordtype">void</span> readExifFromBag(std::vector&lt;rosbag::MessageInstance&gt; <span class="keyword">const</span>&amp; bag_msgs, std::map&lt;<span class="keywordtype">double</span>, std::vector&lt;double&gt;&gt;&amp; exif);</div>
 <div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160; </div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;<span class="comment">// Find the closest depth cloud to given timestamp. Return an empty</span></div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;<span class="comment">// cloud if one cannot be found closer in time than max_time_diff.</span></div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;<span class="comment">// Store it as a cv::Mat of vec3f values. We assume that during</span></div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;<span class="comment">// repeated calls to this function we always travel forward in time,</span></div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;<span class="comment">// and we keep track of where we are in the bag using the variable</span></div>
-<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;<span class="comment">// bag_pos that we update as we go.</span></div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;<span class="keywordtype">bool</span> lookupCloud(<span class="keywordtype">double</span> desired_time, std::vector&lt;rosbag::MessageInstance&gt; <span class="keyword">const</span>&amp; bag_msgs, <span class="keywordtype">double</span> max_time_diff,</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;                 cv::Mat&amp; cloud, <span class="keywordtype">int</span>&amp; bag_pos, <span class="keywordtype">double</span>&amp; found_time);</div>
-<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160; </div>
-<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;<span class="comment">// Read the list of topics in a bag while avoiding repetitions</span></div>
-<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;<span class="keywordtype">void</span> readTopicsInBag(std::string <span class="keyword">const</span>&amp; bag_file, std::vector&lt;std::string&gt;&amp; topics);</div>
-<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160; </div>
-<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;<span class="comment">// A small struct in which to store an opened ROS bag and the vector of its messages</span></div>
-<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;<span class="comment">// that we will use later to quickly navigate through it while going forward in time.</span></div>
-<div class="line"><a name="l00076"></a><span class="lineno"><a class="line" href="structdense__map_1_1RosBagHandle.html">   76</a></span>&#160;<span class="keyword">struct </span><a class="code" href="structdense__map_1_1RosBagHandle.html">RosBagHandle</a> {</div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;  <a class="code" href="structdense__map_1_1RosBagHandle.html">RosBagHandle</a>(std::string <span class="keyword">const</span>&amp; bag_file, std::string <span class="keyword">const</span>&amp; topic) {</div>
-<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;    bag.open(bag_file, rosbag::bagmode::Read);</div>
-<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;    std::vector&lt;std::string&gt; topics;</div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;    topics.push_back(topic);</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;    view = boost::shared_ptr&lt;rosbag::View&gt;(<span class="keyword">new</span> rosbag::View(bag, rosbag::TopicQuery(topics)));</div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;    bag_msgs.clear();</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    <span class="keywordflow">for</span> (rosbag::MessageInstance <span class="keyword">const</span> m : *view) bag_msgs.push_back(m);</div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;  }</div>
-<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;  rosbag::Bag bag;</div>
-<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;  boost::shared_ptr&lt;rosbag::View&gt; view;</div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;  std::vector&lt;rosbag::MessageInstance&gt; bag_msgs;</div>
-<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;};</div>
-<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160; </div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;}  <span class="comment">// end namespace dense_map</span></div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160; </div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;<span class="preprocessor">#endif  // DENSE_MAP_ROS_UTILS_H_</span></div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;<span class="comment">// Find an image at the given timestamp or right after it. We assume</span></div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;<span class="comment">// that during repeated calls to this function we always travel</span></div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;<span class="comment">// forward in time, and we keep track of where we are in the bag using</span></div>
+<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;<span class="comment">// the variable bag_pos that we update as we go.</span></div>
+<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;<span class="keywordtype">bool</span> lookupImage(<span class="keywordtype">double</span> desired_time, std::vector&lt;rosbag::MessageInstance&gt; <span class="keyword">const</span>&amp; bag_msgs, <span class="keywordtype">bool</span> save_grayscale,</div>
+<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;                 cv::Mat&amp; image, <span class="keywordtype">int</span>&amp; bag_pos, <span class="keywordtype">double</span>&amp; found_time);</div>
+<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160; </div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;<span class="comment">// Find the closest depth cloud to given timestamp. Return an empty</span></div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;<span class="comment">// cloud if one cannot be found closer in time than max_time_diff.</span></div>
+<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;<span class="comment">// Store it as a cv::Mat of vec3f values. We assume that during</span></div>
+<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;<span class="comment">// repeated calls to this function we always travel forward in time,</span></div>
+<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;<span class="comment">// and we keep track of where we are in the bag using the variable</span></div>
+<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;<span class="comment">// bag_pos that we update as we go.</span></div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;<span class="keywordtype">bool</span> lookupCloud(<span class="keywordtype">double</span> desired_time, std::vector&lt;rosbag::MessageInstance&gt; <span class="keyword">const</span>&amp; bag_msgs, <span class="keywordtype">double</span> max_time_diff,</div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;                 cv::Mat&amp; cloud, <span class="keywordtype">int</span>&amp; bag_pos, <span class="keywordtype">double</span>&amp; found_time);</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160; </div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;<span class="comment">// Read the list of topics in a bag while avoiding repetitions</span></div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;<span class="keywordtype">void</span> readTopicsInBag(std::string <span class="keyword">const</span>&amp; bag_file, std::vector&lt;std::string&gt;&amp; topics);</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160; </div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;<span class="comment">// A small struct in which to store an opened ROS bag and the vector of its messages</span></div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;<span class="comment">// that we will use later to quickly navigate through it while going forward in time.</span></div>
+<div class="line"><a name="l00083"></a><span class="lineno"><a class="line" href="structdense__map_1_1RosBagHandle.html">   83</a></span>&#160;<span class="keyword">struct </span><a class="code" href="structdense__map_1_1RosBagHandle.html">RosBagHandle</a> {</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;  <a class="code" href="structdense__map_1_1RosBagHandle.html">RosBagHandle</a>(std::string <span class="keyword">const</span>&amp; bag_file, std::string <span class="keyword">const</span>&amp; topic) {</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;    bag.open(bag_file, rosbag::bagmode::Read);</div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;    std::vector&lt;std::string&gt; topics;</div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;    topics.push_back(topic);</div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;    view = boost::shared_ptr&lt;rosbag::View&gt;(<span class="keyword">new</span> rosbag::View(bag, rosbag::TopicQuery(topics)));</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;    bag_msgs.clear();</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;    <span class="keywordflow">for</span> (rosbag::MessageInstance <span class="keyword">const</span> m : *view) bag_msgs.push_back(m);</div>
+<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;  }</div>
+<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;  rosbag::Bag bag;</div>
+<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;  boost::shared_ptr&lt;rosbag::View&gt; view;</div>
+<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;  std::vector&lt;rosbag::MessageInstance&gt; bag_msgs;</div>
+<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;};</div>
+<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160; </div>
+<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;}  <span class="comment">// end namespace dense_map</span></div>
+<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160; </div>
+<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;<span class="preprocessor">#endif  // DENSE_MAP_ROS_UTILS_H_</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
-<div class="ttc" id="astructdense__map_1_1RosBagHandle_html"><div class="ttname"><a href="structdense__map_1_1RosBagHandle.html">dense_map::RosBagHandle</a></div><div class="ttdef"><b>Definition:</b> dense_map_ros_utils.h:76</div></div>
+<div class="ttc" id="astructdense__map_1_1RosBagHandle_html"><div class="ttname"><a href="structdense__map_1_1RosBagHandle.html">dense_map::RosBagHandle</a></div><div class="ttdef"><b>Definition:</b> dense_map_ros_utils.h:83</div></div>
 <!-- HTML footer for doxygen 1.9.0-->
 <!-- start footer part -->
 </body>

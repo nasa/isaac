@@ -133,7 +133,7 @@ $(document).ready(function(){initNavTree('dense__map__utils_8h_source.html','');
 <div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160; </div>
 <div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;<span class="keyword">namespace </span>dense_map {</div>
 <div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160; </div>
-<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;<span class="keyword">const</span> <span class="keywordtype">int</span> NUM_SCALE_PARAMS = 1;</div>
+<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;<span class="keyword">const</span> <span class="keywordtype">int</span> NUM_SCALAR_PARAMS = 1;</div>
 <div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;<span class="keyword">const</span> <span class="keywordtype">int</span> NUM_OPT_CTR_PARAMS = 2;  <span class="comment">// optical center in x and y</span></div>
 <div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;<span class="keyword">const</span> <span class="keywordtype">int</span> NUM_RESIDUALS = 2;       <span class="comment">// Same as pixel size</span></div>
 <div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;<span class="keyword">const</span> <span class="keywordtype">int</span> NUM_XYZ_PARAMS = 3;</div>
@@ -282,20 +282,26 @@ $(document).ready(function(){initNavTree('dense__map__utils_8h_source.html','');
 <div class="line"><a name="l00190"></a><span class="lineno">  190</span>&#160;<span class="comment">// Must always have NUM_EXIF the last.</span></div>
 <div class="line"><a name="l00191"></a><span class="lineno">  191</span>&#160;<span class="keyword">enum</span> ExifData { TIMESTAMP = 0, EXPOSURE_TIME, ISO, APERTURE, FOCAL_LENGTH, NUM_EXIF };</div>
 <div class="line"><a name="l00192"></a><span class="lineno">  192</span>&#160; </div>
-<div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;<span class="comment">// Triangulate rays emanating from given undistorted and centered pixels</span></div>
+<div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;<span class="comment">// Triangulate two rays emanating from given undistorted and centered pixels</span></div>
 <div class="line"><a name="l00194"></a><span class="lineno">  194</span>&#160;Eigen::Vector3d TriangulatePair(<span class="keywordtype">double</span> focal_length1, <span class="keywordtype">double</span> focal_length2, Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam1,</div>
 <div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160;                                Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam2, Eigen::Vector2d <span class="keyword">const</span>&amp; pix1,</div>
 <div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;                                Eigen::Vector2d <span class="keyword">const</span>&amp; pix2);</div>
 <div class="line"><a name="l00197"></a><span class="lineno">  197</span>&#160; </div>
-<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;<span class="comment">// A debug utility for saving a camera in a format ASP understands.</span></div>
-<div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;<span class="comment">// TODO(oalexan1): Expose the sci cam intrinsics rather than having</span></div>
-<div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160;<span class="comment">// them hard-coded.</span></div>
-<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;<span class="keywordtype">void</span> save_tsai_camera(Eigen::MatrixXd <span class="keyword">const</span>&amp; desired_cam_to_world_trans, std::string <span class="keyword">const</span>&amp; output_dir,</div>
-<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;                      <span class="keywordtype">double</span> curr_time, std::string <span class="keyword">const</span>&amp; suffix);</div>
-<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160; </div>
-<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;}  <span class="comment">// namespace dense_map</span></div>
-<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160; </div>
-<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;<span class="preprocessor">#endif  // DENSE_MAP_UTILS_H_</span></div>
+<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;<span class="comment">// Triangulate n rays emanating from given undistorted and centered pixels</span></div>
+<div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;Eigen::Vector3d Triangulate(std::vector&lt;double&gt; <span class="keyword">const</span>&amp; focal_length_vec,</div>
+<div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160;                            std::vector&lt;Eigen::Affine3d&gt; <span class="keyword">const</span>&amp; world_to_cam_vec,</div>
+<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;                            std::vector&lt;Eigen::Vector2d&gt; <span class="keyword">const</span>&amp; pix_vec);</div>
+<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160; </div>
+<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160;<span class="comment">// A utility for saving a camera in a format ASP understands.</span></div>
+<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;<span class="comment">// TODO(oalexan1): Expose the sci cam intrinsics rather than having</span></div>
+<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160;<span class="comment">// them hard-coded.</span></div>
+<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;<span class="keywordtype">void</span> save_tsai_camera(Eigen::MatrixXd <span class="keyword">const</span>&amp; desired_cam_to_world_trans,</div>
+<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;                      std::string <span class="keyword">const</span>&amp; output_dir,</div>
+<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;                      <span class="keywordtype">double</span> curr_time, std::string <span class="keyword">const</span>&amp; suffix);</div>
+<div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160; </div>
+<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;}  <span class="comment">// namespace dense_map</span></div>
+<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160; </div>
+<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;<span class="preprocessor">#endif  // DENSE_MAP_UTILS_H_</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <div class="ttc" id="astructdense__map_1_1CameraPoses_html"><div class="ttname"><a href="structdense__map_1_1CameraPoses.html">dense_map::CameraPoses</a></div><div class="ttdef"><b>Definition:</b> dense_map_utils.h:151</div></div>

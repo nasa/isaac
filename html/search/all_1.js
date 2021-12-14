@@ -1,5 +1,7 @@
 var searchData=
 [
   ['behaviors_11',['Behaviors',['../beh.html',1,'astrobee']]],
-  ['bss_5finfo_12',['bss_info',['../structwifi_1_1bss__info.html',1,'wifi']]]
+  ['bracketedcamerror_12',['BracketedCamError',['../structdense__map_1_1BracketedCamError.html',1,'dense_map']]],
+  ['bracketeddeptherror_13',['BracketedDepthError',['../structdense__map_1_1BracketedDepthError.html',1,'dense_map']]],
+  ['bss_5finfo_14',['bss_info',['../structwifi_1_1bss__info.html',1,'wifi']]]
 ];
