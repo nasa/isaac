@@ -90,7 +90,8 @@
 #include <iostream>
 #include <fstream>
 
-DEFINE_string(ros_bag, "", "A ROS bag with recorded nav_cam, haz_cam, and full-resolution sci_cam data.");
+DEFINE_string(ros_bag, "", "A ROS bag with recorded nav_cam, haz_cam, and "
+              "full-resolution sci_cam data.");
 
 DEFINE_string(sparse_map, "",
               "A registered SURF sparse map made with some of the ROS bag data, "
@@ -100,7 +101,8 @@ DEFINE_string(output_map, "", "Output file containing the updated map.");
 
 DEFINE_string(nav_cam_topic, "/hw/cam_nav", "The nav cam topic in the bag file.");
 
-DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points", "The depth point cloud topic in the bag file.");
+DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points",
+              "The depth point cloud topic in the bag file.");
 
 DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
               "The depth camera intensity topic in the bag file.");
@@ -120,7 +122,8 @@ DEFINE_double(robust_threshold, 3.0,
 
 DEFINE_int32(num_iterations, 20, "How many solver iterations to perform in calibration.");
 
-DEFINE_double(parameter_tolerance, 1e-12, "Stop when the optimization variables change by less than this.");
+DEFINE_double(parameter_tolerance, 1e-12, "Stop when the optimization variables change by "
+              "less than this.");
 
 DEFINE_double(bracket_len, 2.0,
               "Lookup sci and haz cam images only between consecutive nav cam images "
@@ -167,8 +170,9 @@ DEFINE_double(scicam_to_hazcam_timestamp_offset_override_value,
               "Override the value of scicam_to_hazcam_timestamp_offset from the robot config "
               "file with this value.");
 
-DEFINE_double(depth_weight, 1000.0,
-              "The weight to give to depth measurements.");
+DEFINE_double(depth_weight, 10.0,
+              "The weight to give to depth measurements. Use a bigger number as "
+              "depth errors are usually small fractions of a meter.");
 
 DEFINE_string(mesh, "",
               "Refine the sci cam so that the sci cam texture agrees with the nav cam "
@@ -176,12 +180,7 @@ DEFINE_string(mesh, "",
 
 DEFINE_double(mesh_weight, 25.0,
               "A larger value will give more weight to the mesh constraint. "
-              "The mesh residuals printed at the end can be used to examine "
-              "the effect of this weight.");
-
-DEFINE_double(mesh_robust_threshold, 3.0,
-              "A larger value will try harder to minimize large divergences from "
-              "the mesh (but note that some of those may be outliers).");
+              "Use a bigger number as depth errors are usually small fractions of a meter.");
 
 DEFINE_bool(verbose, false,
             "Print the residuals and save the images and match files."
@@ -737,48 +736,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
   }
 }
 
-  // Intersect ray with mesh. Return true on success.
-  bool ray_mesh_intersect(Eigen::Vector2d const& undist_pix,
-                          camera::CameraParameters const& cam_params,
-                          Eigen::Affine3d const& world_to_cam,
-                          mve::TriangleMesh::Ptr const& mesh,
-                          std::shared_ptr<BVHTree> const& bvh_tree,
-                          double min_ray_dist, double max_ray_dist,
-                          // Output
-                          Eigen::Vector3d& intersection) {
-    // Initialize the output
-    intersection = Eigen::Vector3d(0.0, 0.0, 0.0);
-
-    // Ray from camera going through the pixel
-    Eigen::Vector3d cam_ray(undist_pix.x() / cam_params.GetFocalVector()[0],
-                            undist_pix.y() / cam_params.GetFocalVector()[1], 1.0);
-    cam_ray.normalize();
-
-    Eigen::Affine3d cam_to_world = world_to_cam.inverse();
-    Eigen::Vector3d world_ray = cam_to_world.linear() * cam_ray;
-    Eigen::Vector3d cam_ctr = cam_to_world.translation();
-
-    // Set up the ray structure for the mesh
-    BVHTree::Ray bvh_ray;
-    bvh_ray.origin = dense_map::eigen_to_vec3f(cam_ctr);
-    bvh_ray.dir = dense_map::eigen_to_vec3f(world_ray);
-    bvh_ray.dir.normalize();
-
-    bvh_ray.tmin = min_ray_dist;
-    bvh_ray.tmax = max_ray_dist;
-
-    // Intersect the ray with the mesh
-    BVHTree::Hit hit;
-    if (bvh_tree->intersect(bvh_ray, &hit)) {
-      double cam_to_mesh_dist = hit.t;
-      intersection = cam_ctr + cam_to_mesh_dist * world_ray;
-      return true;
-    }
-
-    return false;
-  }
-
-
+  // TODO(oalexan1): This needs to be handled better.
   void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image) {
     int raw_image_cols = image.cols;
     int raw_image_rows = image.rows;
@@ -936,6 +894,46 @@ void calc_median_residuals(std::vector<double> const& residuals,
     sparse_mapping::BundleAdjust(fix_cameras, sparse_map.get());
   }
 
+  // TODO(oalexan1): Move this to utils.
+  // Intersect ray with mesh. Return true on success.
+  bool ray_mesh_intersect(Eigen::Vector2d const& undist_pix, camera::CameraParameters const& cam_params,
+                          Eigen::Affine3d const& world_to_cam, mve::TriangleMesh::Ptr const& mesh,
+                          std::shared_ptr<BVHTree> const& bvh_tree,
+                          double min_ray_dist, double max_ray_dist,
+                          // Output
+                          Eigen::Vector3d& intersection) {
+    // Initialize the output
+    intersection = Eigen::Vector3d(0.0, 0.0, 0.0);
+
+    // Ray from camera going through the pixel
+    Eigen::Vector3d cam_ray(undist_pix.x() / cam_params.GetFocalVector()[0],
+                            undist_pix.y() / cam_params.GetFocalVector()[1], 1.0);
+    cam_ray.normalize();
+
+    Eigen::Affine3d cam_to_world = world_to_cam.inverse();
+    Eigen::Vector3d world_ray = cam_to_world.linear() * cam_ray;
+    Eigen::Vector3d cam_ctr = cam_to_world.translation();
+
+    // Set up the ray structure for the mesh
+    BVHTree::Ray bvh_ray;
+    bvh_ray.origin = dense_map::eigen_to_vec3f(cam_ctr);
+    bvh_ray.dir = dense_map::eigen_to_vec3f(world_ray);
+    bvh_ray.dir.normalize();
+
+    bvh_ray.tmin = min_ray_dist;
+    bvh_ray.tmax = max_ray_dist;
+
+    // Intersect the ray with the mesh
+    BVHTree::Hit hit;
+    if (bvh_tree->intersect(bvh_ray, &hit)) {
+      double cam_to_mesh_dist = hit.t;
+      intersection = cam_ctr + cam_to_mesh_dist * world_ray;
+      return true;
+    }
+
+    return false;
+  }
+
 }  // namespace dense_map
 
 int main(int argc, char** argv) {
@@ -996,8 +994,8 @@ int main(int argc, char** argv) {
     scicam_to_hazcam_timestamp_offset = new_val;
   }
 
-  if (FLAGS_mesh_weight <= 0.0 || FLAGS_mesh_robust_threshold <= 0.0)
-    LOG(FATAL) << "The mesh weight and robust threshold must be positive.\n";
+  if (FLAGS_mesh_weight <= 0.0)
+    LOG(FATAL) << "The mesh weight must be positive.\n";
 
   mve::TriangleMesh::Ptr mesh;
   std::shared_ptr<mve::MeshInfo> mesh_info;
@@ -1005,14 +1003,22 @@ int main(int argc, char** argv) {
   std::shared_ptr<BVHTree> bvh_tree;
   if (FLAGS_mesh != "") dense_map::loadMeshBuildTree(FLAGS_mesh, mesh, mesh_info, graph, bvh_tree);
 
+  // If desired to process only specific timestamps
+  std::set<double> sci_cam_timestamps_to_use;
+  if (FLAGS_sci_cam_timestamps != "") {
+    std::ifstream ifs(FLAGS_sci_cam_timestamps.c_str());
+    double val;
+    while (ifs >> val) sci_cam_timestamps_to_use.insert(val);
+  }
+
 #if 0
   std::cout << "hazcam_to_navcam_trans\n" << hazcam_to_navcam_trans << std::endl;
   std::cout << "scicam_to_hazcam_trans\n" << scicam_to_hazcam_trans << std::endl;
-  std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
-  std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
   std::cout << "hazcam_depth_to_image_transform\n"   << hazcam_depth_to_image_transform.matrix()
             << "\n";
 #endif
+  std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
+  std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
 
   double hazcam_depth_to_image_scale
     = pow(hazcam_depth_to_image_transform.matrix().determinant(), 1.0 / 3.0);
@@ -1048,7 +1054,7 @@ int main(int argc, char** argv) {
   if (ref_timestamps.empty()) LOG(FATAL) << "No sparse map timestamps found.";
 
   // Will optimize the nav cam poses as part of the process
-  std::vector<Eigen::Affine3d>& world_to_ref_t = sparse_map->cid_to_cam_t_global_;  // alias
+  std::vector<Eigen::Affine3d> & world_to_ref_t = sparse_map->cid_to_cam_t_global_;  // alias
 
   // Put transforms of the reference cameras in a vector. We will optimize them.
   int num_ref_cams = world_to_ref_t.size();
@@ -1085,6 +1091,10 @@ int main(int argc, char** argv) {
                                            "/hw/depth_haz/extended/amplitude_int",
                                            "/hw/cam_sci/compressed"};
   std::vector<std::string> depth_topics = {"", "/hw/depth_haz/points", ""};
+
+  std::vector<std::set<double>> cam_timestamps_to_use = {std::set<double>(),
+                                                         std::set<double>(),
+                                                         sci_cam_timestamps_to_use};
 
   // The timestamp offsets from ref cam to given cam
   std::vector<double> ref_to_cam_timestamp_offsets =
@@ -1217,6 +1227,12 @@ int main(int argc, char** argv) {
           LOG(FATAL) << std::fixed << std::setprecision(17)
                      << "Cannot look up camera at time " << cam.timestamp << ".\n";
 
+        // See if to skip this timestamp
+        if (!cam_timestamps_to_use[cam_type].empty() &&
+            cam_timestamps_to_use[cam_type].find(cam.timestamp) ==
+            cam_timestamps_to_use[cam_type].end())
+          continue;
+
         success = true;
 
       } else {
@@ -1289,6 +1305,7 @@ int main(int argc, char** argv) {
         upper_bound[cam_type] = std::min(upper_bound[cam_type], best_time - left_timestamp);
         lower_bound[cam_type] = std::max(lower_bound[cam_type], best_time - right_timestamp);
 
+        // TODO(oalexan1): Wipe this temporary block
         if (cam_type == 1) {
           // Must compare raw big timestamps before and after!
           // Must compare residuals!
@@ -1306,6 +1323,12 @@ int main(int argc, char** argv) {
           // std::cout << "--xxxsci after " << sci_time - nav_start << ' ' << nav_end - sci_time <<
           // ' ' << nav_end - nav_start << std::endl;
         }
+
+        // See if to skip this timestamp
+        if (!cam_timestamps_to_use[cam_type].empty() &&
+            cam_timestamps_to_use[cam_type].find(cam.timestamp) ==
+            cam_timestamps_to_use[cam_type].end())
+          continue;
 
         success = true;
       }
@@ -1505,33 +1528,74 @@ int main(int argc, char** argv) {
     match_map[index_pair] = mvg_matches;
   }
 
-  // Build tracks
-  openMVG::tracks::TracksBuilder trackBuilder;
-  trackBuilder.Build(match_map);  // Build:  Efficient fusion of correspondences
-  trackBuilder.Filter();          // Filter: Remove tracks that have conflict
-  // trackBuilder.ExportToStream(std::cout);
-  openMVG::tracks::STLMAPTracks map_tracks;
-  // Export tracks as a map (each entry is a sequence of imageId and featureIndex):
-  //  {TrackIndex => {(imageIndex, featureIndex), ... ,(imageIndex, featureIndex)}
-  trackBuilder.ExportToSTL(map_tracks);
+  if (FLAGS_verbose) {
+    for (auto it = matches.begin(); it != matches.end(); it++) {
+      std::pair<int, int> index_pair = it->first;
+      dense_map::MATCH_PAIR const& match_pair = it->second;
 
-  // TODO(oalexan1): Print how many pairwise matches were there before
-  // and after filtering tracks.
+      int left_index = index_pair.first;
+      int right_index = index_pair.second;
 
-  if (map_tracks.empty())
-    LOG(FATAL) << "No tracks left after filtering. Perhaps images are too dis-similar?\n";
+      std::cout << "--indices " << left_index << ' ' << right_index << std::endl;
 
-  size_t num_elems = map_tracks.size();
-  // Populate back the filtered tracks.
-  std::vector<std::map<int, int> > pid_to_cid_fid;
-  pid_to_cid_fid.clear();
-  pid_to_cid_fid.resize(num_elems);
-  size_t curr_id = 0;
-  for (auto itr = map_tracks.begin(); itr != map_tracks.end(); itr++) {
-    for (auto itr2 = (itr->second).begin(); itr2 != (itr->second).end(); itr2++) {
-      pid_to_cid_fid[curr_id][itr2->first] = itr2->second;
+      std::ostringstream oss1;
+      oss1 << (10000 + left_index) << "_" << cams[left_index].camera_type;
+
+      std::string left_stem = oss1.str();
+      std::string left_image = left_stem + ".jpg";
+
+      std::ostringstream oss2;
+      oss2 << (10000 + right_index) << "_" << cams[right_index].camera_type;
+
+      std::string right_stem = oss2.str();
+      std::string right_image = right_stem + ".jpg";
+
+      std::string match_file = left_stem + "__" + right_stem + ".match";
+
+      std::cout << "Writing: " << left_image << ' ' << right_image << ' ' << match_file << std::endl;
+      dense_map::writeMatchFile(match_file, match_pair.first, match_pair.second);
     }
-    curr_id++;
+  }
+
+  std::cout << "Find other things which need deallocation!" << std::endl;
+  std::cout << "De-allocate images and point clouds when no longer needed!" << std::endl;
+
+  // not needed anymore and take up a lot of RAM
+  matches.clear(); matches = dense_map::MATCH_MAP();
+  keypoint_map.clear(); keypoint_map.shrink_to_fit();
+  cid_to_descriptor_map.clear(); cid_to_descriptor_map.shrink_to_fit();
+  cid_to_keypoint_map.clear(); cid_to_keypoint_map.shrink_to_fit();
+
+  std::vector<std::map<int, int> > pid_to_cid_fid;
+  {
+    // Build tracks
+    // De-allocate these as soon as not needed to save memory
+    openMVG::tracks::TracksBuilder trackBuilder;
+    trackBuilder.Build(match_map);  // Build:  Efficient fusion of correspondences
+    trackBuilder.Filter();          // Filter: Remove tracks that have conflict
+    // trackBuilder.ExportToStream(std::cout);
+    // Export tracks as a map (each entry is a sequence of imageId and featureIndex):
+    //  {TrackIndex => {(imageIndex, featureIndex), ... ,(imageIndex, featureIndex)}
+    openMVG::tracks::STLMAPTracks map_tracks;
+    trackBuilder.ExportToSTL(map_tracks);
+
+    // TODO(oalexan1): Print how many pairwise matches were there before
+    // and after filtering tracks.
+
+    if (map_tracks.empty())
+      LOG(FATAL) << "No tracks left after filtering. Perhaps images are too dis-similar?\n";
+
+    size_t num_elems = map_tracks.size();
+    // Populate the filtered tracks
+    pid_to_cid_fid.clear();
+    pid_to_cid_fid.resize(num_elems);
+    size_t curr_id = 0;
+    for (auto itr = map_tracks.begin(); itr != map_tracks.end(); itr++) {
+      for (auto itr2 = (itr->second).begin(); itr2 != (itr->second).end(); itr2++) {
+        pid_to_cid_fid[curr_id][itr2->first] = itr2->second;
+      }
+      curr_id++;
+    }
   }
 
   // The transform from every camera to the world
@@ -1571,60 +1635,32 @@ int main(int argc, char** argv) {
   std::vector<Eigen::Vector3d> xyz_vec(pid_to_cid_fid.size());
 
   for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
-    Eigen::Vector3d xyz(0, 0, 0);
+    Eigen::Vector3d mesh_xyz(0, 0, 0);
     int num = 0;
 
-    for (auto cid_fid1 = pid_to_cid_fid[pid].begin();
-         cid_fid1 != pid_to_cid_fid[pid].end(); cid_fid1++) {
-      int cid1 = cid_fid1->first;
-      int fid1 = cid_fid1->second;
+    std::vector<double> focal_length_vec;
+    std::vector<Eigen::Affine3d> world_to_cam_vec;
+    std::vector<Eigen::Vector2d> pix_vec;
 
-      Eigen::Vector2d dist_ip1(keypoint_vec[cid1][fid1].first, keypoint_vec[cid1][fid1].second);
-      Eigen::Vector2d undist_ip1;
-      cam_params[cams[cid1].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
-        (dist_ip1, &undist_ip1);
+    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+      int cid = cid_fid->first;
+      int fid = cid_fid->second;
 
-      // std::cout << "--dist undist1 " << dist_ip1.transpose() << ' ' << undist_ip1.transpose()
-      //          << std::endl;
+      Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
+      Eigen::Vector2d undist_ip;
+      cam_params[cams[cid].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+        (dist_ip, &undist_ip);
 
-      for (auto cid_fid2 = pid_to_cid_fid[pid].begin();
-           cid_fid2 != pid_to_cid_fid[pid].end(); cid_fid2++) {
-        int cid2 = cid_fid2->first;
-        int fid2 = cid_fid2->second;
-        if (cid2 <= cid1) continue;
-
-        Eigen::Vector2d dist_ip2(keypoint_vec[cid2][fid2].first, keypoint_vec[cid2][fid2].second);
-        Eigen::Vector2d undist_ip2;
-        cam_params[cams[cid2].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
-          (dist_ip2, &undist_ip2);
-
-        // std::cout << "--dist undist2 " << dist_ip2.transpose() << ' ' << undist_ip2.transpose()
-        //          << std::endl;
-        // std::cout << "cids are " << cid1 << ' ' << cid2 << std::endl;
-        // std::cout << "--" << std::endl;
-        // std::cout << "---cam1\n" << world_to_cam[cid1].matrix() << std::endl;
-        // std::cout << "---cam2\n" << world_to_cam[cid2].matrix() << std::endl;
-
-        Eigen::Vector3d xyz0
-          = dense_map::TriangulatePair(cam_params[cams[cid1].camera_type].GetFocalLength(),
-                                       cam_params[cams[cid2].camera_type].GetFocalLength(),
-                                       world_to_cam[cid1], world_to_cam[cid2],
-                                       undist_ip1, undist_ip2);
-
-        // std::cout << "---X0 " << xyz0.transpose() << std::endl;
-
-        xyz += xyz0;
-        // std::cout << "------X " << xyz.transpose() << std::endl;
-        num++;
-      }
+      focal_length_vec.push_back(cam_params[cams[cid].camera_type].GetFocalLength());
+      world_to_cam_vec.push_back(world_to_cam[cid]);
+      pix_vec.push_back(undist_ip);
     }
 
-    // std::cout << "---num is " << num << std::endl;
-    if (num > 0) xyz /= num;
+    // Triangulate n rays emanating from given undistorted and centered pixels
+    Eigen::Vector3d joint_xyz = dense_map::Triangulate(focal_length_vec, world_to_cam_vec, pix_vec);
 
-    // std::cout << "---xyz now " << xyz.transpose() << std::endl;
+    xyz_vec[pid] = joint_xyz;
 
-    xyz_vec[pid] = xyz;
     // std::cout << "--xyz1 " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
   }
 
@@ -1634,34 +1670,7 @@ int main(int argc, char** argv) {
   // std::vector<std::map<int, int>> cid_fid_to_pid;
   // sparse_mapping::InitializeCidFidToPid(cams.size(), pid_to_cid_fid, &cid_fid_to_pid);
 
-  if (FLAGS_verbose) {
-  for (auto it = matches.begin(); it != matches.end(); it++) {
-    std::pair<int, int> index_pair = it->first;
-    dense_map::MATCH_PAIR const& match_pair = it->second;
-
-    int left_index = index_pair.first;
-    int right_index = index_pair.second;
-
-    std::cout << "--indices " << left_index << ' ' << right_index << std::endl;
-
-    std::ostringstream oss1;
-    oss1 << (10000 + left_index) << "_" << cams[left_index].camera_type;
-
-    std::string left_stem = oss1.str();
-    std::string left_image = left_stem + ".jpg";
-
-    std::ostringstream oss2;
-    oss2 << (10000 + right_index) << "_" << cams[right_index].camera_type;
-
-    std::string right_stem = oss2.str();
-    std::string right_image = right_stem + ".jpg";
-
-    std::string match_file = left_stem + "__" + right_stem + ".match";
-
-    std::cout << "Writing: " << left_image << ' ' << right_image << ' ' << match_file << std::endl;
-    dense_map::writeMatchFile(match_file, match_pair.first, match_pair.second);
-  }
-  }
+  std::cout << "---too many outliers!" << std::endl;
 
   std::cout << "--start selecting!" << std::endl;
 
@@ -1704,6 +1713,10 @@ int main(int argc, char** argv) {
   ref_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
   ref_depth_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
   ref_depth_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
+
+  // Set up the variable blocks to optimize for the mesh xyz
+  std::vector<int> mesh_block_sizes;
+  mesh_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
 
   std::cout << "must test with the ref cam having depth!" << std::endl;
 
@@ -1882,6 +1895,69 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (FLAGS_mesh != "") {
+  // Add the mesh constraint
+
+    for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+      Eigen::Vector3d mesh_xyz(0, 0, 0);
+      int num = 0;
+
+      for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
+           cid_fid++) {
+        int cid = cid_fid->first;
+        int fid = cid_fid->second;
+
+        Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
+        Eigen::Vector2d undist_ip;
+        cam_params[cams[cid].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+          (dist_ip, &undist_ip);
+
+        bool have_mesh_intersection = false;
+        // Try to make the intersection point be on the mesh and the nav cam ray
+        // to make the sci cam to conform to that.
+        // TODO(oalexan1): Think more of the range of the ray below
+        double min_ray_dist = 0.0;
+        double max_ray_dist = 10.0;
+        Eigen::Vector3d intersection(0.0, 0.0, 0.0);
+        have_mesh_intersection
+          = dense_map::ray_mesh_intersect(undist_ip, cam_params[cams[cid].camera_type],
+                                          world_to_cam[cid], mesh, bvh_tree,
+                                          min_ray_dist, max_ray_dist,
+                                          // Output
+                                          intersection);
+
+        if (have_mesh_intersection) {
+          mesh_xyz += intersection;
+          num += 1;
+        }
+      }
+
+      if (num >= 1) {
+        mesh_xyz /= num;
+
+        // std::cout << "--num and mesh xyz is " << num << ' ' << mesh_xyz.transpose() << std::endl;
+
+        ceres::CostFunction* mesh_cost_function =
+          dense_map::XYZError::Create(mesh_xyz, mesh_block_sizes, FLAGS_mesh_weight);
+
+        ceres::LossFunction* mesh_loss_function =
+          dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
+
+        problem.AddResidualBlock(mesh_cost_function, mesh_loss_function,
+                                            &xyz_vec[pid][0]);
+
+        residual_names.push_back("mesh_x_m");
+        residual_names.push_back("mesh_y_m");
+        residual_names.push_back("mesh_z_m");
+
+        residual_scales.push_back(FLAGS_mesh_weight);
+        residual_scales.push_back(FLAGS_mesh_weight);
+        residual_scales.push_back(FLAGS_mesh_weight);
+      }
+    }
+    // std::cout << "--xyz1 " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
+  }
+
   // See which intrinsics from which cam to float or keep fixed
   for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
     if (intrinsics_to_float[cam_type].find("focal_length") == intrinsics_to_float[cam_type].end()) {
@@ -1957,9 +2033,14 @@ int main(int argc, char** argv) {
   }
 
   // Copy back the reference transforms
+  std::cout.precision(18);
+  std::cout << "--sparse map before\n" << sparse_map->cid_to_cam_t_global_[0].matrix() << std::endl;
+
   for (int cid = 0; cid < num_ref_cams; cid++)
     dense_map::array_to_rigid_transform(world_to_ref_t[cid],
                                         &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
+
+  std::cout << "--sparse map after\n" << sparse_map->cid_to_cam_t_global_[0].matrix() << std::endl;
 
   // Copy back the optimized intrinsics
   for (int it = 0; it < num_cam_types; it++) {
