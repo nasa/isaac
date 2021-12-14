@@ -294,7 +294,7 @@ and, at full resolution, the corners of the calibration target are
 hard to detect. The calibrator also does not handle the color format
 in the bag, hence the switch to grayscale images.
 
-However, the both the geometry and the streaming mapper, as well as
+However, both the geometry and the streaming mapper, as well as
 camera_refiner, can handle both color and grayscale images, and both
 at reduced resolution and full-resolution. These tools can adjust for
 the fact that the calibration was done at reduced resolution.
@@ -561,7 +561,7 @@ Nav cam images can be extracted from a bag as follows:
       -use_timestamp_as_image_name
 
 The last option, `-use_timestamp_as_image_name`, must not be missed.
-It makes it easy to look up the image acqusition based on image name,
+It makes it easy to look up the image acquisition based on image name,
 and this is used by the geometry mapper.
 
 Note that bags acquired on the ISS usually have the nav cam image topic
