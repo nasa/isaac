@@ -187,8 +187,8 @@ add_executable(add_sci_cam_to_bag tools/add_sci_cam_to_bag.cc)
 target_link_libraries(add_sci_cam_to_bag
     geometry_mapper_lib gflags glog)
 
-add_executable(process_bag tools/process_bag.cc)
-target_link_libraries(process_bag
+add_executable(scale_bag tools/scale_bag.cc)
+target_link_libraries(scale_bag
     geometry_mapper_lib gflags glog)
 
 add_executable(colorize_bag_images tools/colorize_bag_images.cc)

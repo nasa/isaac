@@ -302,7 +302,7 @@ the fact that the calibration was done at reduced resolution.
 To accomplish this processing, once the sci cam data is integrated
 into the bag, one can do the following: 
 
-    $ISAAC_WS/devel/lib/geometry_mapper/process_bag -input_bag input.bag \
+    $ISAAC_WS/devel/lib/geometry_mapper/scale_bag -input_bag input.bag \
       -output_bag output.bag --image_type grayscale --scale 0.25
 
 Note that the processed sci cam images will be now on topic
