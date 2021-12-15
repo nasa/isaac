@@ -24,7 +24,7 @@ The ISAAC project has three main technical thrusts:
 This `isaac` repo serves as a master for integrating an end-to-end
 demo that draws on code from the other repos as well as directly
 including a significant amount of the ISAAC code, mostly relating to
-the Astrobee robot). This repository includes:
+the [Astrobee robot](https://github.com/nasa/astrobee). This repository includes:
 
 - [Astrobee software](https://nasa.github.io/isaac/html/astrobee.html) for added behaviors such as inpection and cargo transport as well as new sensor utilization.
 - [Dense mapping](https://nasa.github.io/isaac/html/geometric_streaming_mapper.html) to create a textured 3D map
