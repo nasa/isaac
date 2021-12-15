@@ -1,4 +1,5 @@
-# ISAAC (Integrated System for Autonomous and Adaptive Caretaking)
+ISAAC (Integrated System for Autonomous and Adaptive Caretaking)
+=====
 
 The ISAAC project has three main technical thrusts:
 
@@ -25,7 +26,7 @@ demo that draws on code from the other repos as well as directly
 including a significant amount of the ISAAC code, mostly relating to
 the Astrobee robot). This repository includes:
 
-- [Astrobee software](https://nasa.github.io/isaac/html/astrobee.html) for inspection, cargo transport, measuring wifi signal strength.
+- [Astrobee software](https://nasa.github.io/isaac/html/astrobee.html) for added behaviors such as inpection and cargo transport as well as new sensor utilization.
 - [Dense mapping](https://nasa.github.io/isaac/html/geometric_streaming_mapper.html) to create a textured 3D map
 - [Volumetric mapping](https://nasa.github.io/isaac/html/volumetric_mapper.html) to map volumetric signals, such as WiFi.
 - [Image analysis](https://nasa.github.io/isaac/html/ano.html) module to train a neural network to detect anomalies
@@ -33,7 +34,8 @@ the Astrobee robot). This repository includes:
 You may also be interested in the separate repository for the [ISAAC User Interface](https://github.com/nasa/isaac_user_interface),
 which enables monitoring of multiple robots through a web browser.
 
-### System requirements
+System requirements
+---------
 
 The `isaac` repo depends on the `astrobee` repo, therefore it inherits
 the same system requirements. You must use Ubuntu 16.04 to 20.04 64-bit. When
@@ -41,7 +43,8 @@ running in simulation, certain Gazebo plugins require appropriate
 graphics drivers. See INSTALL.md in that repository for more
 information.
 
-### Usage
+Usage
+---------
 
 There are two main ways to install and run `isaac`:
 
@@ -59,7 +62,8 @@ There are two main ways to install and run `isaac`:
 
 [Instructions on installing and using the ISAAC Software](https://nasa.github.io/isaac/html/md_INSTALL.html). For running the [docker demos](https://nasa.github.io/isaac/html/md_DEMO_INSTALL.html)
 
-### Documentation
+Documentation
+---------
 
 [The documentation is auto-generated from the contents of this repository.](https://nasa.github.io/isaac/documentation.html)
 
@@ -67,14 +71,16 @@ To compile the documentation locally (make sure you have the latest doxygen inst
 
     doxygen isaac.doxyfile
 
-### Contributing
+Contributing
+---------
 
 The ISAAC Software is open source, and we welcome contributions from the public.
 Please submit pull requests to the `develop` branch. For us to merge any pull
 requests, we must request that contributors sign and submit either an [Individual Contributor License Agreement](https://github.com/nasa/isaac/blob/94996bc1a20fa090336e67b3db5c10a9bb30f0f7/doc/cla/ISAAC_Individual%20CLA.pdf) or a [Corporate Contributor License
 Agreement](https://github.com/nasa/isaac/blob/94996bc1a20fa090336e67b3db5c10a9bb30f0f7/doc/cla/ISAAC_Corporate%20CLA.pdf) due to NASA legal requirements. Thank you for your understanding.
 
-### License
+License
+---------
 
 Copyright (c) 2021, United States Government, as represented by the
 Administrator of the National Aeronautics and Space Administration.
