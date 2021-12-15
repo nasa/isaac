@@ -1629,10 +1629,13 @@ int main(int argc, char** argv) {
     // moment that image finished processing and the timestamp is set.
     // This delay is worse for the sci cam which takes longer to acquire.
     // TODO(oalexan1): camera_calibrator must actually solve for them.
-    dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset", "scicam_to_hazcam_timestamp_offset",
-                              "hazcam_to_navcam_transform", "scicam_to_hazcam_transform",
+    dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset",
+                              "scicam_to_hazcam_timestamp_offset",
+                              "hazcam_to_navcam_transform",
+                              "scicam_to_hazcam_transform",
                               "nav_cam_transform",
-                              "hazcam_depth_to_image_transform", navcam_to_hazcam_timestamp_offset,
+                              "hazcam_depth_to_image_transform",
+                              navcam_to_hazcam_timestamp_offset,
                               scicam_to_hazcam_timestamp_offset, hazcam_to_navcam_trans,
                               scicam_to_hazcam_trans,
                               navcam_to_body_trans, hazcam_depth_to_image_transform,
@@ -1651,7 +1654,8 @@ int main(int argc, char** argv) {
     std::cout << "scicam_to_navcam_trans\n" << scicam_to_navcam_trans << std::endl;
     std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
     std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
-    std::cout << "hazcam_depth_to_image_transform\n" << hazcam_depth_to_image_transform.matrix() << "\n";
+    std::cout << "hazcam_depth_to_image_transform\n"
+              << hazcam_depth_to_image_transform.matrix() << "\n";
   }
 
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map;

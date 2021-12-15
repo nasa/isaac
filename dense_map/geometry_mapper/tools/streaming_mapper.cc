@@ -817,7 +817,8 @@ void StreamingMapper::ProcessingLoop() {
           continue;
         }
 
-        if (need_exif && local_sci_cam_exif.find(texture_cam_image_timestamp) == local_sci_cam_exif.end()) {
+        if (need_exif &&
+            local_sci_cam_exif.find(texture_cam_image_timestamp) == local_sci_cam_exif.end()) {
           // Skip if the exif info did not arrive yet
           continue;
         }
@@ -830,7 +831,8 @@ void StreamingMapper::ProcessingLoop() {
         success = true;
 
         // Wipe this image and images older than this as we will never use them
-        while (texture_cam_images.size() > 0 && texture_cam_images.begin()->first <= texture_cam_image_timestamp)
+        while (texture_cam_images.size() > 0 &&
+               texture_cam_images.begin()->first <= texture_cam_image_timestamp)
           texture_cam_images.erase(texture_cam_images.begin());
 
         // Stop given that we have found a good image to process
@@ -852,7 +854,8 @@ void StreamingMapper::ProcessingLoop() {
     // Find the interpolated pose at the current image
     Eigen::Affine3d curr_texture_cam_pose;
 
-    if (!dense_map::findInterpPose(texture_cam_image_timestamp, local_texture_cam_poses, curr_texture_cam_pose))
+    if (!dense_map::findInterpPose(texture_cam_image_timestamp, local_texture_cam_poses,
+                                   curr_texture_cam_pose))
       LOG(FATAL) << "Could not bracket the timestamp. Should have worked at this stage.";
 
     camera::CameraModel cam(curr_texture_cam_pose.inverse(), local_texture_cam_params);
@@ -891,8 +894,9 @@ void StreamingMapper::ProcessingLoop() {
     std::ostringstream oss;
     oss << "processed_" << 1000 + processed_camera_count;  // add 1000 to list them nicely
     std::string out_prefix = oss.str();
-    publishTexturedMesh(mesh, bvh_tree, max_iso_times_exposure, iso, exposure, processed_camera_count,
-                        texture_cam_image, texture_cam_image_timestamp, cam, smallest_cost_per_face, out_prefix);
+    publishTexturedMesh(mesh, bvh_tree, max_iso_times_exposure, iso, exposure,
+                        processed_camera_count, texture_cam_image, texture_cam_image_timestamp,
+                        cam, smallest_cost_per_face, out_prefix);
 
     // Save this for next time
     last_processed_cam_ctr = cam_ctr;

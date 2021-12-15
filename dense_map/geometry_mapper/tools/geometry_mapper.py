@@ -356,11 +356,13 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
         )
 
     camera_types = args.camera_types.split()
-    
-    if ('nav_cam' not in camera_types) or ('haz_cam' not in camera_types):
-        raise Exception("At minimum the nav and haz data must be processed, "    + \
-                        "as those are needed for depth clouds and their poses, " + \
-                        "to create the mesh.")
+
+    if ("nav_cam" not in camera_types) or ("haz_cam" not in camera_types):
+        raise Exception(
+            "At minimum the nav and haz data must be processed, "
+            + "as those are needed for depth clouds and their poses, "
+            + "to create the mesh."
+        )
 
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
@@ -398,14 +400,16 @@ def mkdir_p(path):
 def setup_outputs(args):
     mkdir_p(args.output_dir)
 
+
 def format_cmd(cmd):
     """If some command arguments have spaces, quote them. Then concatenate the results."""
     ans = ""
     for val in cmd:
-        if ' ' in val or '\t' in cmd:
+        if " " in val or "\t" in cmd:
             val = '"' + val + '"'
-        ans += val + ' '
+        ans += val + " "
     return ans
+
 
 def run_cmd(cmd, log_file, verbose=False):
     """
@@ -414,7 +418,7 @@ def run_cmd(cmd, log_file, verbose=False):
 
     cmd_str = format_cmd(cmd)
     print(cmd_str + "\n")
-    
+
     with open(log_file, "w", buffering=0) as f:  # replace 'w' with 'wb' for Python 3
         f.write(cmd_str + "\n")
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
