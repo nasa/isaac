@@ -149,7 +149,9 @@ experimental remeshing tool.
 
 ### With real data
 
-Acquire a bag of data on the bot as follows. 
+Acquire a bag of data on the bot. The current approach is to use a
+recording profile. A step-by-step procedure is outlined below if a
+recording profile has not been set up.
 
 First give the bot the ability to acquire intensity data with the
 depth camera (haz_cam).  For that, connect to the MLP processor of the
@@ -342,11 +344,17 @@ builds upon the instructions used in the doc referenced right above.)
 
     source $KALIBR_WS/devel/setup.bash
     rosrun kalibr kalibr_calibrate_cameras                                           \
-      --topics /hw/cam_nav /hw/depth_haz/extended/amplitude_int /hw/cam_sci2         \
+      --topics /mgt/img_sampler/nav_cam/image_record                                 \
+               /hw/depth_haz/extended/amplitude_int                                  \
+               /hw/cam_sci2                                                          \
       --models pinhole-fov pinhole-radtan pinhole-radtan                             \
       --target $ASTROBEE_SOURCE_PATH/scripts/calibrate/config/granite_april_tag.yaml \
       --bag calibration.bag --dont-show-report --verbose                             \
       --target_corners_dirs calib_nav calib_haz calib_sci
+
+Note that above we assume that the image sampler was used to collect a
+subset of the nav cam images. Otherwise the raw nav cam topic would be
+/hw/cam_nav.
 
 This will create three directories with the corners extracted from the
 nav, haz, and sci cameras.
@@ -557,19 +565,15 @@ down this document, in the section on camera refinement.
 Nav cam images can be extracted from a bag as follows:
 
     $ASTROBEE_BUILD_PATH/devel/lib/localization_node/extract_image_bag \
-      mydata.bag -image_topic /hw/cam_nav -output_directory nav_data   \
-      -use_timestamp_as_image_name
+      mydata.bag -image_topic /mgt/img_sampler/nav_cam/image_record    \
+      -output_directory nav_data -use_timestamp_as_image_name
 
 The last option, `-use_timestamp_as_image_name`, must not be missed.
 It makes it easy to look up the image acquisition based on image name,
 and this is used by the geometry mapper.
 
-Note that bags acquired on the ISS usually have the nav cam image topic
-as:
-
-    /mgt/img_sampler/nav_cam/image_record
-
-Then the command above needs to be adjusted accordingly.
+One should check beforehand if the nav cam topic is correct. If the image
+sampler was not used, the nav cam topic would be /hw/cam_nav.
 
 To extract the sci cam data, if necessary, do:
 
@@ -625,9 +629,13 @@ sci cam images with the geometry mapper.
 
 ## When using real data
 
-The geometry mapper can handle both color and grayscale images, and
-both at full and reduced resolution. (With the sci cam topic name
-being different at reduced resolution.)
+The geometry mapper fuses the depth cloud data and creates textures
+from the image cameras. 
+
+Any image camera is supported, as long as present in the robot
+configuration file and a topic for it is in the bag file (see more
+details further down). The geometry mapper can handle both color and
+grayscale images, and, for sci cam, both full and reduced resolution.
 
 Ensure that the bot name is correct below. Set `ASTROBEE_SOURCE_PATH`,
 `ASTROBEE_BUILD_PATH`, and `ISAAC_WS` as earlier. Run:
@@ -641,11 +649,10 @@ Ensure that the bot name is correct below. Set `ASTROBEE_SOURCE_PATH`,
     python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
       --ros_bag data.bag                                                    \
       --sparse_map nav_data.map                                             \
-      --nav_cam_topic /hw/cam_nav                                           \
+      --camera_types "sci_cam nav_cam haz_cam"                              \
+      --camera_topics "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int"\
+      --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160" \
       --haz_cam_points_topic /hw/depth_haz/points                           \
-      --haz_cam_intensity_topic /hw/depth_haz/extended/amplitude_int        \
-      --sci_cam_topic /hw/cam_sci/compressed                                \
-      --camera_type all                                                     \
       --start 0                                                             \
       --duration 1e+10                                                      \
       --sampling_spacing_seconds 5                                          \
@@ -671,14 +678,20 @@ Ensure that the bot name is correct below. Set `ASTROBEE_SOURCE_PATH`,
 
 Parameters:
 
-    --ros_bag: A ROS bag with recorded nav_cam, haz_cam, and sci_cam data.
+    --ros_bag: A ROS bag with recorded image and point cloud data.
     --sparse_map: A registered SURF sparse map of a subset of the nav_cam data.
-    --nav_cam_topic: The nav cam image topic in the bag file.
+    --camera_types: Specify the cameras to use for the textures, as a list
+      in quotes. Default: "sci_cam nav_cam haz_cam". With simulated
+      data only ``sci_cam`` is supported.
+    --camera_topics: Specify the bag topics for the cameras to texture
+      (in the same order as in ``--camera_types``). Use a list in quotes.
+      The default is in the usage above.
+    --undistorted_crop_wins: The central region to keep after
+      undistorting an image and before texturing. For sci_cam the
+      numbers are at 1/4th of the full resolution and will be adjusted
+      for the actual input image dimensions. Use a list in quotes. The
+      default is "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
     --haz_cam_points_topic: The haz cam point cloud topic in the bag file.
-    --haz_cam_intensity_topic: The haz cam intensity topic in the bag file.
-    --sci_cam_topic: The sci cam image topic in the bag file.
-    --camera_type: Specify which cameras to process. Options: all (default), 
-      nav_cam, and sci_cam (with simulated data only sci_cam is supported).
     --start: How many seconds into the bag to start processing the data.
     --duration: For how many seconds to do the processing.
     --sampling_spacing_seconds: How frequently to sample the sci and haz 
@@ -800,7 +813,7 @@ restricted to the range of timestamps contained within the sparse map
 (this is another restriction, in addition to `--start` and
 `--duration`).
 
-If this tool is too slow, or if localization fails, consider tweaking
+If this tool is too slow, or if localization fails, consider adjusting
 the --localization_options above. For example, to make localization
 work better (which will make the program slower) decrease the value of
 --default_surf_threshold, and increase --early_break_landmarks,
@@ -832,6 +845,17 @@ geometry mapper at any step, use the option '--start_step num', where
 0 <= num and num <= 7. For example, one may want to apply further
 smoothing to the mesh or more hole-filling, before resuming with the
 next steps.
+
+For a given camera type to be textured it must have entries in
+``cameras.config`` and the robot config file (such as
+``bumble.config``), which are analogous to existing
+``nav_cam_to_sci_cam_timestamp_offset``,
+``nav_cam_to_sci_cam_transform``, and ``sci_cam`` intrinsics, with
+"sci" replaced by your camera name. The geometry mapper arguments
+``--camera_types``, ``--camera_topics``, and
+``--undistorted_crop_wins`` must be populated accordingly, with some
+careful choice to be made for the last one. Images for the desired
+camera must be present in the bag file at the the specified topic.
 
 ## With simulated data
 
@@ -984,8 +1008,8 @@ and then enabled by running in a separate terminal:
     rosservice call /loc/ml/enable true
 
 This node will expect the nav cam pose to be published on topic
-`/hw/cam_nav`. If it is on a different topic, such as
-`/mgt/img_sampler/nav_cam/image_record`, it needs to be redirected to
+``/hw/cam_nav``. If it is on a different topic, such as
+``/mgt/img_sampler/nav_cam/image_record``, it needs to be redirected to
 this one when playing the bag, such as:
 
     rosbag play data.bag \
