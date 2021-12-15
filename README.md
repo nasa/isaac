@@ -25,10 +25,10 @@ demo that draws on code from the other repos as well as directly
 including a significant amount of the ISAAC code, mostly relating to
 the Astrobee robot). This repository includes:
 
-- [Astrobee software](astrobee/) for inspection, cargo transport, and measuring wifi signal strength
-- [Dense mapping](dense_map/geometry_mapper) to create a textured 3D map
-- [Wifi mapping](dense_map/volumetric_mapper) to map WIFI signals
-- [Image analysis](img_analysis) module to train a neural network to detect anomalies
+- [Astrobee software](https://nasa.github.io/isaac/html/astrobee.html) for inspection, cargo transport, measuring wifi signal strength.
+- [Dense mapping](https://nasa.github.io/isaac/html/geometric_streaming_mapper.html) to create a textured 3D map
+- [Volumetric mapping](https://nasa.github.io/isaac/html/volumetric_mapper.html) to map volumetric signals, such as WiFi.
+- [Image analysis](https://nasa.github.io/isaac/html/ano.html) module to train a neural network to detect anomalies
 
 You may also be interested in the separate repository for the [ISAAC User Interface](https://github.com/nasa/isaac_user_interface),
 which enables monitoring of multiple robots through a web browser.
