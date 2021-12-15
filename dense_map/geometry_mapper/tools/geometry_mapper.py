@@ -92,7 +92,7 @@ def process_args(args):
         "--haz_cam_points_topic",
         dest="haz_cam_points_topic",
         default="/hw/depth_haz/points",
-        help="The haz cam point cloud topic in the bag file.",
+        help="The depth point cloud topic in the bag file.",
     )
     parser.add_argument(
         "--start",
@@ -355,29 +355,26 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
             + "Specify it via --astrobee_build_dir."
         )
 
-    for camera_type in args.camera_types.split():
-        if camera_type == "nav_cam" and args.simulated_data:
-            raise Exception(
-                "Cannot apply nav cam texture with simulated cameras "
-                + "as the gazebo distorted images are not accurate enough."
-            )
-
-        if camera_type == "haz_cam" and args.simulated_data:
-            raise Exception("Texturing haz cam with simulated data was not tested.")
+    camera_types = args.camera_types.split()
+    
+    if ('nav_cam' not in camera_types) or ('haz_cam' not in camera_types):
+        raise Exception("At minimum the nav and haz data must be processed, "    + \
+                        "as those are needed for depth clouds and their poses, " + \
+                        "to create the mesh.")
 
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
 
-    if len(args.camera_types.split()) != len(args.camera_topics.split()):
+    if len(camera_types) != len(args.camera_topics.split()):
         raise Exception("There must be as many camera types as camera topics.")
 
-    if len(args.camera_types.split()) != len(args.undistorted_crop_wins.split()):
+    if len(camera_types) != len(args.undistorted_crop_wins.split()):
         raise Exception(
             "There must be as many camera types as listed undistorted "
             + "crop windows."
         )
 
-    for cam in args.camera_types.split():
+    for cam in camera_types:
         if not (cam in crop_win_map):
             raise Exception(
                 "No crop win specified in --undistorted_crop_wins for camera: " + cam
@@ -401,14 +398,25 @@ def mkdir_p(path):
 def setup_outputs(args):
     mkdir_p(args.output_dir)
 
+def format_cmd(cmd):
+    """If some command arguments have spaces, quote them. Then concatenate the results."""
+    ans = ""
+    for val in cmd:
+        if ' ' in val or '\t' in cmd:
+            val = '"' + val + '"'
+        ans += val + ' '
+    return ans
 
 def run_cmd(cmd, log_file, verbose=False):
     """
     Run a command and write the output to a file. In verbose mode also print to screen.
     """
-    print(" ".join(cmd) + "\n")
+
+    cmd_str = format_cmd(cmd)
+    print(cmd_str + "\n")
+    
     with open(log_file, "w", buffering=0) as f:  # replace 'w' with 'wb' for Python 3
-        f.write(" ".join(cmd) + "\n")
+        f.write(cmd_str + "\n")
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         for line in iter(
             process.stdout.readline, ""
@@ -478,9 +486,6 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
 
     if args.save_debug_data:
         cmd += ["--save_debug_data"]
-
-    if args.external_mesh != "":
-        cmd += ["--external_mesh", args.external_mesh]
 
     if args.scicam_to_hazcam_timestamp_offset_override_value != "":
         cmd += [

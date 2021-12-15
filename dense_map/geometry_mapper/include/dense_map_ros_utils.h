@@ -72,8 +72,8 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
 // repeated calls to this function we always travel forward in time,
 // and we keep track of where we are in the bag using the variable
 // bag_pos that we update as we go.
-bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs, double max_time_diff,
-                 cv::Mat& cloud, int& bag_pos, double& found_time);
+bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs,
+                 double max_time_diff, cv::Mat& cloud, int& bag_pos, double& found_time);
 
 // Read the list of topics in a bag while avoiding repetitions
 void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topics);
@@ -81,6 +81,7 @@ void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topi
 // A small struct in which to store an opened ROS bag and the vector of its messages
 // that we will use later to quickly navigate through it while going forward in time.
 struct RosBagHandle {
+  RosBagHandle() = delete;  // The rosbag API prevents anything else than initialization
   RosBagHandle(std::string const& bag_file, std::string const& topic) {
     bag.open(bag_file, rosbag::bagmode::Read);
     std::vector<std::string> topics;

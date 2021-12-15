@@ -691,7 +691,7 @@ Parameters:
       numbers are at 1/4th of the full resolution and will be adjusted
       for the actual input image dimensions. Use a list in quotes. The
       default is "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
-    --haz_cam_points_topic: The haz cam point cloud topic in the bag file.
+    --haz_cam_points_topic: The depth point cloud topic in the bag file.
     --start: How many seconds into the bag to start processing the data.
     --duration: For how many seconds to do the processing.
     --sampling_spacing_seconds: How frequently to sample the sci and haz 
