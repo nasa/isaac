@@ -1,6 +1,9 @@
 ISAAC (Integrated System for Autonomous and Adaptive Caretaking)
 =====
 
+[![GitHub license](https://img.shields.io/github/license/nasa/isaac)](https://github.com/nasa/isaac/blob/master/LICENSE)
+[![Build, test and push packages CI](https://github.com/nasa/isaac/actions/workflows/ci_push.yml/badge.svg)](https://github.com/nasa/isaac/actions/workflows/ci_push.yml)
+
 The ISAAC project has three main technical thrusts:
 
 1. **Integrated data**: The current state of the art is that data from sensors associated with different facility
