@@ -1,6 +1,8 @@
-# Native Install
+Native Install
+=====
 
-### Usage instructions for non-NASA and NASA users
+Usage instructions for non-NASA and NASA users
+---------
 
 Install the 64-bit version of [Ubuntu 16.04, 18.04 or 20.04](http://releases.ubuntu.com/)
 on a host machine, and make sure that you can checkout and build code.
@@ -16,11 +18,13 @@ any other operating system or Ubuntu versions.*
 *Note: Please ensure you install the 64-bit version of Ubuntu. We do not
 support running ISAAC Software on 32-bit systems.*
 
-### Machine setup
+Machine setup
+---------
 
 The `isaac` repo depends on some `astrobee` packages, therefore, `astrobee` needs to be installed beforehand.
 
-### Checkout the project source code
+Checkout the project source code
+---------
 
 At this point you need to decide where you'd like to put the ISAAC workspace and code
 (`ISAAC_WS`) on your machine (add this to your .bashrc for persistency):
@@ -37,7 +41,8 @@ Checkout the submodule:
     git submodule update --init --recursive
 
 
-### Dependencies
+Dependencies
+---------
 
 Next, install all required dependencies:
 *Note: `root` access is necessary to install the packages below*
@@ -52,13 +57,15 @@ Next, install all required dependencies:
     rosdep update
     popd
 
-### Configuring the build
+Configuring the build
+---------
 
 By default, the catkin uses the following paths:
   - devel build path: `$ISAAC_WS/devel`
   - install build path: `$ISAAC_WS/install`
 
-### Building the code
+Building the code
+---------
     
 Source your astrobee build environment, for example as:
 
@@ -80,7 +87,8 @@ The command 'source devel/setup.bash' is very important to make sure that everyt
 If you are working in simulation only, then you're all done!
 The next steps are only for running ISAAC onboard Astrobee.
 
-### Cross-compiling isaac
+Cross-compiling isaac
+---------
 
 
 To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions.
@@ -99,7 +107,8 @@ A new catkin profile should be made to retain the configurations and easily swit
                   --cmake-args -DCMAKE_TOOLCHAIN_FILE=$ISAAC_WS/src/scripts/build/isaac_cross.cmake \
                     -DARMHF_CHROOT_DIR=$ARMHF_CHROOT_DIR
 
-### Build ISAAC debian
+Build ISAAC debian
+---------
 
 To build a debian you must first confirm that cross-compiling is functional. Once it is:
 
