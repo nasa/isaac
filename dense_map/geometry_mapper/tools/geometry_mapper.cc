@@ -179,7 +179,7 @@ bool findNearbySparseMapImages(double desired_nav_cam_time,
 // desired camera.
 bool findInterpolatedPose(double desired_nav_cam_time,
                           std::vector<double> const& nav_cam_bag_timestamps,
-                          Eigen::MatrixXd const& nav_cam_to_desired_cam_trans,
+                          Eigen::Affine3d const& nav_cam_to_desired_cam_trans,
                           std::vector<rosbag::MessageInstance> const& nav_cam_msgs,
                           boost::shared_ptr<sparse_mapping::SparseMap> sparse_map,
                           bool use_brisk_map,
@@ -251,7 +251,7 @@ bool findInterpolatedPose(double desired_nav_cam_time,
       Eigen::Affine3d interp_trans = dense_map::linearInterp(alpha, beg_trans, end_trans);
 
       desired_cam_to_world_trans
-        = interp_trans.inverse().matrix() * nav_cam_to_desired_cam_trans.inverse();
+        = interp_trans.inverse().matrix() * nav_cam_to_desired_cam_trans.matrix().inverse();
 
       return true;
     }
@@ -1034,8 +1034,8 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
 // Also write the extracted point clouds and the desired cam (nav or sci) images.
 
 void saveCameraPoses(
-  bool simulated_data, std::string const& cam_type, double desired_cam_to_nav_cam_offset,
-  Eigen::MatrixXd const& nav_cam_to_desired_cam_trans,
+  bool simulated_data, std::string const& cam_type, double nav_to_desired_cam_offset,
+  Eigen::Affine3d const& nav_cam_to_desired_cam_trans,
   Eigen::Affine3d& hazcam_depth_to_image_transform, int depth_exclude_columns,
   int depth_exclude_rows, double foreshortening_delta, double depth_hole_fill_diameter,
   double reliability_weight_exponent, std::vector<double> const& median_filter_params,
@@ -1159,8 +1159,8 @@ void saveCameraPoses(
 
     if (!simulated_data) {
       // Do localization based on nav cam, transform the pose to desired cam coordinates, etc
-      // Note that we convert from the desired time to the nav cam time for this operation
-      if (!findInterpolatedPose(curr_time + desired_cam_to_nav_cam_offset,
+      // Note that we convert from the desired cam time to nav cam time for this operation
+      if (!findInterpolatedPose(curr_time - nav_to_desired_cam_offset,
                                 nav_cam_bag_timestamps,
                                 nav_cam_to_desired_cam_trans, nav_cam_msgs, sparse_map,
                                 use_brisk_map,
@@ -1532,6 +1532,17 @@ int main(int argc, char** argv) {
               << hazcam_depth_to_image_transform.matrix() << "\n";
   }
 
+  std::map<std::string, Eigen::Affine3d> nav_to_desired_cam;
+  nav_to_desired_cam["sci_cam"].matrix() = scicam_to_navcam_trans.inverse();
+  nav_to_desired_cam["nav_cam"] = Eigen::Affine3d::Identity();
+  nav_to_desired_cam["haz_cam"].matrix() = hazcam_to_navcam_trans.inverse();
+
+  std::map<std::string, double> nav_to_desired_cam_offset;
+  nav_to_desired_cam_offset["sci_cam"]
+    = navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
+  nav_to_desired_cam_offset["haz_cam"] = navcam_to_hazcam_timestamp_offset;
+  nav_to_desired_cam_offset["nav_cam"] = 0.0;
+
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map;
   if (!FLAGS_simulated_data) {
     std::cout << "Loading sparse map " << FLAGS_sparse_map << "\n";
@@ -1593,35 +1604,20 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    Eigen::MatrixXd desired_cam_to_nav_cam_trans;
-
-    double desired_cam_to_nav_cam_offset = 0.0;
-    std::cout << "---Fix here" << std::endl;
-    if (cam_type == "haz_cam") {
-      desired_cam_to_nav_cam_trans = hazcam_to_navcam_trans;
-      desired_cam_to_nav_cam_offset = -navcam_to_hazcam_timestamp_offset;
-    } else if (cam_type == "sci_cam") {
-      desired_cam_to_nav_cam_trans = scicam_to_navcam_trans;
-      desired_cam_to_nav_cam_offset
-        = scicam_to_hazcam_timestamp_offset - navcam_to_hazcam_timestamp_offset;
-    } else if (cam_type == "nav_cam") {
-      desired_cam_to_nav_cam_trans = navcam_to_navcam_trans;
-      desired_cam_to_nav_cam_offset = 0.0;       // no offset from the nav cam to itself
-    } else {
-      LOG(FATAL) << "Not implemented yet!\n";
-    }
-
-    saveCameraPoses(
-      FLAGS_simulated_data, cam_type, desired_cam_to_nav_cam_offset,
-      desired_cam_to_nav_cam_trans.inverse(), hazcam_depth_to_image_transform,
-      FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows, FLAGS_foreshortening_delta,
-      FLAGS_depth_hole_fill_diameter, FLAGS_reliability_weight_exponent, median_filter_params,
-      bag_handles[cam_type]->bag_msgs,
-      bag_handles["nav_cam"]->bag_msgs,  // always needed
-      haz_cam_points_handle.bag_msgs, nav_cam_bag_timestamps, sci_cam_exif, FLAGS_output_dir,
-      cam_dirs[cam_type], FLAGS_start, FLAGS_duration, FLAGS_sampling_spacing_seconds,
-      FLAGS_dist_between_processed_cams, sci_cam_timestamps, FLAGS_max_iso_times_exposure,
-      sparse_map, FLAGS_use_brisk_map, sim_haz_cam_poses, FLAGS_save_debug_data);
+    saveCameraPoses(FLAGS_simulated_data, cam_type, nav_to_desired_cam_offset[cam_type], // NOLINT
+                    nav_to_desired_cam[cam_type], hazcam_depth_to_image_transform,       // NOLINT
+                    FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows,               // NOLINT
+                    FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter,          // NOLINT
+                    FLAGS_reliability_weight_exponent, median_filter_params,             // NOLINT
+                    bag_handles[cam_type]->bag_msgs,                                     // NOLINT
+                    bag_handles["nav_cam"]->bag_msgs,  // always needed                  // NOLINT
+                    haz_cam_points_handle.bag_msgs, nav_cam_bag_timestamps,              // NOLINT
+                    sci_cam_exif, FLAGS_output_dir,                                      // NOLINT
+                    cam_dirs[cam_type], FLAGS_start, FLAGS_duration,                     // NOLINT
+                    FLAGS_sampling_spacing_seconds, FLAGS_dist_between_processed_cams,   // NOLINT
+                    sci_cam_timestamps, FLAGS_max_iso_times_exposure,                    // NOLINT
+                    sparse_map, FLAGS_use_brisk_map,                                     // NOLINT
+                    sim_haz_cam_poses, FLAGS_save_debug_data);                           // NOLINT
 
     if (cam_type == "sci_cam" && FLAGS_simulated_data)
       saveSciCamIntrinsics(FLAGS_ros_bag, cam_dirs[cam_type]);
