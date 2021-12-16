@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.20"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ISAAC: ISAAC Software</title>
+<title>ISAAC: ISAAC (Integrated System for Autonomous and Adaptive Caretaking)</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <link rel="icon" href="favicon.png" type="image/png" />
 <script type="text/javascript" src="jquery.js"></script>
@@ -87,35 +87,45 @@ $(document).ready(function(){initNavTree('index.html',''); initResizable(); });
 
 <div class="PageDoc"><div class="header">
   <div class="headertitle">
-<div class="title">ISAAC Software </div>  </div>
+<div class="title">ISAAC (Integrated System for Autonomous and Adaptive Caretaking) </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="md_README"></a> </p>
-<h2><a class="anchor" id="autotoc_md1"></a>
-About</h2>
-<p>The Integrated System for Autonomous and Adaptive Caretaking project is developing technology for combining robots inside a spacecraft with vehicle infrastructure subsystems, to form an integrated autonomous system. The system validates its technology through demonstrations using the Astrobee free-flier robots, existing robots onboard the International Space Station as analogs for future robots that will be developed for the Gateway.</p>
-<p>The ISAAC project actively develops in a variety of repos hosted at Ames and JSC.</p>
-<p>This <code>isaac</code> repo serves as a master for integrating an end-to-end demo that draws on code from the other repos as well as directly including a significant amount of the ISAAC code, mostly relating to the Astrobee robot.</p>
-<h2><a class="anchor" id="autotoc_md2"></a>
-System requirements</h2>
-<p>The <code>isaac</code> repo depends on the <code>astrobee</code> repo, therefore it inherits the same system requirements. You must use Ubuntu 16.04 to 20.04 64-bit. When running in simulation, certain Gazebo plugins require appropriate graphics drivers.</p>
-<h2><a class="anchor" id="autotoc_md3"></a>
-Usage</h2>
+<div class="textblock"><p><a class="anchor" id="md_README"></a></p>
+<p><a href="https://github.com/nasa/isaac/blob/master/LICENSE"><img src="https://img.shields.io/github/license/nasa/isaac" alt="GitHub license" class="inline"/></a> <a href="https://github.com/nasa/isaac/actions/workflows/ci_push.yml"><img src="https://github.com/nasa/isaac/actions/workflows/ci_push.yml/badge.svg" alt="Build, test and push packages CI" style="pointer-events: none;" class="inline"/></a></p>
+<p>The ISAAC project has three main technical thrusts:</p>
+<ol type="1">
+<li><b>Integrated data</b>: The current state of the art is that data from sensors associated with different facility subsystems (Structures, GN&amp;C, and ECLSS, etc.) remain siloed. ISAAC technology unifies facility data and models with autonomous robotics, linking data streams from facility subsystems, sensor networks, and robots, as well as linking 3D geometry and sensor data map layers, and detecting changes and anomalies.</li>
+<li><b>Integrated control interface</b>: Current state of the art manages facilities with largely independent interface tools for different subsystems. Interfaces have different heritage, design assumptions and operator interface styles. Subsystem interactions are hard to analyze due to poor connectivity between separate tools. ISAAC technology combines interface tools for facility subsystems and autonomous robots; improves system-level situation awareness, situation understanding, and operator productivity; enables linking and embedding between tools to improve subsystem interaction analysis; and supports the entire activity life cycle from planning through execution and analysis.</li>
+<li><b>Coordinated execution</b>: The current state of the art for executing facility activities that require coordination between subsystems is either manual commanding (operator tracks dependencies between subsystems) or simple sequencing that can be brittle to even minor contingencies during execution. ISAAC technology models dependencies, uses automated planning to translate a high-level task definition to a plan that can work given the current system state (e.g. include actions to open hatches so that a robot can move where needed), and leverages ISAAC’s integrated data technology to watch for execution contingencies and trigger replanning as needed. This technology will reduce the time to effect changes on the system during critical faults and emergencies.</li>
+</ol>
+<p>This <code>isaac</code> repo serves as a master for integrating an end-to-end demo that draws on code from the other repos as well as directly including a significant amount of the ISAAC code, mostly relating to the <a href="https://github.com/nasa/astrobee">Astrobee robot</a>. This repository includes:</p>
+<ul>
+<li><a href="https://nasa.github.io/isaac/html/astrobee.html">Astrobee software</a> for added behaviors such as inpection and cargo transport as well as new sensor utilization.</li>
+<li><a href="https://nasa.github.io/isaac/html/geometric_streaming_mapper.html">Dense mapping</a> to create a textured 3D map</li>
+<li><a href="https://nasa.github.io/isaac/html/volumetric_mapper.html">Volumetric mapping</a> to map volumetric signals, such as WiFi.</li>
+<li><a href="https://nasa.github.io/isaac/html/ano.html">Image analysis</a> module to train a neural network to detect anomalies</li>
+</ul>
+<p>You may also be interested in the separate repository for the <a href="https://github.com/nasa/isaac_user_interface">ISAAC User Interface</a>, which enables monitoring of multiple robots through a web browser.</p>
+<h1><a class="anchor" id="autotoc_md0"></a>
+System requirements</h1>
+<p>The <code>isaac</code> repo depends on the <code>astrobee</code> repo, therefore it inherits the same system requirements. You must use Ubuntu 16.04 to 20.04 64-bit. When running in simulation, certain Gazebo plugins require appropriate graphics drivers. See INSTALL.md in that repository for more information.</p>
+<h1><a class="anchor" id="autotoc_md1"></a>
+Usage</h1>
 <p>There are two main ways to install and run <code>isaac</code>:</p>
 <ol type="1">
 <li>For development: Build the <code>isaac</code> code on your native Ubuntu OS (or inside a normal virtual machine) in a way that makes it convenient for you to edit and incrementally recompile.</li>
 <li>For demo: For the ISAAC integrated demo, many ISAAC repos are checked out, built, and run in a distributed fashion across multiple docker containers. The <code>isaac</code> code itself is built and run inside one of these containers. Note that the in-docker build is managed by the Dockerfile and completely separate from any build in your native OS, and you don't need to install for development prior to installing for demo.</li>
 </ol>
 <p><a href="https://nasa.github.io/isaac/html/md_INSTALL.html">Instructions on installing and using the ISAAC Software</a>. For running the <a href="https://nasa.github.io/isaac/html/md_DEMO_INSTALL.html">docker demos</a></p>
-<h2><a class="anchor" id="autotoc_md4"></a>
-Documentation</h2>
+<h1><a class="anchor" id="autotoc_md2"></a>
+Documentation</h1>
 <p><a href="https://nasa.github.io/isaac/documentation.html">The documentation is auto-generated from the contents of this repository.</a></p>
 <p>To compile the documentation locally (make sure you have the latest doxygen installed): </p><pre class="fragment">doxygen isaac.doxyfile
-</pre><h2><a class="anchor" id="autotoc_md5"></a>
-Contributing</h2>
+</pre><h1><a class="anchor" id="autotoc_md3"></a>
+Contributing</h1>
 <p>The ISAAC Software is open source, and we welcome contributions from the public. Please submit pull requests to the <code>develop</code> branch. For us to merge any pull requests, we must request that contributors sign and submit either an <a href="https://github.com/nasa/isaac/blob/94996bc1a20fa090336e67b3db5c10a9bb30f0f7/doc/cla/ISAAC_Individual%20CLA.pdf">Individual Contributor License Agreement</a> or a <a href="https://github.com/nasa/isaac/blob/94996bc1a20fa090336e67b3db5c10a9bb30f0f7/doc/cla/ISAAC_Corporate%20CLA.pdf">Corporate Contributor License Agreement</a> due to NASA legal requirements. Thank you for your understanding.</p>
-<h2><a class="anchor" id="autotoc_md6"></a>
-License</h2>
+<h1><a class="anchor" id="autotoc_md4"></a>
+License</h1>
 <p>Copyright (c) 2021, United States Government, as represented by the Administrator of the National Aeronautics and Space Administration. All rights reserved.</p>
 <p>The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
 platform" software is licensed under the Apache License, Version 2.0 "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>.</p>

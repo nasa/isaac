@@ -91,8 +91,8 @@ $(document).ready(function(){initNavTree('md_DEMO_INSTALL.html',''); initResizab
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>Instructions for the full demo install</p>
-<h2><a class="anchor" id="autotoc_md17"></a>
-Check out</h2>
+<h1><a class="anchor" id="autotoc_md13"></a>
+Check out</h1>
 <p>Run: </p><pre class="fragment">mkdir ~/ws
 cd ~/ws
 git clone ssh://git@babelfish.arc.nasa.gov:7999/isaac/isaac.git --branch develop
@@ -100,15 +100,15 @@ git clone ssh://git@babelfish.arc.nasa.gov:7999/isaac/isaac.git --branch develop
 # if you prefer to use [vcstool](https://github.com/dirk-thomas/vcstool), you can run this checkout script instead:
 ./isaac/scripts/checkout-vcstool.sh
 </pre><p>(You can also modify the checkout location <code>~/ws</code> if you want.)</p>
-<h2><a class="anchor" id="autotoc_md18"></a>
-Install dependencies</h2>
+<h1><a class="anchor" id="autotoc_md14"></a>
+Install dependencies</h1>
 <p>Install docker tools: </p><pre class="fragment">sudo apt-get install docker.io docker-compose
 </pre><p>Install nvidia-docker by following (the directions here)[<a href="https://github.com/NVIDIA/nvidia-docker">https://github.com/NVIDIA/nvidia-docker</a>].</p>
-<h2><a class="anchor" id="autotoc_md19"></a>
-Build</h2>
+<h1><a class="anchor" id="autotoc_md15"></a>
+Build</h1>
 <p>Run <code>scripts/docker/build.sh</code> to build the docker images for the demo.</p>
-<h2><a class="anchor" id="autotoc_md20"></a>
-Install</h2>
+<h1><a class="anchor" id="autotoc_md16"></a>
+Install</h1>
 <p>Run <code>scripts/docker/run.sh</code> to run the demo. Open <code><a href="http://127.0.0.1:8080">http://127.0.0.1:8080</a></code> in a web browser to see what is happening. Use <code>docker ps</code> to see the docker containers and use <code>docker exec -it container_name /bin/bash</code> to get a shell in one.</p>
 <p>Cancel with Ctrl+c and then run <code>scripts/docker/shutdown.sh</code> to stop the demo. </p>
 </div></div><!-- contents -->

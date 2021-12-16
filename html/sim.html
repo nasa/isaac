@@ -92,8 +92,8 @@ $(document).ready(function(){initNavTree('sim.html',''); initResizable(); });
 <div class="contents">
 <div class="textblock"><p>Simulation contains the packages where the dense maps are built</p>
 <p>This page describes the isaac gazebo plugins.</p>
-<h1><a class="anchor" id="autotoc_md54"></a>
-Heat cam</h1>
+<h3><a class="anchor" id="autotoc_md36"></a>
+Heat cam</h3>
 <p>This plugin simulates a heat-detecting camera, with the color in the images it produces suggestive of the temperature on the surface of the 3D environment seen in the camera.</p>
 <p>The file</p>
 <p>isaac/isaac/config/hw/heat_cam.config</p>
@@ -115,7 +115,8 @@ Heat cam</h1>
 <p>Note that as the robot moves and leaves the hot spots behind, the heat cam will only show the constant ambient temperature.</p>
 <p>By default, the camera takes pictures as often as it can. It listens however to the topic</p>
 <p>/comm/dds/command</p>
-<p>for guest science commands that may tell it to take a single picture at a specific time, or to take pictures continuously. Such a command must use the app name "gov.nasa.arc.irg.astrobee.heat_cam_image" (which is the "s" field in the first command argument) for it to be processed. </p>
+<p>for guest science commands that may tell it to take a single picture at a specific time, or to take pictures continuously. Such a command must use the app name "gov.nasa.arc.irg.astrobee.heat_cam_image" (which is the "s" field in the first command argument) for it to be processed.</p>
+<p><a class="el" href="acoustics_camera.html">Acoustics camera</a> </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

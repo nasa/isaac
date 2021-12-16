@@ -25,10 +25,30 @@
 var NAVTREE =
 [
   [ "ISAAC", "index.html", [
-    [ "ISAAC Software", "index.html", null ],
-    [ "Native Install", "md_INSTALL.html", null ],
-    [ "Demo docker install", "md_DEMO_INSTALL.html", null ],
-    [ "Subsystems", "md_isaac_Subsystems.html", "md_isaac_Subsystems" ],
+    [ "ISAAC (Integrated System for Autonomous and Adaptive Caretaking)", "index.html", [
+      [ "System requirements", "index.html#autotoc_md0", null ],
+      [ "Usage", "index.html#autotoc_md1", null ],
+      [ "Documentation", "index.html#autotoc_md2", null ],
+      [ "Contributing", "index.html#autotoc_md3", null ],
+      [ "License", "index.html#autotoc_md4", null ]
+    ] ],
+    [ "Native Install", "md_INSTALL.html", [
+      [ "Usage instructions for non-NASA and NASA users", "md_INSTALL.html#autotoc_md5", null ],
+      [ "Machine setup", "md_INSTALL.html#autotoc_md6", null ],
+      [ "Checkout the project source code", "md_INSTALL.html#autotoc_md7", null ],
+      [ "Dependencies", "md_INSTALL.html#autotoc_md8", null ],
+      [ "Configuring the build", "md_INSTALL.html#autotoc_md9", null ],
+      [ "Building the code", "md_INSTALL.html#autotoc_md10", null ],
+      [ "Cross-compiling isaac", "md_INSTALL.html#autotoc_md11", null ],
+      [ "Build ISAAC debian", "md_INSTALL.html#autotoc_md12", null ]
+    ] ],
+    [ "Demo docker install", "md_DEMO_INSTALL.html", [
+      [ "Check out", "md_DEMO_INSTALL.html#autotoc_md13", null ],
+      [ "Install dependencies", "md_DEMO_INSTALL.html#autotoc_md14", null ],
+      [ "Build", "md_DEMO_INSTALL.html#autotoc_md15", null ],
+      [ "Install", "md_DEMO_INSTALL.html#autotoc_md16", null ]
+    ] ],
+    [ "Subsystems", "subsystems.html", "subsystems" ],
     [ "Tutorials", "md_isaac_Tutorials.html", "md_isaac_Tutorials" ],
     [ "Class Index", "classes.html", null ]
   ] ]

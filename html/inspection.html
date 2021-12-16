@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.20"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ISAAC: Inspeiction Behavior</title>
+<title>ISAAC: Inspection Behavior</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <link rel="icon" href="favicon.png" type="image/png" />
 <script type="text/javascript" src="jquery.js"></script>
@@ -87,42 +87,24 @@ $(document).ready(function(){initNavTree('inspection.html',''); initResizable();
 
 <div class="PageDoc"><div class="header">
   <div class="headertitle">
-<div class="title">Inspeiction Behavior </div>  </div>
+<div class="title">Inspection Behavior </div>  </div>
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>This directory provides two tools: inspection_tool and sci_cam_tool.</p>
-<h2><a class="anchor" id="autotoc_md31"></a>
+<h2><a class="anchor" id="autotoc_md26"></a>
 Using the inspection tool</h2>
 <p>This tool is used to initiate inspection actions. To run the tool: </p><pre class="fragment">rosrun inspection inspection_tool -$ACTION [OPTIONS]
 </pre><p>As of now, the actions available are:</p>
-<h3><a class="anchor" id="autotoc_md32"></a>
-Pause</h3>
-<p>Pauses the current action being performed, the goal is kept, so a resume command will resume the action.</p>
-<h3><a class="anchor" id="autotoc_md33"></a>
-Resume</h3>
-<p>Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step.</p>
-<h3><a class="anchor" id="autotoc_md34"></a>
-Repeat</h3>
-<p>Resumes the survey repeating the last inspection pose.</p>
-<h3><a class="anchor" id="autotoc_md35"></a>
-Skip</h3>
-<p>Skips the surrent inspection pose, useful if a certain pose is unreachable.</p>
-<h3><a class="anchor" id="autotoc_md36"></a>
-Save</h3>
-<p>Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using</p>
-<h3><a class="anchor" id="autotoc_md37"></a>
-Anomaly</h3>
-<p>Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.</p>
-<h3><a class="anchor" id="autotoc_md38"></a>
-Geometry</h3>
-<p>Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.</p>
-<h3><a class="anchor" id="autotoc_md39"></a>
-Panorama</h3>
-<p>it will do a panorama survey of all points specified</p>
-<h3><a class="anchor" id="autotoc_md40"></a>
-Volumetric</h3>
-<p>This will perform a volumetric survey</p>
-<h2><a class="anchor" id="autotoc_md41"></a>
+<p><em>pause</em>: Pauses the current action being performed, the goal is kept, so a resume command will resume the action.</p>
+<p><em>resume</em>: Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step.</p>
+<p><em>repeat</em>: Resumes the survey repeating the last inspection pose.</p>
+<p><em>skip</em>: Skips the surrent inspection pose, useful if a certain pose is unreachable.</p>
+<p><em>save</em>: Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using</p>
+<p><em>anomaly</em>: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.</p>
+<p><em>geometry</em>: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.</p>
+<p><em>panorama</em>: it will do a panorama survey of all points specified</p>
+<p><em>volumetric</em>: This will perform a volumetric survey</p>
+<h2><a class="anchor" id="autotoc_md27"></a>
 Using sci_cam_tool</h2>
 <p>This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:</p>
 <p>Start the simulator, for example as: </p><pre class="fragment">roslaunch astrobee sim.launch
