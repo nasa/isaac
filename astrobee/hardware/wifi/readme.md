@@ -1,7 +1,5 @@
 \page wifi_driver Wifi Driver
 
-# Overview
-
 This package provides the driver for publishing wifi strength info. I is based on the library available in https://github.com/bmegli/wifi-scan, adapted to ROS for this project.
 
 Because the function that scans all the networks needs network admin rights, there are 2 modes in which this driver can run. The modes can be set as:
@@ -23,14 +21,14 @@ General Parameters:
 
     interface_name: to find ou the interface name, one can find out the interface name by running ifconfig in the cmd line.
 
-# Scan Station
+### Scan Station
 
 Publishes information to the topic hw/wifi/station. It only includes signal strength of the wifi network to which the robot is currently connected to.
 Scan Station Parameters:
 
     time_scan_station: update rate of the station scan, can be set upt to 50ms.
 
-# Scan All
+### Scan All
 
 Publishes information to the topic hw/wifi/all.
 Scan All Parameters:
@@ -42,7 +40,7 @@ Scan All Parameters:
 All data is published as messages on ROS topics using the prefix hw/wifi.
 
 
-# Lib mnl
+### Lib mnl
 This package is needed in hardware/wifi node, such that we can scan the wifi networks.
 If you are missing this package, and have sudo rights, do:
 

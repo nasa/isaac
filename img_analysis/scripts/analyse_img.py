@@ -16,25 +16,27 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import torch
-from torch import nn
-from torch import optim
-import torch.nn.functional as F
-from torchvision import datasets, transforms, models
-import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
-from PIL import Image
 
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn.functional as F
 import torchvision.transforms as transforms
+from PIL import Image
+from torch import nn, optim
+from torchvision import datasets, models, transforms
 
 # Parameters
 image = Image.open("./analysed_images/img3.jpg")
 
-test_transforms = transforms.Compose([transforms.Resize(224),
-                                      transforms.ToTensor(),
-                                      transforms.Normalize([0.485, 0.456, 0.406],
-                                                           [0.229, 0.224, 0.225])])
+test_transforms = transforms.Compose(
+    [
+        transforms.Resize(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ]
+)
 image_tensor = test_transforms(image).float()
 image_tensor = image_tensor.unsqueeze_(0)
 
@@ -42,23 +44,25 @@ print(image_tensor[0, :5])
 
 
 model = models.densenet121(pretrained=True)
-model.classifier = nn.Sequential(nn.Linear(1024, 256),
-                                 nn.ReLU(),
-                                 nn.Dropout(0.2),
-                                 nn.Linear(256, 3),
-                                 nn.LogSoftmax(dim=1))
-model.load_state_dict(torch.load('model_cnn.pt'))
+model.classifier = nn.Sequential(
+    nn.Linear(1024, 256),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(256, 3),
+    nn.LogSoftmax(dim=1),
+)
+model.load_state_dict(torch.load("model_cnn.pt"))
 model.eval()
 
 output = model(image_tensor)
 print(output)
 
 if output is 0:
-	print("Vent is obstructed")
-else if output is 1:
-	print("Vent is free")
-else if output is 2:
-	print("Could not identify a vent")
+    print("Vent is obstructed")
+elif output is 1:
+    print("Vent is free")
+elif output is 2:
+    print("Could not identify a vent")
 
 index = output.data.numpy().argmax()
 print(index)

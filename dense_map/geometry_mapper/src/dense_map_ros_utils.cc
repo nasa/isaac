@@ -118,6 +118,53 @@ void readBagImageTimestamps(std::string const& bag_file, std::string const& topi
   }
 }
 
+// Given a bag view, for each topic in the view read the vector of
+// messages for that topic, sorted by message header timestamp. Only
+// the following sensor types are supported: sensor_msgs::Image,
+// sensor_msgs::CompressedImage, and sensor_msgs::PointCloud2.
+void indexMessages(rosbag::View& view,  // view can't be made const
+                   std::map<std::string, std::vector<rosbag::MessageInstance>>& bag_map) {
+  bag_map.clear();
+
+  // First put the data in maps so that we can sort it
+  std::map<std::string, std::map<double, rosbag::MessageInstance>> local_map;
+  for (rosbag::MessageInstance const m : view) {
+    // Check for regular image message
+    sensor_msgs::Image::ConstPtr image_msg = m.instantiate<sensor_msgs::Image>();
+    if (image_msg) {
+      double  curr_time = image_msg->header.stamp.toSec();
+      local_map[m.getTopic()].insert(std::make_pair(curr_time, m));
+      continue;
+    }
+
+    // Check for compressed image message
+    sensor_msgs::CompressedImage::ConstPtr comp_image_msg =
+      m.instantiate<sensor_msgs::CompressedImage>();
+    if (comp_image_msg) {
+      double  curr_time = comp_image_msg->header.stamp.toSec();
+      local_map[m.getTopic()].insert(std::make_pair(curr_time, m));
+      continue;
+    }
+
+    // Check for cloud
+    sensor_msgs::PointCloud2::ConstPtr pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
+    if (pc_msg) {
+      double curr_time = pc_msg->header.stamp.toSec();
+      local_map[m.getTopic()].insert(std::make_pair(curr_time, m));
+      continue;
+    }
+  }
+
+  // Add the data in sorted order
+  for (auto topic_it = local_map.begin(); topic_it != local_map.end(); topic_it++) {
+    auto& topic_name = topic_it->first;  // alias
+    auto& topic_map = topic_it->second;  // alias
+
+    for (auto msg_it = topic_map.begin(); msg_it != topic_map.end() ; msg_it++)
+      bag_map[topic_name].push_back(msg_it->second);
+  }
+}
+
 // Read exif data from a bag
 void readExifFromBag(std::vector<rosbag::MessageInstance> const& bag_msgs,
                      std::map<double, std::vector<double> >& exif) {
@@ -142,8 +189,8 @@ void readExifFromBag(std::vector<rosbag::MessageInstance> const& bag_msgs,
 // that during repeated calls to this function we always travel
 // forward in time, and we keep track of where we are in the bag using
 // the variable bag_pos that we update as we go.
-bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs, bool save_grayscale,
-                 cv::Mat& image, int& bag_pos, double& found_time) {
+bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs,
+                   bool save_grayscale, cv::Mat& image, int& bag_pos, double& found_time) {
   found_time = -1.0;  // Record the time at which the image was found
   int num_msgs = bag_msgs.size();
   double prev_image_time = -1.0;
@@ -152,27 +199,35 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
     bag_pos = local_pos;  // save this for exporting
 
     // Check for uncompressed images
-    sensor_msgs::Image::ConstPtr image_msg = bag_msgs[local_pos].instantiate<sensor_msgs::Image>();
+    sensor_msgs::Image::ConstPtr image_msg
+      = bag_msgs[local_pos].instantiate<sensor_msgs::Image>();
     if (image_msg) {
       ros::Time stamp = image_msg->header.stamp;
       found_time = stamp.toSec();
 
       // Sanity check: We must always travel forward in time
-      if (found_time < prev_image_time) LOG(FATAL) << "Time in the bag must be increasing.";
+      if (found_time < prev_image_time) {
+        LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                   << std::fixed << std::setprecision(17)
+                   << "Times in wrong order: " << prev_image_time << ' ' << found_time << ".\n";
+        continue;
+      }
       prev_image_time = found_time;
 
       if (found_time >= desired_time) {
         try {
           if (!save_grayscale) {
-            image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
+            // Do a copy, as image_msg may soon run out of scope
+            (cv_bridge::toCvShare(image_msg, "bgr8")->image).copyTo(image);
           } else {
-            // for some reason, looking up the image as grayscale does not work,
+            // For some reason, looking up the image as grayscale does not work,
             // so first it needs to be looked up as color and then converted.
             cv::Mat tmp_image = cv_bridge::toCvShare(image_msg, "bgr8")->image;
             cv::cvtColor(tmp_image, image, cv::COLOR_BGR2GRAY);
           }
         } catch (cv_bridge::Exception const& e) {
-          ROS_ERROR_STREAM("Unable to convert " << image_msg->encoding.c_str() << " image to bgr8.");
+          ROS_ERROR_STREAM("Unable to convert " << image_msg->encoding.c_str()
+                           << " image to bgr8.");
           return false;
         }
         return true;
@@ -187,7 +242,12 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
       found_time = stamp.toSec();
 
       // Sanity check: We must always travel forward in time
-      if (found_time < prev_image_time) LOG(FATAL) << "Time in the bag must be increasing.";
+      if (found_time < prev_image_time) {
+        LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                   << std::fixed << std::setprecision(17)
+                   << "Times in wrong order: " << prev_image_time << ' ' << found_time << ".\n";
+        continue;
+      }
       prev_image_time = found_time;
 
       if (found_time >= desired_time) {
@@ -209,14 +269,14 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
   return false;
 }
 
-// Find the closest depth cloud to given timestamp. Return an empty
-// one if one cannot be found closer in time than max_time_diff.
-// Store it as a cv::Mat of vec3f values. We assume that during
-// repeated calls to this function we always travel forward in time,
-// and we keep track of where we are in the bag using the variable
-// bag_pos that we update as we go.
-bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs, double max_time_diff,
-                 cv::Mat& cloud, int& bag_pos, double& found_time) {
+// Find the closest depth cloud to given timestamp (before or after
+// it). Return an empty one if one cannot be found closer in time than
+// max_time_diff. Store it as a cv::Mat of vec3f values. We assume
+// that during repeated calls to this function we always travel
+// forward in time, and we keep track of where we are in the bag using
+// the variable bag_pos that we update as we go.
+bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs,
+                   double max_time_diff, cv::Mat& cloud, int& bag_pos, double& found_time) {
   int num_msgs = bag_msgs.size();
   double prev_time = -1.0;
   found_time = -1.0;
@@ -227,12 +287,18 @@ bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const
 
   for (int local_pos = bag_pos; local_pos < num_msgs; local_pos++) {
     // Check for cloud
-    sensor_msgs::PointCloud2::ConstPtr curr_pc_msg = bag_msgs[local_pos].instantiate<sensor_msgs::PointCloud2>();
+    sensor_msgs::PointCloud2::ConstPtr curr_pc_msg
+      = bag_msgs[local_pos].instantiate<sensor_msgs::PointCloud2>();
     if (!curr_pc_msg) continue;
     double curr_time = curr_pc_msg->header.stamp.toSec();
 
     // Sanity check: We must always travel forward in time
-    if (curr_time < prev_time) LOG(FATAL) << "Time in the bag must be increasing.";
+    if (curr_time < prev_time) {
+      LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                 << std::fixed << std::setprecision(17)
+                 << "Times in wrong order: " << prev_time << ' ' << curr_time << ".\n";
+      continue;
+    }
 
     // We are not yet at the stage where we can make decisions, so just keep on going
     if (curr_time <= desired_time) {
@@ -261,14 +327,16 @@ bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const
     // Decode the cloud
     pcl::PointCloud<pcl::PointXYZ> pc;
     pcl::fromROSMsg(*curr_pc_msg, pc);
-    if (static_cast<int>(pc.points.size()) != static_cast<int>(curr_pc_msg->width * curr_pc_msg->height))
+    if (static_cast<int>(pc.points.size()) !=
+        static_cast<int>(curr_pc_msg->width * curr_pc_msg->height))
       LOG(FATAL) << "Extracted point cloud size does not agree with original size.";
 
     cloud = cv::Mat::zeros(curr_pc_msg->height, curr_pc_msg->width, CV_32FC3);
     for (int row = 0; row < curr_pc_msg->height; row++) {
       for (int col = 0; col < curr_pc_msg->width; col++) {
         int count = row * curr_pc_msg->width + col;
-        cloud.at<cv::Vec3f>(row, col) = cv::Vec3f(pc.points[count].x, pc.points[count].y, pc.points[count].z);
+        cloud.at<cv::Vec3f>(row, col)
+          = cv::Vec3f(pc.points[count].x, pc.points[count].y, pc.points[count].z);
       }
     }
 

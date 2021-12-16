@@ -89,7 +89,8 @@ void detectFeatures(const cv::Mat& image, bool verbose,
 // This really likes haz cam first and nav cam second
 void matchFeatures(std::mutex* match_mutex, int left_image_index, int right_image_index,
                    cv::Mat const& left_descriptors, cv::Mat const& right_descriptors,
-                   Eigen::Matrix2Xd const& left_keypoints, Eigen::Matrix2Xd const& right_keypoints, bool verbose,
+                   Eigen::Matrix2Xd const& left_keypoints,
+                   Eigen::Matrix2Xd const& right_keypoints, bool verbose,
                    // output
                    MATCH_PAIR* matches) {
   std::vector<cv::DMatch> cv_matches;
@@ -108,17 +109,17 @@ void matchFeatures(std::mutex* match_mutex, int left_image_index, int right_imag
 
   if (left_vec.empty()) return;
 
-  // These may need some tweaking but work reasonably well.
+  // These may need some tweaking but works reasonably well.
   double ransacReprojThreshold = 20.0;
   cv::Mat inlier_mask;
   int maxIters = 10000;
   double confidence = 0.8;
 
+  // affine2D works better than homography
   // cv::Mat H = cv::findHomography(left_vec, right_vec, cv::RANSAC,
-  // ransacReprojThreshold,
-  //                               inlier_mask, maxIters, confidence);
-  cv::Mat H =
-    cv::estimateAffine2D(left_vec, right_vec, inlier_mask, cv::RANSAC, ransacReprojThreshold, maxIters, confidence);
+  // ransacReprojThreshold, inlier_mask, maxIters, confidence);
+  cv::Mat H = cv::estimateAffine2D(left_vec, right_vec, inlier_mask, cv::RANSAC,
+                                   ransacReprojThreshold, maxIters, confidence);
 
   std::vector<InterestPoint> left_ip, right_ip;
   for (size_t j = 0; j < cv_matches.size(); j++) {
@@ -140,10 +141,16 @@ void matchFeatures(std::mutex* match_mutex, int left_image_index, int right_imag
     right_ip.push_back(right);
   }
 
-  if (verbose) std::cout << "Number of matches: " << left_ip.size() << std::endl;
-
   // Update the shared variable using a lock
   match_mutex->lock();
+
+  // Print the verbose message inside the lock, otherwise the text
+  // may get messed up.
+  if (verbose)
+    std::cout << "Number of matches for pair "
+              << left_image_index << ' ' << right_image_index << ": "
+              << left_ip.size() << std::endl;
+
   *matches = std::make_pair(left_ip, right_ip);
   match_mutex->unlock();
 }

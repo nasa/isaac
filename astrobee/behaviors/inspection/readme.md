@@ -1,8 +1,9 @@
-\page inspection Inspeiction Behavior
+\page inspection Inspection Behavior
 
 This directory provides two tools: inspection_tool and sci_cam_tool.
 
-## Using the inspection tool
+Using the inspection tool
+---------
 
 This tool is used to initiate inspection actions. To run the tool:
 	
@@ -10,45 +11,27 @@ This tool is used to initiate inspection actions. To run the tool:
 
 As of now, the actions available are:
 
-### Pause
+*pause*: Pauses the current action being performed, the goal is kept, so a resume command will resume the action.
 
-Pauses the current action being performed, the goal is kept, so a resume command will resume the action.
+*resume*: Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step. 
 
-### Resume
+*repeat*: Resumes the survey repeating the last inspection pose.
 
-Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step. 
-
-### Repeat
-
-Resumes the survey repeating the last inspection pose.
+*skip*: Skips the surrent inspection pose, useful if a certain pose is unreachable.
 
 
-### Skip
+*save*: Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using 
 
-Skips the surrent inspection pose, useful if a certain pose is unreachable.
+*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.
 
+*geometry*: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.
 
-### Save
+*panorama*: it will do a panorama survey of all points specified
 
-Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using 
+*volumetric*: This will perform a volumetric survey
 
-### Anomaly
-
-Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.
-
-### Geometry
-
-Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.
-
-### Panorama
-
-it will do a panorama survey of all points specified
-
-### Volumetric
-
-This will perform a volumetric survey
-
-## Using sci_cam_tool
+Using sci_cam_tool
+---------
 
 This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:
 

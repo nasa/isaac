@@ -5,7 +5,7 @@ Simulation contains the packages where the dense maps are built
 
 This page describes the isaac gazebo plugins.
 
-# Heat cam
+### Heat cam
 
 This plugin simulates a heat-detecting camera, with the color in the
 images it produces suggestive of the temperature on the surface of the
@@ -72,3 +72,5 @@ at a specific time, or to take pictures continuously. Such a command
 must use the app name "gov.nasa.arc.irg.astrobee.heat_cam_image"
 (which is the "s" field in the first command argument) for it to be
 processed.
+
+\subpage acoustics_camera
