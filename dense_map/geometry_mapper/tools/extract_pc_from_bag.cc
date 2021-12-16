@@ -20,22 +20,22 @@
 #include <ff_common/init.h>
 #include <ff_common/utils.h>
 
+#include <dense_map_ros_utils.h>
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include <opencv2/highgui/highgui.hpp>
 
-// ROS
 #include <cv_bridge/cv_bridge.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/Image.h>
-
 #include <sensor_msgs/PointCloud2.h>
+
 #include <pcl/io/ply_io.h>
 #include <pcl/io/pcd_io.h>
-#include <pcl_ros/point_cloud.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
       }
 
       pcl::PointCloud<pcl::PointXYZ> pc;
-      pcl::fromROSMsg(*pc_msg, pc);
+      dense_map::msgToPcl(pc_msg, pc);
       if (static_cast<int>(pc.points.size()) != static_cast<int>(pc_msg->width * pc_msg->height))
         LOG(FATAL) << "Extracted point cloud size does not agree with original size.";
 

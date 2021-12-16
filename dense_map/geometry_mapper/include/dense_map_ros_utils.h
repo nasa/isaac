@@ -40,6 +40,13 @@
 #include <string>
 #include <vector>
 
+// Forward declaration
+namespace pcl {
+  class PointXYZ;
+  template<class T>
+  class PointCloud;
+}
+
 namespace dense_map {
 
 // Publish a given pose
@@ -74,6 +81,11 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
 // bag_pos that we update as we go.
 bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs,
                  double max_time_diff, cv::Mat& cloud, int& bag_pos, double& found_time);
+
+// A wrapper around a function in pcl_ros/point_cloud.h to avoid
+// including that header all over the place as it creates an annoying
+// warning.
+void msgToPcl(sensor_msgs::PointCloud2::ConstPtr pc_msg, pcl::PointCloud<pcl::PointXYZ> & pc);
 
 // Read the list of topics in a bag while avoiding repetitions
 void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topics);

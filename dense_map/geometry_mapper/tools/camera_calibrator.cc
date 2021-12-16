@@ -39,7 +39,6 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
-#include <pcl_ros/point_cloud.h>
 #include <rosbag/view.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -551,13 +550,15 @@ void read_depth_cam_meas(  // Inputs
       }
 
       pcl::PointCloud<pcl::PointXYZ> pc;
-      pcl::fromROSMsg(*pc_msg, pc);
-      if (static_cast<int>(pc.points.size()) != static_cast<int>(pc_msg->width * pc_msg->height))
+      dense_map::msgToPcl(pc_msg, pc);
+
+      if (static_cast<int>(pc.points.size()) != pc_msg->width * pc_msg->height)
         LOG(FATAL) << "Extracted point cloud size does not agree with original size.";
 
       double best_image_timestamp = cam2_timestamps[image_cid];
       auto it = cam2_target_corners.find(best_image_timestamp);
-      if (it == cam2_target_corners.end()) LOG(FATAL) << "Cannot locate target corners at desired timestamp.";
+      if (it == cam2_target_corners.end())
+        LOG(FATAL) << "Cannot locate target corners at desired timestamp.";
 
       // Will push here one depth measurement for each target corners.
       // Invalid ones will be (0, 0, 0).

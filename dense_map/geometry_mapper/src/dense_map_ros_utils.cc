@@ -347,6 +347,13 @@ bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const
   return false;
 }
 
+// A wrapper around a function in pcl_ros/point_cloud.h to avoid
+// including that header all over the place as it creates an annoying
+// warning.
+void msgToPcl(sensor_msgs::PointCloud2::ConstPtr pc_msg, pcl::PointCloud<pcl::PointXYZ>& pc) {
+  pcl::fromROSMsg(*pc_msg, pc);
+}
+
 // Read the list of topics in a bag while avoiding repetitions
 void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topics) {
   if (!boost::filesystem::exists(bag_file)) LOG(FATAL) << "Bag does not exist: " << bag_file;
