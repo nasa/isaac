@@ -780,8 +780,8 @@ Parameters:
       registered map.
     --external_mesh: Use this mesh to texture the images, rather than
       creating one from depth data in the current bag.
-    --scicam_to_hazcam_timestamp_offset_override_value: Override the
-      value of scicam_to_hazcam_timestamp_offset from the robot config
+    --nav_cam_to_sci_cam_offset_override_value: Override the
+      value of nav_cam_to_sci_cam_timestamp_offset from the robot config
       file with this value.
     --verbose: If specified, echo all output in the terminal.
     --save_debug_data: If specified, save many intermediate datasets
@@ -1127,7 +1127,7 @@ camera's time is first adjusted for the time offset before any of this
 happens.) One may consider using a bracket length of 1.0 seconds if
 the bot is known to move quickly right after taking a sci cam picture.
 
-The option --scicam_to_hazcam_timestamp_offset_override_value can be
+The option --nav_cam_to_sci_cam_offset_override_value can be
 used if the given bag is suspected to have a different value of this
 offset. Such an option the option can be passed also to the camera
 refiner below and to the geometry mapper.
@@ -1257,11 +1257,11 @@ Note how we used the same bracket length as in the image picker.
 
 This tool will print some statistics showing the reprojection 
 residuals for all camera combinations. This can be helpful
-in figuring out if the value of scicam_to_hazcam_timestamp_offset
+in figuring out if the value of nav_cam_to_sci_cam_timestamp_offset
 is correct. If this value is not known well, this tool can be
 run with zero or more iterations and various values of 
 
-  --scicam_to_hazcam_timestamp_offset_override_value <val>
+  --nav_cam_to_sci_cam_offset_override_value <val>
 
 to see which value gives the smallest residuals. The geometry mapper
 cam be run with various obtained calibrated files, and see which
@@ -1346,8 +1346,8 @@ This program's options are:
       option --fix_map is used).
     --num_opt_threads: How many threads to use in the optimization. The 
       default is 16.
-    --scicam_to_hazcam_timestamp_offset_override_value:
-      Override the value of scicam_to_hazcam_timestamp_offset from the
+    --nav_cam_to_sci_cam_offset_override_value:
+      Override the value of nav_cam_to_sci_cam_timestamp_offset from the
       config file with this value.
     --mesh: Refine the sci cam so that the sci cam texture agrees with
       the nav cam texture when projected on this mesh.

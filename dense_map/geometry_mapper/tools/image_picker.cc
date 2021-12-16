@@ -79,12 +79,11 @@ DEFINE_double(bracket_len, 2.0,
 
 DEFINE_double(scicam_to_hazcam_timestamp_offset_override_value,
               std::numeric_limits<double>::quiet_NaN(),
-              "Override the value of scicam_to_hazcam_timestamp_offset from the robot config "
+              "Override the value of nav_cam_to_sci_cam_timestamp_offset from the robot config "
               "file with this value.");
 
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
-
   if (FLAGS_ros_bag.empty()) LOG(FATAL) << "The bag file was not specified.";
 
   if (FLAGS_output_nav_cam_dir.empty()) LOG(FATAL) << "The output nav cam dir was not specified.";
@@ -147,7 +146,8 @@ int main(int argc, char** argv) {
   double haz_cam_start_time = -1.0;
   std::vector<rosbag::MessageInstance> const& haz_cam_intensity_msgs = haz_cam_intensity_handle.bag_msgs;
   for (size_t it = 0; it < haz_cam_intensity_msgs.size(); it++) {
-    sensor_msgs::Image::ConstPtr image_msg = haz_cam_intensity_msgs[it].instantiate<sensor_msgs::Image>();
+    sensor_msgs::Image::ConstPtr image_msg
+      = haz_cam_intensity_msgs[it].instantiate<sensor_msgs::Image>();
     if (image_msg) {
       double haz_cam_time = image_msg->header.stamp.toSec();
       all_haz_cam_timestamps.push_back(haz_cam_time);
@@ -281,6 +281,5 @@ int main(int argc, char** argv) {
     std::cout << "Writing: " << filename_buffer << std::endl;
     cv::imwrite(filename_buffer, image);
   }
-
   return 0;
 }

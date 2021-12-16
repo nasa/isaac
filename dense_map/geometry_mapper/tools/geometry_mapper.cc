@@ -173,7 +173,7 @@ bool findNearbySparseMapImages(double desired_nav_cam_time,
 }
 
 // Given a timestamp of a desired camera (haz_cam or sci_cam) and the
-// list of navcam image timestamps, find the nearest navcam images in
+// list of nav_cam image timestamps, find the nearest nav_cam images in
 // time to the desired timestamp, localize from the sparse map their
 // poses, then interpolate and transform to find the pose of the
 // desired camera.
@@ -815,7 +815,7 @@ void calc_weights(cv::Mat& depthMat, double exponent) {
 }
 
 void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat const& haz_cam_intensity,
-                           Eigen::Affine3d const& hazcam_depth_to_image_transform, int depth_exclude_columns,
+                           Eigen::Affine3d const& haz_cam_depth_to_image_transform, int depth_exclude_columns,
                            int depth_exclude_rows, double foreshortening_delta, double depth_hole_fill_diameter,
                            double reliability_weight_exponent, std::vector<double> const& median_filter_params,
                            bool save_debug_data, const char* filename_buffer,
@@ -930,7 +930,7 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
       }
 
       Eigen::Vector3d X(pt[0], pt[1], pt[2]);
-      X = hazcam_depth_to_image_transform * X;
+      X = haz_cam_depth_to_image_transform * X;
       pci.points[count].x = X[0];
       pci.points[count].y = X[1];
       pci.points[count].z = X[2];
@@ -1006,7 +1006,7 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
 
         // Apply an affine transform
         Eigen::Vector3d X(pt[0], pt[1], pt[2]);
-        X = hazcam_depth_to_image_transform * X;
+        X = haz_cam_depth_to_image_transform * X;
 
         // Apply a 4x4 rotation + translation transform
         Eigen::VectorXd V(4);
@@ -1036,7 +1036,7 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg, cv::Mat co
 void saveCameraPoses(
   bool simulated_data, std::string const& cam_type, double nav_to_desired_cam_offset,
   Eigen::Affine3d const& nav_cam_to_desired_cam_trans,
-  Eigen::Affine3d& hazcam_depth_to_image_transform, int depth_exclude_columns,
+  Eigen::Affine3d& haz_cam_depth_to_image_transform, int depth_exclude_columns,
   int depth_exclude_rows, double foreshortening_delta, double depth_hole_fill_diameter,
   double reliability_weight_exponent, std::vector<double> const& median_filter_params,
   std::vector<rosbag::MessageInstance> const& desired_cam_msgs,
@@ -1111,13 +1111,12 @@ void saveCameraPoses(
     double curr_time = -1.0;
 
     if (cam_type == "haz_cam") {
-      // haz cam
+      // Find the depth cloud and its time
       pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
       if (!pc_msg) continue;
       curr_time = pc_msg->header.stamp.toSec();
     } else {
-      // sci cam or nav cam
-      // Check for image
+      // Find the image and its time
       sensor_msgs::Image::ConstPtr image_msg = m.instantiate<sensor_msgs::Image>();
       if (image_msg) {
         curr_time = image_msg->header.stamp.toSec();
@@ -1205,29 +1204,52 @@ void saveCameraPoses(
     char filename_buffer[1000];
     std::string suffix = cam_type + "_to_world";
 
+    // Lookup and save the image at the current time or soon after it (the latter
+    // case happens when looking up the image based on the cloud time)
+    cv::Mat desired_image;
+    bool save_grayscale = false;  // Get a color image, if possible
+    double found_time = -1.0;
+    if (!dense_map::lookupImage(curr_time, desired_cam_msgs, save_grayscale,
+                                desired_image, desired_cam_pos, found_time))
+      continue;
+
+    // Apply an optional scale. Use a pointer to not copy the data more than
+    // one has to.
+    cv::Mat* img_ptr = &desired_image;
+    cv::Mat scaled_image;
+    if (!simulated_data && cam_type == "sci_cam") {
+      auto exif_it = sci_cam_exif.find(curr_time);
+      if (exif_it != sci_cam_exif.end()) {
+        std::vector<double> const& exif = exif_it->second;
+        double iso = exif[dense_map::ISO];
+        double exposure = exif[dense_map::EXPOSURE_TIME];
+        dense_map::exposureCorrection(max_iso_times_exposure, iso, exposure,
+                                      *img_ptr, scaled_image);
+        img_ptr = &scaled_image;
+      }
+    }
+
+    snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.jpg",
+             desired_cam_dir.c_str(), curr_time);
+    std::cout << "Writing: " << filename_buffer << std::endl;
+    cv::imwrite(filename_buffer, *img_ptr);
+
+    // Save the name of the image in the index
+    ofs << filename_buffer << "\n";
+
+    // Save the transform
+    snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s.txt",
+             output_dir.c_str(), curr_time, suffix.c_str());
+    dense_map::writeMatrix(desired_cam_to_world_trans, filename_buffer);
+
     if (cam_type == "haz_cam") {
-      cv::Mat haz_cam_intensity;
-      bool save_grayscale = false;  // Get a color image, if possible
-
-      // Normally try to look up the image time right after the current cloud time
-      double desired_image_time = curr_time;
-      double found_time = -1.0;
-      if (!dense_map::lookupImage(desired_image_time, desired_cam_msgs, save_grayscale,
-                                  haz_cam_intensity, desired_cam_pos, found_time))
-        continue;
-
-      // Save the transform (only if the above lookup was successful)
-      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s.txt", output_dir.c_str(),
-               curr_time, suffix.c_str());
-      dense_map::writeMatrix(desired_cam_to_world_trans, filename_buffer);
-
-      // Save the transform name in the index file
-      depth_ofs << filename_buffer << "\n";   // for the depth
+      // Save the transform name in the index file, for voxblox
+      depth_ofs << filename_buffer << "\n";
 
       // Append the intensity to the point cloud and save it
       snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.pcd",
                output_dir.c_str(), curr_time);
-      save_proc_depth_cloud(pc_msg, haz_cam_intensity, hazcam_depth_to_image_transform,
+      save_proc_depth_cloud(pc_msg, desired_image, haz_cam_depth_to_image_transform,
                             depth_exclude_columns,
                             depth_exclude_rows, foreshortening_delta, depth_hole_fill_diameter,
                             reliability_weight_exponent, median_filter_params,
@@ -1236,53 +1258,6 @@ void saveCameraPoses(
 
       // Save the name of the point cloud to the index
       depth_ofs << filename_buffer << "\n";
-
-      // Save the image
-      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.jpg",
-               desired_cam_dir.c_str(), curr_time);
-      std::cout << "Writing: " << filename_buffer << std::endl;
-      cv::imwrite(filename_buffer, haz_cam_intensity);
-
-      // Save the name of the image in the index
-      ofs << filename_buffer << "\n";
-
-    } else {
-      // Save the nav or sci cam image at the given timestamp.
-      cv::Mat desired_cam_image;
-      bool save_grayscale = false;
-      double found_time = -1.0;
-      if (!dense_map::lookupImage(curr_time, desired_cam_msgs, save_grayscale,
-                                  desired_cam_image, desired_cam_pos, found_time))
-        continue;
-
-      // Save the transform (only if the above lookup was successful)
-      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s.txt",
-               output_dir.c_str(), curr_time, suffix.c_str());
-      dense_map::writeMatrix(desired_cam_to_world_trans, filename_buffer);
-
-      // Apply an optional scale. Use a pointer to not copy the data more than
-      // one has to.
-      cv::Mat* img_ptr = &desired_cam_image;
-      cv::Mat scaled_image;
-      if (!simulated_data && cam_type == "sci_cam") {
-        auto exif_it = sci_cam_exif.find(curr_time);
-        if (exif_it != sci_cam_exif.end()) {
-          std::vector<double> const& exif = exif_it->second;
-          double iso = exif[dense_map::ISO];
-          double exposure = exif[dense_map::EXPOSURE_TIME];
-          dense_map::exposureCorrection(max_iso_times_exposure, iso, exposure,
-                                        *img_ptr, scaled_image);
-          img_ptr = &scaled_image;
-        }
-      }
-
-      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.jpg",
-               desired_cam_dir.c_str(), curr_time);
-      std::cout << "Writing: " << filename_buffer << std::endl;
-      cv::imwrite(filename_buffer, *img_ptr);
-
-      // Save the name of the image in the index
-      ofs << filename_buffer << "\n";
     }
 
     // Update the previous camera center
@@ -1292,7 +1267,7 @@ void saveCameraPoses(
   std::cout << "Wrote: " << index_file << std::endl;
 }
 
-void save_navcam_poses_and_images(boost::shared_ptr<sparse_mapping::SparseMap> sparse_map,
+void save_nav_cam_poses_and_images(boost::shared_ptr<sparse_mapping::SparseMap> sparse_map,
                                   std::vector<rosbag::MessageInstance> const& nav_cam_msgs,
                                   std::string const& output_dir,
                                   std::string const& nav_cam_dir) {
@@ -1393,8 +1368,8 @@ DEFINE_bool(use_brisk_map, false,
             "If specified, instead of a SURF sparse map made from the same bag that needs "
             "texturing, use a pre-existing and unrelated BRISK map. This map may be more "
             "convenient but less reliable.");
-DEFINE_string(scicam_to_hazcam_timestamp_offset_override_value, "",
-              "Override the value of scicam_to_hazcam_timestamp_offset from the robot config "
+DEFINE_string(nav_cam_to_sci_cam_offset_override_value, "",
+              "Override the value of nav_cam_to_sci_cam_timestamp_offset from the robot config "
               "file with this value.");
 DEFINE_bool(save_debug_data, false, "Save many intermediate datasets for debugging.");
 
@@ -1481,67 +1456,29 @@ int main(int argc, char** argv) {
   std::cout << "Cutting off " << FLAGS_depth_exclude_columns << " columns and "
             << FLAGS_depth_exclude_rows << " rows at the margins of the depth point clouds.\n";
 
-  double navcam_to_hazcam_timestamp_offset = 0.0, scicam_to_hazcam_timestamp_offset = 0.0;
-  Eigen::MatrixXd hazcam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd scicam_to_hazcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd scicam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd navcam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd navcam_to_body_trans   = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::Affine3d hazcam_depth_to_image_transform;
-  hazcam_depth_to_image_transform.setIdentity();  // default value
-  Eigen::Vector2d Zero2d(0, 0);
-  Eigen::Vector2i Zero2i(0, 0);
-  camera::CameraParameters nav_cam_params(Zero2i, Zero2d, Zero2d);
-  camera::CameraParameters haz_cam_params(Zero2i, Zero2d, Zero2d);
-  camera::CameraParameters sci_cam_params(Zero2i, Zero2d, Zero2d);
+  std::vector<camera::CameraParameters> cam_params;
+  std::vector<Eigen::Affine3d>          nav_to_cam_trans;
+  std::vector<double>                   nav_to_cam_timestamp_offset;
+  Eigen::Affine3d                       nav_cam_to_body_trans;
+  Eigen::Affine3d                       haz_cam_depth_to_image_transform;
   if (!FLAGS_simulated_data) {
-    // Read a bunch of transforms from the robot calibration file.
-    // The empirically determined offset between the measured timestamps
-    // of the cameras, in seconds. There are two reasons for this time offset:
-    // (1) The nav cam and sci cam are acquired on different processors.
-    // (2) The actual moment the camera image is recorded is not the same
-    // moment that image finished processing and the timestamp is set.
-    // This delay is worse for the sci cam which takes longer to acquire.
-    // TODO(oalexan1): camera_calibrator must actually solve for them.
-    dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset",
-                              "scicam_to_hazcam_timestamp_offset",
-                              "hazcam_to_navcam_transform",
-                              "scicam_to_hazcam_transform",
-                              "nav_cam_transform",
-                              "hazcam_depth_to_image_transform",
-                              navcam_to_hazcam_timestamp_offset,
-                              scicam_to_hazcam_timestamp_offset, hazcam_to_navcam_trans,
-                              scicam_to_hazcam_trans,
-                              navcam_to_body_trans, hazcam_depth_to_image_transform,
-                              nav_cam_params, haz_cam_params, sci_cam_params);
+    dense_map::readConfigFile(  // Inputs
+      cam_types, "nav_cam_transform", "haz_cam_depth_to_image_transform",
+      // Outputs
+      cam_params, nav_to_cam_trans, nav_to_cam_timestamp_offset, nav_cam_to_body_trans,
+      haz_cam_depth_to_image_transform);
 
-    if (FLAGS_scicam_to_hazcam_timestamp_offset_override_value != "") {
-      double new_val = atof(FLAGS_scicam_to_hazcam_timestamp_offset_override_value.c_str());
-      std::cout << "Overriding the value " << scicam_to_hazcam_timestamp_offset
-                << " of scicam_to_hazcam_timestamp_offset with: " << new_val << std::endl;
-      scicam_to_hazcam_timestamp_offset = new_val;
+    if (FLAGS_nav_cam_to_sci_cam_offset_override_value != "") {
+      for (size_t it = 0; it < cam_types.size(); it++) {
+        if (cam_types[it] == "sci_cam") {
+          double new_val = atof(FLAGS_nav_cam_to_sci_cam_offset_override_value.c_str());
+          std::cout << "Overriding the value " << nav_to_cam_timestamp_offset[it]
+                    << " of nav_cam_to_sci_cam_timestamp_offset with: " << new_val << std::endl;
+          nav_to_cam_timestamp_offset[it] = new_val;
+        }
+      }
     }
-
-    scicam_to_navcam_trans = hazcam_to_navcam_trans * scicam_to_hazcam_trans;
-    std::cout << "hazcam_to_navcam_trans\n" << hazcam_to_navcam_trans << std::endl;
-    std::cout << "scicam_to_hazcam_trans\n" << scicam_to_hazcam_trans << std::endl;
-    std::cout << "scicam_to_navcam_trans\n" << scicam_to_navcam_trans << std::endl;
-    std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
-    std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
-    std::cout << "hazcam_depth_to_image_transform\n"
-              << hazcam_depth_to_image_transform.matrix() << "\n";
   }
-
-  std::map<std::string, Eigen::Affine3d> nav_to_desired_cam;
-  nav_to_desired_cam["sci_cam"].matrix() = scicam_to_navcam_trans.inverse();
-  nav_to_desired_cam["nav_cam"] = Eigen::Affine3d::Identity();
-  nav_to_desired_cam["haz_cam"].matrix() = hazcam_to_navcam_trans.inverse();
-
-  std::map<std::string, double> nav_to_desired_cam_offset;
-  nav_to_desired_cam_offset["sci_cam"]
-    = navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
-  nav_to_desired_cam_offset["haz_cam"] = navcam_to_hazcam_timestamp_offset;
-  nav_to_desired_cam_offset["nav_cam"] = 0.0;
 
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map;
   if (!FLAGS_simulated_data) {
@@ -1597,15 +1534,15 @@ int main(int argc, char** argv) {
       // Take a shortcut, since the sparse map is made of precisely of
       // the images we want to texture. Just save those images and
       // their poses from the map, avoiding localization.
-      save_navcam_poses_and_images(sparse_map,
-                                   bag_handles["nav_cam"]->bag_msgs,
-                                   FLAGS_output_dir,
-                                   cam_dirs["nav_cam"]);
+      save_nav_cam_poses_and_images(sparse_map,
+                                    bag_handles["nav_cam"]->bag_msgs,
+                                    FLAGS_output_dir,
+                                    cam_dirs["nav_cam"]);
       continue;
     }
 
-    saveCameraPoses(FLAGS_simulated_data, cam_type, nav_to_desired_cam_offset[cam_type], // NOLINT
-                    nav_to_desired_cam[cam_type], hazcam_depth_to_image_transform,       // NOLINT
+    saveCameraPoses(FLAGS_simulated_data, cam_type, nav_to_cam_timestamp_offset[it],     // NOLINT
+                    nav_to_cam_trans[it], haz_cam_depth_to_image_transform,              // NOLINT
                     FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows,               // NOLINT
                     FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter,          // NOLINT
                     FLAGS_reliability_weight_exponent, median_filter_params,             // NOLINT
