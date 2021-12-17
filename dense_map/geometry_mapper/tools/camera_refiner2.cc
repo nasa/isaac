@@ -165,9 +165,9 @@ DEFINE_string(sci_cam_intrinsics_to_float, "",
               "optical_center, distortion. Specify as a quoted list. "
               "For example: 'focal_length optical_center'.");
 
-DEFINE_double(scicam_to_hazcam_timestamp_offset_override_value,
+DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
               std::numeric_limits<double>::quiet_NaN(),
-              "Override the value of scicam_to_hazcam_timestamp_offset from the robot config "
+              "Override the value of nav_cam_to_sci_cam_timestamp_offset from the robot config "
               "file with this value.");
 
 DEFINE_double(depth_weight, 10.0,
@@ -960,38 +960,58 @@ int main(int argc, char** argv) {
   if (FLAGS_timestamp_offsets_max_change < 0)
     LOG(FATAL) << "The timestamp offsets must be non-negative.";
 
-  // Read the config file
-  double navcam_to_hazcam_timestamp_offset = 0.0, scicam_to_hazcam_timestamp_offset = 0.0;
-  Eigen::MatrixXd hazcam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd scicam_to_hazcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd navcam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd navcam_to_body_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::Affine3d hazcam_depth_to_image_transform;
-  hazcam_depth_to_image_transform.setIdentity();  // default value
-  camera::CameraParameters nav_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
-                                          Eigen::Vector2d(0, 0));
-  camera::CameraParameters haz_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
-                                          Eigen::Vector2d(0, 0));
-  camera::CameraParameters sci_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
-                                          Eigen::Vector2d(0, 0));
-  dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset", // NOLINT
-                            "scicam_to_hazcam_timestamp_offset", // NOLINT
-                            "hazcam_to_navcam_transform",        // NOLINT
-                            "scicam_to_hazcam_transform",        // NOLINT
-                            "nav_cam_transform",                 // NOLINT
-                            "hazcam_depth_to_image_transform",   // NOLINT
-                            navcam_to_hazcam_timestamp_offset,
-                            scicam_to_hazcam_timestamp_offset,
-                            hazcam_to_navcam_trans, scicam_to_hazcam_trans,
-                            navcam_to_body_trans, hazcam_depth_to_image_transform,
-                            nav_cam_params, haz_cam_params,
-                            sci_cam_params);
+  // We assume our camera rig has n camera types. Each can be image or
+  // depth + image.  Just one camera must be the reference camera. In
+  // this code it will be nav_cam.  Every camera object (class
+  // cameraImage) knows its type (an index), which can be used to look
+  // up its intrinsics, image topic, depth topic (if present),
+  // ref_to_cam_timestamp_offset, and ref_to_cam_transform.  A camera
+  // object also stores its image, depth cloud (if present), its
+  // timestamp, and indices pointing to its left and right ref
+  // bracketing cameras.
 
-  if (!std::isnan(FLAGS_scicam_to_hazcam_timestamp_offset_override_value)) {
-    double new_val = FLAGS_scicam_to_hazcam_timestamp_offset_override_value;
-    std::cout << "Overriding the value " << scicam_to_hazcam_timestamp_offset
-              << " of scicam_to_hazcam_timestamp_offset with: " << new_val << std::endl;
-    scicam_to_hazcam_timestamp_offset = new_val;
+  // For every instance of a reference camera its
+  // ref_to_cam_timestamp_offset is 0 and kept fixed,
+  // ref_to_cam_transform is the identity and kept fixed, and the
+  // indices pointing to the left and right ref bracketing cameras are
+  // identical.
+
+  // The info below will eventually come from a file
+  int num_cam_types = 3;
+  int ref_cam_type = 0;  // Below we assume the starting cam is the ref cam
+
+  // Image and depth topics
+  std::vector<std::string> cam_names    = {"nav_cam", "haz_cam", "sci_cam"};
+  std::vector<std::string> image_topics = {"/mgt/img_sampler/nav_cam/image_record",
+                                           "/hw/depth_haz/extended/amplitude_int",
+                                           "/hw/cam_sci/compressed"};
+  std::vector<std::string> depth_topics = {"", "/hw/depth_haz/points", ""};
+
+  std::vector<camera::CameraParameters> cam_params;
+  std::vector<Eigen::Affine3d>          ref_to_cam_trans;
+  std::vector<double>                   ref_to_cam_timestamp_offsets;
+  Eigen::Affine3d                       nav_cam_to_body_trans;
+  Eigen::Affine3d                       haz_cam_depth_to_image_transform;
+  dense_map::readConfigFile(  // Inputs
+    cam_names, "nav_cam_transform", "haz_cam_depth_to_image_transform",
+    // Outputs
+    cam_params, ref_to_cam_trans, ref_to_cam_timestamp_offsets, nav_cam_to_body_trans,
+    haz_cam_depth_to_image_transform);
+
+  if (!std::isnan(FLAGS_nav_cam_to_sci_cam_offset_override_value)) {
+    for (size_t it = 0; it < cam_names.size(); it++) {
+      if (cam_names[it] == "sci_cam") {
+        double new_val = FLAGS_nav_cam_to_sci_cam_offset_override_value;
+        std::cout << "Overriding the value " << ref_to_cam_timestamp_offsets[it]
+                  << " of nav_cam_to_sci_cam_timestamp_offset with: " << new_val << std::endl;
+        ref_to_cam_timestamp_offsets[it] = new_val;
+      }
+    }
+  }
+
+  for (size_t it = 0; it < ref_to_cam_timestamp_offsets.size(); it++) {
+    std::cout << "Ref to cam offset for " << cam_names[it] << ' '
+              << ref_to_cam_timestamp_offsets[it] << std::endl;
   }
 
   if (FLAGS_mesh_weight <= 0.0)
@@ -1011,30 +1031,13 @@ int main(int argc, char** argv) {
     while (ifs >> val) sci_cam_timestamps_to_use.insert(val);
   }
 
-#if 0
-  std::cout << "hazcam_to_navcam_trans\n" << hazcam_to_navcam_trans << std::endl;
-  std::cout << "scicam_to_hazcam_trans\n" << scicam_to_hazcam_trans << std::endl;
-  std::cout << "hazcam_depth_to_image_transform\n"   << hazcam_depth_to_image_transform.matrix()
-            << "\n";
-#endif
-  std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
-  std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
-
-  double hazcam_depth_to_image_scale
-    = pow(hazcam_depth_to_image_transform.matrix().determinant(), 1.0 / 3.0);
+  double haz_cam_depth_to_image_scale
+    = pow(haz_cam_depth_to_image_transform.matrix().determinant(), 1.0 / 3.0);
 
   // Since we will keep the scale fixed, vary the part of the transform without
   // the scale, while adding the scale each time before the transform is applied
-  Eigen::Affine3d hazcam_depth_to_image_noscale = hazcam_depth_to_image_transform;
-  hazcam_depth_to_image_noscale.linear() /= hazcam_depth_to_image_scale;
-
-  // Convert hazcam_to_navcam_trans to Affine3d
-  Eigen::Affine3d hazcam_to_navcam_aff_trans;
-  hazcam_to_navcam_aff_trans.matrix() = hazcam_to_navcam_trans;
-
-  // Convert scicam_to_hazcam_trans to Affine3d
-  Eigen::Affine3d scicam_to_hazcam_aff_trans;
-  scicam_to_hazcam_aff_trans.matrix() = scicam_to_hazcam_trans;
+  Eigen::Affine3d haz_cam_depth_to_image_noscale = haz_cam_depth_to_image_transform;
+  haz_cam_depth_to_image_noscale.linear() /= haz_cam_depth_to_image_scale;
 
   // Read the sparse map
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map =
@@ -1065,64 +1068,16 @@ int main(int argc, char** argv) {
     dense_map::rigid_transform_to_array(world_to_ref_t[cid],
                                         &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
 
-  // We assume our camera rig has n camera types. Each can be image or
-  // depth + image.  Just one camera must be the reference camera. In
-  // this code it will be nav_cam.  Every camera object (class
-  // cameraImage) knows its type (an index), which can be used to look
-  // up its intrinsics, image topic, depth topic (if present),
-  // ref_to_cam_timestamp_offset, and ref_to_cam_transform.  A camera
-  // object also stores its image, depth cloud (if present), its
-  // timestamp, and indices pointing to its left and right ref
-  // bracketing cameras.
-
-  // For every instance of a reference camera its
-  // ref_to_cam_timestamp_offset is 0 and kept fixed,
-  // ref_to_cam_transform is the identity and kept fixed, and the
-  // indices pointing to the left and right ref bracketing cameras are
-  // identical.
-
-  // The info below will eventually come from a file
-  int num_cam_types = 3;
-  int ref_cam_type = 0;  // Below we assume the starting cam is the ref cam
-
-  // Image and depth topics
-  std::vector<std::string> cam_names    = {"nav_cam", "haz_cam", "sci_cam"};
-  std::vector<std::string> image_topics = {"/mgt/img_sampler/nav_cam/image_record",
-                                           "/hw/depth_haz/extended/amplitude_int",
-                                           "/hw/cam_sci/compressed"};
-  std::vector<std::string> depth_topics = {"", "/hw/depth_haz/points", ""};
 
   std::vector<std::set<double>> cam_timestamps_to_use = {std::set<double>(),
                                                          std::set<double>(),
                                                          sci_cam_timestamps_to_use};
-
-  // The timestamp offsets from ref cam to given cam
-  std::vector<double> ref_to_cam_timestamp_offsets =
-    {0.0,
-     navcam_to_hazcam_timestamp_offset,
-     navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset};
-
-  for (size_t it = 0; it < ref_to_cam_timestamp_offsets.size(); it++) {
-    std::cout << "Ref to cam offset for " << cam_names[it] << ' '
-              << ref_to_cam_timestamp_offsets[it] << std::endl;
-  }
-
-  std::vector<camera::CameraParameters> cam_params = {nav_cam_params,
-                                                      haz_cam_params,
-                                                      sci_cam_params};
 
   // Which intrinsics from which cameras to float
   std::vector<std::set<std::string>> intrinsics_to_float(num_cam_types);
   dense_map::parse_intrinsics_to_float(FLAGS_nav_cam_intrinsics_to_float, intrinsics_to_float[0]);
   dense_map::parse_intrinsics_to_float(FLAGS_haz_cam_intrinsics_to_float, intrinsics_to_float[1]);
   dense_map::parse_intrinsics_to_float(FLAGS_sci_cam_intrinsics_to_float, intrinsics_to_float[2]);
-
-  // The transform from ref to given cam
-  std::vector<Eigen::Affine3d> ref_to_cam_trans;
-  ref_to_cam_trans.push_back(Eigen::Affine3d::Identity());
-  ref_to_cam_trans.push_back(hazcam_to_navcam_aff_trans.inverse());
-  ref_to_cam_trans.push_back(scicam_to_hazcam_aff_trans.inverse()
-                             * hazcam_to_navcam_aff_trans.inverse());
 
   // Put in arrays, so we can optimize them
   std::vector<double> ref_to_cam_vec(num_cam_types * dense_map::NUM_RIGID_PARAMS);
@@ -1138,9 +1093,9 @@ int main(int argc, char** argv) {
 
   // Depth to image transforms and scales
   std::vector<Eigen::Affine3d> depth_to_image_noscale;
-  std::vector<double> depth_to_image_scales = {1.0, hazcam_depth_to_image_scale, 1.0};
+  std::vector<double> depth_to_image_scales = {1.0, haz_cam_depth_to_image_scale, 1.0};
   depth_to_image_noscale.push_back(Eigen::Affine3d::Identity());
-  depth_to_image_noscale.push_back(hazcam_depth_to_image_noscale);
+  depth_to_image_noscale.push_back(haz_cam_depth_to_image_noscale);
   depth_to_image_noscale.push_back(Eigen::Affine3d::Identity());
   // Put in arrays, so we can optimize them
   std::vector<double> depth_to_image_noscale_vec(num_cam_types * dense_map::NUM_RIGID_PARAMS);
@@ -1267,7 +1222,8 @@ int main(int argc, char** argv) {
           if (found_time >= right_timestamp) break;  // out of range
 
           cv::Mat image;
-          if (!dense_map::lookupImage(curr_timestamp, bag_map[image_topics[cam_type]], save_grayscale,
+          if (!dense_map::lookupImage(curr_timestamp, bag_map[image_topics[cam_type]],
+                                      save_grayscale,
                                       // outputs
                                       image,
                                       start_pos,  // care here
@@ -1286,7 +1242,8 @@ int main(int argc, char** argv) {
             image.copyTo(best_image);
           }
 
-          // Go forward in time. We count on the fact that lookupImage() looks forward from given guess.
+          // Go forward in time. We count on the fact that
+          // lookupImage() looks forward from given guess.
           curr_timestamp = std::nextafter(found_time, 1.01 * found_time);
         }
 
@@ -1622,7 +1579,8 @@ int main(int argc, char** argv) {
     // std::cout << "pid is " << pid << std::endl;
     // std::cout << "---aaa pid size is " << pid_to_cid_fid[pid].size() << std::endl;
     // std::cout << "zzz2 ";
-    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
+         cid_fid++) {
       int cid = cid_fid->first;
       int fid = cid_fid->second;
       // std::cout  << cid << ' ' << keypoint_vec[cid][fid].first << ' ';
@@ -1642,7 +1600,8 @@ int main(int argc, char** argv) {
     std::vector<Eigen::Affine3d> world_to_cam_vec;
     std::vector<Eigen::Vector2d> pix_vec;
 
-    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
+         cid_fid++) {
       int cid = cid_fid->first;
       int fid = cid_fid->second;
 
@@ -2061,89 +2020,26 @@ int main(int argc, char** argv) {
       (depth_to_image_noscale[cam_type],
        &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
 
-  // Copy extrinsics to specific cameras
-  hazcam_to_navcam_aff_trans = ref_to_cam_trans[1].inverse();
-  scicam_to_hazcam_aff_trans = hazcam_to_navcam_aff_trans.inverse() * ref_to_cam_trans[2].inverse();
-
-  // Copy intrinsics to the specific cameras
-  if (FLAGS_nav_cam_intrinsics_to_float != "") nav_cam_params = cam_params[0];
-  if (FLAGS_haz_cam_intrinsics_to_float != "") haz_cam_params = cam_params[1];
-  if (FLAGS_sci_cam_intrinsics_to_float != "") sci_cam_params = cam_params[2];
-
-  // Copy the offsets to specific cameras
-  std::cout.precision(18);
-  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
-    std::cout << "--offset after " << ref_to_cam_timestamp_offsets[cam_type] << std::endl;
-
-  navcam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1];
-  scicam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1]
-    - ref_to_cam_timestamp_offsets[2];
-
-  std::cout.precision(18);
-  std::cout << "--navcam_to_hazcam_timestamp_offset " << navcam_to_hazcam_timestamp_offset << std::endl;
-  std::cout << "--scicam_to_hazcam_timestamp_offset " << scicam_to_hazcam_timestamp_offset << std::endl;
-
   // Update the optimized depth to image (for haz cam only)
   int cam_type = 1;  // haz cam
-  hazcam_depth_to_image_scale = depth_to_image_scales[cam_type];
-  hazcam_depth_to_image_transform = depth_to_image_noscale[cam_type];
-  hazcam_depth_to_image_transform.linear() *= hazcam_depth_to_image_scale;
+  haz_cam_depth_to_image_scale = depth_to_image_scales[cam_type];
+  haz_cam_depth_to_image_transform = depth_to_image_noscale[cam_type];
+  haz_cam_depth_to_image_transform.linear() *= haz_cam_depth_to_image_scale;
 
-  // Update the config file
-  {
-    // update nav and haz
-    bool update_cam1 = true, update_cam2 = true;
-    std::string cam1_name = "nav_cam", cam2_name = "haz_cam";
-    boost::shared_ptr<camera::CameraParameters>
-      cam1_params(new camera::CameraParameters(nav_cam_params));
-    boost::shared_ptr<camera::CameraParameters>
-      cam2_params(new camera::CameraParameters(haz_cam_params));
-    bool update_depth_to_image_transform = true;
-    bool update_extrinsics = true;
-    bool update_timestamp_offset = true;
-    std::string cam1_to_cam2_timestamp_offset_str = "navcam_to_hazcam_timestamp_offset";
-    // Modify in-place the robot config file
-    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
-                                  update_cam2, cam2_name, cam2_params,
-                                  update_depth_to_image_transform,
-                                  hazcam_depth_to_image_transform, update_extrinsics,
-                                  hazcam_to_navcam_aff_trans, update_timestamp_offset,
-                                  cam1_to_cam2_timestamp_offset_str,
-                                  navcam_to_hazcam_timestamp_offset);
-  }
-  {
-    // update sci and haz cams
-    // TODO(oalexan1): Write a single function to update all 3 of them
-    bool update_cam1 = true, update_cam2 = true;
-    std::string cam1_name = "sci_cam", cam2_name = "haz_cam";
-    boost::shared_ptr<camera::CameraParameters>
-      cam1_params(new camera::CameraParameters(sci_cam_params));
-    boost::shared_ptr<camera::CameraParameters>
-      cam2_params(new camera::CameraParameters(haz_cam_params));
-    bool update_depth_to_image_transform = true;
-    bool update_extrinsics = true;
-    bool update_timestamp_offset = true;
-    std::string cam1_to_cam2_timestamp_offset_str = "scicam_to_hazcam_timestamp_offset";
-    // Modify in-place the robot config file
-    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
-                                  update_cam2, cam2_name, cam2_params,
-                                  update_depth_to_image_transform,
-                                  hazcam_depth_to_image_transform, update_extrinsics,
-                                  scicam_to_hazcam_aff_trans.inverse(),
-                                  update_timestamp_offset,
-                                  cam1_to_cam2_timestamp_offset_str,
-                                  scicam_to_hazcam_timestamp_offset);
-  }
+  dense_map::updateConfigFile(cam_names, "haz_cam_depth_to_image_transform",
+                              cam_params, ref_to_cam_trans,
+                              ref_to_cam_timestamp_offsets,
+                              haz_cam_depth_to_image_transform);
 
-  std::cout << "Writing: " << FLAGS_output_map << std::endl;
   if (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != "") {
     std::cout << "Either the sparse map intrinsics or cameras got modified. "
               << "The map must be rebuilt." << std::endl;
 
     dense_map::RebuildMap(FLAGS_output_map,  // Will be used for temporary saving of aux data
-                          nav_cam_params, sparse_map);
+                          cam_params[ref_cam_type], sparse_map);
   }
 
+  std::cout << "Writing: " << FLAGS_output_map << std::endl;
   sparse_map->Save(FLAGS_output_map);
 
   return 0;
