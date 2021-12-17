@@ -143,9 +143,9 @@ DEFINE_string(sci_cam_intrinsics_to_float, "",
               "optical_center, distortion. Specify as a quoted list. "
               "For example: 'focal_length optical_center'.");
 
-DEFINE_double(scicam_to_hazcam_timestamp_offset_override_value,
+DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
               std::numeric_limits<double>::quiet_NaN(),
-              "Override the value of scicam_to_hazcam_timestamp_offset from the robot config "
+              "Override the value of nav_cam_to_sci_cam_timestamp_offset from the robot config "
               "file with this value.");
 
 DEFINE_string(mesh, "",
@@ -1679,7 +1679,6 @@ void calc_median_residuals(std::vector<double> const& residuals,
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
   GOOGLE_PROTOBUF_VERIFY_VERSION;
-
   std::cout.precision(17);  // to be able to print timestamps
 
   if (FLAGS_ros_bag.empty())
@@ -1713,38 +1712,39 @@ int main(int argc, char** argv) {
   if (haz_cam_intensity_handle.bag_msgs.empty()) LOG(FATAL) << "No haz cam images found.";
 
   // Read the config file
-  double navcam_to_hazcam_timestamp_offset = 0.0, scicam_to_hazcam_timestamp_offset = 0.0;
-  Eigen::MatrixXd hazcam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd scicam_to_hazcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd navcam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::MatrixXd navcam_to_body_trans = Eigen::MatrixXd::Identity(4, 4);
-  Eigen::Affine3d hazcam_depth_to_image_transform;
-  hazcam_depth_to_image_transform.setIdentity();  // default value
-  camera::CameraParameters nav_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
-                                          Eigen::Vector2d(0, 0));
-  camera::CameraParameters haz_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
-                                          Eigen::Vector2d(0, 0));
-  camera::CameraParameters sci_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
-                                          Eigen::Vector2d(0, 0));
-  dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset", // NOLINT
-                            "scicam_to_hazcam_timestamp_offset", // NOLINT
-                            "hazcam_to_navcam_transform",        // NOLINT
-                            "scicam_to_hazcam_transform",        // NOLINT
-                            "nav_cam_transform",                 // NOLINT
-                            "hazcam_depth_to_image_transform",   // NOLINT
-                            navcam_to_hazcam_timestamp_offset,
-                            scicam_to_hazcam_timestamp_offset,
-                            hazcam_to_navcam_trans, scicam_to_hazcam_trans,
-                            navcam_to_body_trans, hazcam_depth_to_image_transform,
-                            nav_cam_params, haz_cam_params,
-                            sci_cam_params);
+  std::vector<std::string> cam_names = {"nav_cam", "haz_cam", "sci_cam"};
+  std::vector<camera::CameraParameters> cam_params;
+  std::vector<Eigen::Affine3d>          ref_to_cam_trans;
+  std::vector<double>                   ref_to_cam_timestamp_offsets;
+  Eigen::Affine3d                       navcam_to_body_trans;
+  Eigen::Affine3d                       hazcam_depth_to_image_transform;
+  dense_map::readConfigFile(  // Inputs
+    cam_names, "nav_cam_transform", "haz_cam_depth_to_image_transform",
+    // Outputs
+    cam_params, ref_to_cam_trans, ref_to_cam_timestamp_offsets, navcam_to_body_trans,
+    hazcam_depth_to_image_transform);
 
-  if (!std::isnan(FLAGS_scicam_to_hazcam_timestamp_offset_override_value)) {
-    double new_val = FLAGS_scicam_to_hazcam_timestamp_offset_override_value;
-    std::cout << "Overriding the value " << scicam_to_hazcam_timestamp_offset
-              << " of scicam_to_hazcam_timestamp_offset with: " << new_val << std::endl;
-    scicam_to_hazcam_timestamp_offset = new_val;
+  if (!std::isnan(FLAGS_nav_cam_to_sci_cam_offset_override_value)) {
+    for (size_t it = 0; it < cam_names.size(); it++) {
+      if (cam_names[it] == "sci_cam") {
+        double new_val = FLAGS_nav_cam_to_sci_cam_offset_override_value;
+        std::cout << "Overriding the value " << ref_to_cam_timestamp_offsets[it]
+                  << " of nav_cam_to_sci_cam_timestamp_offset with: " << new_val << std::endl;
+        ref_to_cam_timestamp_offsets[it] = new_val;
+      }
+    }
   }
+
+  // Copy to structures expected by this tool
+  camera::CameraParameters nav_cam_params = cam_params[0];
+  camera::CameraParameters haz_cam_params = cam_params[1];
+  camera::CameraParameters sci_cam_params = cam_params[2];
+  Eigen::Affine3d hazcam_to_navcam_aff_trans = ref_to_cam_trans[1].inverse();
+  Eigen::Affine3d scicam_to_hazcam_aff_trans =
+    ref_to_cam_trans[1] * ref_to_cam_trans[2].inverse();
+  double navcam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1];
+  double scicam_to_hazcam_timestamp_offset =
+    ref_to_cam_timestamp_offsets[1] - ref_to_cam_timestamp_offsets[2];
 
   if (FLAGS_mesh_weight <= 0.0 || FLAGS_mesh_robust_threshold <= 0.0)
     LOG(FATAL) << "The mesh weight and robust threshold must be positive.\n";
@@ -1763,14 +1763,6 @@ int main(int argc, char** argv) {
 #endif
   std::cout << "navcam_to_hazcam_timestamp_offset: " << navcam_to_hazcam_timestamp_offset << "\n";
   std::cout << "scicam_to_hazcam_timestamp_offset: " << scicam_to_hazcam_timestamp_offset << "\n";
-
-  // Convert hazcam_to_navcam_trans to Affine3d
-  Eigen::Affine3d hazcam_to_navcam_aff_trans;
-  hazcam_to_navcam_aff_trans.matrix() = hazcam_to_navcam_trans;
-
-  // Convert scicam_to_hazcam_trans to Affine3d
-  Eigen::Affine3d scicam_to_hazcam_aff_trans;
-  scicam_to_hazcam_aff_trans.matrix() = scicam_to_hazcam_trans;
 
   // Read the sparse map
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map =
@@ -1812,7 +1804,8 @@ int main(int argc, char** argv) {
   std::vector<rosbag::MessageInstance> const& sci_cam_msgs = sci_cam_handle.bag_msgs;
   std::vector<double> all_sci_cam_timestamps;
   for (size_t sci_it = 0; sci_it < sci_cam_msgs.size(); sci_it++) {
-    sensor_msgs::Image::ConstPtr sci_image_msg = sci_cam_msgs[sci_it].instantiate<sensor_msgs::Image>();
+    sensor_msgs::Image::ConstPtr sci_image_msg
+      = sci_cam_msgs[sci_it].instantiate<sensor_msgs::Image>();
     sensor_msgs::CompressedImage::ConstPtr comp_sci_image_msg =
       sci_cam_msgs[sci_it].instantiate<sensor_msgs::CompressedImage>();
     if (sci_image_msg)
@@ -2241,49 +2234,24 @@ int main(int argc, char** argv) {
   sparse_map->Save(FLAGS_output_map);
 
   if (!FLAGS_opt_map_only) {
-    // update nav and haz
-    bool update_cam1 = true, update_cam2 = true;
-    std::string cam1_name = "nav_cam", cam2_name = "haz_cam";
-    boost::shared_ptr<camera::CameraParameters>
-      cam1_params(new camera::CameraParameters(nav_cam_params));
-    boost::shared_ptr<camera::CameraParameters>
-      cam2_params(new camera::CameraParameters(haz_cam_params));
-    bool update_depth_to_image_transform = true;
-    bool update_extrinsics = true;
-    bool update_timestamp_offset = true;
-    std::string cam1_to_cam2_timestamp_offset_str = "navcam_to_hazcam_timestamp_offset";
-    // Modify in-place the robot config file
-    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
-                                  update_cam2, cam2_name, cam2_params,
-                                  update_depth_to_image_transform,
-                                  hazcam_depth_to_image_transform, update_extrinsics,
-                                  hazcam_to_navcam_aff_trans, update_timestamp_offset,
-                                  cam1_to_cam2_timestamp_offset_str,
-                                  navcam_to_hazcam_timestamp_offset);
+  // Save back the results
+  // Recall that cam_names = {"nav_cam", "haz_cam", "sci_cam"};
+  // nav_to_haz
+    ref_to_cam_trans[1] = hazcam_to_navcam_aff_trans.inverse();
+    // nav_to_sci
+    ref_to_cam_trans[2] = scicam_to_hazcam_aff_trans.inverse() *
+      hazcam_to_navcam_aff_trans.inverse();
+
+    ref_to_cam_timestamp_offsets[1] = navcam_to_hazcam_timestamp_offset;
+    ref_to_cam_timestamp_offsets[2] =
+      navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
+
+    dense_map::updateConfigFile(cam_names, "haz_cam_depth_to_image_transform",
+                                cam_params, ref_to_cam_trans,
+                                ref_to_cam_timestamp_offsets,
+                                hazcam_depth_to_image_transform);
   }
-  if (!FLAGS_opt_map_only) {
-    // update sci and haz
-    // TODO(oalexan1): Write a single function to update all 3 of them
-    bool update_cam1 = true, update_cam2 = true;
-    std::string cam1_name = "sci_cam", cam2_name = "haz_cam";
-    boost::shared_ptr<camera::CameraParameters>
-      cam1_params(new camera::CameraParameters(sci_cam_params));
-    boost::shared_ptr<camera::CameraParameters>
-      cam2_params(new camera::CameraParameters(haz_cam_params));
-    bool update_depth_to_image_transform = true;
-    bool update_extrinsics = true;
-    bool update_timestamp_offset = true;
-    std::string cam1_to_cam2_timestamp_offset_str = "scicam_to_hazcam_timestamp_offset";
-    // Modify in-place the robot config file
-    dense_map::update_config_file(update_cam1, cam1_name, cam1_params,
-                                  update_cam2, cam2_name, cam2_params,
-                                  update_depth_to_image_transform,
-                                  hazcam_depth_to_image_transform, update_extrinsics,
-                                  scicam_to_hazcam_aff_trans.inverse(),
-                                  update_timestamp_offset,
-                                  cam1_to_cam2_timestamp_offset_str,
-                                  scicam_to_hazcam_timestamp_offset);
-  }
+
   return 0;
 } // NOLINT
 
