@@ -1353,7 +1353,7 @@ int main(int argc, char** argv) {
   double scicam_to_hazcam_timestamp_offset =
     ref_to_cam_timestamp_offsets[1] - ref_to_cam_timestamp_offsets[2];
 
-  // read cam1 params
+  // Set cam1 and cam2 params
   boost::shared_ptr<camera::CameraParameters> cam1_params;
   boost::shared_ptr<camera::CameraParameters> cam2_params;
   double cam1_to_cam2_timestamp_offset = 0.0;

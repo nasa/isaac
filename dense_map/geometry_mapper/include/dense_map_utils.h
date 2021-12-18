@@ -74,18 +74,30 @@ std::string matType(cv::Mat const& mat);
 
 // Read the transform from depth to given camera
 void readCameraTransform(config_reader::ConfigReader& config, std::string const transform_str,
-                         Eigen::MatrixXd& transform);
+                         Eigen::Affine3d& transform);
 
-// Read a bunch of transforms from the robot calibration file
-void readConfigFile(std::string const& navcam_to_hazcam_timestamp_offset_str,
-                    std::string const& scicam_to_hazcam_timestamp_offset_str,
-                    std::string const& hazcam_to_navcam_transform_str,
-                    std::string const& scicam_to_hazcam_transform_str, std::string const& navcam_to_body_transform_str,
-                    std::string const& hazcam_depth_to_image_transform_str, double& navcam_to_hazcam_timestamp_offset,
-                    double& scicam_to_hazcam_timestamp_offset, Eigen::MatrixXd& hazcam_to_navcam_trans,
-                    Eigen::MatrixXd& scicam_to_hazcam_trans, Eigen::MatrixXd& navcam_to_body_trans,
-                    Eigen::Affine3d& hazcam_depth_to_image_transform, camera::CameraParameters& nav_cam_params,
-                    camera::CameraParameters& haz_cam_params, camera::CameraParameters& sci_cam_params);
+// Read some transforms from the robot calibration file
+void readConfigFile                                                     // NOLINT
+(// Inputs                                                              // NOLINT
+ std::vector<std::string> const& cam_names,                             // NOLINT
+ std::string const& nav_cam_to_body_trans_str,                          // NOLINT
+ std::string const& haz_cam_depth_to_image_trans_str,                   // NOLINT
+ // Outputs                                                             // NOLINT
+ std::vector<camera::CameraParameters> & cam_params,                    // NOLINT
+ std::vector<Eigen::Affine3d>          & nav_to_cam_trans,              // NOLINT
+ std::vector<double>                   & nav_to_cam_timestamp_offset,   // NOLINT
+ Eigen::Affine3d                       & nav_cam_to_body_trans,         // NOLINT
+ Eigen::Affine3d                       & haz_cam_depth_to_image_trans); // NOLINT
+
+// Save some transforms from the robot calibration file. This has some very fragile
+// logic and cannot handle comments in the config file.
+void updateConfigFile                                                           // NOLINT
+(std::vector<std::string>              const& cam_names,                        // NOLINT
+ std::string                           const& haz_cam_depth_to_image_trans_str, // NOLINT
+ std::vector<camera::CameraParameters> const& cam_params,                       // NOLINT
+ std::vector<Eigen::Affine3d>          const& nav_to_cam_trans,                 // NOLINT
+ std::vector<double>                   const& nav_to_cam_timestamp_offset,      // NOLINT
+ Eigen::Affine3d                       const& haz_cam_depth_to_image_trans);    // NOLINT
 
 // Given two poses aff0 and aff1, and 0 <= alpha <= 1, do linear interpolation.
 Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::Affine3d const& aff1);
@@ -137,15 +149,6 @@ double fileNameToTimestamp(std::string const& file_name);
 
 // Create a directory unless it exists already
 void createDir(std::string const& dir);
-
-// Modify in-place the robot config file
-void update_config_file(bool update_cam1, std::string const& cam1_name,
-                        boost::shared_ptr<camera::CameraParameters> cam1_params, bool update_cam2,
-                        std::string const& cam2_name, boost::shared_ptr<camera::CameraParameters> cam2_params,
-                        bool update_depth_to_image_transform, Eigen::Affine3d const& depth_to_image_transform,
-                        bool update_extrinsics, Eigen::Affine3d const& cam2_to_cam1_transform,
-                        bool update_timestamp_offset, std::string const& cam1_to_cam2_timestamp_offset_str,
-                        double cam1_to_cam2_timestamp_offset);
 
 // A little holding structure for nav, sci, and haz poses
 struct CameraPoses {

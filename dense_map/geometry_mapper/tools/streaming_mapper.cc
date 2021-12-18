@@ -108,11 +108,11 @@ class StreamingMapper {
   config_reader::ConfigReader config_params;
 
   camera::CameraParameters m_texture_cam_params;
-  sensor_msgs::Image texture_obj_msg, texture_mtl_msg;
+  sensor_msgs::Image m_texture_obj_msg, m_texture_mtl_msg;
 
-  double navcam_to_texture_cam_timestamp_offset;
-  Eigen::MatrixXd texture_cam_to_navcam_trans;
-  Eigen::MatrixXd navcam_to_body_trans;
+  double m_navcam_to_texture_cam_timestamp_offset;
+  Eigen::MatrixXd m_texture_cam_to_navcam_trans;
+  Eigen::MatrixXd m_navcam_to_body_trans;
 
   std::string nav_cam_pose_topic, ekf_state_topic, ekf_pose_topic, texture_cam_topic, sci_cam_exif_topic,
     texture_cam_type, mesh_file;
@@ -160,9 +160,9 @@ class StreamingMapper {
 
 StreamingMapper::StreamingMapper()
     : m_texture_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0)),
-      navcam_to_texture_cam_timestamp_offset(0.0),
-      texture_cam_to_navcam_trans(Eigen::MatrixXd::Identity(4, 4)),
-      navcam_to_body_trans(Eigen::MatrixXd::Identity(4, 4)),
+      m_navcam_to_texture_cam_timestamp_offset(0.0),
+      m_texture_cam_to_navcam_trans(Eigen::MatrixXd::Identity(4, 4)),
+      m_navcam_to_body_trans(Eigen::MatrixXd::Identity(4, 4)),
       last_processed_cam_ctr(Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0)),
       processed_camera_count(0) {}
 
@@ -185,61 +185,50 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
 
   // Read configuration data
   if (!sim_mode) {
-    Eigen::MatrixXd hazcam_to_navcam_trans;
-    Eigen::MatrixXd scicam_to_hazcam_trans;
-    Eigen::Affine3d hazcam_depth_to_image_transform;
-    double navcam_to_hazcam_timestamp_offset, scicam_to_hazcam_timestamp_offset;
+    // Read the bot config file
+    std::vector<std::string> cam_names = {"nav_cam", "haz_cam", "sci_cam"};
+    std::vector<camera::CameraParameters> cam_params;
+    std::vector<Eigen::Affine3d>          ref_to_cam_trans;
+    std::vector<double>                   ref_to_cam_timestamp_offsets;
+    Eigen::Affine3d                       hazcam_depth_to_image_transform;
+    Eigen::Affine3d                       navcam_to_body_trans;
 
-    camera::CameraParameters nav_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0));
-    camera::CameraParameters haz_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0));
-    camera::CameraParameters sci_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0));
+    dense_map::readConfigFile(  // Inputs
+      cam_names, "nav_cam_transform", "haz_cam_depth_to_image_transform",
+      // Outputs
+      cam_params, ref_to_cam_trans, ref_to_cam_timestamp_offsets, navcam_to_body_trans,
+      hazcam_depth_to_image_transform);
+
+    m_navcam_to_body_trans = navcam_to_body_trans.matrix();
 
     {
       // Note the lock, because m_texture_cam_params is a shared resource
       const std::lock_guard<std::mutex> lock(texture_cam_info_lock);
-      dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset", "scicam_to_hazcam_timestamp_offset",
-                                "hazcam_to_navcam_transform", "scicam_to_hazcam_transform", "nav_cam_transform",
-                                "hazcam_depth_to_image_transform", navcam_to_hazcam_timestamp_offset,
-                                scicam_to_hazcam_timestamp_offset, hazcam_to_navcam_trans, scicam_to_hazcam_trans,
-                                navcam_to_body_trans, hazcam_depth_to_image_transform, nav_cam_params, haz_cam_params,
-                                sci_cam_params);
 
       // Transform to convert from given camera to nav camera coordinates
       if (texture_cam_type == "nav_cam") {
-        texture_cam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-        navcam_to_texture_cam_timestamp_offset = 0.0;
-        m_texture_cam_params = nav_cam_params;
+        // Index 0 below, based on the order in cam_names
+        m_texture_cam_to_navcam_trans = ref_to_cam_trans[0].inverse().matrix();
+        m_navcam_to_texture_cam_timestamp_offset = ref_to_cam_timestamp_offsets[0];
+        m_texture_cam_params = cam_params[0];
       } else if (texture_cam_type == "haz_cam") {
-        texture_cam_to_navcam_trans = hazcam_to_navcam_trans;
-        navcam_to_texture_cam_timestamp_offset = navcam_to_hazcam_timestamp_offset;
-        m_texture_cam_params = haz_cam_params;
+        // Index 1 below, based on the order in cam_names
+        m_texture_cam_to_navcam_trans = ref_to_cam_trans[1].inverse().matrix();
+        m_navcam_to_texture_cam_timestamp_offset = ref_to_cam_timestamp_offsets[1];
+        m_texture_cam_params = cam_params[1];
       } else if (texture_cam_type == "sci_cam") {
-        texture_cam_to_navcam_trans = hazcam_to_navcam_trans * scicam_to_hazcam_trans;
-        navcam_to_texture_cam_timestamp_offset = navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
-        m_texture_cam_params = sci_cam_params;
+        // Index 2 below, based on the order in cam_names
+        m_texture_cam_to_navcam_trans = ref_to_cam_trans[2].inverse().matrix();
+        m_navcam_to_texture_cam_timestamp_offset = ref_to_cam_timestamp_offsets[2];
+        m_texture_cam_params = cam_params[2];
       } else {
         LOG(FATAL) << "Invalid texture cam type: " << texture_cam_type;
       }
 
-#if 0
-      std::cout << "hazcam_to_navcam_trans\n" << hazcam_to_navcam_trans << "\n";
-      std::cout << "scicam_to_hazcam_trans\n" << scicam_to_hazcam_trans << "\n";
-      std::cout << "texture_cam_to_navcam_trans\n" << texture_cam_to_navcam_trans << "\n";
-      std::cout << "navcam_to_hazcam_timestamp_offset: "
-                << navcam_to_hazcam_timestamp_offset
-                << "\n";
-      std::cout << "scicam_to_hazcam_timestamp_offset: "
-                << scicam_to_hazcam_timestamp_offset
-                << "\n";
-      std::cout << "hazcam_depth_to_image_transform\n"
-                << hazcam_depth_to_image_transform.matrix()
-                << "\n";
-
-      std::cout << "navcam_to_texture_cam_timestamp_offset: "
-                << navcam_to_texture_cam_timestamp_offset << "\n";
+      std::cout << "m_navcam_to_texture_cam_timestamp_offset: "
+                << m_navcam_to_texture_cam_timestamp_offset << "\n";
       std::cout << "texture cam focal vector: "
                 << m_texture_cam_params.GetFocalVector().transpose() << "\n";
-#endif
     }
   }
 
@@ -426,7 +415,8 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
   std::map<int, Eigen::Vector2d> uv_map;
   if (!use_single_texture) {
     // Find the UV coordinates and the faces having them
-    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, num_exclude_boundary_pixels, smallest_cost_per_face,
+    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, num_exclude_boundary_pixels,
+                              smallest_cost_per_face,
                               face_vec, uv_map);
 
     msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *img_ptr).toImageMsg();
@@ -456,22 +446,23 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
     int height = obj_len / width + 1;
     if (width * height <= obj_len) LOG(FATAL) << "Not enough room allocated for the image.";
 
-    texture_obj_msg.header.stamp = ros::Time(image_timestamp);
-    texture_obj_msg.width = width;
-    texture_obj_msg.height = height;
-    texture_obj_msg.step = width;
-    texture_obj_msg.encoding = "mono8";
-    texture_obj_msg.is_bigendian = false;
-    texture_obj_msg.data.resize(width * height);
+    m_texture_obj_msg.header.stamp = ros::Time(image_timestamp);
+    m_texture_obj_msg.width = width;
+    m_texture_obj_msg.height = height;
+    m_texture_obj_msg.step = width;
+    m_texture_obj_msg.encoding = "mono8";
+    m_texture_obj_msg.is_bigendian = false;
+    m_texture_obj_msg.data.resize(width * height);
 
     std::copy(reinterpret_cast<const char*>(&obj_str[0]),            // input beg
               reinterpret_cast<const char*>(&obj_str[0]) + obj_len,  // input end
-              texture_obj_msg.data.begin());                         // destination
+              m_texture_obj_msg.data.begin());                         // destination
     // Pad with nulls
-    for (int it = obj_len; it < width * height; it++) texture_obj_msg.data[it] = '\0';
+    for (int it = obj_len; it < width * height; it++) m_texture_obj_msg.data[it] = '\0';
 
     // When using a single texture, publish just once
-    if (!use_single_texture || processed_camera_count == 0) texture_obj_pub.publish(texture_obj_msg);
+    if (!use_single_texture || processed_camera_count == 0)
+      texture_obj_pub.publish(m_texture_obj_msg);
   }
 
   // Publish the mtl string as a mono image with one row (this hack is temporary)
@@ -479,18 +470,19 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
   if (!use_single_texture || processed_camera_count == 0 || save_to_disk) {
     formMtl(out_prefix, mtl_str);
     int mtl_len = mtl_str.size();
-    texture_mtl_msg.header.stamp = ros::Time(image_timestamp);
-    texture_mtl_msg.width = mtl_len;
-    texture_mtl_msg.height = 1;
-    texture_mtl_msg.step = mtl_len;
-    texture_mtl_msg.encoding = "mono8";
-    texture_mtl_msg.is_bigendian = false;
-    texture_mtl_msg.data.resize(mtl_len);
+    m_texture_mtl_msg.header.stamp = ros::Time(image_timestamp);
+    m_texture_mtl_msg.width = mtl_len;
+    m_texture_mtl_msg.height = 1;
+    m_texture_mtl_msg.step = mtl_len;
+    m_texture_mtl_msg.encoding = "mono8";
+    m_texture_mtl_msg.is_bigendian = false;
+    m_texture_mtl_msg.data.resize(mtl_len);
     std::copy(reinterpret_cast<const char*>(&mtl_str[0]),            // input beg
               reinterpret_cast<const char*>(&mtl_str[0]) + mtl_len,  // input end
-              texture_mtl_msg.data.begin());                         // destination
+              m_texture_mtl_msg.data.begin());                         // destination
 
-    if (!use_single_texture || processed_camera_count == 0) texture_mtl_pub.publish(texture_mtl_msg);
+    if (!use_single_texture || processed_camera_count == 0)
+      texture_mtl_pub.publish(m_texture_mtl_msg);
   }
 
   if (save_to_disk) {
@@ -579,13 +571,13 @@ void StreamingMapper::AddTextureCamPose(double nav_cam_timestamp, Eigen::Affine3
 
   // Must compensate for the fact that the nav cam, haz cam, and texture cam all
   // have some time delay among them
-  double texture_cam_timestamp = nav_cam_timestamp + navcam_to_texture_cam_timestamp_offset;
+  double texture_cam_timestamp = nav_cam_timestamp + m_navcam_to_texture_cam_timestamp_offset;
 
   // Keep in mind that nav_cam_pose is the transform from the nav cam
   // to the world.  Hence the matrices are multiplied in the order as
   // below.
   Eigen::Affine3d texture_cam_pose;
-  texture_cam_pose.matrix() = nav_cam_pose.matrix() * texture_cam_to_navcam_trans;
+  texture_cam_pose.matrix() = nav_cam_pose.matrix() * m_texture_cam_to_navcam_trans;
   {
     // Add the latest pose. Use a lock.
     const std::lock_guard<std::mutex> lock(texture_cam_pose_lock);
@@ -622,7 +614,7 @@ void StreamingMapper::EkfStateCallback(ff_msgs::EkfState::ConstPtr const& ekf_st
   // Use the equation: body_to_world = navcam_to_world * body_to_navcam, written equivalently as:
   // navcam_to_world = body_to_world * navcam_to_body
   Eigen::Affine3d nav_cam_pose;
-  nav_cam_pose.matrix() = body_pose.matrix() * navcam_to_body_trans;
+  nav_cam_pose.matrix() = body_pose.matrix() * m_navcam_to_body_trans;
   StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
 }
 
@@ -638,7 +630,7 @@ void StreamingMapper::EkfPoseCallback(geometry_msgs::PoseStamped::ConstPtr const
   // Use the equation: body_to_world = navcam_to_world * body_to_navcam, written equivalently as:
   // navcam_to_world = body_to_world * navcam_to_body
   Eigen::Affine3d nav_cam_pose;
-  nav_cam_pose.matrix() = body_pose.matrix() * navcam_to_body_trans;
+  nav_cam_pose.matrix() = body_pose.matrix() * m_navcam_to_body_trans;
   StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
 }
 

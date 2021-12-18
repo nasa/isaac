@@ -2241,11 +2241,9 @@ int main(int argc, char** argv) {
     // nav_to_sci
     ref_to_cam_trans[2] = scicam_to_hazcam_aff_trans.inverse() *
       hazcam_to_navcam_aff_trans.inverse();
-
     ref_to_cam_timestamp_offsets[1] = navcam_to_hazcam_timestamp_offset;
     ref_to_cam_timestamp_offsets[2] =
       navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
-
     dense_map::updateConfigFile(cam_names, "haz_cam_depth_to_image_transform",
                                 cam_params, ref_to_cam_trans,
                                 ref_to_cam_timestamp_offsets,

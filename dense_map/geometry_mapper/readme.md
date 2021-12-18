@@ -241,13 +241,16 @@ record command to run is:
 
     rosbag record /hw/depth_haz/points                      \
       /hw/depth_haz/extended/amplitude_int /hw/cam_sci      \
-      /sim/haz_cam/pose /sim/sci_cam/pose /sim/sci_cam/info
+      /hw/cam_nav /sim/haz_cam/pose /sim/sci_cam/pose       \
+      /sim/sci_cam/info
 
-Note that we record no nav cam data at all since that one is needed
-only for computing camera poses that are pre-computed in
-simulation. Also the sci cam topic changed, compared to the earlier
+Note that sci cam topic changed, compared to the earlier
 record command, as the simulator returns uncompressed images (they are
 grayscale as well, unlike for the real sci cam).
+
+See also note later in the geometry mapper documentation regarding the
+fact that texturing the nav cam data acquired above is not supported
+at this time in simulation mode.
 
 The robot can be told to move around by either running a plan, or by
 sending it a move command, such as:
@@ -311,6 +314,10 @@ Note that the processed sci cam images will be now on topic
 `/hw/cam_sci2`.
 
 ## Camera calibration
+
+Currently the calibrator solution is not that accurate. It is suggested
+to use instead camera_refiner (see further down) on a bag acquired
+without a calibration target.
 
 Camera calibration is an advanced topic. Likely your robot's cameras
 have been calibrated by now, and then this step can be skipped.
@@ -857,6 +864,9 @@ For a given camera type to be textured it must have entries in
 careful choice to be made for the last one. Images for the desired
 camera must be present in the bag file at the the specified topic.
 
+The haz_cam must be included among the camera types and camera
+topics as it is necessary to build the mesh.
+
 ## With simulated data
 
 When working with simulated data, the flag
@@ -881,6 +891,12 @@ For this operation it is suggested to pick a portion of the bag where
 the images face the wall as much as possible, so one may need to
 change the `-start` and `-duration` values. That will result in the
 best possible output.
+
+With simulated data the geometry mapper interface requires the nav_cam
+info to be populated as part of the ``--camera_types``,
+``--camera_topics``, and ``--undistorted_crop_wins`` options, but no
+data is read and no textured nav cam mesh is generated as of the
+current time.
 
 ## Running the streaming mapper
 
@@ -988,12 +1004,12 @@ modifying the above `roslaunch` command as follows:
       streaming_mapper:=true output:=screen     
 
 Alternatively, the streaming mapper can be started first,
-without localization, such as:
+without localization, as:
 
-    roslaunch streaming_mapper.launch sim_mode:=false output:=screen
-
-(the full path to streaming_mapper.launch needs to be specified if not
-found). 
+    export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
+    export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
+    roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
+      sim_mode:=false output:=screen
 
 Ensure then that nav_cam_pose_topic is set to /loc/ml/features in
 streaming_mapper.config and that ekf_state_topic is empty.
