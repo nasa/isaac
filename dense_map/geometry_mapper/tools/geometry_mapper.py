@@ -355,7 +355,7 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
         )
 
     camera_types = args.camera_types.split()
-    
+
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
 
@@ -369,8 +369,10 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
         )
 
     if "nav_cam" not in camera_types or "haz_cam" not in camera_types:
-        raise Exception("nav_cam and haz_cam data and cameras must be specified as those are needed " +
-                        "to localize and build the mesh.")
+        raise Exception(
+            "nav_cam and haz_cam data and cameras must be specified as those are needed "
+            + "to localize and build the mesh."
+        )
     for cam in camera_types:
         if not (cam in crop_win_map):
             raise Exception(
@@ -395,14 +397,16 @@ def mkdir_p(path):
 def setup_outputs(args):
     mkdir_p(args.output_dir)
 
+
 def format_cmd(cmd):
     """If some command arguments have spaces, quote them. Then concatenate the results."""
     ans = ""
     for val in cmd:
-        if ' ' in val or '\t' in cmd:
+        if " " in val or "\t" in cmd:
             val = '"' + val + '"'
-        ans += val + ' '
+        ans += val + " "
     return ans
+
 
 def run_cmd(cmd, log_file, verbose=False):
     """
@@ -411,7 +415,7 @@ def run_cmd(cmd, log_file, verbose=False):
 
     cmd_str = format_cmd(cmd)
     print(cmd_str + "\n")
-    
+
     with open(log_file, "w", buffering=0) as f:  # replace 'w' with 'wb' for Python 3
         f.write(cmd_str + "\n")
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -498,7 +502,7 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
     run_cmd(cmd, log_file, verbose=args.verbose)
 
 
-def fuse_clouds(batch_tsdf_path, mesh, args): 
+def fuse_clouds(batch_tsdf_path, mesh, args):
     """
     Invoke the voxblox batch_tsdf tool to fuse the depth images.
     """
@@ -732,7 +736,7 @@ def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
     if args.simulated_data and cam_type == "nav_cam":
         print("Texturing nav_cam is not supported with simulated data.")
         return "None"
-    
+
     dist_image_list = os.path.join(args.output_dir, cam_type + "_index.txt")
     with open(dist_image_list) as f:
         image_files = f.readlines()
@@ -770,6 +774,7 @@ def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
         textured_mesh = run_texrecon(args, src_path, mesh, dist_dir, cam_type)
 
     return textured_mesh
+
 
 def copy_dir(src, dst, symlinks=False, ignore=None):
     for item in os.listdir(src):
@@ -920,7 +925,7 @@ if __name__ == "__main__":
         for camera_type in args.camera_types.split():
             textured_mesh = texture_mesh(
                 src_path, camera_type, crop_win_map, simplified_mesh, args
-                )
+            )
             textured_meshes += [textured_mesh]
 
     if args.external_mesh == "":
