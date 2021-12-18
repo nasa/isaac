@@ -1009,6 +1009,8 @@ int main(int argc, char** argv) {
     }
   }
 
+  std::vector<camera::CameraParameters> orig_cam_params = cam_params;
+
   for (size_t it = 0; it < ref_to_cam_timestamp_offsets.size(); it++) {
     std::cout << "Ref to cam offset for " << cam_names[it] << ' '
               << ref_to_cam_timestamp_offsets[it] << std::endl;
@@ -2007,6 +2009,14 @@ int main(int argc, char** argv) {
     cam_params[it].SetOpticalOffset(optical_centers[it]);
     cam_params[it].SetDistortion(distortions[it]);
   }
+
+  // The nav cam did not get optimized. Go back to the solution with
+  // two focal lengths, rather than the one with one focal length
+  // solved by this solver (as the average of the two).  The two focal
+  // lengths are very similar, but it is not worth modifying the
+  // camera model we don't plan to optimize.
+  if (FLAGS_nav_cam_intrinsics_to_float == "" || FLAGS_num_iterations == 0)
+    cam_params[ref_cam_type] = orig_cam_params[ref_cam_type];
 
   // Copy back the optimized extrinsics
   for (int cam_type = 0; cam_type < num_cam_types; cam_type++)

@@ -1314,8 +1314,7 @@ DEFINE_string(sparse_map, "", "A registered sparse map made with some of the ROS
 DEFINE_string(output_dir, "", "The full path to a directory where to write the processed data.");
 DEFINE_string(sci_cam_exif_topic, "/hw/sci_cam_exif", "The sci cam exif metadata topic the output bag.");
 DEFINE_string(camera_types, "sci_cam nav_cam haz_cam",
-              "Specify the cameras to use for the textures, as a list in quotes."
-              "With simulated data only sci_cam is supported.");
+              "Specify the cameras to use for the textures, as a list in quotes.");
 DEFINE_string(camera_topics, "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record "
               "/hw/depth_haz/extended/amplitude_int",
               "Specify the bag topics for the cameras to texture (in the same order as in "
@@ -1400,7 +1399,15 @@ int main(int argc, char** argv) {
   std::vector<std::string> cam_types;
   std::string str;
   std::istringstream ifsc(FLAGS_camera_types);
-  while (ifsc >> str) cam_types.push_back(str);
+  bool do_haz_cam = false, do_nav_cam = false;
+  while (ifsc >> str) {
+    cam_types.push_back(str);
+    if (str == "haz_cam") do_haz_cam = true;
+    if (str == "nav_cam") do_nav_cam = true;
+  }
+  if (!do_haz_cam || !do_nav_cam)
+    LOG(FATAL) << "Nav cam and haz cam data and cameras must be specified as those are needed "
+               << "to localize and build the mesh.\n";
 
   // Parse the camera topics
   std::map<std::string, std::string> cam_topics;
@@ -1410,7 +1417,8 @@ int main(int argc, char** argv) {
     if (count >= cam_types.size())
       LOG(FATAL) << "There must be a topic for each camera type.\n";
     cam_topics[cam_types[count]] = str;
-    std::cout << "Camera topic for " << cam_types[count] << ": " << cam_topics[cam_types[count]] << "\n";
+    std::cout << "Camera topic for " << cam_types[count] << ": " << cam_topics[cam_types[count]]
+              << "\n";
   }
   if (cam_types.size() != cam_topics.size())
     LOG(FATAL) << "There must be a topic for each camera type.\n";
@@ -1433,12 +1441,6 @@ int main(int argc, char** argv) {
   for (size_t it = 0; it < cam_types.size(); it++)
     bag_handles[cam_types[it]] = boost::shared_ptr<dense_map::RosBagHandle>
       (new dense_map::RosBagHandle(FLAGS_ros_bag, cam_topics[cam_types[it]]));
-
-  if (bag_handles.find("nav_cam") == bag_handles.end() ||
-      bag_handles.find("haz_cam") == bag_handles.end())
-    LOG(FATAL) << "At minimum the nav and haz data must be processed, "
-               << "as those are needed for depth clouds and their poses, "
-               << "to create the mesh.\n";
 
   dense_map::RosBagHandle haz_cam_points_handle(FLAGS_ros_bag, FLAGS_haz_cam_points_topic);
   dense_map::RosBagHandle exif_handle(FLAGS_ros_bag, FLAGS_sci_cam_exif_topic);
@@ -1523,12 +1525,14 @@ int main(int argc, char** argv) {
     dense_map::createDir(cam_dirs[cam_types[it]]);
   }
 
-  // Save camera poses and other data for all desired ameras
+  // Save camera poses and other data for all desired cameras
   for (size_t it = 0; it < cam_types.size(); it++) {
     std::string cam_type = cam_types[it];
 
-    if (cam_type == "nav_cam" && FLAGS_simulated_data)
-      continue;  // cannot texture nav cam with simulated data as the distortion is inaccurate
+    if (cam_type == "nav_cam" && FLAGS_simulated_data) {
+      std::cout << "The nav_cam is not supported with simulated data.\n";
+      continue;
+    }
 
     if (cam_type == "nav_cam" && !FLAGS_use_brisk_map) {
       // Take a shortcut, since the sparse map is made of precisely of

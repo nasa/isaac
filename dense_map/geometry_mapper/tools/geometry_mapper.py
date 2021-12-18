@@ -69,8 +69,7 @@ def process_args(args):
         "--camera_types",
         dest="camera_types",
         default="sci_cam nav_cam haz_cam",
-        help="Specify the cameras to use for the textures, as a list in quotes."
-        + "With simulated data only sci_cam is supported.",
+        help="Specify the cameras to use for the textures, as a list in quotes.",
     )
     parser.add_argument(
         "--camera_topics",
@@ -296,10 +295,10 @@ def process_args(args):
         + "from depth data in the current bag.",
     )
     parser.add_argument(
-        "--scicam_to_hazcam_timestamp_offset_override_value",
-        dest="scicam_to_hazcam_timestamp_offset_override_value",
+        "--nav_cam_to_sci_cam_offset_override_value",
+        dest="nav_cam_to_sci_cam_offset_override_value",
         default="",
-        help="Override the value of scicam_to_hazcam_timestamp_offset "
+        help="Override the value of nav_cam_to_sci_cam_timestamp_offset "
         + "from the robot config file with this value.",
     )
     parser.add_argument(
@@ -357,11 +356,6 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
 
     camera_types = args.camera_types.split()
     
-    if ('nav_cam' not in camera_types) or ('haz_cam' not in camera_types):
-        raise Exception("At minimum the nav and haz data must be processed, "    + \
-                        "as those are needed for depth clouds and their poses, " + \
-                        "to create the mesh.")
-
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
 
@@ -374,6 +368,9 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
             + "crop windows."
         )
 
+    if "nav_cam" not in camera_types or "haz_cam" not in camera_types:
+        raise Exception("nav_cam and haz_cam data and cameras must be specified as those are needed " +
+                        "to localize and build the mesh.")
     for cam in camera_types:
         if not (cam in crop_win_map):
             raise Exception(
@@ -487,10 +484,10 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
     if args.save_debug_data:
         cmd += ["--save_debug_data"]
 
-    if args.scicam_to_hazcam_timestamp_offset_override_value != "":
+    if args.nav_cam_to_sci_cam_offset_override_value != "":
         cmd += [
-            "--scicam_to_hazcam_timestamp_offset_override_value",
-            args.scicam_to_hazcam_timestamp_offset_override_value,
+            "--nav_cam_to_sci_cam_offset_override_value",
+            args.nav_cam_to_sci_cam_offset_override_value,
         ]
 
     log_file = os.path.join(args.output_dir, "geometry_mapper_log.txt")
@@ -732,6 +729,10 @@ def find_sci_cam_scale(image_file):
 
 
 def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
+    if args.simulated_data and cam_type == "nav_cam":
+        print("Texturing nav_cam is not supported with simulated data.")
+        return "None"
+    
     dist_image_list = os.path.join(args.output_dir, cam_type + "_index.txt")
     with open(dist_image_list) as f:
         image_files = f.readlines()
@@ -769,7 +770,6 @@ def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
         textured_mesh = run_texrecon(args, src_path, mesh, dist_dir, cam_type)
 
     return textured_mesh
-
 
 def copy_dir(src, dst, symlinks=False, ignore=None):
     for item in os.listdir(src):
@@ -920,7 +920,7 @@ if __name__ == "__main__":
         for camera_type in args.camera_types.split():
             textured_mesh = texture_mesh(
                 src_path, camera_type, crop_win_map, simplified_mesh, args
-            )
+                )
             textured_meshes += [textured_mesh]
 
     if args.external_mesh == "":
