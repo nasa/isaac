@@ -234,23 +234,26 @@ Start the simulator, such as:
 
 In RVIZ turn on visualizing these cameras from the Panels menu.
 
-When recording simulated data, need to also save the camera poses and
-camera information, which is different than how we do for real data,
-when these quantities must be estimated by algorithms. Hence the
-record command to run is:
+When recording simulated data for a given camera, for example, for
+``sci_cam``, so that later it can be used with the geometry and
+streaming mapper, one needs to record, in addition to depth clouds and
+camera images, also the camera poses and intrinsics information, which
+is done as follows:
 
-    rosbag record /hw/depth_haz/points                      \
-      /hw/depth_haz/extended/amplitude_int /hw/cam_sci      \
-      /hw/cam_nav /sim/haz_cam/pose /sim/sci_cam/pose       \
-      /sim/sci_cam/info
+    rosbag record /hw/depth_haz/points                   \
+      /hw/cam_sci /sim/sci_cam/pose /sim/sci_cam/info
 
-Note that sci cam topic changed, compared to the earlier
-record command, as the simulator returns uncompressed images (they are
-grayscale as well, unlike for the real sci cam).
+It is good to check for the precise name of the camera image topic.
+The above pattern normally holds true, and certainly so for 
+nav_cam and sci_cam, but note that for haz_cam it is named:
 
-See also note later in the geometry mapper documentation regarding the
-fact that texturing the nav cam data acquired above is not supported
-at this time in simulation mode.
+    /hw/depth_haz/extended/amplitude_int
+          
+If desired to record data for many cameras, these topics must
+be specified for each of them.
+
+The simulator supports other cameras as well, including
+``acoustics_cam`` and ``heat_cam``.
 
 The robot can be told to move around by either running a plan, or by
 sending it a move command, such as:
@@ -637,7 +640,7 @@ sci cam images with the geometry mapper.
 ## When using real data
 
 The geometry mapper fuses the depth cloud data and creates textures
-from the image cameras. 
+from the image cameras.
 
 Any image camera is supported, as long as present in the robot
 configuration file and a topic for it is in the bag file (see more
@@ -802,9 +805,14 @@ with Meshlab:
   - data_dir/hole_filled_mesh.ply: A mesh obtained by filling holes in the fused mesh.
   - data_dir/clean_mesh.ply: The mesh with small connected components removed.
   - data_dir/smooth_mesh2.ply: A further smoothed version of the mesh.
+  - data_dir/hole_filled_mesh2.ply: A further hole-filled mesh.
   - data_dir/simplified_mesh.ply: The simplified mesh.
+  - data_dir/smooth_mesh3.ply: A further smoothed version of the mesh.
   - data_dir/nav_cam_texture/run.obj: The mesh overlayed with the nav cam texture.
   - data_dir/sci_cam_texture/run.obj: The mesh overlayed with the sci cam texture.
+
+(Several passes of smoothing and hole-filling, as done above, appear
+necessary from experiments.)
 
 Intermediate products are the undistorted nav cam and sci cam images.
 It is suggested to review those in an image viewer, such as 'eog' and
@@ -848,10 +856,9 @@ with the option --external_mesh.
 
 The most time-consuming part of the geometry mapper is computing the
 initial poses, which is the earliest step, or step 0. To resume the
-geometry mapper at any step, use the option '--start_step num', where
-0 <= num and num <= 7. For example, one may want to apply further
-smoothing to the mesh or more hole-filling, before resuming with the
-next steps.
+geometry mapper at any step, use the option '--start_step num'. For
+example, one may want to apply further smoothing to the mesh or more
+hole-filling, before resuming with the next steps.
 
 For a given camera type to be textured it must have entries in
 ``cameras.config`` and the robot config file (such as
@@ -864,39 +871,51 @@ For a given camera type to be textured it must have entries in
 careful choice to be made for the last one. Images for the desired
 camera must be present in the bag file at the the specified topic.
 
-The haz_cam must be included among the camera types and camera
-topics as it is necessary to build the mesh.
-
 ## With simulated data
 
-When working with simulated data, the flag
+The geometry mapper works with any simulated cameras not having
+distortion.  It was tested to work with simulated images for
+``sci_cam``, ``haz_cam``, ``heat_cam``, and ``acoustics_cam``. It does
+not work with ``nav_cam``, which has distortion.
+
+The flag:
 
     --simulated_data
 
-should be passed to this tool. Also, the sci cam image topic option
-should be:
+should be passed to the geometry mapper. The sparse map is not
+necessary, no localization will take place, and intrinsics
+information, camera transform, and timestamp offset will not be read
+from the robot configuration file. Instead, it is expected that each
+simulated camera, for example ``sci_cam``, will provide, in addition to an
+image topic, the topics
 
-    --sci_cam_topic /hw/cam_sci
-
-It is not necessary to produce or pass in a sparse map with simulated
-data. The nav cam and the camera information provided by the value of
-`ASTROBEE_ROBOT` will be ignored. Instead, camera poses and
-information will be read from
-
-    /sim/haz_cam/pose
     /sim/sci_cam/pose
     /sim/sci_cam/info
 
-For this operation it is suggested to pick a portion of the bag where
-the images face the wall as much as possible, so one may need to
-change the `-start` and `-duration` values. That will result in the
-best possible output.
+having the pose and intrinsics of each camera image. These should be
+recorded in the bag (see more on recording earlier in the document).
 
-With simulated data the geometry mapper interface requires the nav_cam
-info to be populated as part of the ``--camera_types``,
-``--camera_topics``, and ``--undistorted_crop_wins`` options, but no
-data is read and no textured nav cam mesh is generated as of the
-current time.
+It is assumed that the simulated images are not distorted. In particular,
+``nav_cam``, which has fisheye lens distortion, is not supported. 
+
+Example of running the geometry mapper with simulated data:
+
+    export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
+    export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
+    export ASTROBEE_WORLD=iss
+    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ISAAC_WS/devel/setup.bash
+    python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
+      --ros_bag data.bag                                                    \
+      --camera_types "sci_cam"                                              \
+      --camera_topics "/hw/cam_sci"                                         \
+      --haz_cam_points_topic /hw/depth_haz/points                           \
+      --output_dir data_dir                                                 \
+      --verbose
+
+It is important to check for the correct name for the camera image
+topic passed to ``--camera-topic``. As mentioned earlier,
+for haz_cam the name will not follow the above convention.
 
 ## Running the streaming mapper
 
@@ -931,32 +950,47 @@ It will listen to the robot body pose being published at:
 
     /gnc/ekf
 
-and the sci cam image data at:
+The tool will read the configuration options from:
+
+    $ISAAC_WS/src/isaac/config/dense_map/streaming_mapper.config
+
+which specifies the camera image to texture. The image topic must be set,
+which, for ``sci_cam`` is normally
 
     /hw/cam_sci/compressed
+
+while for other ``haz_cam`` is:
+
+   /hw/depth_haz/extended/amplitude_int
+
+and for other cameras, such as ``nav_cam``, etc., it is of form:
+
+    /hw/cam_nav
+
+For the sci cam, it also expects image exposure data on the topic:
+
     /hw/sci_cam_exif
 
-It will publish the the texture on the topics:
+while this is not needed for other cameras. The streaming mapper will
+publish several topics having texture information, which for
+``sci_cam`` are:
 
     /ism/sci_cam/img
     /ism/sci_cam/obj
     /ism/sci_cam/mtl
 
-(when the texture type is sci_cam, and this is customizable, see
-below).
+and an analogous convention is followed for other cameras.
+
+In order for the the streaming mapper to produce texture it should
+receive input information with its needed topics, either from a bag or
+from the robot in real time.
 
 The header.stamp value for each published message will be the same as
 the header.stamp for the corresponding input sci cam image.
-
-Next one can play a bag having the input topics expected by the robot.
 (See the note below on perhaps redirecting the nav cam topic if the
 localization node is necessary.)
 
-Additional configuration option for this tool can be specified in
-
-    $ISAAC_WS/src/isaac/config/dense_map/streaming_mapper.config
-
-which has the following fields:
+The ``streaming_mapper.config`` file has following fields:
 
   - mesh_file: Override the location of the mesh described earlier.
   - ekf_state_topic: The topic to listen to for robot pose information.

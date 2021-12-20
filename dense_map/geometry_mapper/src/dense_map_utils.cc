@@ -258,7 +258,8 @@ void readConfigFile                                                     // NOLIN
 }
 
 // Given two poses aff0 and aff1, and 0 <= alpha <= 1, do linear interpolation.
-Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::Affine3d const& aff1) {
+Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0,
+                               Eigen::Affine3d const& aff1) {
   Eigen::Quaternion<double> rot0(aff0.linear());
   Eigen::Quaternion<double> rot1(aff1.linear());
 
@@ -276,7 +277,8 @@ Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::A
 // Given a set of poses indexed by timestamp in an std::map, find the
 // interpolated pose at desired timestamp. This is efficient
 // only for very small maps. Else use the StampedPoseStorage class.
-bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses, Eigen::Affine3d& interp_pose) {
+bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses,
+                      Eigen::Affine3d& interp_pose) {
   double left_time = std::numeric_limits<double>::max();
   double right_time = -left_time;
   for (auto it = poses.begin(); it != poses.end(); it++) {

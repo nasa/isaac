@@ -368,18 +368,16 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
             + "crop windows."
         )
 
-    if "nav_cam" not in camera_types or "haz_cam" not in camera_types:
-        raise Exception(
-            "nav_cam and haz_cam data and cameras must be specified as those are needed "
-            + "to localize and build the mesh."
-        )
-    for cam in camera_types:
-        if not (cam in crop_win_map):
-            raise Exception(
-                "No crop win specified in --undistorted_crop_wins for camera: " + cam
-            )
-
-
+    if args.simulated_data and 'nav_cam' in camera_types:
+        raise Exception ('The geometry mapper does not support nav_cam with simulated data as ' +
+        'its distortion is not modeled.')
+        
+    if not args.simulated_data:
+        for cam in camera_types:
+            if not (cam in crop_win_map):
+                raise Exception \
+                      ("No crop win specified in --undistorted_crop_wins for camera: " + cam)
+            
 def mkdir_p(path):
     if path == "":
         return  # this can happen when path is os.path.dirname("myfile.txt")
@@ -876,24 +874,24 @@ if __name__ == "__main__":
     # Smothing must happen before hole-filling, to remove weird
     # artifacts
     smooth_mesh = os.path.join(args.output_dir, "smooth_mesh.ply")
-    if start_step <= 2 and args.external_mesh == "":
+    if start_step <= 2 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 1
         smoothe_mesh(fused_mesh, smooth_mesh, args, attempt)
 
     # Fill holes
     hole_filled_mesh = os.path.join(args.output_dir, "hole_filled_mesh.ply")
-    if start_step <= 3 and args.external_mesh == "":
+    if start_step <= 3 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 1
         fill_holes_in_mesh(smooth_mesh, hole_filled_mesh, args, attempt)
 
     # Rm small connected components
     clean_mesh = os.path.join(args.output_dir, "clean_mesh.ply")
-    if start_step <= 4 and args.external_mesh == "":
+    if start_step <= 4 and args.external_mesh == "" and (not args.simulated_data):
         rm_connected_components(hole_filled_mesh, clean_mesh, args)
 
     # Smoothe again
     smooth_mesh2 = os.path.join(args.output_dir, "smooth_mesh2.ply")
-    if start_step <= 5 and args.external_mesh == "":
+    if start_step <= 5 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 2
         smoothe_mesh(clean_mesh, smooth_mesh2, args, attempt)
 
@@ -901,22 +899,24 @@ if __name__ == "__main__":
     # smoothing.  Mesh cleaning creates small holes and they can't be
     # cleaned well without some more smoothing like above.
     hole_filled_mesh2 = os.path.join(args.output_dir, "hole_filled_mesh2.ply")
-    if start_step <= 6 and args.external_mesh == "":
+    if start_step <= 6 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 2
         fill_holes_in_mesh(smooth_mesh2, hole_filled_mesh2, args, attempt)
 
     # Smoothe again as filling holes can make the mesh a little rough
     smooth_mesh3 = os.path.join(args.output_dir, "smooth_mesh3.ply")
-    if start_step <= 7 and args.external_mesh == "":
+    if start_step <= 7 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 3
         smoothe_mesh(hole_filled_mesh2, smooth_mesh3, args, attempt)
 
     # Simplify the mesh
     simplified_mesh = os.path.join(args.output_dir, "simplified_mesh.ply")
-    if start_step <= 8 and args.external_mesh == "":
+    if start_step <= 8 and args.external_mesh == "" and (not args.simulated_data):
         simplify_mesh(smooth_mesh3, simplified_mesh, args)
 
-    if args.external_mesh != "":
+    if args.simulated_data:
+        simplified_mesh = fused_mesh
+    elif args.external_mesh != "":
         # So that can texture on top of it
         simplified_mesh = args.external_mesh
 
@@ -928,7 +928,9 @@ if __name__ == "__main__":
             )
             textured_meshes += [textured_mesh]
 
-    if args.external_mesh == "":
+    if args.simulated_data:
+        print("Fused mesh:                           " + fused_mesh)
+    elif args.external_mesh == "":
         print("Fused mesh:                           " + fused_mesh)
         print("Smoothed mesh:                        " + smooth_mesh)
         print("Hole-filled mesh:                     " + hole_filled_mesh)
