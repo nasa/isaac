@@ -368,16 +368,21 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
             + "crop windows."
         )
 
-    if args.simulated_data and 'nav_cam' in camera_types:
-        raise Exception ('The geometry mapper does not support nav_cam with simulated data as ' +
-        'its distortion is not modeled.')
-        
+    if args.simulated_data and "nav_cam" in camera_types:
+        raise Exception(
+            "The geometry mapper does not support nav_cam with simulated data as "
+            + "its distortion is not modeled."
+        )
+
     if not args.simulated_data:
         for cam in camera_types:
             if not (cam in crop_win_map):
-                raise Exception \
-                      ("No crop win specified in --undistorted_crop_wins for camera: " + cam)
-            
+                raise Exception(
+                    "No crop win specified in --undistorted_crop_wins for camera: "
+                    + cam
+                )
+
+
 def mkdir_p(path):
     if path == "":
         return  # this can happen when path is os.path.dirname("myfile.txt")
@@ -917,7 +922,6 @@ if __name__ == "__main__":
     if args.simulated_data:
         simplified_mesh = fused_mesh
     elif args.external_mesh != "":
-        # So that can texture on top of it
         simplified_mesh = args.external_mesh
 
     textured_meshes = []
