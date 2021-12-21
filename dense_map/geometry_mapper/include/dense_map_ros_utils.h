@@ -95,11 +95,11 @@ void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topi
 struct RosBagHandle {
   RosBagHandle() = delete;  // The rosbag API prevents anything else than initialization
   RosBagHandle(std::string const& bag_file, std::string const& topic) {
+    bag_msgs.clear();
     bag.open(bag_file, rosbag::bagmode::Read);
     std::vector<std::string> topics;
     topics.push_back(topic);
     view = boost::shared_ptr<rosbag::View>(new rosbag::View(bag, rosbag::TopicQuery(topics)));
-    bag_msgs.clear();
     for (rosbag::MessageInstance const m : *view) bag_msgs.push_back(m);
   }
   rosbag::Bag bag;

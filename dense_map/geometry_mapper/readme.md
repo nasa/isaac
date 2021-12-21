@@ -75,24 +75,8 @@ about which of the two paradigms one refers to.
 ## Additional sensors present only in simulation
 
 A number of robot sensors are present only as part of the simulator.
-Those are the heat camera, described in:
+This is discussed further down the document.
 
-    $ISAAC_WS/src/astrobee/simulation/gazebo/readme.md
-
-and the acoustics camera, documented at
-
-    $ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
-
-These tools are implemented and documented in different places
-in the source tree because the first one is a gazebo plugin
-while the second one is a Python node.
-
-See also
-
-    $ASTROBEE_SOURCE_PATH/simulation/readme.md
-
-for information about the simulated nav_cam, haz_cam, and sci_cam.
- 
 ## Compiling the software
 
 It is assumed that by now the Astrobee and ISAAC software is compiled.
@@ -211,7 +195,15 @@ Copy the resulting bag off the robot.
 
 ### With simulated data
 
-Edit the simulation configuration, in
+#### Cameras present in simulation
+
+The astrobee simulator supports a handful of cameras, including
+``nav_cam``, ``sci_cam``, ``haz_cam``, ``heat_cam``,
+``acoustics_cam``, etc. All these have been tested with the gemetry
+mapper and streaming mapper.
+
+The ``sci_cam`` and ``haz_cam`` cameras are not enabled by default in
+the simulator. To enable them, edit the simulation configuration, in
 
     $ASTROBEE_SOURCE_PATH/astrobee/config/simulation/simulation.config
 
@@ -222,17 +214,38 @@ and set:
     sci_cam_continuous_picture_taking = true;
 
 The later will make sure sci cam pictures are taken automatically. If
-custom behavior is desired, see
+custom behavior is desired, see:
 
     $ISAAC_WS/src/astrobee/behaviors/inspection/readme.md
+
+More information about the simulated nav_cam, haz_cam, and sci_cam is
+at:
+
+    $ASTROBEE_SOURCE_PATH/simulation/readme.md
+
+The heat camera is described in:
+
+    $ISAAC_WS/src/astrobee/simulation/gazebo/readme.md
+
+The acoustics camera and how to enable it is documented at:
+
+    $ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
+
+#### Recording simulated data
 
 Start the simulator, such as:
 
     source $ASTROBEE_BUILD_PATH/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
-    roslaunch isaac sim.launch rviz:=true pose:="11.0 -7.0 5.0 0 0 0 1" world:=iss
+    roslaunch isaac sim.launch rviz:=true dds:=false \
+      pose:="11.0 -7.0 5.0 0 0 0 1" world:=iss
 
-In RVIZ turn on visualizing these cameras from the Panels menu.
+In rviz turn on visualizing the desired cameras cameras from the
+Panels menu, as otherwise the needed camera topics may not be
+published.
+
+Adjust the 3D view in rviz with the mouse so that the robot, which is
+present in the middle of the module, can be seen.
 
 When recording simulated data for a given camera, for example, for
 ``sci_cam``, so that later it can be used with the geometry and
@@ -240,20 +253,27 @@ streaming mapper, one needs to record, in addition to depth clouds and
 camera images, also the camera poses and intrinsics information, which
 is done as follows:
 
-    rosbag record /hw/depth_haz/points                   \
-      /hw/cam_sci /sim/sci_cam/pose /sim/sci_cam/info
+    rosbag record /hw/depth_haz/points                           \
+      /hw/cam_sci/compressed /sim/sci_cam/pose /sim/sci_cam/info
 
 It is good to check for the precise name of the camera image topic.
-The above pattern normally holds true, and certainly so for 
-nav_cam and sci_cam, but note that for haz_cam it is named:
+For haz cam the image topic will be instead:
 
     /hw/depth_haz/extended/amplitude_int
-          
-If desired to record data for many cameras, these topics must
-be specified for each of them.
 
-The simulator supports other cameras as well, including
-``acoustics_cam`` and ``heat_cam``.
+For nav cam, the image topic will be:
+
+    /hw/cam_nav
+
+and the same convention is followed for the rest of the cameras.
+
+If desired to record data for many cameras, these topics must
+be specified for each of them. For example, for ``heat_cam`` add
+the lines:
+
+      /hw/cam_heat /sim/heat_cam/pose /sim/heat_cam/info
+
+to the ``rosbag record`` command.
 
 The robot can be told to move around by either running a plan, or by
 sending it a move command, such as:
@@ -310,8 +330,8 @@ the fact that the calibration was done at reduced resolution.
 To accomplish this processing, once the sci cam data is integrated
 into the bag, one can do the following: 
 
-    $ISAAC_WS/devel/lib/geometry_mapper/scale_bag -input_bag input.bag \
-      -output_bag output.bag --image_type grayscale --scale 0.25
+    $ISAAC_WS/devel/lib/geometry_mapper/scale_bag --input_bag input.bag \
+      --output_bag output.bag --image_type grayscale --scale 0.25
 
 Note that the processed sci cam images will be now on topic
 `/hw/cam_sci2`.
@@ -898,24 +918,26 @@ recorded in the bag (see more on recording earlier in the document).
 It is assumed that the simulated images are not distorted. In particular,
 ``nav_cam``, which has fisheye lens distortion, is not supported. 
 
+The simulated haz_cam is required to be among the topics being recorded
+and read in, because its pose is needed to process the depth clouds.
+
 Example of running the geometry mapper with simulated data:
 
-    export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
-    export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
-    export ASTROBEE_WORLD=iss
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
-    source $ISAAC_WS/devel/setup.bash
+    sci_topic=/hw/cam_sci/compressed 
+    haz_topic=/hw/depth_haz/extended/amplitude_int
     python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
+      --simulated_data                                                      \
       --ros_bag data.bag                                                    \
-      --camera_types "sci_cam"                                              \
-      --camera_topics "/hw/cam_sci"                                         \
+      --camera_types "sci_cam haz_cam"                                      \
+      --camera_topics "$sci_topic $haz_topic"                               \
       --haz_cam_points_topic /hw/depth_haz/points                           \
       --output_dir data_dir                                                 \
+      --sampling_spacing_seconds 2                                          \
+      --dist_between_processed_cams 0.1                                     \
       --verbose
 
-It is important to check for the correct name for the camera image
-topic passed to ``--camera-topic``. As mentioned earlier,
-for haz_cam the name will not follow the above convention.
+It is important to check for the correct names for the camera image
+topics are passed to ``--camera_topics``.
 
 ## Running the streaming mapper
 
@@ -1111,8 +1133,8 @@ To launch the streaming mapper, one can do the following:
     export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
     export ASTROBEE_WORLD=iss
-    roslaunch isaac sim.launch world:=iss rviz:=true streaming_mapper:=true \
-      pose:="11.0 -7.0 5.0 0 0 0 1"   
+    roslaunch isaac sim.launch world:=iss rviz:=true \
+      streaming_mapper:=true pose:="11.0 -7.0 5.0 0 0 0 1"   
 
 and then the robot can be moved in order to create images to texture as:
 

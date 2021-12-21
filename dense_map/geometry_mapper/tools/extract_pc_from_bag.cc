@@ -25,13 +25,8 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include <opencv2/highgui/highgui.hpp>
-
-#include <cv_bridge/cv_bridge.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <sensor_msgs/CompressedImage.h>
-#include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 
 #include <pcl/io/ply_io.h>
@@ -46,9 +41,9 @@
 #include <vector>
 #include <fstream>
 
-// Extract images from a ROS bag.
+// Extract clouds a ROS bag.
 
-DEFINE_string(topic, "/hw/cam_nav", "Image topic that you want to write to disk.");
+DEFINE_string(topic, "/hw/depth_haz/points", "The topic having the clouds.");
 DEFINE_string(output_directory, "", "Directory for writing the output imagery.");
 DEFINE_string(output_format, "%06i", "Format string for writing the output data.");
 DEFINE_double(start, 0, "Start extracting this many seconds into the bag.");
@@ -85,7 +80,7 @@ int main(int argc, char** argv) {
   if (output_directory.empty()) {
     char* temp = strdup(argv[1]);
     std::string base = std::string(basename(temp));
-    output_directory = base.substr(0, base.length() - 4) + "_images";
+    output_directory = base.substr(0, base.length() - 4) + "_clouds";
   }
 
   // Create the output directory, if missing
@@ -99,70 +94,6 @@ int main(int argc, char** argv) {
   rosbag::View view(bag, rosbag::TopicQuery(topics));
   std::cout << "Copying at most " << view.size() << " frames from the bag file.\n";
   for (rosbag::MessageInstance const m : view) {
-    // Extract a regular image
-    sensor_msgs::Image::ConstPtr image_msg = m.instantiate<sensor_msgs::Image>();
-    if (image_msg) {
-      ros::Time stamp = image_msg->header.stamp;
-      curr_time = stamp.toSec();
-
-      // Set up the output filename
-      form_filename(image_msg->header.seq, curr_time, filename_buffer, sizeof(filename_buffer));
-      std::string name(filename_buffer);
-      name = output_directory + "/" + name + ".jpg";
-
-      if (beg_time < 0) beg_time = curr_time;
-      if (curr_time - beg_time < FLAGS_start || curr_time - beg_time > FLAGS_start + FLAGS_duration) {
-        continue;
-      }
-
-      // Convert to an opencv image
-      cv::Mat image;
-      try {
-        // Do a copy as the message is temporary
-        (cv_bridge::toCvShare(image_msg, "bgr8")->image).copyTo(image);
-      } catch (cv_bridge::Exception const& e) {
-        try {
-          (cv_bridge::toCvShare(image_msg, "32FC1")->image).copyTo(image);
-        } catch (cv_bridge::Exception const& e) {
-          LOG(ERROR) << "Unable to convert " << image_msg->encoding.c_str() << " image to bgr8 or 32FC1";
-          continue;
-        }
-      }
-
-      std::cout << "Writing: " << name << "\n";
-      cv::imwrite(name, image);
-    }
-
-    // Extract a compressed image
-    sensor_msgs::CompressedImage::ConstPtr comp_image_msg
-      = m.instantiate<sensor_msgs::CompressedImage>();
-    if (comp_image_msg) {
-      ros::Time stamp = comp_image_msg->header.stamp;
-      curr_time = stamp.toSec();
-
-      // Set up the output filename
-      form_filename(comp_image_msg->header.seq, curr_time, filename_buffer,
-                    sizeof(filename_buffer));
-      std::string name(filename_buffer);
-      name = output_directory + "/" + name + ".jpg";
-
-      if (beg_time < 0) beg_time = curr_time;
-      if (curr_time - beg_time < FLAGS_start || curr_time - beg_time > FLAGS_start + FLAGS_duration) {
-        continue;
-      }
-
-      cv::Mat image;
-      try {
-        // convert compressed image data to cv::Mat
-        image = cv::imdecode(cv::Mat(comp_image_msg->data), cv::IMREAD_COLOR);
-      } catch (cv_bridge::Exception const& e) {
-        LOG(ERROR) << "Unable to convert compressed image to bgr8.";
-        continue;
-      }
-      std::cout << "Writing: " << name << "\n";
-      cv::imwrite(name, image);
-    }
-
     sensor_msgs::PointCloud2::ConstPtr pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
     if (pc_msg) {
       ros::Time stamp = pc_msg->header.stamp;
@@ -174,7 +105,8 @@ int main(int argc, char** argv) {
       name = output_directory + "/" + name + ".ply";
 
       if (beg_time < 0) beg_time = curr_time;
-      if (curr_time - beg_time < FLAGS_start || curr_time - beg_time > FLAGS_start + FLAGS_duration) {
+      if (curr_time - beg_time < FLAGS_start ||
+          curr_time - beg_time > FLAGS_start + FLAGS_duration) {
         continue;
       }
 

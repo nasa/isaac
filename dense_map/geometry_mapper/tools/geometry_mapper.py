@@ -362,27 +362,28 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
     if len(camera_types) != len(args.camera_topics.split()):
         raise Exception("There must be as many camera types as camera topics.")
 
-    if len(camera_types) != len(args.undistorted_crop_wins.split()):
+    if (not args.simulated_data) and \
+           len(camera_types) != len(args.undistorted_crop_wins.split()):
         raise Exception(
             "There must be as many camera types as listed undistorted "
             + "crop windows."
         )
 
-    if args.simulated_data and "nav_cam" in camera_types:
-        raise Exception(
-            "The geometry mapper does not support nav_cam with simulated data as "
-            + "its distortion is not modeled."
-        )
+    if args.simulated_data and 'nav_cam' in camera_types:
+        raise Exception ('The geometry mapper does not support nav_cam with simulated data as ' +
+        'its distortion is not modeled.')
+        
+    if args.simulated_data and 'haz_cam' not in camera_types:
+        raise Exception ('The haz_cam must be one of the camera types in simulation mode ' + \
+                         'as it is needed to read the simulated camera pose in order to ' +
+                         'process the depth clouds.')
 
     if not args.simulated_data:
         for cam in camera_types:
             if not (cam in crop_win_map):
-                raise Exception(
-                    "No crop win specified in --undistorted_crop_wins for camera: "
-                    + cam
-                )
-
-
+                raise Exception \
+                      ("No crop win specified in --undistorted_crop_wins for camera: " + cam)
+            
 def mkdir_p(path):
     if path == "":
         return  # this can happen when path is os.path.dirname("myfile.txt")
@@ -445,8 +446,6 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         geometry_mapper_path,
         "--ros_bag",
         args.ros_bag,
-        "--sparse_map",
-        args.sparse_map,
         "--output_dir",
         args.output_dir,
         "--camera_topics",
@@ -487,6 +486,8 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
 
     if args.simulated_data:
         cmd += ["--simulated_data"]
+    else:
+         cmd += ["--sparse_map", args.sparse_map]
 
     if args.save_debug_data:
         cmd += ["--save_debug_data"]
