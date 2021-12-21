@@ -584,7 +584,7 @@ Visualization Manager:
               Image Topic: /hw/depth_haz/extended/amplitude_int
               Median window: 5
               Min Value: 0
-              Name: "DEBUG: HazCam"
+              Name: "DEBUG: HazCam intensity"
               Normalize Range: true
               Queue Size: 2
               Transport Hint: raw
