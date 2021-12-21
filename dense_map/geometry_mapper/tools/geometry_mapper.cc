@@ -1083,11 +1083,8 @@ void saveCameraPoses(
   // Open a handle for writing the index of files being written to
   // disk.  This is not done if we only want to process the haz cam
   // cloud without the haz_cam image.
-  bool process_image = (cam_type != "haz_cam" || do_haz_cam_image);
   std::string index_file = output_dir + "/" + cam_type + "_index.txt";
-  std::ofstream ofs;
-  if (process_image)
-    ofs = std::ofstream(index_file.c_str());
+  std::ofstream ofs(index_file.c_str());
 
   // For the haz cam, need an image index, which will be haz_cam_index.txt,
   // and a point cloud index, which will be depth_cam_index.txt.
@@ -1233,7 +1230,7 @@ void saveCameraPoses(
     cv::Mat desired_image;
     bool save_grayscale = false;  // Get a color image, if possible
     double found_time = -1.0;
-    if (process_image) {
+    if (cam_type != "haz_cam" || do_haz_cam_image) {
       if (!dense_map::lookupImage(curr_time, desired_cam_msgs, save_grayscale, desired_image,
                                   desired_cam_pos, found_time))
         continue;  // the expected image could not be found
@@ -1260,20 +1257,18 @@ void saveCameraPoses(
       }
     }
 
-    if (process_image) {
-      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.jpg",
-               desired_cam_dir.c_str(), curr_time);
-      std::cout << "Writing: " << filename_buffer << std::endl;
-      cv::imwrite(filename_buffer, *img_ptr);
+    snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.jpg",
+             desired_cam_dir.c_str(), curr_time);
+    std::cout << "Writing: " << filename_buffer << std::endl;
+    cv::imwrite(filename_buffer, *img_ptr);
 
-      // Save the name of the image in the index
-      ofs << filename_buffer << "\n";
+    // Save the name of the image in the index
+    ofs << filename_buffer << "\n";
 
-      // Save the transform
-      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s.txt",
-               output_dir.c_str(), curr_time, suffix.c_str());
-      dense_map::writeMatrix(desired_cam_to_world_trans, filename_buffer);
-    }
+    // Save the transform
+    snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s.txt",
+             output_dir.c_str(), curr_time, suffix.c_str());
+    dense_map::writeMatrix(desired_cam_to_world_trans, filename_buffer);
 
     if (cam_type == "haz_cam") {
       // Save the transform name in the index file, for voxblox
