@@ -36,7 +36,7 @@ def process_args(args):
     Set up the parser and parse the args.
     """
 
-    # Extract some paths before the args are parsed
+    # Extract some paths before the arguments are parsed
     src_path = os.path.dirname(args[0])
     exec_path = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.dirname(src_path)))

@@ -40,7 +40,9 @@ parser.add_argument(
     help="The directory containing the undistorted images.",
 )
 parser.add_argument(
-    "--camera_type", default="", help="The camera type (nav_cam, haz_cam, or sci_cam, etc.)."
+    "--camera_type",
+    default="",
+    help="The camera type (nav_cam, haz_cam, or sci_cam, etc.).",
 )
 
 args = parser.parse_args()
