@@ -953,6 +953,8 @@ obtained textured model to be visualized.
 
 ### Running with real data
 
+#### When the robot (or nav cam) poses are known
+
 To run the streaming mapper with real data for the given bot, do:
 
     source $ASTROBEE_BUILD_PATH/devel/setup.bash
@@ -964,9 +966,17 @@ To run the streaming mapper with real data for the given bot, do:
     roslaunch isaac isaac_astrobee.launch llp:=disabled nodes:=framestore \
       streaming_mapper:=true output:=screen     
 
-This will load the mesh produced by the geometry mapper from 
+Wait until it finishes forming the texture model, which may take 
+30 seconds on more.
+
+Ensure that the ASTROBEE_ROBOT name is correct above.
+
+This node will load the mesh produced by the geometry mapper from 
 
     $ISAAC_WS/src/isaac/resources/geometry/${ASTROBEE_WORLD}.ply
+
+If an updated geometry mapper mesh exists, it should be copied to that
+location first.
 
 It will listen to the robot body pose being published at:
 
@@ -993,9 +1003,12 @@ For the sci cam, it also expects image exposure data on the topic:
 
     /hw/sci_cam_exif
 
-while this is not needed for other cameras. The streaming mapper will
-publish several topics having texture information, which for
-``sci_cam`` are:
+to do exposure correction, unlesss in simulation mode or
+``sci_cam_exposure_correction`` is set to false. This is not needed
+for other cameras.
+
+The streaming mapper will publish several topics having texture
+information, which for ``sci_cam`` are:
 
     /ism/sci_cam/img
     /ism/sci_cam/obj
@@ -1008,9 +1021,112 @@ receive input information with its needed topics, either from a bag or
 from the robot in real time.
 
 The header.stamp value for each published message will be the same as
-the header.stamp for the corresponding input sci cam image.
-(See the note below on perhaps redirecting the nav cam topic if the
-localization node is necessary.)
+the header.stamp for the corresponding input camera image.
+
+The data produced by the streaming mapper can be recorded with:
+
+    rosbag record /ism/sci_cam/img /ism/sci_cam/obj /ism/sci_cam/mtl \
+       -b 10000
+    
+The recording should start before the input bag is played. The `-b`
+option tells ROS to increase its recording buffer size, as sometimes
+the streaming mapper can publish giant meshes.
+
+The robot pose that the streaming mapper needs assumes a very accurate
+calibration of the IMU sensor in addition to the nav, haz, and sci cam
+sensors, and very accurate knowledge of the pose of these sensors on
+the robot body. If that is not the case, it is suggested to use the
+nav cam pose via the ``nav_cam_pose_topic`` field in
+streaming_mapper.config, for which only accurate calibration of the
+nav, sci, and haz cameras among each other is assumed.
+
+The input texture can be in color or grayscale, at full or reduced
+resolution, and compressed or not. 
+
+#### Running with no robot or nav cam pose information
+
+If no robot body or nav cam pose information is present, for example,
+if the EKF or localization node was not running when the image data was
+acquired, or this data was not recorded or was not reliable, the
+localization node can be started together with the streaming mapper by
+modifying the above `roslaunch` command as follows:
+
+    export ASTROBEE_ROBOT=bsharp2
+    roslaunch isaac isaac_astrobee.launch llp:=disabled \
+      nodes:=framestore,localization_node               \
+      streaming_mapper:=true output:=screen     
+
+and then enabled by running in a separate terminal:
+
+    rosservice call /loc/ml/enable true
+
+Alternatively, the streaming mapper can be started first,
+without localization, as:
+
+    export ASTROBEE_WORLD=iss
+    export ASTROBEE_ROBOT=bsharp2 # the robot name should be checked
+    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ISAAC_WS/devel/setup.bash
+    export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
+    export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
+    roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
+      sim_mode:=false output:=screen
+
+Ensure then that nav_cam_pose_topic is set to /loc/ml/features in
+streaming_mapper.config and that ekf_state_topic is empty. Also
+check the robot name, as earlier.
+
+Then the localization node can be started separately, as:
+    
+    export ASTROBEE_ROBOT=bsharp2
+    roslaunch astrobee astrobee.launch llp:=disabled \
+      nodes:=framestore,localization_node output:=screen
+
+with the same environment, including the robot name, and then can be
+enabled with a rosservice call as earlier.
+
+This node will expect the nav cam pose to be published on topic
+``/hw/cam_nav``. If it is on a different topic, such as
+``/mgt/img_sampler/nav_cam/image_record``, it needs to be redirected
+to this one when playing the bag, such as:
+
+    rosbag play data.bag                                 \
+      /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav \
+      /loc/ml/features:=/tmp/features
+
+Above the /loc/ml/features topic which may exist in the bag is
+redirected to /tmp/features since the currently started localization
+node will create new such features.
+ 
+The localization node, if needed, will make use of a registered sparse
+map with BRISK features, histogram equalization, and a vocabulary
+database to find the nav cam poses. The command for building such a
+BRISK map from a registered SURF map is:
+
+  cp surf_map.map brisk_map.map 
+  $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/build_map         \
+    --output_map brisk_map.map --rebuild --histogram_equalization \
+    --vocab_db
+
+See:
+
+     $ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
+
+for more information.
+
+If running on a local machine, after the map is rebuilt it should be
+copied to:
+
+    $ASTROBEE_RESOURCE_DIR/maps/${ASTROBEE_WORLD}.map
+
+(The ``maps`` directory needs to be created if missing.)
+
+Also see a note earlier in the text for how to reduce the BRISK
+thresholds if the map has too few features. For more details on what
+the localization node expects, see build_map.md, in the section about
+running this node on a local machine.
+
+#### The streaming mapper configuration file
 
 The ``streaming_mapper.config`` file has following fields:
 
@@ -1038,86 +1154,19 @@ The ``streaming_mapper.config`` file has following fields:
     to adjust for lightning differences, then apply the gamma
     transform back. This value should be set to the maximum observed
     ISO * exposure_time. The default is 5.1. Not used with simulated 
-    data.
-  - use_single_texture: Use a single texture buffer. Sample
-    the images by picking points on each triangle face with spacing
-    pixel_size. This can take a couple of minutes to form the
-    necessary structures to be able to stream the texture.
+    data or when sci_cam_exposure_correction if false.
+  - sci_cam_exposure_correction: If set to 'true', correct the
+    exposure of sci_cam images.
+  - use_single_texture: If set to 'true', use a single texture
+    buffer. Sample the images by picking points on each triangle face
+    with spacing pixel_size. This can take a couple of minutes to form
+    the necessary structures to be able to stream the texture.
   - pixel_size: The pixel size to use with use_single_texture.
     The default is 0.001 meters.
   - num_threads: Number of threads to use. The default is 48.
-  - save_to_disk: If to save to disk an .obj file for each topic
-    published, to be debugged in Meshlab. These will be saved in
+  - save_to_disk: If set to 'true', save to disk an .obj file for each
+    topic published, to be debugged in Meshlab. These will be saved in
     ~/.ros. The default is 'false'.
-
-If no pose information is present, for example, if the EKF or
-localization node was not running when the data was acquired, or this
-data was not recorded, the localization node can be started by
-modifying the above `roslaunch` command as follows:
-
-    roslaunch isaac isaac_astrobee.launch llp:=disabled \
-      nodes:=framestore,localization_node               \
-      streaming_mapper:=true output:=screen     
-
-Alternatively, the streaming mapper can be started first,
-without localization, as:
-
-    export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
-    export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
-    roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
-      sim_mode:=false output:=screen
-
-Ensure then that nav_cam_pose_topic is set to /loc/ml/features in
-streaming_mapper.config and that ekf_state_topic is empty.
-
-Then the localization node can be started separately, as:
-    
-    roslaunch astrobee astrobee.launch llp:=disabled \
-      nodes:=framestore,localization_node output:=screen
-
-and then enabled by running in a separate terminal:
-
-    rosservice call /loc/ml/enable true
-
-This node will expect the nav cam pose to be published on topic
-``/hw/cam_nav``. If it is on a different topic, such as
-``/mgt/img_sampler/nav_cam/image_record``, it needs to be redirected to
-this one when playing the bag, such as:
-
-    rosbag play data.bag \
-      /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav
-
-The localization node, if needed, will make use of a registered sparse
-map with BRISK features, histogram equalization, and a vocabulary
-database to find the nav cam poses. See build_map.md in the astrobee
-repository how such a map can be created and where it should be
-copied. If running on a local machine, it should go to:
-
-    $ASTROBEE_RESOURCE_DIR/maps/${ASTROBEE_WORLD}.map
-
-Also see a note earlier in the text for how to reduce the BRISK
-thresholds if the map has too few features. For more details on what
-the localization node expects, see build_map.md, in the section about
-running this node on a local machine.
-
-The data produced by the streaming mapper can be recorded with:
-
-    rosbag record /ism/sci_cam/img /ism/sci_cam/obj /ism/sci_cam/mtl \
-       -b 10000
-    
-The recording should start before the input bag is played. The `-b`
-option tells ROS to increase its recording buffer size, as sometimes
-the streaming mapper can publish giant meshes.
-
-The robot pose that the streaming mapper needs assumes a very accurate
-calibration of the IMU sensor in addition to the nav, haz, and sci cam
-sensors, and very accurate knowledge of the pose of these sensors on
-the robot body. If that is not the case, it is suggested to use the nav
-cam pose via the nav_cam_pose_topic field, for which only accurate
-calibration of the nav, sci, and haz cameras among each other is assumed.
-
-The input texture can be in color or grayscale, at full or reduced
-resolution, and compressed or not. 
 
 ## Running with simulated data
 
@@ -1136,7 +1185,7 @@ To launch the streaming mapper, one can do the following:
     roslaunch isaac sim.launch world:=iss rviz:=true \
       streaming_mapper:=true pose:="11.0 -7.0 5.0 0 0 0 1"   
 
-and then the robot can be moved in order to create images to texture as:
+Then the robot can be moved in order to create images to texture as:
 
     rosrun mobility teleop -move -pos "11.0 -5.0 5.0" -tolerance_pos 0.0001 \
       -att "0 0 0 1"

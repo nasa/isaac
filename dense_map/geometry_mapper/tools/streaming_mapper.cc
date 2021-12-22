@@ -119,16 +119,17 @@ class StreamingMapper {
 
   std::string nav_cam_pose_topic, ekf_state_topic, ekf_pose_topic, texture_cam_topic,
     sci_cam_exif_topic, m_texture_cam_type, mesh_file;
-  bool sim_mode, save_to_disk, use_single_texture;
+  bool m_sim_mode, save_to_disk, m_sci_cam_exp_corr, use_single_texture;
 
   // For meshing
   mve::TriangleMesh::Ptr mesh;
   std::shared_ptr<mve::MeshInfo> mesh_info;
-  std::shared_ptr<tex::Graph> graph;  // TODO(oalexan1): Is this necessary?
+  std::shared_ptr<tex::Graph> graph;
   std::shared_ptr<BVHTree> bvh_tree;
 
   // Each callback must have a lock
-  std::mutex nav_cam_pose_lock, texture_cam_pose_lock, texture_cam_info_lock, texture_cam_image_lock, sci_cam_exif_lock;
+  std::mutex nav_cam_pose_lock, texture_cam_pose_lock, texture_cam_info_lock,
+    texture_cam_image_lock, sci_cam_exif_lock;
 
   // Data indexed by timestamp
   std::map<double, Eigen::Affine3d> nav_cam_localization_poses;
@@ -178,7 +179,8 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
 
   // Set the config path to ISAAC
   char* path;
-  if ((path = getenv("ISAAC_CONFIG_DIR")) == NULL) ROS_FATAL("Could not find the config path.");
+  if ((path = getenv("ISAAC_CONFIG_DIR")) == NULL)
+    ROS_FATAL("Could not find the config path. Ensure that ISAAC_CONFIG_DIR was set.");
   config_params.SetPath(path);
 
   config_params.AddFile("dense_map/streaming_mapper.config");
@@ -187,7 +189,7 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
   StreamingMapper::ReadParams(nh);
 
   // Read configuration data
-  if (!sim_mode) {
+  if (!m_sim_mode) {
     // Read the bot config file
     std::vector<std::string> cam_names = {m_texture_cam_type};
     std::vector<camera::CameraParameters> cam_params;
@@ -232,7 +234,7 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
   texture_mtl_pub = nh.advertise<sensor_msgs::Image>(mapper_mtl_topic, 1);
 
   // Set up the subscribers
-  if (sim_mode) {
+  if (m_sim_mode) {
     // Subscribe to the simulated texture cam image pose and intrinsics.
     // Keep a bunch of them in the queue.
     // The name of these topics are TOPIC_HAZ_CAM_SIM_POSE, etc., in ff_names.h.
@@ -261,8 +263,7 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
     }
   }
 
-  // TODO(oalexan1): Allow the sci cam to function without the exif topic
-  if (m_texture_cam_type == "sci_cam" && !sim_mode) {
+  if (m_texture_cam_type == "sci_cam" && !m_sim_mode && m_sci_cam_exp_corr) {
     sci_cam_exif_topic = "/hw/sci_cam_exif";
     ROS_INFO_STREAM("Subscribing to sci cam exif topic: " << sci_cam_exif_topic);
     sci_cam_exif_sub = nh.subscribe(sci_cam_exif_topic, 10,
@@ -295,7 +296,8 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
     m_smallest_cost_per_face = std::vector<double>(num_faces, 1.0e+100);
 
     if (use_single_texture)
-      dense_map::formModel(mesh, pixel_size, num_threads, face_projection_info, texture_atlases, texture_model);
+      dense_map::formModel(mesh, pixel_size, num_threads, face_projection_info,
+                           texture_atlases, texture_model);
   } catch (std::exception& e) {
     LOG(FATAL) << "Could not load mesh.\n" << e.what() << "\n";
   }
@@ -329,30 +331,36 @@ void StreamingMapper::ReadParams(ros::NodeHandle const& nh) {
 
   // The sim_mode parameter is very important, it must be read early
   // on as a lot of logic depends on its value.
-  nh.getParam("sim_mode", sim_mode);
-
-  if (!config_params.GetBool("save_to_disk", &save_to_disk)) ROS_FATAL("Could not read the save_to_disk parameter.");
+  nh.getParam("sim_mode", m_sim_mode);
 
   if (!config_params.GetBool("use_single_texture", &use_single_texture))
     ROS_FATAL("Could not read the use_single_texture parameter.");
 
+  if (!config_params.GetBool("sci_cam_exposure_correction", &m_sci_cam_exp_corr))
+    ROS_FATAL("Could not read the sci_cam_exposure_correction parameter.");
+
+  if (!config_params.GetBool("save_to_disk", &save_to_disk))
+    ROS_FATAL("Could not read the save_to_disk parameter.");
+
   ROS_INFO_STREAM("Texture camera type = " << m_texture_cam_type);
   ROS_INFO_STREAM("Mesh = " << mesh_file);
-  if (!sim_mode) {
+  if (!m_sim_mode) {
     int num = (!nav_cam_pose_topic.empty()) + (!ekf_state_topic.empty()) + (!ekf_pose_topic.empty());
     if (num != 1)
       LOG(FATAL) << "Must specify exactly only one of nav_cam_pose_topic, "
                  << "ekf_state_topic, ekf_pose_topic.";
 
     ROS_INFO_STREAM("dist_between_processed_cams = " << dist_between_processed_cams);
-    ROS_INFO_STREAM("max_iso_times_exposure = " << max_iso_times_exposure);
-    ROS_INFO_STREAM("use_single_texture = " << use_single_texture);
-    ROS_INFO_STREAM("pixel_size = " << pixel_size);
-    ROS_INFO_STREAM("num_threads = " << num_threads);
-    ROS_INFO_STREAM("sim_mode = " << sim_mode);
-    ROS_INFO_STREAM("save_to_disk = " << save_to_disk);
+    ROS_INFO_STREAM("max_iso_times_exposure      = " << max_iso_times_exposure);
+    ROS_INFO_STREAM("use_single_texture          = " << use_single_texture);
+    ROS_INFO_STREAM("sci_cam_exposure_correction = " << m_sci_cam_exp_corr);
+    ROS_INFO_STREAM("pixel_size                  = " << pixel_size);
+    ROS_INFO_STREAM("num_threads                 = " << num_threads);
+    ROS_INFO_STREAM("sim_mode                    = " << m_sim_mode);
+    ROS_INFO_STREAM("save_to_disk                = " << save_to_disk);
     ROS_INFO_STREAM("num_exclude_boundary_pixels = " << num_exclude_boundary_pixels);
-    ROS_INFO_STREAM("ASTROBEE_ROBOT = " << getenv("ASTROBEE_ROBOT"));
+    ROS_INFO_STREAM("ASTROBEE_ROBOT              = " << getenv("ASTROBEE_ROBOT"));
+    ROS_INFO_STREAM("ASTROBEE_WORLD              = " << getenv("ASTROBEE_WORLD"));
   }
 
   // For a camera like sci_cam, the word "sci" better be part of texture_cam_topic.
@@ -485,19 +493,19 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
 
   if (save_to_disk) {
     std::string obj_file = out_prefix + ".obj";
-    std::cout << "Writing: " << obj_file << std::endl;
+    std::cout << "Writing: ~/.ros/" << obj_file << std::endl;
     std::ofstream obj_handle(obj_file);
     obj_handle << obj_str;
     obj_handle.close();
 
     std::string mtl_file = out_prefix + ".mtl";
-    std::cout << "Writing: " << mtl_file << std::endl;
+    std::cout << "Writing: ~/.ros/" << mtl_file << std::endl;
     std::ofstream mtl_handle(mtl_file);
     mtl_handle << mtl_str;
     mtl_handle.close();
 
     std::string png_file = out_prefix + ".png";
-    std::cout << "Writing: " << png_file << std::endl;
+    std::cout << "Writing: ~/.ros/" << png_file << std::endl;
     if (!use_single_texture)
       cv::imwrite(png_file, *img_ptr);
     else
@@ -508,7 +516,7 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
 // Add the latest received texture cam pose to the storage. This is meant to be used
 // only for simulated data. Else use the landmark and ekf callbacks.
 void StreamingMapper::TextureCamSimPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& pose) {
-  if (!sim_mode) return;
+  if (!m_sim_mode) return;
 
   // Add the latest pose. Use a lock.
   const std::lock_guard<std::mutex> lock(texture_cam_pose_lock);
@@ -528,7 +536,7 @@ void StreamingMapper::TextureCamSimPoseCallback(const geometry_msgs::PoseStamped
 }
 
 void StreamingMapper::TextureCamSimInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& info) {
-  if (!sim_mode) return;
+  if (!m_sim_mode) return;
 
   // Initialize m_texture_cam_params just once. Use a lock.
   if (m_texture_cam_params.GetFocalVector() == Eigen::Vector2d(0, 0)) {
@@ -590,7 +598,7 @@ void StreamingMapper::AddTextureCamPose(double nav_cam_timestamp, Eigen::Affine3
 
 // This callback takes as input the nav_cam pose as output by localization_node.
 void StreamingMapper::LandmarkCallback(ff_msgs::VisualLandmarks::ConstPtr const& vl) {
-  if (sim_mode) return;
+  if (m_sim_mode) return;
 
   double nav_cam_timestamp = vl->header.stamp.toSec();
   Eigen::Affine3d nav_cam_pose;
@@ -602,7 +610,7 @@ void StreamingMapper::LandmarkCallback(ff_msgs::VisualLandmarks::ConstPtr const&
 // This callback takes as input the robot pose as output by ekf on
 // ekf_state_topic (it should be set to /gnc/ekf)
 void StreamingMapper::EkfStateCallback(ff_msgs::EkfState::ConstPtr const& ekf_state) {
-  if (sim_mode) return;
+  if (m_sim_mode) return;
 
   double nav_cam_timestamp = ekf_state->header.stamp.toSec();
   Eigen::Affine3d body_pose;
@@ -618,7 +626,7 @@ void StreamingMapper::EkfStateCallback(ff_msgs::EkfState::ConstPtr const& ekf_st
 
 // This callback takes as input the robot pose as output by ekf on /loc/pose.
 void StreamingMapper::EkfPoseCallback(geometry_msgs::PoseStamped::ConstPtr const& ekf_pose) {
-  if (sim_mode) return;
+  if (m_sim_mode) return;
 
   double nav_cam_timestamp = ekf_pose->header.stamp.toSec();
   Eigen::Affine3d body_pose;
@@ -634,7 +642,7 @@ void StreamingMapper::EkfPoseCallback(geometry_msgs::PoseStamped::ConstPtr const
 
 // This callback takes as input the robot pose as output by ekf on /loc/pose.
 void StreamingMapper::SciCamExifCallback(std_msgs::Float64MultiArray::ConstPtr const& exif) {
-  if (sim_mode) return;
+  if (m_sim_mode || !m_sci_cam_exp_corr) return;
 
   double timestamp = exif->data[dense_map::TIMESTAMP];
 
@@ -771,7 +779,7 @@ void StreamingMapper::ProcessingLoop() {
     }
 
     // Copy the exif data locally using a lock
-    bool need_exif = (!sim_mode && m_texture_cam_type == "sci_cam");
+    bool need_exif = (!m_sim_mode && m_texture_cam_type == "sci_cam" && m_sci_cam_exp_corr);
 
     std::map<double, std::vector<double> > local_sci_cam_exif;
     if (need_exif) {
@@ -895,7 +903,7 @@ void StreamingMapper::ProcessingLoop() {
     m_last_processed_cam_ctr = cam_ctr;
     m_processed_camera_count++;
 
-    std::cout << "Total processing took " << timer.get_elapsed() / 1000.0 << " seconds\n";
+    std::cout << "Texture processing took " << timer.get_elapsed() / 1000.0 << " seconds\n";
   }
 }
 

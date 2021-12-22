@@ -21,16 +21,13 @@
 """
 A wrapper around the tools that when run together produce a textured mesh.
 """
-
 import argparse
 import os
 import re
 import shutil
 import subprocess
 import sys
-
 import cv2
-
 
 def process_args(args):
     """
