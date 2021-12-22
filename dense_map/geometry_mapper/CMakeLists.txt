@@ -195,10 +195,6 @@ add_executable(colorize_bag_images tools/colorize_bag_images.cc)
 target_link_libraries(colorize_bag_images
     geometry_mapper_lib gflags glog)
 
-add_executable(colorize_bag_images tools/colorize_bag_images.cc)
-target_link_libraries(colorize_bag_images
-    geometry_mapper_lib gflags glog)
-
 add_executable(test_correct tools/test_correct.cc)
 target_link_libraries(test_correct
     geometry_mapper_lib gflags glog)
