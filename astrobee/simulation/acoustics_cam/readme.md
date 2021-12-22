@@ -1,8 +1,6 @@
 \page acoustics_camera Acoustics camera
 
-# Acoustics camera
-
-## Overview
+### Overview
 
 This camera simulates a microphone array, or, in other words, a
 directional microphone. Its readings are assembled into a spherical
@@ -19,7 +17,7 @@ from. The reading at a pixel of that camera is the value of the
 microphone measurement in the direction of the ray going from the
 microphone (and camera) center through that pixel.
 
-## Installation
+### Installation
 
 The acoustics camera depends on the pyroomacoustics package. This
 package can be installed together with its dependencies in a Python
@@ -33,7 +31,7 @@ It would normally install itself in:
 
     $HOME/.local/lib/python2.7/site-packages/pyroomacoustics
 
-## Running the acoustics camera
+### Running the acoustics camera
 
 The acoustics camera ROS node can be run as part of the simulator. For that,
 first set up the environment along the lines of:
@@ -72,7 +70,7 @@ mode it will only create a plot of the acoustics cam image. The
 sources of sounds will be represented as crosses in this plot, and the
 camera (microphone) position will be shown as a star.
 
-## ROS communication
+### ROS communication
 
 The acoustics camera subscribes to
 
@@ -97,7 +95,7 @@ must use the app name "gov.nasa.arc.irg.astrobee.acoustics_cam_image"
 (which is the "s" field in the first command argument) for it to be
 processed.
 
-## Configuration
+### Configuration
 
 The behavior of this camera is described in 
 

@@ -355,6 +355,10 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
 
     camera_types = args.camera_types.split()
 
+    if args.camera_type == "haz_cam" and args.simulated_data:
+        print("Texturing haz cam with simulated data was not tested.")
+        sys.exit(1)
+
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
 
