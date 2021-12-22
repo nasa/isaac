@@ -322,7 +322,7 @@ and, at full resolution, the corners of the calibration target are
 hard to detect. The calibrator also does not handle the color format
 in the bag, hence the switch to grayscale images.
 
-However, the both the geometry and the streaming mapper, as well as
+However, both the geometry and the streaming mapper, as well as
 camera_refiner, can handle both color and grayscale images, and both
 at reduced resolution and full-resolution. These tools can adjust for
 the fact that the calibration was done at reduced resolution.
@@ -383,7 +383,7 @@ builds upon the instructions used in the doc referenced right above.)
       --target_corners_dirs calib_nav calib_haz calib_sci
 
 Note that above we assume that the image sampler was used to collect a
-subset of the nav cam images. Otherwise the raw nav cam topic would be
+subset of the nav cam images. Otherwise the nav cam topic would be
 /hw/cam_nav.
 
 This will create three directories with the corners extracted from the
