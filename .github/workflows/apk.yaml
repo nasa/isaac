@@ -19,6 +19,7 @@ jobs:
         mkdir $HOME/android-sdk
         cd $HOME/android-sdk
         wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip
+        java -version
         unzip tools_r25.2.3-linux.zip
         tools/bin/sdkmanager --update
         tools/bin/sdkmanager -y "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
