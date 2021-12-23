@@ -1,0 +1,28 @@
+# Check for lint error and auto correct them
+
+name: Compile APK
+
+on: ['push', 'pull_request']
+
+jobs:
+  install dependencies:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        path: repo/
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y libc6-dev-i386 lib32z1 openjdk-8-jdk
+        mkdir $HOME/android-sdk
+        cd $HOME/android-sdk
+        wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip
+        unzip tools_r25.2.3-linux.zip
+        tools/bin/sdkmanager --update
+        tools/bin/sdkmanager -y "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
+    - name: Build apk
+      run: |
+        cd repo/apks/isaac_gs_ros_bridge
+        ANDROID_HOME=$HOME/android-sdk ./gradlew build
