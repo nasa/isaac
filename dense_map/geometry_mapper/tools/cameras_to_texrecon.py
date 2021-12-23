@@ -40,7 +40,9 @@ parser.add_argument(
     help="The directory containing the undistorted images.",
 )
 parser.add_argument(
-    "--camera_type", default="", help="The camera type (nav_cam, haz_cam, or sci_cam)."
+    "--camera_type",
+    default="",
+    help="The camera type (nav_cam, haz_cam, or sci_cam, etc.).",
 )
 
 args = parser.parse_args()
@@ -49,14 +51,6 @@ if args.camera_dir == "" or args.undistorted_image_dir == "" or args.camera_type
     print(
         "Must specify the camera directory, directory of undistorted images, and camera type."
     )
-    sys.exit(1)
-
-if (
-    args.camera_type != "nav_cam"
-    and args.camera_type != "haz_cam"
-    and args.camera_type != "sci_cam"
-):
-    print("The camera type must be nav_cam, haz_cam, or sci_cam")
     sys.exit(1)
 
 # Read the intrinsics

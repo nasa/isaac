@@ -39,7 +39,6 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
-#include <pcl_ros/point_cloud.h>
 #include <rosbag/view.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -115,11 +114,11 @@ DEFINE_int32(num_cam1_focal_lengths, 1,
 DEFINE_int32(num_cam2_focal_lengths, 1,
              "If set to 2, use separate focal lengths along image rows and columns for cam2. Else use the same one.");
 
-DEFINE_int32(num_cam1_iterations, 10000, "How many solver iterations to perform to solve for cam1 intrinsics.");
+DEFINE_int32(num_cam1_iterations, 1000, "How many solver iterations to perform to solve for cam1 intrinsics.");
 
-DEFINE_int32(num_cam2_iterations, 10000, "How many solver iterations to perform to solve for cam2 intrinsics.");
+DEFINE_int32(num_cam2_iterations, 1000, "How many solver iterations to perform to solve for cam2 intrinsics.");
 
-DEFINE_int32(num_extrinsics_iterations, 10000, "How many solver iterations to perform to solve for extrinsics.");
+DEFINE_int32(num_extrinsics_iterations, 1000, "How many solver iterations to perform to solve for extrinsics.");
 
 DEFINE_double(robust_threshold, 4.0,
               "Pixel errors much larger than this will be exponentially attenuated "
@@ -487,6 +486,11 @@ void read_depth_cam_meas(  // Inputs
     cam2_timestamps.push_back(it->first);
   }
 
+  if (cam2_timestamps.empty()) {
+    std::cout << "Could not read any target corners." << std::endl;
+    return;
+  }
+
   // Iterate over the depth cam clouds
   rosbag::Bag bag;
   bag.open(bag_file, rosbag::bagmode::Read);
@@ -551,13 +555,15 @@ void read_depth_cam_meas(  // Inputs
       }
 
       pcl::PointCloud<pcl::PointXYZ> pc;
-      pcl::fromROSMsg(*pc_msg, pc);
-      if (static_cast<int>(pc.points.size()) != static_cast<int>(pc_msg->width * pc_msg->height))
+      dense_map::msgToPcl(pc_msg, pc);
+
+      if (static_cast<int>(pc.points.size()) != pc_msg->width * pc_msg->height)
         LOG(FATAL) << "Extracted point cloud size does not agree with original size.";
 
       double best_image_timestamp = cam2_timestamps[image_cid];
       auto it = cam2_target_corners.find(best_image_timestamp);
-      if (it == cam2_target_corners.end()) LOG(FATAL) << "Cannot locate target corners at desired timestamp.";
+      if (it == cam2_target_corners.end())
+        LOG(FATAL) << "Cannot locate target corners at desired timestamp.";
 
       // Will push here one depth measurement for each target corners.
       // Invalid ones will be (0, 0, 0).
@@ -601,7 +607,8 @@ void read_depth_cam_meas(  // Inputs
 
 // Create the vector timestamp offset samples. If none are specified
 // on the command line, use only the one specified in the config file.
-void parse_timestamp_offset_sampling(double cam1_to_cam2_timestamp_offset, std::string const& timestamp_offset_sampling,
+void parse_timestamp_offset_sampling(double cam1_to_cam2_timestamp_offset,
+                                     std::string const& timestamp_offset_sampling,
                                      std::vector<double>& samples) {
   std::istringstream is(timestamp_offset_sampling);
 
@@ -683,7 +690,10 @@ double calc_and_print_residual_stats(std::string const& prefix, std::string cons
   std::vector<double> err_norm;
   size_t len = residuals.size() / 2;
 
-  if (len == 0) LOG(FATAL) << "No residuals exist.";
+  if (len == 0) {
+    std::cout << "No residuals exist. This is likely an error.\n";
+    return 0;
+  }
 
   double res = 0.0;
   for (size_t it = 0; it < len; it++) {
@@ -694,15 +704,18 @@ double calc_and_print_residual_stats(std::string const& prefix, std::string cons
   res /= len;
 
   std::sort(err_norm.begin(), err_norm.end());
-  std::cout << prefix << " min, mean, median and max reprojection error for " << cam_name << ": " << err_norm[0] << ' '
+  std::cout << prefix << " min, mean, median and max reprojection error for "
+            << cam_name << ": " << err_norm[0] << ' '
             << res << ' ' << err_norm[err_norm.size() / 2] << ' ' << err_norm.back() << std::endl;
 
   // Return the median error
   return err_norm[err_norm.size() / 2];
 }
 
-void save_residuals(std::string const& prefix, std::string const& cam_name, std::string const& output_dir,
-                    std::vector<Eigen::Vector2d> const& pixels, std::vector<double> const& residuals) {
+void save_residuals(std::string const& prefix, std::string const& cam_name,
+                    std::string const& output_dir,
+                    std::vector<Eigen::Vector2d> const& pixels,
+                    std::vector<double> const& residuals) {
   size_t len = residuals.size() / 2;
   if (len != pixels.size()) {
     LOG(FATAL) << "Must have one residual norm per pixel.";
@@ -715,8 +728,8 @@ void save_residuals(std::string const& prefix, std::string const& cam_name, std:
   ofs << "# pixel_x, pixel_y, residual_x, residual_y, residual_norm\n";
   for (size_t it = 0; it < len; it++) {
     double norm = Eigen::Vector2d(residuals[2 * it + 0], residuals[2 * it + 1]).norm();
-    ofs << pixels[it][0] << ", " << pixels[it][1] << ", " << residuals[2 * it + 0] << ", " << residuals[2 * it + 1]
-        << ", " << norm << std::endl;
+    ofs << pixels[it][0] << ", " << pixels[it][1] << ", " << residuals[2 * it + 0]
+        << ", " << residuals[2 * it + 1] << ", " << norm << std::endl;
   }
   ofs.close();
 }
@@ -769,37 +782,42 @@ void refine_intrinsics(  // Inputs
 
       ceres::LossFunction* loss_function = GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-      problem.AddResidualBlock(cost_function, loss_function, &focal_vector[0], &optical_center[0], &distortion[0],
+      problem.AddResidualBlock(cost_function, loss_function, &focal_vector[0],
+                               &optical_center[0], &distortion[0],
                                &cameras[NUM_RIGID_PARAMS * cam_it]);
 
       // In case it is ever desired to experiment with fixing the cameras
       // problem.SetParameterBlockConstant(&cameras[NUM_RIGID_PARAMS * cam_it]);
-    }
-  }
 
-  // See which values to float or keep fixed
-  if (cam_intrinsics_to_float.find("focal_length") == cam_intrinsics_to_float.end()) {
-    // std::cout << "For " << cam_name << " not floating focal_length." <<
-    // std::endl;
-    problem.SetParameterBlockConstant(&focal_vector[0]);
-  } else {
-    // std::cout << "For " << cam_name << " floating focal_length." <<
-    // std::endl;
-  }
-  if (cam_intrinsics_to_float.find("optical_center") == cam_intrinsics_to_float.end()) {
-    // std::cout << "For " << cam_name << " not floating optical_center." <<
-    // std::endl;
-    problem.SetParameterBlockConstant(&optical_center[0]);
-  } else {
-    // std::cout << "For " << cam_name << " floating optical_center." <<
-    // std::endl;
-  }
-  if (cam_intrinsics_to_float.find("distortion") == cam_intrinsics_to_float.end()) {
-    // std::cout << "For " << cam_name << " not floating distortion." <<
-    // std::endl;
-    problem.SetParameterBlockConstant(&distortion[0]);
-  } else {
-    // std::cout << "For " << cam_name << " floating distortion." << std::endl;
+      // This logic must be in the loop, right after the residual got
+      // added, otherwise one risks fixing parameters which were not
+      // created yet.
+
+      // See which values to float or keep fixed
+      if (cam_intrinsics_to_float.find("focal_length") == cam_intrinsics_to_float.end()) {
+        // std::cout << "For " << cam_name << " not floating focal_length." <<
+        // std::endl;
+        problem.SetParameterBlockConstant(&focal_vector[0]);
+      } else {
+        // std::cout << "For " << cam_name << " floating focal_length." <<
+        // std::endl;
+      }
+      if (cam_intrinsics_to_float.find("optical_center") == cam_intrinsics_to_float.end()) {
+        // std::cout << "For " << cam_name << " not floating optical_center." <<
+        // std::endl;
+        problem.SetParameterBlockConstant(&optical_center[0]);
+      } else {
+        // std::cout << "For " << cam_name << " floating optical_center." <<
+        // std::endl;
+      }
+      if (cam_intrinsics_to_float.find("distortion") == cam_intrinsics_to_float.end()) {
+        // std::cout << "For " << cam_name << " not floating distortion." <<
+        // std::endl;
+        problem.SetParameterBlockConstant(&distortion[0]);
+      } else {
+        // std::cout << "For " << cam_name << " floating distortion." << std::endl;
+      }
+    }
   }
 
   // Evaluate the residual before optimization
@@ -1170,8 +1188,10 @@ void find_initial_extrinsics(std::vector<double> const& cam1_timestamps, std::ve
 // Refine cam2_to_cam1_transform
 void refine_extrinsics(int num_iterations, std::vector<double> const& cam1_timestamps,
                        std::vector<double> const& cam2_timestamps,
-                       std::vector<Eigen::Affine3d> const& world_to_cam1_vec, double cam1_to_cam2_timestamp_offset,
-                       double max_interp_dist, boost::shared_ptr<camera::CameraParameters> const& cam2_params,
+                       std::vector<Eigen::Affine3d> const& world_to_cam1_vec,
+                       double cam1_to_cam2_timestamp_offset,
+                       double max_interp_dist,
+                       boost::shared_ptr<camera::CameraParameters> const& cam2_params,
                        std::map<double, std::vector<std::vector<double>>> const& cam2_target_corners,
                        Eigen::Affine3d& cam2_to_cam1_transform, double& median_error) {
   // Convert the initial transform to vector format, to pass to the solver
@@ -1224,7 +1244,8 @@ void refine_extrinsics(int num_iterations, std::vector<double> const& cam1_times
 
       double alpha = (cam2_time - left_cam1_time) / (right_cam1_time - left_cam1_time);
 
-      Eigen::Affine3d interp_world_to_cam1 = dense_map::linearInterp(alpha, left_world_to_cam1, right_world_to_cam1);
+      Eigen::Affine3d interp_world_to_cam1
+        = dense_map::linearInterp(alpha, left_world_to_cam1, right_world_to_cam1);
 
       auto it = cam2_target_corners.find(cam2_time);
       if (it == cam2_target_corners.end()) continue;
@@ -1238,8 +1259,9 @@ void refine_extrinsics(int num_iterations, std::vector<double> const& cam1_times
         target_corner_pixel[0] = target_corners[pt_iter][3];  // projection into camera x
         target_corner_pixel[1] = target_corners[pt_iter][4];  // projection into camera y
 
-        ceres::CostFunction* cost_function = ExtrinsicsError::Create(target_corner_pixel, target_corner_meas,
-                                                                     interp_world_to_cam1, block_sizes, cam2_params);
+        ceres::CostFunction* cost_function
+          = ExtrinsicsError::Create(target_corner_pixel, target_corner_meas,
+                                    interp_world_to_cam1, block_sizes, cam2_params);
         problem.AddResidualBlock(cost_function, loss_function, &cam2_to_cam1_transform_vec[0]);
       }
     }
@@ -1279,9 +1301,11 @@ void refine_extrinsics(int num_iterations, std::vector<double> const& cam1_times
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
   GOOGLE_PROTOBUF_VERIFY_VERSION;
-  if (FLAGS_cam1_dir.empty() || FLAGS_cam2_dir.empty()) LOG(FATAL) << "Not all inputs were specified.";
+  if (FLAGS_cam1_dir.empty() || FLAGS_cam2_dir.empty())
+    LOG(FATAL) << "Not all inputs were specified.";
 
-  if ((FLAGS_cam1_name != "nav_cam" && FLAGS_cam1_name != "sci_cam") || FLAGS_cam2_name != "haz_cam")
+  if ((FLAGS_cam1_name != "nav_cam" && FLAGS_cam1_name != "sci_cam") ||
+      FLAGS_cam2_name != "haz_cam")
     LOG(FATAL) << "Must specify -cam1_name as one of nav_cam or sci_cam,"
                << " and -cam2_name as haz_cam.";
 
@@ -1309,30 +1333,52 @@ int main(int argc, char** argv) {
   dense_map::parse_intrinsics_to_float(FLAGS_cam1_intrinsics_to_float, cam1_intrinsics_to_float);
   dense_map::parse_intrinsics_to_float(FLAGS_cam2_intrinsics_to_float, cam2_intrinsics_to_float);
 
-  config_reader::ConfigReader config;
-  config.AddFile("cameras.config");
-  config.AddFile("transforms.config");
-  if (!config.ReadFiles()) LOG(FATAL) << "Failed to read config files.";
-  // read cam1 params
-  boost::shared_ptr<camera::CameraParameters> cam1_params =
-    boost::shared_ptr<camera::CameraParameters>(new camera::CameraParameters(&config, FLAGS_cam1_name.c_str()));
-  // read cam2 params
-  boost::shared_ptr<camera::CameraParameters> cam2_params =
-    boost::shared_ptr<camera::CameraParameters>(new camera::CameraParameters(&config, FLAGS_cam2_name.c_str()));
+  // Read the bot config file
+  std::vector<std::string> cam_names = {"nav_cam", "haz_cam", "sci_cam"};
+  std::vector<camera::CameraParameters> cam_params;
+  std::vector<Eigen::Affine3d>          ref_to_cam_trans;
+  std::vector<double>                   ref_to_cam_timestamp_offsets;
+  Eigen::Affine3d                       navcam_to_body_trans;
+  Eigen::Affine3d                       hazcam_depth_to_image_transform;
+  dense_map::readConfigFile(  // Inputs
+    cam_names, "nav_cam_transform", "haz_cam_depth_to_image_transform",
+    // Outputs
+    cam_params, ref_to_cam_trans, ref_to_cam_timestamp_offsets, navcam_to_body_trans,
+    hazcam_depth_to_image_transform);
 
-  std::string cam1_to_cam2_timestamp_offset_str;
+  Eigen::Affine3d hazcam_to_navcam_aff_trans = ref_to_cam_trans[1].inverse();
+  Eigen::Affine3d scicam_to_hazcam_aff_trans =
+    ref_to_cam_trans[1] * ref_to_cam_trans[2].inverse();
+  double navcam_to_hazcam_timestamp_offset = ref_to_cam_timestamp_offsets[1];
+  double scicam_to_hazcam_timestamp_offset =
+    ref_to_cam_timestamp_offsets[1] - ref_to_cam_timestamp_offsets[2];
+
+  // Set cam1 and cam2 params
+  boost::shared_ptr<camera::CameraParameters> cam1_params;
+  boost::shared_ptr<camera::CameraParameters> cam2_params;
   double cam1_to_cam2_timestamp_offset = 0.0;
+  std::string cam1_to_cam2_timestamp_offset_str;
+  Eigen::Affine3d cam2_to_cam1_transform;
   if (FLAGS_cam1_name == "nav_cam" && FLAGS_cam2_name == "haz_cam") {
+    cam1_params = boost::shared_ptr<camera::CameraParameters>
+      (new camera::CameraParameters(cam_params[0]));
+    cam2_params = boost::shared_ptr<camera::CameraParameters>
+      (new camera::CameraParameters(cam_params[1]));
+    cam1_to_cam2_timestamp_offset     = navcam_to_hazcam_timestamp_offset;
     cam1_to_cam2_timestamp_offset_str = "navcam_to_hazcam_timestamp_offset";
+    cam2_to_cam1_transform = hazcam_to_navcam_aff_trans;
   } else if (FLAGS_cam1_name == "sci_cam" && FLAGS_cam2_name == "haz_cam") {
+    cam1_params = boost::shared_ptr<camera::CameraParameters>
+      (new camera::CameraParameters(cam_params[2]));
+    cam2_params = boost::shared_ptr<camera::CameraParameters>
+      (new camera::CameraParameters(cam_params[1]));
+    cam1_to_cam2_timestamp_offset = scicam_to_hazcam_timestamp_offset;
     cam1_to_cam2_timestamp_offset_str = "scicam_to_hazcam_timestamp_offset";
+    cam2_to_cam1_transform = scicam_to_hazcam_aff_trans.inverse();
   } else {
     LOG(FATAL) << "Must specify -cam1_name as nav_cam or sci_cam, "
                << "and -cam2_name as haz_cam.";
   }
-  if (!config.GetReal(cam1_to_cam2_timestamp_offset_str.c_str(), &cam1_to_cam2_timestamp_offset))
-    LOG(FATAL) << "Could not read value of " << cam1_to_cam2_timestamp_offset
-               << " for robot: " << getenv("ASTROBEE_ROBOT");
 
   if (FLAGS_num_cam1_focal_lengths != 1 && FLAGS_num_cam1_focal_lengths != 2)
     LOG(FATAL) << "Can use 1 or 2 focal lengths.";
@@ -1350,7 +1396,8 @@ int main(int argc, char** argv) {
   }
 
   std::vector<double> timestamp_offset_samples;
-  dense_map::parse_timestamp_offset_sampling(cam1_to_cam2_timestamp_offset, FLAGS_timestamp_offset_sampling,
+  dense_map::parse_timestamp_offset_sampling(cam1_to_cam2_timestamp_offset,
+                                             FLAGS_timestamp_offset_sampling,
                                              timestamp_offset_samples);
 
   // Find cam1 poses and timestamps
@@ -1366,12 +1413,10 @@ int main(int argc, char** argv) {
   // Refine cam1_params and world_to_cam1_vec
   if (FLAGS_update_cam1)
     dense_map::refine_intrinsics(  // Inputs
-                                 FLAGS_cam1_name, FLAGS_num_cam1_focal_lengths,
-                                 FLAGS_num_cam1_iterations, cam1_intrinsics_to_float,
-                                 FLAGS_output_dir,
-                                 // Outputs
-                                 cam1_params, cam1_observations, cam1_landmarks, world_to_cam1_vec);
-
+      FLAGS_cam1_name, FLAGS_num_cam1_focal_lengths, FLAGS_num_cam1_iterations,
+      cam1_intrinsics_to_float, FLAGS_output_dir,
+      // Outputs
+      cam1_params, cam1_observations, cam1_landmarks, world_to_cam1_vec);
   // Refine cam2_params. It is very important to note that here we
   // want the 3D points as measured by the depth camera to project
   // accurately to the target corner pixels, unlike for the intrinsics
@@ -1380,40 +1425,38 @@ int main(int argc, char** argv) {
   // depth camera while cam1 is not.
   if (FLAGS_update_cam2)
     dense_map::refine_depth_cam_intrinsics(  // Inputs
-                                           FLAGS_cam2_name, FLAGS_num_cam2_focal_lengths,
-                                           FLAGS_num_cam2_iterations, cam2_intrinsics_to_float,
-                                           cam2_target_corners, target_corners_depth,
-                                           // Outputs
-                                           cam2_params);
+      FLAGS_cam2_name, FLAGS_num_cam2_focal_lengths, FLAGS_num_cam2_iterations,
+      cam2_intrinsics_to_float, cam2_target_corners, target_corners_depth,
+      // Outputs
+      cam2_params);
 
   // Find cam2 poses and timestamps
   std::vector<double> cam2_timestamps;
   std::vector<std::vector<Eigen::Vector2d>> cam2_observations;
   std::vector<std::vector<Eigen::Vector3d>> cam2_landmarks;
   std::vector<Eigen::Affine3d> world_to_cam2_vec;
-  dense_map::find_world_to_cam_trans(FLAGS_cam2_name, cam2_params, cam2_target_corners, cam2_timestamps,
-                                     cam2_observations, cam2_landmarks, world_to_cam2_vec);
+  dense_map::find_world_to_cam_trans(FLAGS_cam2_name, cam2_params, cam2_target_corners,
+                                     cam2_timestamps, cam2_observations, cam2_landmarks,
+                                     world_to_cam2_vec);
 
   // Find the transform to correct the scale of the haz cam depth clouds
-  Eigen::Affine3d depth_to_image_transform;
   if (FLAGS_update_depth_to_image_transform)
     dense_map::find_depth_to_image_transform(  // Inputs
-                                             cam2_timestamps, world_to_cam2_vec, cam2_target_corners,
-                                             target_corners_depth, FLAGS_cam2_name, cam2_params,
+      cam2_timestamps, world_to_cam2_vec, cam2_target_corners, target_corners_depth,
+      FLAGS_cam2_name, cam2_params,
       // Outputs
-      depth_to_image_transform);
+      hazcam_depth_to_image_transform);
 
   // Find the transform from cam2 to cam1.
-  Eigen::Affine3d cam2_to_cam1_transform;
   if (FLAGS_update_extrinsics) {
     // If provided, try several values
     // for cam1_to_cam2_timestamp_offset and pick the one with the smallest
     // median error.
     if (FLAGS_timestamp_offset_sampling != "") {
       std::cout << std::endl;
-      std::cout << "Sampling the timestamp offset from " << timestamp_offset_samples.front() << " to "
-                << timestamp_offset_samples.back() << " with " << timestamp_offset_samples.size() << " sample(s)."
-                << std::endl;
+      std::cout << "Sampling the timestamp offset from " << timestamp_offset_samples.front()
+                << " to " << timestamp_offset_samples.back() << " with "
+                << timestamp_offset_samples.size() << " sample(s)." << std::endl;
     }
 
     double median_extrinsics_err = std::numeric_limits<double>::max();
@@ -1426,12 +1469,17 @@ int main(int argc, char** argv) {
       std::cout << "Finding extrinsics with " << cam1_to_cam2_timestamp_offset_str << " "
                 << curr_cam1_to_cam2_timestamp_offset << std::endl;
 
-      dense_map::find_initial_extrinsics(cam1_timestamps, cam2_timestamps, world_to_cam1_vec, world_to_cam2_vec,
-                                         curr_cam1_to_cam2_timestamp_offset, FLAGS_max_interp_dist,
+      dense_map::find_initial_extrinsics(cam1_timestamps, cam2_timestamps,
+                                         world_to_cam1_vec, world_to_cam2_vec,
+                                         curr_cam1_to_cam2_timestamp_offset,
+                                         FLAGS_max_interp_dist,
                                          curr_cam2_to_cam1_transform);
-      dense_map::refine_extrinsics(FLAGS_num_extrinsics_iterations, cam1_timestamps, cam2_timestamps, world_to_cam1_vec,
-                                   curr_cam1_to_cam2_timestamp_offset, FLAGS_max_interp_dist, cam2_params,
-                                   cam2_target_corners, curr_cam2_to_cam1_transform, curr_median_extrinsics_err);
+      dense_map::refine_extrinsics(FLAGS_num_extrinsics_iterations, cam1_timestamps,
+                                   cam2_timestamps, world_to_cam1_vec,
+                                   curr_cam1_to_cam2_timestamp_offset, FLAGS_max_interp_dist,
+                                   cam2_params,
+                                   cam2_target_corners, curr_cam2_to_cam1_transform,
+                                   curr_median_extrinsics_err);
       if (curr_median_extrinsics_err < median_extrinsics_err) {
         cam1_to_cam2_timestamp_offset = curr_cam1_to_cam2_timestamp_offset;
         cam2_to_cam1_transform = curr_cam2_to_cam1_transform;
@@ -1440,21 +1488,46 @@ int main(int argc, char** argv) {
     }
 
     std::cout << std::endl;
-    std::cout << "Final value of " << cam1_to_cam2_timestamp_offset_str << " is " << cam1_to_cam2_timestamp_offset
-              << " with smallest median error of " << median_extrinsics_err << " pixels" << std::endl;
+    std::cout << "Final value of " << cam1_to_cam2_timestamp_offset_str << " is "
+              << cam1_to_cam2_timestamp_offset
+              << " with smallest median error of " << median_extrinsics_err
+              << " pixels" << std::endl;
 
     std::cout << std::endl;
-    std::cout << "Extrinsics transform from " << FLAGS_cam2_name << " to " << FLAGS_cam1_name << ":\n"
+    std::cout << "Extrinsics transform from " << FLAGS_cam2_name << " to "
+              << FLAGS_cam1_name << ":\n"
               << cam2_to_cam1_transform.matrix() << std::endl;
   }
 
-  bool update_timestamp_offset = (FLAGS_timestamp_offset_sampling != "");
-  dense_map::update_config_file(FLAGS_update_cam1, FLAGS_cam1_name, cam1_params, FLAGS_update_cam2, FLAGS_cam2_name,
-                                cam2_params, FLAGS_update_depth_to_image_transform, depth_to_image_transform,
-                                FLAGS_update_extrinsics, cam2_to_cam1_transform, update_timestamp_offset,
-                                cam1_to_cam2_timestamp_offset_str, cam1_to_cam2_timestamp_offset);
+  // Save back the results
+  if (FLAGS_cam1_name == "nav_cam" && FLAGS_cam2_name == "haz_cam") {
+    cam_params[0] = *cam1_params;
+    cam_params[1] = *cam2_params;
+    navcam_to_hazcam_timestamp_offset = cam1_to_cam2_timestamp_offset;
+    hazcam_to_navcam_aff_trans = cam2_to_cam1_transform;
+  } else if (FLAGS_cam1_name == "sci_cam" && FLAGS_cam2_name == "haz_cam") {
+    cam_params[2] = *cam1_params;
+    cam_params[1] = *cam2_params;
+    scicam_to_hazcam_timestamp_offset = cam1_to_cam2_timestamp_offset;
+    scicam_to_hazcam_aff_trans = cam2_to_cam1_transform.inverse();
+  } else {
+    LOG(FATAL) << "Must specify -cam1_name as nav_cam or sci_cam, "
+               << "and -cam2_name as haz_cam.";
+  }
 
-  if (FLAGS_output_dir == "") std::cout << "No output directory provided, hence no residuals got saved." << std::endl;
+  // Recall that cam_names = {"nav_cam", "haz_cam", "sci_cam"};
+  // nav_to_haz
+  ref_to_cam_trans[1] = hazcam_to_navcam_aff_trans.inverse();
+  // nav_to_sci
+  ref_to_cam_trans[2] = scicam_to_hazcam_aff_trans.inverse() *
+    hazcam_to_navcam_aff_trans.inverse();
+  ref_to_cam_timestamp_offsets[1] = navcam_to_hazcam_timestamp_offset;
+  ref_to_cam_timestamp_offsets[2] =
+    navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
+  dense_map::updateConfigFile(cam_names, "haz_cam_depth_to_image_transform",
+                              cam_params, ref_to_cam_trans,
+                              ref_to_cam_timestamp_offsets,
+                              hazcam_depth_to_image_transform);
 
   return 0;
 }

@@ -183,67 +183,83 @@ std::string matType(cv::Mat const& mat) {
 
 // Read the transform from depth to given camera
 void readCameraTransform(config_reader::ConfigReader& config, std::string const transform_str,
-                         Eigen::MatrixXd& transform) {
+                         Eigen::Affine3d& transform) {
   Eigen::Vector3d T;
   Eigen::Quaterniond R;
   if (!msg_conversions::config_read_transform(&config, transform_str.c_str(), &T, &R))
-    LOG(FATAL) << "Unspecified transform: " << transform_str;
+    LOG(FATAL) << "Unspecified transform: " << transform_str << " for robot: "
+               << getenv("ASTROBEE_ROBOT") << "\n";
 
   R.normalize();
 
-  Eigen::Affine3d affine_trans = Eigen::Affine3d(Eigen::Translation3d(T.x(), T.y(), T.z())) * Eigen::Affine3d(R);
-  transform = affine_trans.matrix();
+  transform = Eigen::Affine3d(Eigen::Translation3d(T.x(), T.y(), T.z())) * Eigen::Affine3d(R);
 }
 
-// Read a bunch of transforms from the robot calibration file
-void readConfigFile(std::string const& navcam_to_hazcam_timestamp_offset_str,
-                    std::string const& scicam_to_hazcam_timestamp_offset_str,
-                    std::string const& hazcam_to_navcam_transform_str,
-                    std::string const& scicam_to_hazcam_transform_str, std::string const& navcam_to_body_transform_str,
-                    std::string const& hazcam_depth_to_image_transform_str, double& navcam_to_hazcam_timestamp_offset,
-                    double& scicam_to_hazcam_timestamp_offset, Eigen::MatrixXd& hazcam_to_navcam_trans,
-                    Eigen::MatrixXd& scicam_to_hazcam_trans, Eigen::MatrixXd& navcam_to_body_trans,
-                    Eigen::Affine3d& hazcam_depth_to_image_transform, camera::CameraParameters& nav_cam_params,
-                    camera::CameraParameters& haz_cam_params, camera::CameraParameters& sci_cam_params) {
+// Read some transforms from the robot calibration file
+void readConfigFile                                                     // NOLINT
+(// Inputs                                                              // NOLINT
+ std::vector<std::string> const& cam_names,                             // NOLINT
+ std::string const& nav_cam_to_body_trans_str,                          // NOLINT
+ std::string const& haz_cam_depth_to_image_trans_str,                   // NOLINT
+ // Outputs                                                             // NOLINT
+ std::vector<camera::CameraParameters> & cam_params,                    // NOLINT
+ std::vector<Eigen::Affine3d>          & nav_to_cam_trans,              // NOLINT
+ std::vector<double>                   & nav_to_cam_timestamp_offset,   // NOLINT
+ Eigen::Affine3d                       & nav_cam_to_body_trans,         // NOLINT
+ Eigen::Affine3d                       & haz_cam_depth_to_image_trans){ // NOLINT
   config_reader::ConfigReader config;
   config.AddFile("cameras.config");
   config.AddFile("transforms.config");
   if (!config.ReadFiles()) LOG(FATAL) << "Failed to read config files.";
 
-  readCameraTransform(config, hazcam_to_navcam_transform_str, hazcam_to_navcam_trans);
-  readCameraTransform(config, scicam_to_hazcam_transform_str, scicam_to_hazcam_trans);
-  readCameraTransform(config, navcam_to_body_transform_str, navcam_to_body_trans);
+  cam_params.clear();
+  nav_to_cam_trans.clear();
+  nav_to_cam_timestamp_offset.clear();
+  for (size_t it = 0; it < cam_names.size(); it++) {
+    camera::CameraParameters params = camera::CameraParameters(&config, cam_names[it].c_str());
+    cam_params.push_back(params);
 
-  if (!config.GetReal(navcam_to_hazcam_timestamp_offset_str.c_str(), &navcam_to_hazcam_timestamp_offset))
-    LOG(FATAL) << "Could not read value of " << navcam_to_hazcam_timestamp_offset_str
-               << " for robot: " << getenv("ASTROBEE_ROBOT");
+    std::string trans_str = "nav_cam_to_" + cam_names[it] + "_transform";
+    if (cam_names[it] == "nav_cam") {
+      // transforms from nav cam to itself
+      nav_to_cam_trans.push_back(Eigen::Affine3d::Identity());
+      nav_to_cam_timestamp_offset.push_back(0.0);
+    } else {
+      Eigen::Affine3d trans;
+      readCameraTransform(config, trans_str, trans);
+      nav_to_cam_trans.push_back(trans);
 
-  if (!config.GetReal(scicam_to_hazcam_timestamp_offset_str.c_str(), &scicam_to_hazcam_timestamp_offset))
-    LOG(FATAL) << "Could not read value of " << scicam_to_hazcam_timestamp_offset_str
-               << " for robot: " << getenv("ASTROBEE_ROBOT");
+      std::string offset_str = "nav_cam_to_" + cam_names[it] + "_timestamp_offset";
+      double offset;
+      if (!config.GetReal(offset_str.c_str(), &offset))
+        LOG(FATAL) << "Could not read value of " << offset_str
+                   << " for robot: " << getenv("ASTROBEE_ROBOT");
+      nav_to_cam_timestamp_offset.push_back(offset);
+    }
+  }
+
+  // Read the remaining data
+  readCameraTransform(config, nav_cam_to_body_trans_str, nav_cam_to_body_trans);
 
   Eigen::MatrixXd M(4, 4);
-  config_reader::ConfigReader::Table mat(&config, hazcam_depth_to_image_transform_str.c_str());
+  config_reader::ConfigReader::Table mat(&config, haz_cam_depth_to_image_trans_str.c_str());
   int count = 0;
   for (int row = 0; row < M.rows(); row++) {
     for (int col = 0; col < M.cols(); col++) {
       count++;  // note that the count stats from 1
       if (!mat.GetReal(count, &M(row, col))) {
-        LOG(FATAL) << "Could not read value of " << hazcam_depth_to_image_transform_str
+        LOG(FATAL) << "Could not read value of " << haz_cam_depth_to_image_trans_str
                    << " for robot: " << getenv("ASTROBEE_ROBOT");
       }
     }
   }
 
-  hazcam_depth_to_image_transform.matrix() = M;
-
-  nav_cam_params = camera::CameraParameters(&config, "nav_cam");
-  haz_cam_params = camera::CameraParameters(&config, "haz_cam");
-  sci_cam_params = camera::CameraParameters(&config, "sci_cam");
+  haz_cam_depth_to_image_trans.matrix() = M;
 }
 
 // Given two poses aff0 and aff1, and 0 <= alpha <= 1, do linear interpolation.
-Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::Affine3d const& aff1) {
+Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0,
+                               Eigen::Affine3d const& aff1) {
   Eigen::Quaternion<double> rot0(aff0.linear());
   Eigen::Quaternion<double> rot1(aff1.linear());
 
@@ -261,7 +277,8 @@ Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::A
 // Given a set of poses indexed by timestamp in an std::map, find the
 // interpolated pose at desired timestamp. This is efficient
 // only for very small maps. Else use the StampedPoseStorage class.
-bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses, Eigen::Affine3d& interp_pose) {
+bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses,
+                      Eigen::Affine3d& interp_pose) {
   double left_time = std::numeric_limits<double>::max();
   double right_time = -left_time;
   for (auto it = poses.begin(); it != poses.end(); it++) {
@@ -509,6 +526,11 @@ int robust_find(std::string const& text, std::string const& val, int beg) {
     beg = text.find(val, beg);
     if (beg == std::string::npos) return beg;
 
+    // TODO(oalexan1): Must skip comments.  From this position must
+    // read back towards the beginning of the current line and see if
+    // the text "--" is encountered, which would mean that this
+    // position is on a comment and hence the search must continue.
+
     beg += val.size();  // advance
 
     // Look for spaces and the equal sign
@@ -536,7 +558,8 @@ int robust_find(std::string const& text, std::string const& val, int beg) {
 // Replace a given parameter's value in the text. This is very fragile
 // code, particularly it does not understand that text starting with
 // "--" is a comment.
-void replace_param_val(std::string const& param_name, std::string const& param_val, std::string const& parent,
+void replace_param_val(std::string const& param_name, std::string const& param_val,
+                       std::string const& parent,
                        std::string const& beg_brace, std::string const& end_brace,
                        // The text to modify
                        std::string& text) {
@@ -589,19 +612,25 @@ void replace_param_val(std::string const& param_name, std::string const& param_v
   text = text.replace(beg, end - beg + 1, param_val);
 }
 
-// Modify in-place the robot config file
-void update_config_file(bool update_cam1, std::string const& cam1_name,
-                        boost::shared_ptr<camera::CameraParameters> cam1_params, bool update_cam2,
-                        std::string const& cam2_name, boost::shared_ptr<camera::CameraParameters> cam2_params,
-                        bool update_depth_to_image_transform, Eigen::Affine3d const& depth_to_image_transform,
-                        bool update_extrinsics, Eigen::Affine3d const& cam2_to_cam1_transform,
-                        bool update_timestamp_offset, std::string const& cam1_to_cam2_timestamp_offset_str,
-                        double cam1_to_cam2_timestamp_offset) {
+// Save some transforms from the robot calibration file. This has some very fragile
+// logic and cannot handle comments in the config file.
+void updateConfigFile                                                           // NOLINT
+(std::vector<std::string>              const& cam_names,                        // NOLINT
+ std::string                           const& haz_cam_depth_to_image_trans_str, // NOLINT
+ std::vector<camera::CameraParameters> const& cam_params,                       // NOLINT
+ std::vector<Eigen::Affine3d>          const& nav_to_cam_trans,                 // NOLINT
+ std::vector<double>                   const& nav_to_cam_timestamp_offset,      // NOLINT
+ Eigen::Affine3d                       const& haz_cam_depth_to_image_trans) {   // NOLINT
+  if (cam_names.size() != cam_params.size()  ||
+      cam_names.size() != nav_to_cam_trans.size() ||
+      cam_names.size() != nav_to_cam_timestamp_offset.size())
+    LOG(FATAL) << "The number of various inputs to updateConfigFile() do not match.";
+
   // Open the config file to modify
   char* config_dir = getenv("ASTROBEE_CONFIG_DIR");
-  if (config_dir == NULL) LOG(FATAL) << "The environmental variable ASTROBEE_CONFIG_DIR was not set";
+  if (config_dir == NULL) LOG(FATAL) << "The environmental variable ASTROBEE_CONFIG_DIR was not set.";
   char* robot = getenv("ASTROBEE_ROBOT");
-  if (robot == NULL) LOG(FATAL) << "The environmental variable ASTROBEE_ROBOT was not set";
+  if (robot == NULL) LOG(FATAL) << "The environmental variable ASTROBEE_ROBOT was not set.";
   std::string config_file = std::string(config_dir) + "/robots/" + robot + ".config";
   std::ifstream ifs(config_file.c_str());
   if (!ifs.is_open()) LOG(FATAL) << "Could not open file: " << config_file;
@@ -612,67 +641,41 @@ void update_config_file(bool update_cam1, std::string const& cam1_name,
   while (std::getline(ifs, line)) text += line + "\n";
   ifs.close();
 
-  std::cout << "Updating " << config_file << std::endl;
+  std::cout << "Updating: " << config_file << std::endl;
 
-  // Handle cam1
-  if (update_cam1) {
-    std::string cam1_intrinsics = intrinsics_to_string(cam1_params->GetFocalVector(), cam1_params->GetOpticalOffset());
-    replace_param_val("intrinsic_matrix", cam1_intrinsics, cam1_name, "{", "}", text);
-    Eigen::VectorXd cam1_distortion = cam1_params->GetDistortion();
-    if (cam1_distortion.size() > 1) {
-      std::string distortion_str = vector_to_string(cam1_distortion);
-      replace_param_val("distortion_coeff", distortion_str, cam1_name, "{", "}", text);
-    } else if (cam1_distortion.size() == 1) {
-      std::string distortion_str = " " + number_to_string(cam1_distortion[0]);
-      replace_param_val("distortion_coeff", distortion_str, cam1_name, "", "", text);
+  for (size_t it = 0; it < cam_names.size(); it++) {
+    std::string              const& cam_name = cam_names[it];  // alias
+    camera::CameraParameters const& params = cam_params[it];   // alias
+
+    std::string intrinsics = intrinsics_to_string(params.GetFocalVector(),
+                                                  params.GetOpticalOffset());
+    replace_param_val("intrinsic_matrix", intrinsics, cam_name, "{", "}", text);
+    Eigen::VectorXd cam_distortion = params.GetDistortion();
+    if (cam_distortion.size() > 1) {
+      std::string distortion_str = vector_to_string(cam_distortion);
+      replace_param_val("distortion_coeff", distortion_str, cam_name, "{", "}", text);
+    } else if (cam_distortion.size() == 1) {
+      std::string distortion_str = " " + number_to_string(cam_distortion[0]);
+      replace_param_val("distortion_coeff", distortion_str, cam_name, "", "", text);
     } else {
-      LOG(FATAL) << "Camera " << cam1_name << " must have distortion.";
-    }
-  }
-
-  // Handle cam2
-  if (update_cam2) {
-    std::string cam2_intrinsics = intrinsics_to_string(cam2_params->GetFocalVector(), cam2_params->GetOpticalOffset());
-    replace_param_val("intrinsic_matrix", cam2_intrinsics, cam2_name, "{", "}", text);
-    Eigen::VectorXd cam2_distortion = cam2_params->GetDistortion();
-    if (cam2_distortion.size() > 1) {
-      std::string distortion_str = vector_to_string(cam2_distortion);
-      replace_param_val("distortion_coeff", distortion_str, cam2_name, "{", "}", text);
-    } else if (cam2_distortion.size() == 1) {
-      std::string distortion_str = " " + number_to_string(cam2_distortion[0]);
-      replace_param_val("distortion_coeff", distortion_str, cam2_name, "", "", text);
-    } else {
-      LOG(FATAL) << "Camera " << cam2_name << " must have distortion.";
-    }
-  }
-
-  std::string short_cam1 = ff_common::ReplaceInStr(cam1_name, "_", "");
-  std::string short_cam2 = ff_common::ReplaceInStr(cam2_name, "_", "");
-
-  if (update_depth_to_image_transform) {
-    Eigen::MatrixXd depth_to_image_transform_mat = depth_to_image_transform.matrix();
-    std::string depth_to_image_transform_param = short_cam2 + "_depth_to_image_transform";
-    std::string depth_to_image_transform_val = matrix_to_string(depth_to_image_transform_mat);
-    replace_param_val(depth_to_image_transform_param, depth_to_image_transform_val, "", "{", "}", text);
-  }
-
-  if (update_extrinsics) {
-    if (cam1_name == "nav_cam") {
-      std::string extrinsics_name = short_cam2 + "_to_" + short_cam1 + "_transform";
-      std::string extrinsics_str = affine_to_string(cam2_to_cam1_transform);
-      replace_param_val(extrinsics_name, extrinsics_str, "", "(", ")", text);
-    } else if (cam1_name == "sci_cam") {
-      std::string extrinsics_name = short_cam1 + "_to_" + short_cam2 + "_transform";
-      std::string extrinsics_str = affine_to_string(cam2_to_cam1_transform.inverse());
-      replace_param_val(extrinsics_name, extrinsics_str, "", "(", ")", text);
-    } else {
-      LOG(FATAL) << "Unexpected value for cam1: " << cam1_name;
+      LOG(FATAL) << "Camera " << cam_name << " must have distortion.";
     }
 
-    if (update_timestamp_offset)
-      replace_param_val(cam1_to_cam2_timestamp_offset_str, " " + number_to_string(cam1_to_cam2_timestamp_offset), "",
+    if (cam_names[it] == "nav_cam") continue;  // this will have the trivial transforms
+
+    std::string trans_name = "nav_cam_to_" + cam_names[it] + "_transform";
+    std::string trans_val = affine_to_string(nav_to_cam_trans[it]);
+    replace_param_val(trans_name, trans_val, "", "(", ")", text);
+
+    std::string offset_str = "nav_cam_to_" + cam_names[it] + "_timestamp_offset";
+    replace_param_val(offset_str, " " + number_to_string(nav_to_cam_timestamp_offset[it]), "",
                         "", "", text);
   }
+
+  std::string depth_to_image_transform_val
+    = matrix_to_string(haz_cam_depth_to_image_trans.matrix());
+  replace_param_val(haz_cam_depth_to_image_trans_str, depth_to_image_transform_val,
+                    "", "{", "}", text);
 
   // Write the updated values
   std::ofstream ofs(config_file.c_str());
@@ -680,40 +683,10 @@ void update_config_file(bool update_cam1, std::string const& cam1_name,
   ofs.close();
 }
 
-// Some small utilities for writing a file having poses for nav, sci, and haz cam,
-// and also the depth timestamp corresponding to given haz intensity timestamp
-void writeCameraPoses(std::string const& filename, std::map<double, double> const& haz_depth_to_image_timestamps,
-                      std::map<std::string, std::map<double, Eigen::Affine3d> > const& world_to_cam_poses) {
-  std::ofstream ofs(filename.c_str());
-  ofs.precision(17);
-
-  for (auto it = world_to_cam_poses.begin(); it != world_to_cam_poses.end(); it++) {
-    std::string cam_name = it->first;
-    auto& cam_poses = it->second;
-
-    for (auto it2 = cam_poses.begin(); it2 != cam_poses.end(); it2++) {
-      double timestamp = it2->first;
-      Eigen::MatrixXd M = it2->second.matrix();
-
-      ofs << cam_name << ' ' << timestamp << " ";
-      for (int row = 0; row < 4; row++) {
-        for (int col = 0; col < 4; col++) {
-          ofs << M(row, col) << " ";
-        }
-      }
-      ofs << "\n";
-    }
-  }
-
-  for (auto it = haz_depth_to_image_timestamps.begin(); it != haz_depth_to_image_timestamps.end(); it++) {
-    ofs << "haz_depth_to_image " << it->first << ' ' << it->second << "\n";
-  }
-
-  ofs.close();
-}
-
-void readCameraPoses(std::string const& filename, std::map<double, double>& haz_depth_to_image_timestamps,
-                     std::map<std::string, std::map<double, Eigen::Affine3d> >& world_to_cam_poses) {
+void readCameraPoses(std::string const& filename,
+                     std::map<double, double>& haz_depth_to_image_timestamps,
+                     std::map<std::string, std::map<double, Eigen::Affine3d> >&
+                     world_to_cam_poses) {
   haz_depth_to_image_timestamps.clear();
   world_to_cam_poses.clear();
 
