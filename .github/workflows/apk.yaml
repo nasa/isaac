@@ -32,4 +32,4 @@ jobs:
     - name: Build apk
       run: |
         cd repo/apks/isaac_gs_ros_bridge
-        ANDROID_HOME=$HOME/android-sdk ./gradlew build
+        ANDROID_HOME=$HOME/android-sdk ./gradlew build --stacktrace --debug
