@@ -1109,44 +1109,28 @@ and run:
       nodes:=framestore,localization_node,localization_manager     \
       streaming_mapper:=true output:=screen     
 
-and then enable the localization node by running in a separate
-terminal:
+Wait until the textured model is created, which can take a minute.
 
-    rosservice call /loc/ml/enable true
-
-Alternatively, the streaming mapper can be started first,
-without localization, as:
-
-    export ASTROBEE_WORLD=iss
-    export ASTROBEE_ROBOT=bsharp2 # the robot name should be checked
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
-    source $ISAAC_WS/devel/setup.bash
-    export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
-    export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
-    roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
-      sim_mode:=false output:=screen
-
-Then the localization node can be started separately, with the same
-environment, including the robot name, as:
-    
-    roslaunch astrobee astrobee.launch mlp:=local llp:=disabled  \
-      nodes:=framestore,localization_node,localization_manager   \
-      output:=screen
-
-This node should be enabled with a rosservice call as earlier.
-
-The localization node will expect the nav cam images to be published on
-topic ``/hw/cam_nav``. If it is on a different topic, such as
+Then, in a different terminal, play the bag. The localization node will
+expect the nav cam images to be published on topic ``/hw/cam_nav``. If
+it is on a different topic, such as
 ``/mgt/img_sampler/nav_cam/image_record``, it needs to be redirected
 to this one when playing the bag, such as:
 
-    rosbag play data.bag                                 \
+    rosbag play --clock data.bag                         \
       /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav \
       /loc/ml/features:=/tmp/features /gnc/ekf:=/tmp/ekf
 
 Above the /loc/ml/features and /gnc/ekf topics which may exist in the
 bag are redirected to temporary topics, since the currently started
 localization node will create new camera pose information.
+
+The ``--clock`` option should not be missed.
+
+Then enable the localization node by running in a separate
+terminal:
+
+    rosservice call /loc/ml/enable true
 
 #### The streaming mapper configuration file
 
