@@ -96,35 +96,37 @@ Overview</h3>
 <p>For visualization purposes, the microphone measurements are converted to an acoustic "image". Hence, a virtual camera is created centered at the microphone and with a certain pose that is ideally facing the direction where all or most of the interesting sounds are coming from. The reading at a pixel of that camera is the value of the microphone measurement in the direction of the ray going from the microphone (and camera) center through that pixel.</p>
 <h3><a class="anchor" id="autotoc_md32"></a>
 Installation</h3>
-<p>The acoustics camera depends on the pyroomacoustics package. This package can be installed together with its dependencies in a Python 2.7 environment using the command:</p>
-<p>pip install numpy==1.15.4 scipy==0.18 pillow==6 PyWavelets==0.4.0 \ networkx==1.8 matplotlib==2.0.0 scikit-image==0.14 \ pyroomacoustics==0.3.1</p>
-<p>It would normally install itself in:</p>
-<p>$HOME/.local/lib/python2.7/site-packages/pyroomacoustics</p>
-<h3><a class="anchor" id="autotoc_md33"></a>
+<p>The acoustics camera depends on the pyroomacoustics package. This package can be installed together with its dependencies in a Python 2.7 environment using the command: </p><pre class="fragment">pip install numpy==1.15.4 scipy==0.18 pillow==6 PyWavelets==0.4.0 \
+  networkx==1.8 matplotlib==2.0.0 scikit-image==0.14              \
+  pyroomacoustics==0.3.1
+</pre><p>It would normally install itself in: </p><pre class="fragment">$HOME/.local/lib/python2.7/site-packages/pyroomacoustics
+</pre><h3><a class="anchor" id="autotoc_md33"></a>
 Running the acoustics camera</h3>
-<p>The acoustics camera ROS node can be run as part of the simulator as:</p>
-<p>source ~/astrobee_build/native/devel/setup.zsh source ~/projects/isaac/devel/setup.zsh roslaunch isaac sim.launch world:=iss rviz:=true acoustics_cam:=true \ pose:="11.2 -7.72 5.0 0 0 0 0 1"</p>
-<p>Here we assume that the astrobee build is in <code>~/astrobee_build</code> and that the ISAAC build is in <code>~/projects/isaac</code>.</p>
-<p>One must ensure that the "DEBUG: AcousticsCam" image checkbox is checked in RViz upon launch, to be able to visualize this image. If it is not checked, it should be checked manually, the current config should be saved from the RViz menu, and the simulation should be restarted.</p>
-<p>It is also possible to start the simulator without this camera, and then launch it separately via:</p>
-<p>source ~/astrobee_build/native/devel/setup.zsh source ~/projects/isaac/devel/setup.zsh roslaunch acoustics_cam acoustics_cam.launch output:=screen</p>
-<p>The acoustics camera can be run without ROS as:</p>
-<p>~/projects/isaac/src/isaac/hardware/acoustics_cam/nodes/acoustics_cam debug_mode</p>
-<p>In that case, it assumes that the robot pose is the value set in the field "debug_robot_pose" in acoustics_cam.json (see below). In this mode it will only create a plot of the acoustics cam image. The sources of sounds will be represented as crosses in this plot, and the camera (microphone) position will be shown as a star.</p>
+<p>The acoustics camera ROS node can be run as part of the simulator. For that, first set up the environment along the lines of: </p><pre class="fragment">export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
+export ASTROBEE_BUILD_PATH=$HOME/astrobee
+export ISAAC_WS=$HOME/isaac
+source $ASTROBEE_BUILD_PATH/devel/setup.bash
+source $ISAAC_WS/devel/setup.bash
+</pre><p>then run: </p><pre class="fragment">roslaunch isaac sim.launch world:=iss rviz:=true acoustics_cam:=true \
+  pose:="11.2 -7.72 5.0 0 0 0 0 1"
+</pre><p>One must ensure that the "DEBUG: AcousticsCam" image checkbox is checked in RViz upon launch, to be able to visualize this image. If it is not checked, it should be checked manually, the current config should be saved from the RViz menu, and the simulation should be restarted.</p>
+<p>It is also possible to start the simulator without this camera, and then launch this camera separately as: </p><pre class="fragment">source $ASTROBEE_BUILD_PATH/devel/setup.bash
+source $ISAAC_WS/devel/setup.bash
+roslaunch acoustics_cam acoustics_cam.launch output:=screen
+</pre><p>The acoustics camera can be run without ROS as: </p><pre class="fragment">$ISAAC_WS/src/astrobee/simulation/acoustics_cam/nodes/acoustics_cam debug_mode
+</pre><p>In that case it assumes that the robot pose is the value set in the field "debug_robot_pose" in acoustics_cam.json (see below). In this mode it will only create a plot of the acoustics cam image. The sources of sounds will be represented as crosses in this plot, and the camera (microphone) position will be shown as a star.</p>
 <h3><a class="anchor" id="autotoc_md34"></a>
 ROS communication</h3>
-<p>The acoustics camera subscribes to</p>
-<p>/loc/truth/pose</p>
-<p>to get the robot pose. It publishes its image, camera pose, and camera intrinsics on topics:</p>
-<p>/hw/cam_acoustics /sim/acoustics_cam/pose /sim/acoustics_cam/info</p>
-<p>By default, the camera takes pictures as often as it can (see the configuration below), which is rarely, in fact, as it is slow. It listens however to the topic</p>
-<p>/comm/dds/command</p>
-<p>for guest science commands that may tell it to take a single picture at a specific time, or to take pictures continuously. Such a command must use the app name "gov.nasa.arc.irg.astrobee.acoustics_cam_image" (which is the "s" field in the first command argument) for it to be processed.</p>
+<p>The acoustics camera subscribes to </p><pre class="fragment">/loc/truth/pose
+</pre><p>to get the robot pose. It publishes its image, camera pose, and camera intrinsics on topics: </p><pre class="fragment">/hw/cam_acoustics
+/sim/acoustics_cam/pose
+/sim/acoustics_cam/info
+</pre><p>By default, the camera takes pictures as often as it can (see the configuration below), which is rarely, in fact, as it is slow. It listens however to the topic </p><pre class="fragment">/comm/dds/command
+</pre><p>for guest science commands that may tell it to take a single picture at a specific time, or to take pictures continuously. Such a command must use the app name "gov.nasa.arc.irg.astrobee.acoustics_cam_image" (which is the "s" field in the first command argument) for it to be processed.</p>
 <h3><a class="anchor" id="autotoc_md35"></a>
 Configuration</h3>
-<p>The behavior of this camera is described in</p>
-<p>isaac/hardware/acoustics_cam/acoustics_cam.json</p>
-<p>It has the following entries:</p>
+<p>The behavior of this camera is described in </p><pre class="fragment"> $ISAAC_WS/src/astrobee/simulation/acoustics_cam/acoustics_cam.json
+</pre><p>It has the following entries:</p>
 <ul>
 <li>room_corners: the min and max coordinates of the simulated room in which the directional microphone takes measurements. Since the room is assumed to be anechoic, so there is no reflection from room walls, the precise room dimensions are not important, as long as the room is big enough to contain the sources of sound and the possible positions of the microphone and the robot carrying it.</li>
 <li>sound_sources: the locations of the sound sources, their strengths, and files having the specific sound patterns. Those can be used, together with a machine learning algorithm, to differentiate among different types of sound.</li>

@@ -121,11 +121,7 @@ Actual vs simulated robot data</h2>
 <p>The drawback is that having two such sources of input data complicates the presentation of these tools. Some of them will be relevant only for one of the two data types, and some tools that apply to both may have different invocations for each case. The reader is advised to keep close attention to this, and we will make it clear at every step about which of the two paradigms one refers to.</p>
 <h2><a class="anchor" id="autotoc_md41"></a>
 Additional sensors present only in simulation</h2>
-<p>A number of robot sensors are present only as part of the simulator. Those are the heat camera, described in: </p><pre class="fragment">$ISAAC_WS/src/astrobee/simulation/gazebo/readme.md
-</pre><p>and the acoustics camera, documented at </p><pre class="fragment">$ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
-</pre><p>These tools are implemented and documented in different places in the source tree because the first one is a gazebo plugin while the second one is a Python node.</p>
-<p>See also </p><pre class="fragment">$ASTROBEE_SOURCE_PATH/simulation/readme.md
-</pre><p>for information about the simulated nav_cam, haz_cam, and sci_cam.</p>
+<p>A number of robot sensors are present only as part of the simulator. This is discussed further down the document.</p>
 <h2><a class="anchor" id="autotoc_md42"></a>
 Compiling the software</h2>
 <p>It is assumed that by now the Astrobee and ISAAC software is compiled.</p>
@@ -150,7 +146,7 @@ Functionality provided by CGAL</h3>
 Data acquisition</h2>
 <h3><a class="anchor" id="autotoc_md48"></a>
 With real data</h3>
-<p>Acquire a bag of data on the bot as follows.</p>
+<p>Acquire a bag of data on the bot. The current approach is to use a recording profile. A step-by-step procedure is outlined below if a recording profile has not been set up.</p>
 <p>First give the bot the ability to acquire intensity data with the depth camera (haz_cam). For that, connect to the MLP processor of the bot. Edit the file: </p><pre class="fragment">/opt/astrobee/config/cameras.config
 </pre><p>Go to the section: </p><pre class="fragment">picoflexx = {
   api_key = "",
@@ -169,22 +165,35 @@ rosbag record /hw/cam_nav /hw/depth_haz/points                   \
 <p>Copy the resulting bag off the robot.</p>
 <h3><a class="anchor" id="autotoc_md49"></a>
 With simulated data</h3>
-<p>Edit the simulation configuration, in </p><pre class="fragment">$ASTROBEE_SOURCE_PATH/astrobee/config/simulation/simulation.config
+<h4><a class="anchor" id="autotoc_md50"></a>
+Cameras present in simulation</h4>
+<p>The astrobee simulator supports a handful of cameras, including <code>nav_cam</code>, <code>sci_cam</code>, <code>haz_cam</code>, <code>heat_cam</code>, <code>acoustics_cam</code>, etc. All these have been tested with the gemetry mapper and streaming mapper.</p>
+<p>The <code>sci_cam</code> and <code>haz_cam</code> cameras are not enabled by default in the simulator. To enable them, edit the simulation configuration, in </p><pre class="fragment">$ASTROBEE_SOURCE_PATH/astrobee/config/simulation/simulation.config
 </pre><p>and set: </p><pre class="fragment">haz_cam_rate = 1.0;
 sci_cam_rate = 1.0;
 sci_cam_continuous_picture_taking = true;
-</pre><p>The later will make sure sci cam pictures are taken automatically. If custom behavior is desired, see </p><pre class="fragment">$ISAAC_WS/src/astrobee/behaviors/inspection/readme.md
-</pre><p>Start the simulator, such as: </p><pre class="fragment">source $ASTROBEE_BUILD_PATH/devel/setup.bash
+</pre><p>The later will make sure sci cam pictures are taken automatically. If custom behavior is desired, see: </p><pre class="fragment">$ISAAC_WS/src/astrobee/behaviors/inspection/readme.md
+</pre><p>More information about the simulated nav_cam, haz_cam, and sci_cam is at: </p><pre class="fragment">$ASTROBEE_SOURCE_PATH/simulation/readme.md
+</pre><p>The heat camera is described in: </p><pre class="fragment">$ISAAC_WS/src/astrobee/simulation/gazebo/readme.md
+</pre><p>The acoustics camera and how to enable it is documented at: </p><pre class="fragment">$ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
+</pre><h4><a class="anchor" id="autotoc_md51"></a>
+Recording simulated data</h4>
+<p>Start the simulator, such as: </p><pre class="fragment">source $ASTROBEE_BUILD_PATH/devel/setup.bash
 source $ISAAC_WS/devel/setup.bash
-roslaunch isaac sim.launch rviz:=true pose:="11.0 -7.0 5.0 0 0 0 1" world:=iss
-</pre><p>In RVIZ turn on visualizing these cameras from the Panels menu.</p>
-<p>When recording simulated data, need to also save the camera poses and camera information, which is different than how we do for real data, when these quantities must be estimated by algorithms. Hence the record command to run is: </p><pre class="fragment">rosbag record /hw/depth_haz/points                      \
-  /hw/depth_haz/extended/amplitude_int /hw/cam_sci      \
-  /sim/haz_cam/pose /sim/sci_cam/pose /sim/sci_cam/info
-</pre><p>Note that we record no nav cam data at all since that one is needed only for computing camera poses that are pre-computed in simulation. Also the sci cam topic changed, compared to the earlier record command, as the simulator returns uncompressed images (they are grayscale as well, unlike for the real sci cam).</p>
+roslaunch isaac sim.launch rviz:=true dds:=false \
+  pose:="11.0 -7.0 5.0 0 0 0 1" world:=iss
+</pre><p>In rviz turn on visualizing the desired cameras cameras from the Panels menu, as otherwise the needed camera topics may not be published.</p>
+<p>Adjust the 3D view in rviz with the mouse so that the robot, which is present in the middle of the module, can be seen.</p>
+<p>When recording simulated data for a given camera, for example, for <code>sci_cam</code>, so that later it can be used with the geometry and streaming mapper, one needs to record, in addition to depth clouds and camera images, also the camera poses and intrinsics information, which is done as follows: </p><pre class="fragment">rosbag record /hw/depth_haz/points                           \
+  /hw/cam_sci/compressed /sim/sci_cam/pose /sim/sci_cam/info
+</pre><p>It is good to check for the precise name of the camera image topic. For haz cam the image topic will be instead: </p><pre class="fragment">/hw/depth_haz/extended/amplitude_int
+</pre><p>For nav cam, the image topic will be: </p><pre class="fragment">/hw/cam_nav
+</pre><p>and the same convention is followed for the rest of the cameras.</p>
+<p>If desired to record data for many cameras, these topics must be specified for each of them. For example, for <code>heat_cam</code> add the lines: </p><pre class="fragment">  /hw/cam_heat /sim/heat_cam/pose /sim/heat_cam/info
+</pre><p>to the <code>rosbag record</code> command.</p>
 <p>The robot can be told to move around by either running a plan, or by sending it a move command, such as: </p><pre class="fragment">rosrun mobility teleop -move -pos "11.0 -5.0 5.0" -tolerance_pos 0.0001 -att "0 0 0 1"
 </pre><p>when it will go along the module axis while not changing its orientation.</p>
-<h2><a class="anchor" id="autotoc_md50"></a>
+<h2><a class="anchor" id="autotoc_md52"></a>
 Data pre-processing</h2>
 <p>This applies only to real data.</p>
 <p>If the recorded data is split into many small bags, as it often happens on the ISS, those bags should be first merged as documented in: </p><pre class="fragment"> $ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
@@ -197,11 +206,12 @@ Data pre-processing</h2>
 <p>(Normally the sci cam data will be downloaded from the HLP of ISS robots using some established infrastructure. Alternatively, one can use <code>adb pull</code>. After this tool is used, the data can be manually deleted from HLP by first connecting to it with <code>adb shell</code>.)</p>
 <p>In order to run camera_calibrator, the sci cam data in the bag needs to be decompressed, resized to 1/4 of the resolution, and made to be grayscale. This is needed since the sci cam images are a little blurry and, at full resolution, the corners of the calibration target are hard to detect. The calibrator also does not handle the color format in the bag, hence the switch to grayscale images.</p>
 <p>However, both the geometry and the streaming mapper, as well as camera_refiner, can handle both color and grayscale images, and both at reduced resolution and full-resolution. These tools can adjust for the fact that the calibration was done at reduced resolution.</p>
-<p>To accomplish this processing, once the sci cam data is integrated into the bag, one can do the following: </p><pre class="fragment">$ISAAC_WS/devel/lib/geometry_mapper/process_bag -input_bag input.bag \
-  -output_bag output.bag --image_type grayscale --scale 0.25
+<p>To accomplish this processing, once the sci cam data is integrated into the bag, one can do the following: </p><pre class="fragment">$ISAAC_WS/devel/lib/geometry_mapper/scale_bag --input_bag input.bag \
+  --output_bag output.bag --image_type grayscale --scale 0.25
 </pre><p>Note that the processed sci cam images will be now on topic <code>/hw/cam_sci2</code>.</p>
-<h2><a class="anchor" id="autotoc_md51"></a>
+<h2><a class="anchor" id="autotoc_md53"></a>
 Camera calibration</h2>
+<p>Currently the calibrator solution is not that accurate. It is suggested to use instead camera_refiner (see further down) on a bag acquired without a calibration target.</p>
 <p>Camera calibration is an advanced topic. Likely your robot's cameras have been calibrated by now, and then this step can be skipped.</p>
 <p>This step applies only to real data and not to simulated data.</p>
 <p>Data for calibration of the cameras should be acquired and processed as described earlier, to reduce the image resolution and to make them grayscale. The sci cam should be configured beforehand to take pictures continuously.</p>
@@ -210,12 +220,15 @@ Camera calibration</h2>
 <p>It is recommended to use instead the calibrator provided with this software, which can take care of those issues. The procedure to use it is as follows.</p>
 <p>First invoke Kalibr to save to disk the corners of the calibration target it detects from the bag. That can be done as follows. (This builds upon the instructions used in the doc referenced right above.) </p><pre class="fragment">source $KALIBR_WS/devel/setup.bash
 rosrun kalibr kalibr_calibrate_cameras                                           \
-  --topics /hw/cam_nav /hw/depth_haz/extended/amplitude_int /hw/cam_sci2         \
+  --topics /mgt/img_sampler/nav_cam/image_record                                 \
+           /hw/depth_haz/extended/amplitude_int                                  \
+           /hw/cam_sci2                                                          \
   --models pinhole-fov pinhole-radtan pinhole-radtan                             \
   --target $ASTROBEE_SOURCE_PATH/scripts/calibrate/config/granite_april_tag.yaml \
   --bag calibration.bag --dont-show-report --verbose                             \
   --target_corners_dirs calib_nav calib_haz calib_sci
-</pre><p>This will create three directories with the corners extracted from the nav, haz, and sci cameras.</p>
+</pre><p>Note that above we assume that the image sampler was used to collect a subset of the nav cam images. Otherwise the nav cam topic would be /hw/cam_nav.</p>
+<p>This will create three directories with the corners extracted from the nav, haz, and sci cameras.</p>
 <p>Next, set up the environment: </p><pre class="fragment">export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
 export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
 export ASTROBEE_WORLD=iss
@@ -351,21 +364,20 @@ export ASTROBEE_ROBOT=bsharp2
 </pre><p>As before, one better not use the option <code>--timestamp_offset_sampling</code> unless one is sure it is necessary.</p>
 <p>Note that this time we optimize the intrinsics of cam1 (sci_cam) and we do not use <code>--update_depth_to_image_transform</code> or optimize the intrinsics of cam2 (haz_cam) as this was already done earlier. We do not optimize the distortion of cam1 as that can result in incorrect values if there are not enough measurements at image periphery. The distortion is best optimized with the camera refiner (see below).</p>
 <p>Optionally, one can try to further refine the calibration if not good enough when used with data collected while the bot is flying around doing inspection. This is an advanced topic which is handled further down this document, in the section on camera refinement.</p>
-<h2><a class="anchor" id="autotoc_md52"></a>
+<h2><a class="anchor" id="autotoc_md54"></a>
 Data extraction</h2>
 <p>Nav cam images can be extracted from a bag as follows: </p><pre class="fragment">$ASTROBEE_BUILD_PATH/devel/lib/localization_node/extract_image_bag \
-  mydata.bag -image_topic /hw/cam_nav -output_directory nav_data   \
-  -use_timestamp_as_image_name
+  mydata.bag -image_topic /mgt/img_sampler/nav_cam/image_record    \
+  -output_directory nav_data -use_timestamp_as_image_name
 </pre><p>The last option, <code>-use_timestamp_as_image_name</code>, must not be missed. It makes it easy to look up the image acquisition based on image name, and this is used by the geometry mapper.</p>
-<p>Note that bags acquired on the ISS usually have the nav cam image topic as: </p><pre class="fragment">/mgt/img_sampler/nav_cam/image_record
-</pre><p>Then the command above needs to be adjusted accordingly.</p>
+<p>One should check beforehand if the nav cam topic is correct. If the image sampler was not used, the nav cam topic would be /hw/cam_nav.</p>
 <p>To extract the sci cam data, if necessary, do: </p><pre class="fragment">$ASTROBEE_BUILD_PATH/devel/lib/localization_node/extract_image_bag \
  mydata.bag -image_topic /hw/cam_sci/compressed                    \
  -output_directory sci_data -use_timestamp_as_image_name
 </pre><p>To extract the depth clouds, which may be useful for debugging purposes, do: </p><pre class="fragment">$ISAAC_WS/devel/lib/geometry_mapper/extract_pc_from_bag mydata.bag \
    -topic /hw/depth_haz/points -output_directory pc_data           \
    -use_timestamp_as_image_name
-</pre><h2><a class="anchor" id="autotoc_md53"></a>
+</pre><h2><a class="anchor" id="autotoc_md55"></a>
 Map building and registration</h2>
 <p>Build and register a SURF sparse map with the nav cam images. (This is needed only with real data.)</p>
 <p>An example for how to collect images and build a map is shown later in this doc, in the section about camera refinement. See also the reference documentation in </p><pre class="fragment">$ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
@@ -377,11 +389,12 @@ Map building and registration</h2>
 <p>Don't forget to set: </p><pre class="fragment">export ASTROBEE_ROBOT=&lt;robot name&gt;
 </pre><p>and the other environmental variables from that document before running map-building.</p>
 <p>It is very important to keep in the map at least one nav cam image whose timestamp is a couple of seconds before the sci cam image that we would like to later overlay on top of the mesh created with with the help of this map, and one nav cam image a couple of seconds after the last sci cam image we would like to keep, to ensure we process all sci cam images with the geometry mapper.</p>
-<h1><a class="anchor" id="autotoc_md54"></a>
+<h1><a class="anchor" id="autotoc_md56"></a>
 Running the geometry mapper</h1>
-<h2><a class="anchor" id="autotoc_md55"></a>
+<h2><a class="anchor" id="autotoc_md57"></a>
 When using real data</h2>
-<p>The geometry mapper can handle both color and grayscale images, and both at full and reduced resolution. (With the sci cam topic name being different at reduced resolution.)</p>
+<p>The geometry mapper fuses the depth cloud data and creates textures from the image cameras.</p>
+<p>Any image camera is supported, as long as present in the robot configuration file and a topic for it is in the bag file (see more details further down). The geometry mapper can handle both color and grayscale images, and, for sci cam, both full and reduced resolution.</p>
 <p>Ensure that the bot name is correct below. Set <code>ASTROBEE_SOURCE_PATH</code>, <code>ASTROBEE_BUILD_PATH</code>, and <code>ISAAC_WS</code> as earlier. Run: </p><pre class="fragment">export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
 export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
 export ASTROBEE_WORLD=iss
@@ -391,11 +404,10 @@ source $ISAAC_WS/devel/setup.bash
 python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   --ros_bag data.bag                                                    \
   --sparse_map nav_data.map                                             \
-  --nav_cam_topic /hw/cam_nav                                           \
+  --camera_types "sci_cam nav_cam haz_cam"                              \
+  --camera_topics "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int"\
+  --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160" \
   --haz_cam_points_topic /hw/depth_haz/points                           \
-  --haz_cam_intensity_topic /hw/depth_haz/extended/amplitude_int        \
-  --sci_cam_topic /hw/cam_sci/compressed                                \
-  --camera_type all                                                     \
   --start 0                                                             \
   --duration 1e+10                                                      \
   --sampling_spacing_seconds 5                                          \
@@ -418,14 +430,20 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   --edge_keep_ratio 0.2                                                 \
   --output_dir data_dir                                                 \
   --verbose
-</pre><p>Parameters: </p><pre class="fragment">--ros_bag: A ROS bag with recorded nav_cam, haz_cam, and sci_cam data.
+</pre><p>Parameters: </p><pre class="fragment">--ros_bag: A ROS bag with recorded image and point cloud data.
 --sparse_map: A registered SURF sparse map of a subset of the nav_cam data.
---nav_cam_topic: The nav cam image topic in the bag file.
---haz_cam_points_topic: The haz cam point cloud topic in the bag file.
---haz_cam_intensity_topic: The haz cam intensity topic in the bag file.
---sci_cam_topic: The sci cam image topic in the bag file.
---camera_type: Specify which cameras to process. Options: all (default), 
-  nav_cam, and sci_cam (with simulated data only sci_cam is supported).
+--camera_types: Specify the cameras to use for the textures, as a list
+  in quotes. Default: "sci_cam nav_cam haz_cam". With simulated
+  data only ``sci_cam`` is supported.
+--camera_topics: Specify the bag topics for the cameras to texture
+  (in the same order as in ``--camera_types``). Use a list in quotes.
+  The default is in the usage above.
+--undistorted_crop_wins: The central region to keep after
+  undistorting an image and before texturing. For sci_cam the
+  numbers are at 1/4th of the full resolution and will be adjusted
+  for the actual input image dimensions. Use a list in quotes. The
+  default is "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
+--haz_cam_points_topic: The depth point cloud topic in the bag file.
 --start: How many seconds into the bag to start processing the data.
 --duration: For how many seconds to do the processing.
 --sampling_spacing_seconds: How frequently to sample the sci and haz 
@@ -514,8 +532,8 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   registered map.
 --external_mesh: Use this mesh to texture the images, rather than
   creating one from depth data in the current bag.
---scicam_to_hazcam_timestamp_offset_override_value: Override the
-  value of scicam_to_hazcam_timestamp_offset from the robot config
+--nav_cam_to_sci_cam_offset_override_value: Override the
+  value of nav_cam_to_sci_cam_timestamp_offset from the robot config
   file with this value.
 --verbose: If specified, echo all output in the terminal.
 --save_debug_data: If specified, save many intermediate datasets
@@ -527,33 +545,53 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
 <li>data_dir/hole_filled_mesh.ply: A mesh obtained by filling holes in the fused mesh.</li>
 <li>data_dir/clean_mesh.ply: The mesh with small connected components removed.</li>
 <li>data_dir/smooth_mesh2.ply: A further smoothed version of the mesh.</li>
+<li>data_dir/hole_filled_mesh2.ply: A further hole-filled mesh.</li>
 <li>data_dir/simplified_mesh.ply: The simplified mesh.</li>
+<li>data_dir/smooth_mesh3.ply: A further smoothed version of the mesh.</li>
 <li>data_dir/nav_cam_texture/run.obj: The mesh overlayed with the nav cam texture.</li>
 <li>data_dir/sci_cam_texture/run.obj: The mesh overlayed with the sci cam texture.</li>
 </ul>
+<p>(Several passes of smoothing and hole-filling, as done above, appear necessary from experiments.)</p>
 <p>Intermediate products are the undistorted nav cam and sci cam images. It is suggested to review those in an image viewer, such as 'eog' and delete some of them if they cause artifacts. After that, the last part of the pipeline (invocation of the texrecon tool) can be redone.</p>
 <p>To run this tool it is suggested to pick a portion of the bag where the images face the wall as much as possible, so one may need to change the <code>--start</code> and <code>--duration</code> values.</p>
 <p>Unless the flag <code>--use_brisk_map</code> is set, the data processing will be restricted to the range of timestamps contained within the sparse map (this is another restriction, in addition to <code>--start</code> and <code>--duration</code>).</p>
-<p>If this tool is too slow, or if localization fails, consider tweaking the &ndash;localization_options above. For example, to make localization work better (which will make the program slower) decrease the value of &ndash;default_surf_threshold, and increase &ndash;early_break_landmarks, &ndash;min_surf_features, and &ndash;max_surf_features. To make it faster, do the opposite.</p>
+<p>If this tool is too slow, or if localization fails, consider adjusting the &ndash;localization_options above. For example, to make localization work better (which will make the program slower) decrease the value of &ndash;default_surf_threshold, and increase &ndash;early_break_landmarks, &ndash;min_surf_features, and &ndash;max_surf_features. To make it faster, do the opposite.</p>
 <p>The values of &ndash;depth_exclude_columns and &ndash;depth_exclude_rows can be adjusted to remove rows and columns at the margins which may result in a nicer mesh. If, for example, the bot moves upwards or downwards, there is little loss in removing some rows at the margins as they will be filled in from other depth readings. Then, if there are several up-down scans with good lateral overlap, removing some columns won't result in much loss but may remove some noise.</p>
 <p>If it is desired to use only a precise subset of the sci cam images, specify those with the option &ndash;sci_cam_timestamps.</p>
 <p>If several acquisitions were performed, and the geometry mapper was run with each of them, those can be merged by invoking the geometry mapper with the option &ndash;merge_maps.</p>
 <p>The geometry mapper can run with a previously created mesh if invoked with the option &ndash;external_mesh.</p>
-<p>The most time-consuming part of the geometry mapper is computing the initial poses, which is the earliest step, or step 0. To resume the geometry mapper at any step, use the option '&ndash;start_step num', where 0 &lt;= num and num &lt;= 7. For example, one may want to apply further smoothing to the mesh or more hole-filling, before resuming with the next steps.</p>
-<h2><a class="anchor" id="autotoc_md56"></a>
+<p>The most time-consuming part of the geometry mapper is computing the initial poses, which is the earliest step, or step 0. To resume the geometry mapper at any step, use the option '&ndash;start_step num'. For example, one may want to apply further smoothing to the mesh or more hole-filling, before resuming with the next steps.</p>
+<p>For a given camera type to be textured it must have entries in <code>cameras.config</code> and the robot config file (such as <code>bumble.config</code>), which are analogous to existing <code>nav_cam_to_sci_cam_timestamp_offset</code>, <code>nav_cam_to_sci_cam_transform</code>, and <code>sci_cam</code> intrinsics, with "sci" replaced by your camera name. The geometry mapper arguments <code>--camera_types</code>, <code>--camera_topics</code>, and <code>--undistorted_crop_wins</code> must be populated accordingly, with some careful choice to be made for the last one. Images for the desired camera must be present in the bag file at the the specified topic.</p>
+<h2><a class="anchor" id="autotoc_md58"></a>
 With simulated data</h2>
-<p>When working with simulated data, the flag </p><pre class="fragment">--simulated_data
-</pre><p>should be passed to this tool. Also, the sci cam image topic option should be: </p><pre class="fragment">--sci_cam_topic /hw/cam_sci
-</pre><p>It is not necessary to produce or pass in a sparse map with simulated data. The nav cam and the camera information provided by the value of <code>ASTROBEE_ROBOT</code> will be ignored. Instead, camera poses and information will be read from </p><pre class="fragment">/sim/haz_cam/pose
-/sim/sci_cam/pose
+<p>The geometry mapper works with any simulated cameras not having distortion. It was tested to work with simulated images for <code>sci_cam</code>, <code>haz_cam</code>, <code>heat_cam</code>, and <code>acoustics_cam</code>. It does not work with <code>nav_cam</code>, which has distortion.</p>
+<p>The flag: </p><pre class="fragment">--simulated_data
+</pre><p>should be passed to the geometry mapper. The sparse map is not necessary, no localization will take place, and intrinsics information, camera transform, and timestamp offset will not be read from the robot configuration file. Instead, it is expected that each simulated camera, for example <code>sci_cam</code>, will provide, in addition to an image topic, the topics </p><pre class="fragment">/sim/sci_cam/pose
 /sim/sci_cam/info
-</pre><p>For this operation it is suggested to pick a portion of the bag where the images face the wall as much as possible, so one may need to change the <code>-start</code> and <code>-duration</code> values. That will result in the best possible output.</p>
-<h2><a class="anchor" id="autotoc_md57"></a>
+</pre><p>having the pose and intrinsics of each camera image. These should be recorded in the bag (see more on recording earlier in the document).</p>
+<p>It is assumed that the simulated images are not distorted. In particular, <code>nav_cam</code>, which has fisheye lens distortion, is not supported.</p>
+<p>The simulated haz_cam is required to be among the topics being recorded and read in, because its pose is needed to process the depth clouds.</p>
+<p>Example of running the geometry mapper with simulated data: </p><pre class="fragment">sci_topic=/hw/cam_sci/compressed 
+haz_topic=/hw/depth_haz/extended/amplitude_int
+python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
+  --simulated_data                                                      \
+  --ros_bag data.bag                                                    \
+  --camera_types "sci_cam haz_cam"                                      \
+  --camera_topics "$sci_topic $haz_topic"                               \
+  --haz_cam_points_topic /hw/depth_haz/points                           \
+  --output_dir data_dir                                                 \
+  --sampling_spacing_seconds 2                                          \
+  --dist_between_processed_cams 0.1                                     \
+  --verbose
+</pre><p>It is important to check for the correct names for the camera image topics are passed to <code>--camera_topics</code>.</p>
+<h2><a class="anchor" id="autotoc_md59"></a>
 Running the streaming mapper</h2>
 <p>Here we assume that the geometry mapper ran and created a dense 3D model of the region of interest. Then, the robot is run, whether in simulation or in the real world. It records images with a camera, which can be sci cam, nav cam, etc. (see the complete list below), that we call the "texture images".</p>
 <p>The streaming mapper ROS node will then overlay each texture image received with this camera on top of the 3D model, and publish the obtained textured model to be visualized.</p>
-<h3><a class="anchor" id="autotoc_md58"></a>
+<h3><a class="anchor" id="autotoc_md60"></a>
 Running with real data</h3>
+<h4><a class="anchor" id="autotoc_md61"></a>
+When the robot (or nav cam) poses are known</h4>
 <p>To run the streaming mapper with real data for the given bot, do: </p><pre class="fragment">source $ASTROBEE_BUILD_PATH/devel/setup.bash
 source $ISAAC_WS/devel/setup.bash
 export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
@@ -562,18 +600,63 @@ export ASTROBEE_WORLD=iss
 export ASTROBEE_ROBOT=bsharp2
 roslaunch isaac isaac_astrobee.launch llp:=disabled nodes:=framestore \
   streaming_mapper:=true output:=screen     
-</pre><p>This will load the mesh produced by the geometry mapper from </p><pre class="fragment">$ISAAC_WS/src/isaac/resources/geometry/${ASTROBEE_WORLD}.ply
-</pre><p>It will listen to the robot body pose being published at: </p><pre class="fragment">/gnc/ekf
-</pre><p>and the sci cam image data at: </p><pre class="fragment">/hw/cam_sci/compressed
-/hw/sci_cam_exif
-</pre><p>It will publish the the texture on the topics: </p><pre class="fragment">/ism/sci_cam/img
+</pre><p>Wait until it finishes forming the texture model, which may take 30 seconds on more.</p>
+<p>Ensure that the ASTROBEE_ROBOT name is correct above.</p>
+<p>This node will load the mesh produced by the geometry mapper from </p><pre class="fragment">$ISAAC_WS/src/isaac/resources/geometry/${ASTROBEE_WORLD}.ply
+</pre><p>If an updated geometry mapper mesh exists, it should be copied to that location first.</p>
+<p>It will listen to the robot body pose being published at: </p><pre class="fragment">/gnc/ekf
+</pre><p>The tool will read the configuration options from: </p><pre class="fragment">$ISAAC_WS/src/isaac/config/dense_map/streaming_mapper.config
+</pre><p>which specifies the camera image to texture. The image topic must be set, which, for <code>sci_cam</code> is normally </p><pre class="fragment">/hw/cam_sci/compressed
+</pre><p>while for other <code>haz_cam</code> is:</p>
+<p>/hw/depth_haz/extended/amplitude_int</p>
+<p>and for other cameras, such as <code>nav_cam</code>, etc., it is of form: </p><pre class="fragment">/hw/cam_nav
+</pre><p>For the sci cam, it also expects image exposure data on the topic: </p><pre class="fragment">/hw/sci_cam_exif
+</pre><p>to do exposure correction, unlesss in simulation mode or <code>sci_cam_exposure_correction</code> is set to false. This is not needed for other cameras.</p>
+<p>The streaming mapper will publish several topics having texture information, which for <code>sci_cam</code> are: </p><pre class="fragment">/ism/sci_cam/img
 /ism/sci_cam/obj
 /ism/sci_cam/mtl
-</pre><p>(when the texture type is sci_cam, and this is customizable, see below).</p>
-<p>The header.stamp value for each published message will be the same as the header.stamp for the corresponding input sci cam image.</p>
-<p>Next one can play a bag having the input topics expected by the robot. (See the note below on perhaps redirecting the nav cam topic if the localization node is necessary.)</p>
-<p>Additional configuration option for this tool can be specified in </p><pre class="fragment">$ISAAC_WS/src/isaac/config/dense_map/streaming_mapper.config
-</pre><p>which has the following fields:</p>
+</pre><p>and an analogous convention is followed for other cameras.</p>
+<p>In order for the the streaming mapper to produce texture it should receive input information with its needed topics, either from a bag or from the robot in real time.</p>
+<p>The header.stamp value for each published message will be the same as the header.stamp for the corresponding input camera image.</p>
+<p>The data produced by the streaming mapper can be recorded with: </p><pre class="fragment">rosbag record /ism/sci_cam/img /ism/sci_cam/obj /ism/sci_cam/mtl \
+   -b 10000
+</pre><p>The recording should start before the input bag is played. The <code>-b</code> option tells ROS to increase its recording buffer size, as sometimes the streaming mapper can publish giant meshes.</p>
+<p>The robot pose that the streaming mapper needs assumes a very accurate calibration of the IMU sensor in addition to the nav, haz, and sci cam sensors, and very accurate knowledge of the pose of these sensors on the robot body. If that is not the case, it is suggested to use the nav cam pose via the <code>nav_cam_pose_topic</code> field in streaming_mapper.config, for which only accurate calibration of the nav, sci, and haz cameras among each other is assumed.</p>
+<p>The input texture can be in color or grayscale, at full or reduced resolution, and compressed or not.</p>
+<h4><a class="anchor" id="autotoc_md62"></a>
+Running with no robot or nav cam pose information</h4>
+<p>If no robot body or nav cam pose information is present, for example, if the EKF or localization node was not running when the image data was acquired, or this data was not recorded or was not reliable, the localization node can be started together with the streaming mapper by modifying the above <code>roslaunch</code> command as follows: </p><pre class="fragment">export ASTROBEE_ROBOT=bsharp2
+roslaunch isaac isaac_astrobee.launch llp:=disabled \
+  nodes:=framestore,localization_node               \
+  streaming_mapper:=true output:=screen     
+</pre><p>and then enabled by running in a separate terminal: </p><pre class="fragment">rosservice call /loc/ml/enable true
+</pre><p>Alternatively, the streaming mapper can be started first, without localization, as: </p><pre class="fragment">export ASTROBEE_WORLD=iss
+export ASTROBEE_ROBOT=bsharp2 # the robot name should be checked
+source $ASTROBEE_BUILD_PATH/devel/setup.bash
+source $ISAAC_WS/devel/setup.bash
+export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
+export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
+roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
+  sim_mode:=false output:=screen
+</pre><p>Ensure then that nav_cam_pose_topic is set to /loc/ml/features in streaming_mapper.config and that ekf_state_topic is empty. Also check the robot name, as earlier.</p>
+<p>Then the localization node can be started separately, as: </p><pre class="fragment">export ASTROBEE_ROBOT=bsharp2
+roslaunch astrobee astrobee.launch llp:=disabled \
+  nodes:=framestore,localization_node output:=screen
+</pre><p>with the same environment, including the robot name, and then can be enabled with a rosservice call as earlier.</p>
+<p>This node will expect the nav cam pose to be published on topic <code>/hw/cam_nav</code>. If it is on a different topic, such as <code>/mgt/img_sampler/nav_cam/image_record</code>, it needs to be redirected to this one when playing the bag, such as: </p><pre class="fragment">rosbag play data.bag                                 \
+  /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav \
+  /loc/ml/features:=/tmp/features
+</pre><p>Above the /loc/ml/features topic which may exist in the bag is redirected to /tmp/features since the currently started localization node will create new such features.</p>
+<p>The localization node, if needed, will make use of a registered sparse map with BRISK features, histogram equalization, and a vocabulary database to find the nav cam poses. The command for building such a BRISK map from a registered SURF map is:</p>
+<p>cp surf_map.map brisk_map.map $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/build_map \ &ndash;output_map brisk_map.map &ndash;rebuild &ndash;histogram_equalization \ &ndash;vocab_db</p>
+<p>See: </p><pre class="fragment"> $ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
+</pre><p>for more information.</p>
+<p>If running on a local machine, after the map is rebuilt it should be copied to: </p><pre class="fragment">$ASTROBEE_RESOURCE_DIR/maps/${ASTROBEE_WORLD}.map
+</pre><p>(The <code>maps</code> directory needs to be created if missing.)</p>
+<p>Also see a note earlier in the text for how to reduce the BRISK thresholds if the map has too few features. For more details on what the localization node expects, see build_map.md, in the section about running this node on a local machine.</p>
+<h4><a class="anchor" id="autotoc_md63"></a>
+The streaming mapper configuration file</h4>
+<p>The <code>streaming_mapper.config</code> file has following fields:</p>
 <ul>
 <li>mesh_file: Override the location of the mesh described earlier.</li>
 <li>ekf_state_topic: The topic to listen to for robot pose information. It can be set to /gnc/ekf, whose type is ff_msgs::EkfState.</li>
@@ -582,31 +665,14 @@ roslaunch isaac isaac_astrobee.launch llp:=disabled nodes:=framestore \
 <li>texture_cam_type: The camera that creates the texture images (can be nav_cam, sci_cam, haz_cam, and in simulation also heat_cam, and acoustics_cam). The default is sci_cam. This field affects the name of the topics on which the streaming mapper publishes its output.</li>
 <li>texture_cam_topic: The topic having the texture to overlay. The default value is /hw/cam_sci/compressed.</li>
 <li>dist_between_processed_cams: Once an image is textured and published, how far the camera should move (in meters) before it should process another texture (any images arriving in between will be ignored). The default is 0.1 meters.</li>
-<li>max_iso_times_exposure: Apply the inverse gamma transform to images, multiply them by max_iso_times_exposure/ISO/exposure_time to adjust for lightning differences, then apply the gamma transform back. This value should be set to the maximum observed ISO * exposure_time. The default is 5.1. Not used with simulated data.</li>
-<li>use_single_texture: Use a single texture buffer. Sample the images by picking points on each triangle face with spacing pixel_size. This can take a couple of minutes to form the necessary structures to be able to stream the texture.</li>
+<li>max_iso_times_exposure: Apply the inverse gamma transform to images, multiply them by max_iso_times_exposure/ISO/exposure_time to adjust for lightning differences, then apply the gamma transform back. This value should be set to the maximum observed ISO * exposure_time. The default is 5.1. Not used with simulated data or when sci_cam_exposure_correction if false.</li>
+<li>sci_cam_exposure_correction: If set to 'true', correct the exposure of sci_cam images.</li>
+<li>use_single_texture: If set to 'true', use a single texture buffer. Sample the images by picking points on each triangle face with spacing pixel_size. This can take a couple of minutes to form the necessary structures to be able to stream the texture.</li>
 <li>pixel_size: The pixel size to use with use_single_texture. The default is 0.001 meters.</li>
 <li>num_threads: Number of threads to use. The default is 48.</li>
-<li>save_to_disk: If to save to disk an .obj file for each topic published, to be debugged in Meshlab. These will be saved in ~/.ros. The default is 'false'.</li>
+<li>save_to_disk: If set to 'true', save to disk an .obj file for each topic published, to be debugged in Meshlab. These will be saved in ~/.ros. The default is 'false'.</li>
 </ul>
-<p>If no pose information is present, for example, if the EKF or localization node was not running when the data was acquired, or this data was not recorded, the localization node can be started by modifying the above <code>roslaunch</code> command as follows: </p><pre class="fragment">roslaunch isaac isaac_astrobee.launch llp:=disabled \
-  nodes:=framestore,localization_node               \
-  streaming_mapper:=true output:=screen     
-</pre><p>Alternatively, the streaming mapper can be started first, without localization, such as: </p><pre class="fragment">roslaunch streaming_mapper.launch sim_mode:=false output:=screen
-</pre><p>(the full path to streaming_mapper.launch needs to be specified if not found).</p>
-<p>Ensure then that nav_cam_pose_topic is set to /loc/ml/features in streaming_mapper.config and that ekf_state_topic is empty.</p>
-<p>Then the localization node can be started separately, as: </p><pre class="fragment">roslaunch astrobee astrobee.launch llp:=disabled \
-  nodes:=framestore,localization_node output:=screen
-</pre><p>and then enabled by running in a separate terminal: </p><pre class="fragment">rosservice call /loc/ml/enable true
-</pre><p>This node will expect the nav cam pose to be published on topic <code>/hw/cam_nav</code>. If it is on a different topic, such as <code>/mgt/img_sampler/nav_cam/image_record</code>, it needs to be redirected to this one when playing the bag, such as: </p><pre class="fragment">rosbag play data.bag \
-  /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav
-</pre><p>The localization node, if needed, will make use of a registered sparse map with BRISK features, histogram equalization, and a vocabulary database to find the nav cam poses. See build_map.md in the astrobee repository how such a map can be created and where it should be copied. If running on a local machine, it should go to: </p><pre class="fragment">$ASTROBEE_RESOURCE_DIR/maps/${ASTROBEE_WORLD}.map
-</pre><p>Also see a note earlier in the text for how to reduce the BRISK thresholds if the map has too few features. For more details on what the localization node expects, see build_map.md, in the section about running this node on a local machine.</p>
-<p>The data produced by the streaming mapper can be recorded with: </p><pre class="fragment">rosbag record /ism/sci_cam/img /ism/sci_cam/obj /ism/sci_cam/mtl \
-   -b 10000
-</pre><p>The recording should start before the input bag is played. The <code>-b</code> option tells ROS to increase its recording buffer size, as sometimes the streaming mapper can publish giant meshes.</p>
-<p>The robot pose that the streaming mapper needs assumes a very accurate calibration of the IMU sensor in addition to the nav, haz, and sci cam sensors, and very accurate knowledge of the pose of these sensors on the robot body. If that is not the case, it is suggested to use the nav cam pose via the nav_cam_pose_topic field, for which only accurate calibration of the nav, sci, and haz cameras among each other is assumed.</p>
-<p>The input texture can be in color or grayscale, at full or reduced resolution, and compressed or not.</p>
-<h2><a class="anchor" id="autotoc_md59"></a>
+<h2><a class="anchor" id="autotoc_md64"></a>
 Running with simulated data</h2>
 <p>For simulated data the usage is somewhat different. First, simulation.config needs to be edited as described earlier in the document to turn on the simulated sci cam, haz cam, or other desired camera.</p>
 <p>To launch the streaming mapper, one can do the following: </p><pre class="fragment">source $ASTROBEE_BUILD_PATH/devel/setup.bash
@@ -614,20 +680,20 @@ source $ISAAC_WS/devel/setup.bash
 export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
 export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
 export ASTROBEE_WORLD=iss
-roslaunch isaac sim.launch world:=iss rviz:=true streaming_mapper:=true \
-  pose:="11.0 -7.0 5.0 0 0 0 1"   
-</pre><p>and then the robot can be moved in order to create images to texture as: </p><pre class="fragment">rosrun mobility teleop -move -pos "11.0 -5.0 5.0" -tolerance_pos 0.0001 \
+roslaunch isaac sim.launch world:=iss rviz:=true \
+  streaming_mapper:=true pose:="11.0 -7.0 5.0 0 0 0 1"   
+</pre><p>Then the robot can be moved in order to create images to texture as: </p><pre class="fragment">rosrun mobility teleop -move -pos "11.0 -5.0 5.0" -tolerance_pos 0.0001 \
   -att "0 0 0 1"
 </pre><p>With simulated data the pose and intrinsics for each camera are received directly from the simulator, on topics that, for example for sci_cam, are: </p><pre class="fragment">/sim/sci_cam/pose
 /sim/sci_cam/info
 </pre><p>Hence, the parameters ekf_state_topic, ekf_pose_topic, and nav_cam_pose_topic are ignored.</p>
 <p>Note that value of <code>ASTROBEE_ROBOT</code> is not needed in this case.</p>
-<h2><a class="anchor" id="autotoc_md60"></a>
+<h2><a class="anchor" id="autotoc_md65"></a>
 Camera refinement</h2>
 <p>The calibration done with the calibration target can still leave some residual registration error between the cameras, which manifests itself as discrepancies in the geometry mapper and streaming mapper products, and between the nav cam and sci cam textures.</p>
 <p>Once a dataset of the robot flying around and performing inspections is acquired, so in realistic conditions, rather than with a calibration target, it can be used to further refine the camera calibration file. This refinement will change the transforms between the cameras and the intrinsics of the sci cam.</p>
 <p>To avoid issues with accuracy of the timestamps of the images, we assume that the robot is paused, or otherwise moves very slowly, during each sci cam shot. Then, to refine the camera calibration, the following approach should be taken.</p>
-<h3><a class="anchor" id="autotoc_md61"></a>
+<h3><a class="anchor" id="autotoc_md66"></a>
 Image selection</h3>
 <p>Select a set of nav cam images around 1 second before and after each sci cam image using the tool: </p><pre class="fragment">export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
 export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
@@ -643,13 +709,13 @@ $ISAAC_WS/devel/lib/geometry_mapper/image_picker                 \
   --bracket_len 2.0 --output_nav_cam_dir nav_images
 </pre><p>Setting up the correct robot name above is very important.</p>
 <p>The &ndash;bracket_len option brackets sci cam images by nav cam images so the length of time between these two nav cam images is at most this value. These nav cam images are saved. Later in camera_refiner sci cam and haz cam images are picked in each such a nav cam interval. (A camera's time is first adjusted for the time offset before any of this happens.) One may consider using a bracket length of 1.0 seconds if the bot is known to move quickly right after taking a sci cam picture.</p>
-<p>The option &ndash;scicam_to_hazcam_timestamp_offset_override_value can be used if the given bag is suspected to have a different value of this offset. Such an option the option can be passed also to the camera refiner below and to the geometry mapper.</p>
+<p>The option &ndash;nav_cam_to_sci_cam_offset_override_value can be used if the given bag is suspected to have a different value of this offset. Such an option the option can be passed also to the camera refiner below and to the geometry mapper.</p>
 <p>Examine these images. Since they are used for bracketing, there will be pairs of very similar images. Yet, it is good that there should be no excessive overlap otherwise, so the images in the first pair better have about 3/4 or 4/5 overlap with images from other pairs.</p>
 <p>If necessary, add more intermediate images manually, or re-running this tool with</p>
 <p>&ndash;max_time_between_images &lt;val&gt;</p>
 <p>It is good to not allow too many images or excessive overlap, but, if removing excessive images, ensure that each sci cam image is still bracketed as originally by two nav cam images close in time, and keep the images in pairs of very similar ones. That is good even if there's no sci cam images between some pairs, as it is likely haz cam images are found later in that bracket.</p>
 <p>One could start by running this tool with a smaller value of the &ndash;max_time_between_images option, wiping many redundant images while ensuring there is good overlap among them and keeping pairs of similar images, then running this tool one more time with a very large value of this option to ensure the bracketing images for each sci cam image are added back.</p>
-<h3><a class="anchor" id="autotoc_md62"></a>
+<h3><a class="anchor" id="autotoc_md67"></a>
 Map building and registration</h3>
 <p>Build a sparse map with these images. Use the same environment as above: </p><pre class="fragment">dir=nav_images
 images=$(ls $dir/*jpg)
@@ -677,7 +743,7 @@ $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/build_map         \
   --input_map merged.map --output_map ${dir}_surf_reg.map    \
   ${dir}/*jpg
 </pre><p>Here, $dir points to nav_images as earlier in the document.</p>
-<h3><a class="anchor" id="autotoc_md63"></a>
+<h3><a class="anchor" id="autotoc_md68"></a>
 Running the refiner</h3>
 <p>Next, the refiner tool is run, as shown below. This will overwrite the camera calibration file, so it may be prudent to start by copying the existing calibration file to a new name, and set ASTROBEE_ROBOT to point to that. </p><pre class="fragment">export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
 export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
@@ -697,8 +763,8 @@ $ISAAC_WS/devel/lib/geometry_mapper/camera_refiner      \
   --mesh mesh.ply --mesh_weight 25                      \
   --mesh_robust_threshold 3
 </pre><p>Note how we used the same bracket length as in the image picker.</p>
-<p>This tool will print some statistics showing the reprojection residuals for all camera combinations. This can be helpful in figuring out if the value of scicam_to_hazcam_timestamp_offset is correct. If this value is not known well, this tool can be run with zero or more iterations and various values of</p>
-<p>&ndash;scicam_to_hazcam_timestamp_offset_override_value &lt;val&gt;</p>
+<p>This tool will print some statistics showing the reprojection residuals for all camera combinations. This can be helpful in figuring out if the value of nav_cam_to_sci_cam_timestamp_offset is correct. If this value is not known well, this tool can be run with zero or more iterations and various values of</p>
+<p>&ndash;nav_cam_to_sci_cam_offset_override_value &lt;val&gt;</p>
 <p>to see which value gives the smallest residuals. The geometry mapper cam be run with various obtained calibrated files, and see which causes least amount of registration errors and most agreement between the nav_cam and sci_cam textures.</p>
 <p>A subset of the stats output is as follows: </p><pre class="fragment">The 25, 50 and 75 percentile residual stats before opt
 haznavhaz1: 0.15588849206757516 0.28939657329467749 0.50425806803227147
@@ -711,8 +777,8 @@ navscisci1: 0.57405681159248445 1.3846928084816739 3.0725112787539501
 navscisci2: 0.42920106999360996 1.4522176781247396 3.4578275058146062
 </pre><p>For the first two lines with stats, a 3D point was found for the haz and nav camera pair (taking into account pixel matches, the depth measurement, and camera orientations), it was projected into the haz camera, and the column (first line) and row (second line) absolute difference residuals were computed, sorted, and given percentiles were found. For the next two lines the same logic was used, without depth measurements, by simply triangulating a 3D point from given nav cam matches and projecting it back into the nav camera. Other lines of statistics are to be interpreted analogously.</p>
 <p>Above, the options &ndash;mesh, &ndash;mesh_weight, and &ndash;mesh_robust_threshold were used in order to employ a mesh generated from a previous run of the geometry mapper with the same dataset as a constraint. This was found to greatly improve the sci cam intrinsics and extrinsics parameters as well as the agreement between nav_cam and sci_cam textures. In a first pass this tool can be used without these mesh options.</p>
-<p>This program's options are: &ndash;ros_bag: A ROS bag with recorded nav_cam, haz_cam, and full-resolution sci_cam data. &ndash;sparse_map: A registered SURF sparse map made with some of the ROS bag data, and including nav cam images closely bracketing the sci cam images. &ndash;nav_cam_topic: The nav cam image topic in the bag file. &ndash;haz_cam_points_topic: The haz cam point cloud topic in the bag file. &ndash;haz_cam_intensity_topic: The haz cam intensity topic in the bag file. &ndash;sci_cam_topic: The sci cam image topic in the bag file. &ndash;start: How many seconds into the bag to start processing the data. &ndash;duration: For how many seconds to do the processing. &ndash;max_haz_cam_image_to_depth_timestamp_diff: Use depth haz cam clouds that are within this distance in time from the nearest haz cam intensity image. The default is 0.2. &ndash;robust_threshold: Pixel errors much larger than this will be exponentially attenuated to affect less the cost function. The default is 1.0. &ndash;num_cam_iterations: How many solver iterations to perform to solve for cam1 intrinsics. The default is 20. &ndash;bracket_len: Lookup sci and haz cam images only between consecutive nav cam images whose distance in time is no more than this (in seconds). It is assumed the robot moves slowly and uniformly during this time. &ndash;sci_cam_timestamps: Use only these sci cam timestamps. Must be a file with one timestamp per line. &ndash;float_scale: If to optimize the scale of the clouds (use it if the sparse map is kept fixed). &ndash;fix_map: Do not optimize the sparse map, hence only the camera params. &ndash;sci_cam_intrinsics_to_float: Refine 0 or more of the following intrinsics for sci_cam: focal_length, optical_center, distortion. Specify as a quoted list. For example: 'focal_length optical_center distortion'. &ndash;timestamp_interpolation: If true, interpolate between timestamps. May give better results if the robot is known to move uniformly, and perhaps less so for stop-and-go robot motion. &ndash;skip_registration: If true, do not re-register the sparse map. Then the hugin and xyz file options need not be provided. This may result in the scale not being correct if the sparse map is not fixed. &ndash;hugin_file: The path to the hugin .pto file used for sparse map registration. &ndash;xyz_file: The path to the xyz file used for sparse map registration. &ndash;output_map: The map optimized by this tool (it won't change if the option &ndash;fix_map is used). &ndash;num_opt_threads: How many threads to use in the optimization. The default is 16. &ndash;scicam_to_hazcam_timestamp_offset_override_value: Override the value of scicam_to_hazcam_timestamp_offset from the config file with this value. &ndash;mesh: Refine the sci cam so that the sci cam texture agrees with the nav cam texture when projected on this mesh. &ndash;mesh_weight: A larger value will give more weight to the mesh constraint. The mesh residuals printed at the end can be used to examine the effect of this weight. Default: 25.0. &ndash;mesh_robust_threshold: A larger value will try harder to minimize large divergences from the mesh (but note that some of those may be outliers). Default: 3.0. &ndash;verbose: Print the residuals and save the images and match files. Stereo Pipeline's viewer can be used for visualizing these.</p>
-<h2><a class="anchor" id="autotoc_md64"></a>
+<p>This program's options are: &ndash;ros_bag: A ROS bag with recorded nav_cam, haz_cam, and full-resolution sci_cam data. &ndash;sparse_map: A registered SURF sparse map made with some of the ROS bag data, and including nav cam images closely bracketing the sci cam images. &ndash;nav_cam_topic: The nav cam image topic in the bag file. &ndash;haz_cam_points_topic: The haz cam point cloud topic in the bag file. &ndash;haz_cam_intensity_topic: The haz cam intensity topic in the bag file. &ndash;sci_cam_topic: The sci cam image topic in the bag file. &ndash;start: How many seconds into the bag to start processing the data. &ndash;duration: For how many seconds to do the processing. &ndash;max_haz_cam_image_to_depth_timestamp_diff: Use depth haz cam clouds that are within this distance in time from the nearest haz cam intensity image. The default is 0.2. &ndash;robust_threshold: Pixel errors much larger than this will be exponentially attenuated to affect less the cost function. The default is 1.0. &ndash;num_cam_iterations: How many solver iterations to perform to solve for cam1 intrinsics. The default is 20. &ndash;bracket_len: Lookup sci and haz cam images only between consecutive nav cam images whose distance in time is no more than this (in seconds). It is assumed the robot moves slowly and uniformly during this time. &ndash;sci_cam_timestamps: Use only these sci cam timestamps. Must be a file with one timestamp per line. &ndash;float_scale: If to optimize the scale of the clouds (use it if the sparse map is kept fixed). &ndash;fix_map: Do not optimize the sparse map, hence only the camera params. &ndash;sci_cam_intrinsics_to_float: Refine 0 or more of the following intrinsics for sci_cam: focal_length, optical_center, distortion. Specify as a quoted list. For example: 'focal_length optical_center distortion'. &ndash;timestamp_interpolation: If true, interpolate between timestamps. May give better results if the robot is known to move uniformly, and perhaps less so for stop-and-go robot motion. &ndash;skip_registration: If true, do not re-register the sparse map. Then the hugin and xyz file options need not be provided. This may result in the scale not being correct if the sparse map is not fixed. &ndash;hugin_file: The path to the hugin .pto file used for sparse map registration. &ndash;xyz_file: The path to the xyz file used for sparse map registration. &ndash;output_map: The map optimized by this tool (it won't change if the option &ndash;fix_map is used). &ndash;num_opt_threads: How many threads to use in the optimization. The default is 16. &ndash;nav_cam_to_sci_cam_offset_override_value: Override the value of nav_cam_to_sci_cam_timestamp_offset from the config file with this value. &ndash;mesh: Refine the sci cam so that the sci cam texture agrees with the nav cam texture when projected on this mesh. &ndash;mesh_weight: A larger value will give more weight to the mesh constraint. The mesh residuals printed at the end can be used to examine the effect of this weight. Default: 25.0. &ndash;mesh_robust_threshold: A larger value will try harder to minimize large divergences from the mesh (but note that some of those may be outliers). Default: 3.0. &ndash;verbose: Print the residuals and save the images and match files. Stereo Pipeline's viewer can be used for visualizing these.</p>
+<h2><a class="anchor" id="autotoc_md69"></a>
 Orthoprojecting images</h2>
 <p>Given a camera image, its pose, and a mesh, a useful operation is to create a textured mesh with this camera. While the geometry mapper can create textured meshes as well, this tool does so from individual images rather than fusing them. It uses the logic from the streaming mapper instead of texrecon which is used by the geometry mapper.</p>
 <p>A geometry mapper run directory has all the inputs this tool needs. It can be run as follows: </p><pre class="fragment">export ASTROBEE_SOURCE_PATH=$HOME/projects/astrobee/src

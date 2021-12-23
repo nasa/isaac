@@ -110,8 +110,10 @@ Heat cam</h3>
 <p>and it will gradually change to the ambient radiance by the time the boundary of the outer radius is reached.</p>
 <p>This camera publishes the RGB heat image, its pose and intrinsics, on topics:</p>
 <p>/hw/cam_heat /sim/heat_cam/pose /sim/heat_cam/info</p>
-<p>To launch the simulator and see the heat map, one can do:</p>
-<p>source ~/freeflyer_build/native/devel/setup.zsh source ~/projects/isaac/devel/setup.zsh roslaunch isaac sim.launch world:=iss rviz:=true \ pose:="11.2 -7.72 5.0 0 0 0 0 1"</p>
+<p>To launch the simulator and see the heat map, first set up the environment. The paths below may need to be adjusted for your system.</p>
+<p>export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src export ASTROBEE_BUILD_PATH=$HOME/astrobee export ISAAC_WS=$HOME/isaac source $ASTROBEE_BUILD_PATH/devel/setup.bash source $ISAAC_WS/devel/setup.bash</p>
+<p>Then run:</p>
+<p>roslaunch isaac sim.launch world:=iss rviz:=true \ pose:="11.2 -7.72 5.0 0 0 0 0 1"</p>
 <p>Note that as the robot moves and leaves the hot spots behind, the heat cam will only show the constant ambient temperature.</p>
 <p>By default, the camera takes pictures as often as it can. It listens however to the topic</p>
 <p>/comm/dds/command</p>

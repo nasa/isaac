@@ -166,146 +166,149 @@ $(document).ready(function(){initNavTree('dense__map__utils_8h_source.html','');
 <div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160; </div>
 <div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;<span class="comment">// Read the transform from depth to given camera</span></div>
 <div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;<span class="keywordtype">void</span> readCameraTransform(config_reader::ConfigReader&amp; config, std::string <span class="keyword">const</span> transform_str,</div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;                         Eigen::MatrixXd&amp; transform);</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;                         Eigen::Affine3d&amp; transform);</div>
 <div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160; </div>
-<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;<span class="comment">// Read a bunch of transforms from the robot calibration file</span></div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;<span class="keywordtype">void</span> readConfigFile(std::string <span class="keyword">const</span>&amp; navcam_to_hazcam_timestamp_offset_str,</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;                    std::string <span class="keyword">const</span>&amp; scicam_to_hazcam_timestamp_offset_str,</div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;                    std::string <span class="keyword">const</span>&amp; hazcam_to_navcam_transform_str,</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;                    std::string <span class="keyword">const</span>&amp; scicam_to_hazcam_transform_str, std::string <span class="keyword">const</span>&amp; navcam_to_body_transform_str,</div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;                    std::string <span class="keyword">const</span>&amp; hazcam_depth_to_image_transform_str, <span class="keywordtype">double</span>&amp; navcam_to_hazcam_timestamp_offset,</div>
-<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;                    <span class="keywordtype">double</span>&amp; scicam_to_hazcam_timestamp_offset, Eigen::MatrixXd&amp; hazcam_to_navcam_trans,</div>
-<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;                    Eigen::MatrixXd&amp; scicam_to_hazcam_trans, Eigen::MatrixXd&amp; navcam_to_body_trans,</div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;                    Eigen::Affine3d&amp; hazcam_depth_to_image_transform, camera::CameraParameters&amp; nav_cam_params,</div>
-<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;                    camera::CameraParameters&amp; haz_cam_params, camera::CameraParameters&amp; sci_cam_params);</div>
-<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160; </div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;<span class="comment">// Given two poses aff0 and aff1, and 0 &lt;= alpha &lt;= 1, do linear interpolation.</span></div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;Eigen::Affine3d linearInterp(<span class="keywordtype">double</span> alpha, Eigen::Affine3d <span class="keyword">const</span>&amp; aff0, Eigen::Affine3d <span class="keyword">const</span>&amp; aff1);</div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160; </div>
-<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;<span class="comment">// Given a set of poses indexed by timestamp in an std::map, find the</span></div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;<span class="comment">// interpolated pose at desired timestamp. This is efficient</span></div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;<span class="comment">// only for very small maps. Else use the StampedPoseStorage class.</span></div>
-<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;<span class="keywordtype">bool</span> findInterpPose(<span class="keywordtype">double</span> desired_time, std::map&lt;double, Eigen::Affine3d&gt; <span class="keyword">const</span>&amp; poses, Eigen::Affine3d&amp; interp_pose);</div>
-<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160; </div>
-<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;<span class="comment">// A class to store timestamped poses, implementing O(log(n)) linear</span></div>
-<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;<span class="comment">// interpolation at a desired timestamp. For fast access, keep the</span></div>
-<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;<span class="comment">// poses in bins obtained by flooring the timestamp, which is measured</span></div>
-<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;<span class="comment">// in seconds. It is assumed that there are a handful of poses</span></div>
-<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;<span class="comment">// measured every second, so in each bin. When bins get large, or too</span></div>
-<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;<span class="comment">// many bins are empty, the efficiency of this algorithm goes down.</span></div>
-<div class="line"><a name="l00104"></a><span class="lineno"><a class="line" href="classdense__map_1_1StampedPoseStorage.html">  104</a></span>&#160;<span class="keyword">class </span><a class="code" href="classdense__map_1_1StampedPoseStorage.html">StampedPoseStorage</a> {</div>
-<div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160; <span class="keyword">public</span>:</div>
-<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;  <span class="keywordtype">void</span> addPose(Eigen::Affine3d <span class="keyword">const</span>&amp; pose, <span class="keywordtype">double</span> timestamp);</div>
-<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160; </div>
-<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;  <span class="comment">// Find the interpolated pose by looking up the two poses with</span></div>
-<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;  <span class="comment">// closest timestamps that are below and above input_timestamp. If</span></div>
-<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;  <span class="comment">// the gap between those timestamps is more than max_gap, return</span></div>
-<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;  <span class="comment">// failure, as then likely the interpolation result is not accurate.</span></div>
-<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;  <span class="keywordtype">bool</span> interpPose(<span class="keywordtype">double</span> input_timestamp, <span class="keywordtype">double</span> max_gap, Eigen::Affine3d&amp; out_pose) <span class="keyword">const</span>;</div>
-<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160; </div>
-<div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;  <span class="keywordtype">void</span> clear();</div>
-<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160; </div>
-<div class="line"><a name="l00116"></a><span class="lineno">  116</span>&#160;  <span class="keywordtype">bool</span> empty() <span class="keyword">const</span>;</div>
-<div class="line"><a name="l00117"></a><span class="lineno">  117</span>&#160; </div>
-<div class="line"><a name="l00118"></a><span class="lineno">  118</span>&#160; <span class="keyword">private</span>:</div>
-<div class="line"><a name="l00119"></a><span class="lineno">  119</span>&#160;  std::map&lt;int, std::map&lt;double, Eigen::Affine3d&gt; &gt; m_poses;</div>
-<div class="line"><a name="l00120"></a><span class="lineno">  120</span>&#160;};</div>
-<div class="line"><a name="l00121"></a><span class="lineno">  121</span>&#160; </div>
-<div class="line"><a name="l00122"></a><span class="lineno">  122</span>&#160;<span class="comment">// Compute the azimuth and elevation for a (normal) vector</span></div>
-<div class="line"><a name="l00123"></a><span class="lineno">  123</span>&#160;<span class="keywordtype">void</span> normalToAzimuthAndElevation(Eigen::Vector3d <span class="keyword">const</span>&amp; normal, <span class="keywordtype">double</span>&amp; azimuth, <span class="keywordtype">double</span>&amp; elevation);</div>
-<div class="line"><a name="l00124"></a><span class="lineno">  124</span>&#160; </div>
-<div class="line"><a name="l00125"></a><span class="lineno">  125</span>&#160;<span class="comment">// Compute a normal vector based on the azimuth and elevation angles</span></div>
-<div class="line"><a name="l00126"></a><span class="lineno">  126</span>&#160;<span class="keywordtype">void</span> azimuthAndElevationToNormal(Eigen::Vector3d&amp; normal, <span class="keywordtype">double</span> azimuth, <span class="keywordtype">double</span> elevation);</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;<span class="comment">// Read some transforms from the robot calibration file</span></div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;<span class="keywordtype">void</span> readConfigFile                                                     <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;(<span class="comment">// Inputs                                                              // NOLINT</span></div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160; std::vector&lt;std::string&gt; <span class="keyword">const</span>&amp; cam_names,                             <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160; std::string <span class="keyword">const</span>&amp; nav_cam_to_body_trans_str,                          <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160; std::string <span class="keyword">const</span>&amp; haz_cam_depth_to_image_trans_str,                   <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160; <span class="comment">// Outputs                                                             // NOLINT</span></div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160; std::vector&lt;camera::CameraParameters&gt; &amp; cam_params,                    <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160; std::vector&lt;Eigen::Affine3d&gt;          &amp; nav_to_cam_trans,              <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160; std::vector&lt;double&gt;                   &amp; nav_to_cam_timestamp_offset,   <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160; Eigen::Affine3d                       &amp; nav_cam_to_body_trans,         <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160; Eigen::Affine3d                       &amp; haz_cam_depth_to_image_trans); <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160; </div>
+<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;<span class="comment">// Save some transforms from the robot calibration file. This has some very fragile</span></div>
+<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;<span class="comment">// logic and cannot handle comments in the config file.</span></div>
+<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;<span class="keywordtype">void</span> updateConfigFile                                                           <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;(std::vector&lt;std::string&gt;              <span class="keyword">const</span>&amp; cam_names,                        <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160; std::string                           <span class="keyword">const</span>&amp; haz_cam_depth_to_image_trans_str, <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160; std::vector&lt;camera::CameraParameters&gt; <span class="keyword">const</span>&amp; cam_params,                       <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160; std::vector&lt;Eigen::Affine3d&gt;          <span class="keyword">const</span>&amp; nav_to_cam_trans,                 <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160; std::vector&lt;double&gt;                   <span class="keyword">const</span>&amp; nav_to_cam_timestamp_offset,      <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160; Eigen::Affine3d                       <span class="keyword">const</span>&amp; haz_cam_depth_to_image_trans);    <span class="comment">// NOLINT</span></div>
+<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160; </div>
+<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;<span class="comment">// Given two poses aff0 and aff1, and 0 &lt;= alpha &lt;= 1, do linear interpolation.</span></div>
+<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;Eigen::Affine3d linearInterp(<span class="keywordtype">double</span> alpha, Eigen::Affine3d <span class="keyword">const</span>&amp; aff0, Eigen::Affine3d <span class="keyword">const</span>&amp; aff1);</div>
+<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160; </div>
+<div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;<span class="comment">// Given a set of poses indexed by timestamp in an std::map, find the</span></div>
+<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;<span class="comment">// interpolated pose at desired timestamp. This is efficient</span></div>
+<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;<span class="comment">// only for very small maps. Else use the StampedPoseStorage class.</span></div>
+<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;<span class="keywordtype">bool</span> findInterpPose(<span class="keywordtype">double</span> desired_time, std::map&lt;double, Eigen::Affine3d&gt; <span class="keyword">const</span>&amp; poses, Eigen::Affine3d&amp; interp_pose);</div>
+<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160; </div>
+<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;<span class="comment">// A class to store timestamped poses, implementing O(log(n)) linear</span></div>
+<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;<span class="comment">// interpolation at a desired timestamp. For fast access, keep the</span></div>
+<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;<span class="comment">// poses in bins obtained by flooring the timestamp, which is measured</span></div>
+<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;<span class="comment">// in seconds. It is assumed that there are a handful of poses</span></div>
+<div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;<span class="comment">// measured every second, so in each bin. When bins get large, or too</span></div>
+<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160;<span class="comment">// many bins are empty, the efficiency of this algorithm goes down.</span></div>
+<div class="line"><a name="l00116"></a><span class="lineno"><a class="line" href="classdense__map_1_1StampedPoseStorage.html">  116</a></span>&#160;<span class="keyword">class </span><a class="code" href="classdense__map_1_1StampedPoseStorage.html">StampedPoseStorage</a> {</div>
+<div class="line"><a name="l00117"></a><span class="lineno">  117</span>&#160; <span class="keyword">public</span>:</div>
+<div class="line"><a name="l00118"></a><span class="lineno">  118</span>&#160;  <span class="keywordtype">void</span> addPose(Eigen::Affine3d <span class="keyword">const</span>&amp; pose, <span class="keywordtype">double</span> timestamp);</div>
+<div class="line"><a name="l00119"></a><span class="lineno">  119</span>&#160; </div>
+<div class="line"><a name="l00120"></a><span class="lineno">  120</span>&#160;  <span class="comment">// Find the interpolated pose by looking up the two poses with</span></div>
+<div class="line"><a name="l00121"></a><span class="lineno">  121</span>&#160;  <span class="comment">// closest timestamps that are below and above input_timestamp. If</span></div>
+<div class="line"><a name="l00122"></a><span class="lineno">  122</span>&#160;  <span class="comment">// the gap between those timestamps is more than max_gap, return</span></div>
+<div class="line"><a name="l00123"></a><span class="lineno">  123</span>&#160;  <span class="comment">// failure, as then likely the interpolation result is not accurate.</span></div>
+<div class="line"><a name="l00124"></a><span class="lineno">  124</span>&#160;  <span class="keywordtype">bool</span> interpPose(<span class="keywordtype">double</span> input_timestamp, <span class="keywordtype">double</span> max_gap, Eigen::Affine3d&amp; out_pose) <span class="keyword">const</span>;</div>
+<div class="line"><a name="l00125"></a><span class="lineno">  125</span>&#160; </div>
+<div class="line"><a name="l00126"></a><span class="lineno">  126</span>&#160;  <span class="keywordtype">void</span> clear();</div>
 <div class="line"><a name="l00127"></a><span class="lineno">  127</span>&#160; </div>
-<div class="line"><a name="l00128"></a><span class="lineno">  128</span>&#160;<span class="comment">// Snap the normal to the plane (and the plane itself) to make</span></div>
-<div class="line"><a name="l00129"></a><span class="lineno">  129</span>&#160;<span class="comment">// all angles multiple of 45 degrees with the coordinate axes.</span></div>
-<div class="line"><a name="l00130"></a><span class="lineno">  130</span>&#160;<span class="keywordtype">void</span> snapPlaneNormal(Eigen::Vector3d&amp; plane_normal);</div>
-<div class="line"><a name="l00131"></a><span class="lineno">  131</span>&#160; </div>
-<div class="line"><a name="l00132"></a><span class="lineno">  132</span>&#160;<span class="comment">// Find the best fitting plane to a set of points</span></div>
-<div class="line"><a name="l00133"></a><span class="lineno">  133</span>&#160;<span class="keywordtype">void</span> bestFitPlane(<span class="keyword">const</span> std::vector&lt;Eigen::Vector3d&gt;&amp; points, Eigen::Vector3d&amp; centroid, Eigen::Vector3d&amp; plane_normal);</div>
-<div class="line"><a name="l00134"></a><span class="lineno">  134</span>&#160; </div>
-<div class="line"><a name="l00135"></a><span class="lineno">  135</span>&#160;<span class="comment">// Extract from a string of the form someDir/1234.5678.jpg the number 123.456.</span></div>
-<div class="line"><a name="l00136"></a><span class="lineno">  136</span>&#160;<span class="keywordtype">double</span> fileNameToTimestamp(std::string <span class="keyword">const</span>&amp; file_name);</div>
-<div class="line"><a name="l00137"></a><span class="lineno">  137</span>&#160; </div>
-<div class="line"><a name="l00138"></a><span class="lineno">  138</span>&#160;<span class="comment">// Create a directory unless it exists already</span></div>
-<div class="line"><a name="l00139"></a><span class="lineno">  139</span>&#160;<span class="keywordtype">void</span> createDir(std::string <span class="keyword">const</span>&amp; dir);</div>
-<div class="line"><a name="l00140"></a><span class="lineno">  140</span>&#160; </div>
-<div class="line"><a name="l00141"></a><span class="lineno">  141</span>&#160;<span class="comment">// Modify in-place the robot config file</span></div>
-<div class="line"><a name="l00142"></a><span class="lineno">  142</span>&#160;<span class="keywordtype">void</span> update_config_file(<span class="keywordtype">bool</span> update_cam1, std::string <span class="keyword">const</span>&amp; cam1_name,</div>
-<div class="line"><a name="l00143"></a><span class="lineno">  143</span>&#160;                        boost::shared_ptr&lt;camera::CameraParameters&gt; cam1_params, <span class="keywordtype">bool</span> update_cam2,</div>
-<div class="line"><a name="l00144"></a><span class="lineno">  144</span>&#160;                        std::string <span class="keyword">const</span>&amp; cam2_name, boost::shared_ptr&lt;camera::CameraParameters&gt; cam2_params,</div>
-<div class="line"><a name="l00145"></a><span class="lineno">  145</span>&#160;                        <span class="keywordtype">bool</span> update_depth_to_image_transform, Eigen::Affine3d <span class="keyword">const</span>&amp; depth_to_image_transform,</div>
-<div class="line"><a name="l00146"></a><span class="lineno">  146</span>&#160;                        <span class="keywordtype">bool</span> update_extrinsics, Eigen::Affine3d <span class="keyword">const</span>&amp; cam2_to_cam1_transform,</div>
-<div class="line"><a name="l00147"></a><span class="lineno">  147</span>&#160;                        <span class="keywordtype">bool</span> update_timestamp_offset, std::string <span class="keyword">const</span>&amp; cam1_to_cam2_timestamp_offset_str,</div>
-<div class="line"><a name="l00148"></a><span class="lineno">  148</span>&#160;                        <span class="keywordtype">double</span> cam1_to_cam2_timestamp_offset);</div>
+<div class="line"><a name="l00128"></a><span class="lineno">  128</span>&#160;  <span class="keywordtype">bool</span> empty() <span class="keyword">const</span>;</div>
+<div class="line"><a name="l00129"></a><span class="lineno">  129</span>&#160; </div>
+<div class="line"><a name="l00130"></a><span class="lineno">  130</span>&#160; <span class="keyword">private</span>:</div>
+<div class="line"><a name="l00131"></a><span class="lineno">  131</span>&#160;  std::map&lt;int, std::map&lt;double, Eigen::Affine3d&gt; &gt; m_poses;</div>
+<div class="line"><a name="l00132"></a><span class="lineno">  132</span>&#160;};</div>
+<div class="line"><a name="l00133"></a><span class="lineno">  133</span>&#160; </div>
+<div class="line"><a name="l00134"></a><span class="lineno">  134</span>&#160;<span class="comment">// Compute the azimuth and elevation for a (normal) vector</span></div>
+<div class="line"><a name="l00135"></a><span class="lineno">  135</span>&#160;<span class="keywordtype">void</span> normalToAzimuthAndElevation(Eigen::Vector3d <span class="keyword">const</span>&amp; normal, <span class="keywordtype">double</span>&amp; azimuth, <span class="keywordtype">double</span>&amp; elevation);</div>
+<div class="line"><a name="l00136"></a><span class="lineno">  136</span>&#160; </div>
+<div class="line"><a name="l00137"></a><span class="lineno">  137</span>&#160;<span class="comment">// Compute a normal vector based on the azimuth and elevation angles</span></div>
+<div class="line"><a name="l00138"></a><span class="lineno">  138</span>&#160;<span class="keywordtype">void</span> azimuthAndElevationToNormal(Eigen::Vector3d&amp; normal, <span class="keywordtype">double</span> azimuth, <span class="keywordtype">double</span> elevation);</div>
+<div class="line"><a name="l00139"></a><span class="lineno">  139</span>&#160; </div>
+<div class="line"><a name="l00140"></a><span class="lineno">  140</span>&#160;<span class="comment">// Snap the normal to the plane (and the plane itself) to make</span></div>
+<div class="line"><a name="l00141"></a><span class="lineno">  141</span>&#160;<span class="comment">// all angles multiple of 45 degrees with the coordinate axes.</span></div>
+<div class="line"><a name="l00142"></a><span class="lineno">  142</span>&#160;<span class="keywordtype">void</span> snapPlaneNormal(Eigen::Vector3d&amp; plane_normal);</div>
+<div class="line"><a name="l00143"></a><span class="lineno">  143</span>&#160; </div>
+<div class="line"><a name="l00144"></a><span class="lineno">  144</span>&#160;<span class="comment">// Find the best fitting plane to a set of points</span></div>
+<div class="line"><a name="l00145"></a><span class="lineno">  145</span>&#160;<span class="keywordtype">void</span> bestFitPlane(<span class="keyword">const</span> std::vector&lt;Eigen::Vector3d&gt;&amp; points, Eigen::Vector3d&amp; centroid, Eigen::Vector3d&amp; plane_normal);</div>
+<div class="line"><a name="l00146"></a><span class="lineno">  146</span>&#160; </div>
+<div class="line"><a name="l00147"></a><span class="lineno">  147</span>&#160;<span class="comment">// Extract from a string of the form someDir/1234.5678.jpg the number 123.456.</span></div>
+<div class="line"><a name="l00148"></a><span class="lineno">  148</span>&#160;<span class="keywordtype">double</span> fileNameToTimestamp(std::string <span class="keyword">const</span>&amp; file_name);</div>
 <div class="line"><a name="l00149"></a><span class="lineno">  149</span>&#160; </div>
-<div class="line"><a name="l00150"></a><span class="lineno">  150</span>&#160;<span class="comment">// A little holding structure for nav, sci, and haz poses</span></div>
-<div class="line"><a name="l00151"></a><span class="lineno"><a class="line" href="structdense__map_1_1CameraPoses.html">  151</a></span>&#160;<span class="keyword">struct </span><a class="code" href="structdense__map_1_1CameraPoses.html">CameraPoses</a> {</div>
-<div class="line"><a name="l00152"></a><span class="lineno">  152</span>&#160;  std::map&lt;double, double&gt; haz_depth_to_image_timestamps;</div>
-<div class="line"><a name="l00153"></a><span class="lineno">  153</span>&#160;  std::map&lt;std::string, std::map&lt;double, Eigen::Affine3d&gt; &gt; world_to_cam_poses;</div>
-<div class="line"><a name="l00154"></a><span class="lineno">  154</span>&#160;};</div>
-<div class="line"><a name="l00155"></a><span class="lineno">  155</span>&#160; </div>
-<div class="line"><a name="l00156"></a><span class="lineno">  156</span>&#160;<span class="comment">// Some small utilities for writing a file having poses for nav, sci, and haz cam,</span></div>
-<div class="line"><a name="l00157"></a><span class="lineno">  157</span>&#160;<span class="comment">// and also the depth timestamp corresponding to given haz intensity timestamp</span></div>
-<div class="line"><a name="l00158"></a><span class="lineno">  158</span>&#160;<span class="keywordtype">void</span> writeCameraPoses(std::string <span class="keyword">const</span>&amp; filename, std::map&lt;double, double&gt; <span class="keyword">const</span>&amp; haz_depth_to_image_timestamps,</div>
-<div class="line"><a name="l00159"></a><span class="lineno">  159</span>&#160;                      std::map&lt;std::string, std::map&lt;double, Eigen::Affine3d&gt; &gt; <span class="keyword">const</span>&amp; world_to_cam_poses);</div>
-<div class="line"><a name="l00160"></a><span class="lineno">  160</span>&#160; </div>
-<div class="line"><a name="l00161"></a><span class="lineno">  161</span>&#160;<span class="keywordtype">void</span> readCameraPoses(std::string <span class="keyword">const</span>&amp; filename, std::map&lt;double, double&gt;&amp; haz_depth_to_image_timestamps,</div>
-<div class="line"><a name="l00162"></a><span class="lineno">  162</span>&#160;                     std::map&lt;std::string, std::map&lt;double, Eigen::Affine3d&gt; &gt;&amp; world_to_cam_poses);</div>
+<div class="line"><a name="l00150"></a><span class="lineno">  150</span>&#160;<span class="comment">// Create a directory unless it exists already</span></div>
+<div class="line"><a name="l00151"></a><span class="lineno">  151</span>&#160;<span class="keywordtype">void</span> createDir(std::string <span class="keyword">const</span>&amp; dir);</div>
+<div class="line"><a name="l00152"></a><span class="lineno">  152</span>&#160; </div>
+<div class="line"><a name="l00153"></a><span class="lineno">  153</span>&#160;<span class="comment">// A little holding structure for nav, sci, and haz poses</span></div>
+<div class="line"><a name="l00154"></a><span class="lineno"><a class="line" href="structdense__map_1_1CameraPoses.html">  154</a></span>&#160;<span class="keyword">struct </span><a class="code" href="structdense__map_1_1CameraPoses.html">CameraPoses</a> {</div>
+<div class="line"><a name="l00155"></a><span class="lineno">  155</span>&#160;  std::map&lt;double, double&gt; haz_depth_to_image_timestamps;</div>
+<div class="line"><a name="l00156"></a><span class="lineno">  156</span>&#160;  std::map&lt;std::string, std::map&lt;double, Eigen::Affine3d&gt; &gt; world_to_cam_poses;</div>
+<div class="line"><a name="l00157"></a><span class="lineno">  157</span>&#160;};</div>
+<div class="line"><a name="l00158"></a><span class="lineno">  158</span>&#160; </div>
+<div class="line"><a name="l00159"></a><span class="lineno">  159</span>&#160;<span class="comment">// Some small utilities for writing a file having poses for nav, sci, and haz cam,</span></div>
+<div class="line"><a name="l00160"></a><span class="lineno">  160</span>&#160;<span class="comment">// and also the depth timestamp corresponding to given haz intensity timestamp</span></div>
+<div class="line"><a name="l00161"></a><span class="lineno">  161</span>&#160;<span class="keywordtype">void</span> writeCameraPoses(std::string <span class="keyword">const</span>&amp; filename, std::map&lt;double, double&gt; <span class="keyword">const</span>&amp; haz_depth_to_image_timestamps,</div>
+<div class="line"><a name="l00162"></a><span class="lineno">  162</span>&#160;                      std::map&lt;std::string, std::map&lt;double, Eigen::Affine3d&gt; &gt; <span class="keyword">const</span>&amp; world_to_cam_poses);</div>
 <div class="line"><a name="l00163"></a><span class="lineno">  163</span>&#160; </div>
-<div class="line"><a name="l00164"></a><span class="lineno">  164</span>&#160;<span class="comment">// Gamma and inverse gamma functions</span></div>
-<div class="line"><a name="l00165"></a><span class="lineno">  165</span>&#160;<span class="comment">// https://en.wikipedia.org/wiki/SRGB#Specification_of_the_transformation</span></div>
-<div class="line"><a name="l00166"></a><span class="lineno">  166</span>&#160;<span class="keywordtype">double</span> gamma(<span class="keywordtype">double</span> x);</div>
-<div class="line"><a name="l00167"></a><span class="lineno">  167</span>&#160;<span class="keywordtype">double</span> inv_gamma(<span class="keywordtype">double</span> x);</div>
-<div class="line"><a name="l00168"></a><span class="lineno">  168</span>&#160; </div>
-<div class="line"><a name="l00169"></a><span class="lineno">  169</span>&#160;<span class="comment">// Apply the inverse gamma transform to images, multiply them by</span></div>
-<div class="line"><a name="l00170"></a><span class="lineno">  170</span>&#160;<span class="comment">// max_iso_times_exposure/ISO/exposure_time to adjust for</span></div>
-<div class="line"><a name="l00171"></a><span class="lineno">  171</span>&#160;<span class="comment">// lightning differences, then apply the gamma transform back.</span></div>
-<div class="line"><a name="l00172"></a><span class="lineno">  172</span>&#160;<span class="keywordtype">void</span> exposureCorrection(<span class="keywordtype">double</span> max_iso_times_exposure, <span class="keywordtype">double</span> iso, <span class="keywordtype">double</span> exposure, cv::Mat <span class="keyword">const</span>&amp; input_image,</div>
-<div class="line"><a name="l00173"></a><span class="lineno">  173</span>&#160;                        cv::Mat&amp; output_image);</div>
-<div class="line"><a name="l00174"></a><span class="lineno">  174</span>&#160; </div>
-<div class="line"><a name="l00175"></a><span class="lineno">  175</span>&#160;<span class="comment">// Scale an image to correct for lightning variations by taking into</span></div>
-<div class="line"><a name="l00176"></a><span class="lineno">  176</span>&#160;<span class="comment">// account that JPEG images have gamma correction applied to them.</span></div>
-<div class="line"><a name="l00177"></a><span class="lineno">  177</span>&#160;<span class="comment">// See https://en.wikipedia.org/wiki/Gamma_correction.</span></div>
-<div class="line"><a name="l00178"></a><span class="lineno">  178</span>&#160;<span class="keywordtype">void</span> scaleImage(<span class="keywordtype">double</span> max_iso_times_exposure, <span class="keywordtype">double</span> iso, <span class="keywordtype">double</span> exposure, cv::Mat <span class="keyword">const</span>&amp; input_image,</div>
-<div class="line"><a name="l00179"></a><span class="lineno">  179</span>&#160;                cv::Mat&amp; output_image);</div>
-<div class="line"><a name="l00180"></a><span class="lineno">  180</span>&#160; </div>
-<div class="line"><a name="l00181"></a><span class="lineno">  181</span>&#160;<span class="comment">// Given two bounds, pick two timestamps within these bounds, the one</span></div>
-<div class="line"><a name="l00182"></a><span class="lineno">  182</span>&#160;<span class="comment">// closest to the left bound and the one to the right bound. Take into</span></div>
-<div class="line"><a name="l00183"></a><span class="lineno">  183</span>&#160;<span class="comment">// account that the timestamps may need to have an offset added to</span></div>
-<div class="line"><a name="l00184"></a><span class="lineno">  184</span>&#160;<span class="comment">// them. Assume that the input timestamps are sorted in increasing order.</span></div>
-<div class="line"><a name="l00185"></a><span class="lineno">  185</span>&#160;<span class="comment">// TODO(oalexan1): May have to add a constraint to only pick</span></div>
-<div class="line"><a name="l00186"></a><span class="lineno">  186</span>&#160;<span class="comment">// a timestamp if not further from the bound than a given value.</span></div>
-<div class="line"><a name="l00187"></a><span class="lineno">  187</span>&#160;<span class="keywordtype">void</span> pickTimestampsInBounds(std::vector&lt;double&gt; <span class="keyword">const</span>&amp; timestamps, <span class="keywordtype">double</span> left_bound, <span class="keywordtype">double</span> right_bound, <span class="keywordtype">double</span> offset,</div>
-<div class="line"><a name="l00188"></a><span class="lineno">  188</span>&#160;                            std::vector&lt;double&gt;&amp; out_timestamps);</div>
-<div class="line"><a name="l00189"></a><span class="lineno">  189</span>&#160; </div>
-<div class="line"><a name="l00190"></a><span class="lineno">  190</span>&#160;<span class="comment">// Must always have NUM_EXIF the last.</span></div>
-<div class="line"><a name="l00191"></a><span class="lineno">  191</span>&#160;<span class="keyword">enum</span> ExifData { TIMESTAMP = 0, EXPOSURE_TIME, ISO, APERTURE, FOCAL_LENGTH, NUM_EXIF };</div>
+<div class="line"><a name="l00164"></a><span class="lineno">  164</span>&#160;<span class="keywordtype">void</span> readCameraPoses(std::string <span class="keyword">const</span>&amp; filename, std::map&lt;double, double&gt;&amp; haz_depth_to_image_timestamps,</div>
+<div class="line"><a name="l00165"></a><span class="lineno">  165</span>&#160;                     std::map&lt;std::string, std::map&lt;double, Eigen::Affine3d&gt; &gt;&amp; world_to_cam_poses);</div>
+<div class="line"><a name="l00166"></a><span class="lineno">  166</span>&#160; </div>
+<div class="line"><a name="l00167"></a><span class="lineno">  167</span>&#160;<span class="comment">// Gamma and inverse gamma functions</span></div>
+<div class="line"><a name="l00168"></a><span class="lineno">  168</span>&#160;<span class="comment">// https://en.wikipedia.org/wiki/SRGB#Specification_of_the_transformation</span></div>
+<div class="line"><a name="l00169"></a><span class="lineno">  169</span>&#160;<span class="keywordtype">double</span> gamma(<span class="keywordtype">double</span> x);</div>
+<div class="line"><a name="l00170"></a><span class="lineno">  170</span>&#160;<span class="keywordtype">double</span> inv_gamma(<span class="keywordtype">double</span> x);</div>
+<div class="line"><a name="l00171"></a><span class="lineno">  171</span>&#160; </div>
+<div class="line"><a name="l00172"></a><span class="lineno">  172</span>&#160;<span class="comment">// Apply the inverse gamma transform to images, multiply them by</span></div>
+<div class="line"><a name="l00173"></a><span class="lineno">  173</span>&#160;<span class="comment">// max_iso_times_exposure/ISO/exposure_time to adjust for</span></div>
+<div class="line"><a name="l00174"></a><span class="lineno">  174</span>&#160;<span class="comment">// lightning differences, then apply the gamma transform back.</span></div>
+<div class="line"><a name="l00175"></a><span class="lineno">  175</span>&#160;<span class="keywordtype">void</span> exposureCorrection(<span class="keywordtype">double</span> max_iso_times_exposure, <span class="keywordtype">double</span> iso, <span class="keywordtype">double</span> exposure, cv::Mat <span class="keyword">const</span>&amp; input_image,</div>
+<div class="line"><a name="l00176"></a><span class="lineno">  176</span>&#160;                        cv::Mat&amp; output_image);</div>
+<div class="line"><a name="l00177"></a><span class="lineno">  177</span>&#160; </div>
+<div class="line"><a name="l00178"></a><span class="lineno">  178</span>&#160;<span class="comment">// Scale an image to correct for lightning variations by taking into</span></div>
+<div class="line"><a name="l00179"></a><span class="lineno">  179</span>&#160;<span class="comment">// account that JPEG images have gamma correction applied to them.</span></div>
+<div class="line"><a name="l00180"></a><span class="lineno">  180</span>&#160;<span class="comment">// See https://en.wikipedia.org/wiki/Gamma_correction.</span></div>
+<div class="line"><a name="l00181"></a><span class="lineno">  181</span>&#160;<span class="keywordtype">void</span> scaleImage(<span class="keywordtype">double</span> max_iso_times_exposure, <span class="keywordtype">double</span> iso, <span class="keywordtype">double</span> exposure, cv::Mat <span class="keyword">const</span>&amp; input_image,</div>
+<div class="line"><a name="l00182"></a><span class="lineno">  182</span>&#160;                cv::Mat&amp; output_image);</div>
+<div class="line"><a name="l00183"></a><span class="lineno">  183</span>&#160; </div>
+<div class="line"><a name="l00184"></a><span class="lineno">  184</span>&#160;<span class="comment">// Given two bounds, pick two timestamps within these bounds, the one</span></div>
+<div class="line"><a name="l00185"></a><span class="lineno">  185</span>&#160;<span class="comment">// closest to the left bound and the one to the right bound. Take into</span></div>
+<div class="line"><a name="l00186"></a><span class="lineno">  186</span>&#160;<span class="comment">// account that the timestamps may need to have an offset added to</span></div>
+<div class="line"><a name="l00187"></a><span class="lineno">  187</span>&#160;<span class="comment">// them. Assume that the input timestamps are sorted in increasing order.</span></div>
+<div class="line"><a name="l00188"></a><span class="lineno">  188</span>&#160;<span class="comment">// TODO(oalexan1): May have to add a constraint to only pick</span></div>
+<div class="line"><a name="l00189"></a><span class="lineno">  189</span>&#160;<span class="comment">// a timestamp if not further from the bound than a given value.</span></div>
+<div class="line"><a name="l00190"></a><span class="lineno">  190</span>&#160;<span class="keywordtype">void</span> pickTimestampsInBounds(std::vector&lt;double&gt; <span class="keyword">const</span>&amp; timestamps, <span class="keywordtype">double</span> left_bound, <span class="keywordtype">double</span> right_bound, <span class="keywordtype">double</span> offset,</div>
+<div class="line"><a name="l00191"></a><span class="lineno">  191</span>&#160;                            std::vector&lt;double&gt;&amp; out_timestamps);</div>
 <div class="line"><a name="l00192"></a><span class="lineno">  192</span>&#160; </div>
-<div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;<span class="comment">// Triangulate two rays emanating from given undistorted and centered pixels</span></div>
-<div class="line"><a name="l00194"></a><span class="lineno">  194</span>&#160;Eigen::Vector3d TriangulatePair(<span class="keywordtype">double</span> focal_length1, <span class="keywordtype">double</span> focal_length2, Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam1,</div>
-<div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160;                                Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam2, Eigen::Vector2d <span class="keyword">const</span>&amp; pix1,</div>
-<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;                                Eigen::Vector2d <span class="keyword">const</span>&amp; pix2);</div>
-<div class="line"><a name="l00197"></a><span class="lineno">  197</span>&#160; </div>
-<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;<span class="comment">// Triangulate n rays emanating from given undistorted and centered pixels</span></div>
-<div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;Eigen::Vector3d Triangulate(std::vector&lt;double&gt; <span class="keyword">const</span>&amp; focal_length_vec,</div>
-<div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160;                            std::vector&lt;Eigen::Affine3d&gt; <span class="keyword">const</span>&amp; world_to_cam_vec,</div>
-<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;                            std::vector&lt;Eigen::Vector2d&gt; <span class="keyword">const</span>&amp; pix_vec);</div>
-<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160; </div>
-<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160;<span class="comment">// A utility for saving a camera in a format ASP understands.</span></div>
-<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;<span class="comment">// TODO(oalexan1): Expose the sci cam intrinsics rather than having</span></div>
-<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160;<span class="comment">// them hard-coded.</span></div>
-<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;<span class="keywordtype">void</span> save_tsai_camera(Eigen::MatrixXd <span class="keyword">const</span>&amp; desired_cam_to_world_trans,</div>
-<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;                      std::string <span class="keyword">const</span>&amp; output_dir,</div>
-<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;                      <span class="keywordtype">double</span> curr_time, std::string <span class="keyword">const</span>&amp; suffix);</div>
-<div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160; </div>
-<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;}  <span class="comment">// namespace dense_map</span></div>
-<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160; </div>
-<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;<span class="preprocessor">#endif  // DENSE_MAP_UTILS_H_</span></div>
+<div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;<span class="comment">// Must always have NUM_EXIF the last.</span></div>
+<div class="line"><a name="l00194"></a><span class="lineno">  194</span>&#160;<span class="keyword">enum</span> ExifData { TIMESTAMP = 0, EXPOSURE_TIME, ISO, APERTURE, FOCAL_LENGTH, NUM_EXIF };</div>
+<div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160; </div>
+<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;<span class="comment">// Triangulate two rays emanating from given undistorted and centered pixels</span></div>
+<div class="line"><a name="l00197"></a><span class="lineno">  197</span>&#160;Eigen::Vector3d TriangulatePair(<span class="keywordtype">double</span> focal_length1, <span class="keywordtype">double</span> focal_length2, Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam1,</div>
+<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;                                Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam2, Eigen::Vector2d <span class="keyword">const</span>&amp; pix1,</div>
+<div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;                                Eigen::Vector2d <span class="keyword">const</span>&amp; pix2);</div>
+<div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160; </div>
+<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;<span class="comment">// Triangulate n rays emanating from given undistorted and centered pixels</span></div>
+<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;Eigen::Vector3d Triangulate(std::vector&lt;double&gt; <span class="keyword">const</span>&amp; focal_length_vec,</div>
+<div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160;                            std::vector&lt;Eigen::Affine3d&gt; <span class="keyword">const</span>&amp; world_to_cam_vec,</div>
+<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;                            std::vector&lt;Eigen::Vector2d&gt; <span class="keyword">const</span>&amp; pix_vec);</div>
+<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160; </div>
+<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;<span class="comment">// A utility for saving a camera in a format ASP understands.</span></div>
+<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;<span class="comment">// TODO(oalexan1): Expose the sci cam intrinsics rather than having</span></div>
+<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;<span class="comment">// them hard-coded.</span></div>
+<div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160;<span class="keywordtype">void</span> save_tsai_camera(Eigen::MatrixXd <span class="keyword">const</span>&amp; desired_cam_to_world_trans,</div>
+<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;                      std::string <span class="keyword">const</span>&amp; output_dir,</div>
+<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;                      <span class="keywordtype">double</span> curr_time, std::string <span class="keyword">const</span>&amp; suffix);</div>
+<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160; </div>
+<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;}  <span class="comment">// namespace dense_map</span></div>
+<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160; </div>
+<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;<span class="preprocessor">#endif  // DENSE_MAP_UTILS_H_</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
-<div class="ttc" id="astructdense__map_1_1CameraPoses_html"><div class="ttname"><a href="structdense__map_1_1CameraPoses.html">dense_map::CameraPoses</a></div><div class="ttdef"><b>Definition:</b> dense_map_utils.h:151</div></div>
-<div class="ttc" id="aclassdense__map_1_1StampedPoseStorage_html"><div class="ttname"><a href="classdense__map_1_1StampedPoseStorage.html">dense_map::StampedPoseStorage</a></div><div class="ttdef"><b>Definition:</b> dense_map_utils.h:104</div></div>
+<div class="ttc" id="astructdense__map_1_1CameraPoses_html"><div class="ttname"><a href="structdense__map_1_1CameraPoses.html">dense_map::CameraPoses</a></div><div class="ttdef"><b>Definition:</b> dense_map_utils.h:154</div></div>
+<div class="ttc" id="aclassdense__map_1_1StampedPoseStorage_html"><div class="ttname"><a href="classdense__map_1_1StampedPoseStorage.html">dense_map::StampedPoseStorage</a></div><div class="ttdef"><b>Definition:</b> dense_map_utils.h:116</div></div>
 <!-- HTML footer for doxygen 1.9.0-->
 <!-- start footer part -->
 </body>
