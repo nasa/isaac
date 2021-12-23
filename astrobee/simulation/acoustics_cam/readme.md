@@ -85,7 +85,7 @@ intrinsics on topics:
 
 By default, the camera takes pictures as often as it can (see the
 configuration below), which is rarely, in fact, as it is slow. It
-listens however to the topic 
+listens however to the topic:
 
     /comm/dds/command
 
@@ -97,7 +97,7 @@ processed.
 
 ### Configuration
 
-The behavior of this camera is described in 
+The behavior of this camera is described in:
 
      $ISAAC_WS/src/astrobee/simulation/acoustics_cam/acoustics_cam.json
 

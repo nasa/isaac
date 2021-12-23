@@ -83,8 +83,8 @@ def process_args(args):
         default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160",
         help="The central region to keep after undistorting an image and "
         + "before texturing. For sci_cam the numbers are at 1/4th of the full "
-        + "resolution and will be adjusted for the actual input image dimensions. "
-        + "Use a list in quotes.",
+        + "resolution (resolution of calibration) and will be adjusted for the "
+        + "actual input image dimensions. Use a list in quotes.",
     )
     parser.add_argument(
         "--haz_cam_points_topic",

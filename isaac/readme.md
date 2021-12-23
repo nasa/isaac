@@ -133,12 +133,8 @@ and then the bot can be moved via:
 
     rosrun mobility teleop -move -pos "11.0 -5.0 5.0" -tolerance_pos 0.0001 -att "0 0 0 1"
 
-3. Start the bot with the acoustics camera on.
+3. ISAAC supports a simulated acoustics camera. See:
 
-  source ~/freeflyer_build/native/devel/setup.zsh
-  source ~/projects/isaac/devel/setup.zsh 
-  roslaunch isaac sim.launch world:=iss rviz:=true acoustics_cam:=true \
-    pose:="11.2 -7.72 5.0 0 0 0 0 1"
+  astrobee/simulation/acoustics_cam/readme.md
 
-See isaac/hardware/acoustics_cam/readme.md for more details.
-
+for how to use it with the simulator.

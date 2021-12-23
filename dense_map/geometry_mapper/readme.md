@@ -72,10 +72,42 @@ have different invocations for each case. The reader is advised to
 keep close attention to this, and we will make it clear at every step
 about which of the two paradigms one refers to.
 
-## Additional sensors present only in simulation
+## Sensors present in simulation
 
-A number of robot sensors are present only as part of the simulator.
-This is discussed further down the document.
+The simulator supports the ``nav_cam``, ``sci_cam``, ``haz_cam``,
+which are analogous to the ones on the real robot, and also the
+``heat_cam`` and ``acoustics_cam`` cameras which exist only in
+simulation. All these have been tested with the geometry mapper and
+streaming mapper.
+
+The ``sci_cam`` and ``haz_cam`` cameras are not enabled by default in
+the simulator. To enable them, edit the simulation configuration, in
+
+    $ASTROBEE_SOURCE_PATH/astrobee/config/simulation/simulation.config
+
+and set:
+
+    haz_cam_rate = 1.0;
+    sci_cam_rate = 1.0;
+    sci_cam_continuous_picture_taking = true;
+
+The later will make sure sci cam pictures are taken automatically. If
+custom behavior is desired, see:
+
+    $ISAAC_WS/src/astrobee/behaviors/inspection/readme.md
+
+More information about the simulated nav_cam, haz_cam, and sci_cam is
+at:
+
+    $ASTROBEE_SOURCE_PATH/simulation/readme.md
+
+The heat camera is described in:
+
+    $ISAAC_WS/src/astrobee/simulation/isaac_gazebo/readme.md
+
+The acoustics camera and how to enable it is documented at:
+
+    $ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
 
 ## Compiling the software
 
@@ -195,41 +227,8 @@ Copy the resulting bag off the robot.
 
 ### With simulated data
 
-#### Cameras present in simulation
-
-The astrobee simulator supports a handful of cameras, including
-``nav_cam``, ``sci_cam``, ``haz_cam``, ``heat_cam``,
-``acoustics_cam``, etc. All these have been tested with the gemetry
-mapper and streaming mapper.
-
-The ``sci_cam`` and ``haz_cam`` cameras are not enabled by default in
-the simulator. To enable them, edit the simulation configuration, in
-
-    $ASTROBEE_SOURCE_PATH/astrobee/config/simulation/simulation.config
-
-and set:
-
-    haz_cam_rate = 1.0;
-    sci_cam_rate = 1.0;
-    sci_cam_continuous_picture_taking = true;
-
-The later will make sure sci cam pictures are taken automatically. If
-custom behavior is desired, see:
-
-    $ISAAC_WS/src/astrobee/behaviors/inspection/readme.md
-
-More information about the simulated nav_cam, haz_cam, and sci_cam is
-at:
-
-    $ASTROBEE_SOURCE_PATH/simulation/readme.md
-
-The heat camera is described in:
-
-    $ISAAC_WS/src/astrobee/simulation/gazebo/readme.md
-
-The acoustics camera and how to enable it is documented at:
-
-    $ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
+The astrobee simulator supports a handful of cameras, mentioned
+earlier in the text.
 
 #### Recording simulated data
 
@@ -237,7 +236,7 @@ Start the simulator, such as:
 
     source $ASTROBEE_BUILD_PATH/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
-    roslaunch isaac sim.launch rviz:=true dds:=false \
+    roslaunch isaac sim.launch rviz:=true      \
       pose:="11.0 -7.0 5.0 0 0 0 1" world:=iss
 
 In rviz turn on visualizing the desired cameras cameras from the
@@ -718,9 +717,10 @@ Parameters:
       The default is in the usage above.
     --undistorted_crop_wins: The central region to keep after
       undistorting an image and before texturing. For sci_cam the
-      numbers are at 1/4th of the full resolution and will be adjusted
-      for the actual input image dimensions. Use a list in quotes. The
-      default is "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
+      numbers are at 1/4th of the full resolution (resolution of
+      calibration) and will be adjusted for the actual input image
+      dimensions. Use a list in quotes. The default is
+      "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
     --haz_cam_points_topic: The depth point cloud topic in the bag file.
     --start: How many seconds into the bag to start processing the data.
     --duration: For how many seconds to do the processing.
@@ -978,34 +978,55 @@ This node will load the mesh produced by the geometry mapper from
 If an updated geometry mapper mesh exists, it should be copied to that
 location first.
 
-It will listen to the robot body pose being published at:
-
-    /gnc/ekf
-
 The tool will read the configuration options from:
 
     $ISAAC_WS/src/isaac/config/dense_map/streaming_mapper.config
 
-which specifies the camera image to texture. The image topic must be set,
-which, for ``sci_cam`` is normally
+By default, as specified in that file, it will listen to the robot
+body pose being published at:
+
+    /gnc/ekf
+
+That config file specifies the the camera image to texture, which, by
+default, is ``sci_cam``. Its image topic must be set, which, for
+``sci_cam`` is normally
 
     /hw/cam_sci/compressed
 
-while for other ``haz_cam`` is:
+while for ``haz_cam`` is:
 
    /hw/depth_haz/extended/amplitude_int
 
-and for other cameras, such as ``nav_cam``, etc., it is of form:
+For ``nav_cam`` the image topic is either
+
+   /mgt/img_sampler/nav_cam/image_record
+
+if the images are played from a bag which recorded the images produced
+with the image sampler, or
 
     /hw/cam_nav
 
-For the sci cam, it also expects image exposure data on the topic:
+if no image sampler was used. The rest of the cameras usually follow
+the convention on the line above.
+
+For the sci cam, the streaming mapper also expects image exposure data
+on the topic:
 
     /hw/sci_cam_exif
 
-to do exposure correction, unlesss in simulation mode or
+to do exposure correction, unless in simulation mode or
 ``sci_cam_exposure_correction`` is set to false. This is not needed
 for other cameras.
+
+In order for the streaming mapper to produce texture it should receive
+input information with its needed topics (robot or nav_cam pose and
+the image to texture), either from a bag or from the robot in real
+time. A data bag can be played with the usual command:
+
+    rosbag play data.bag
+
+See the note further down if it is desired to rename the topics
+on which some bag data is published.
 
 The streaming mapper will publish several topics having texture
 information, which for ``sci_cam`` are:
@@ -1016,14 +1037,11 @@ information, which for ``sci_cam`` are:
 
 and an analogous convention is followed for other cameras.
 
-In order for the the streaming mapper to produce texture it should
-receive input information with its needed topics, either from a bag or
-from the robot in real time.
-
 The header.stamp value for each published message will be the same as
 the header.stamp for the corresponding input camera image.
 
-The data produced by the streaming mapper can be recorded with:
+The data produced by the streaming mapper can be recorded (for
+sci_cam, and analogously for other cameras) with:
 
     rosbag record /ism/sci_cam/img /ism/sci_cam/obj /ism/sci_cam/mtl \
        -b 10000
@@ -1037,8 +1055,10 @@ calibration of the IMU sensor in addition to the nav, haz, and sci cam
 sensors, and very accurate knowledge of the pose of these sensors on
 the robot body. If that is not the case, it is suggested to use the
 nav cam pose via the ``nav_cam_pose_topic`` field in
-streaming_mapper.config, for which only accurate calibration of the
-nav, sci, and haz cameras among each other is assumed.
+streaming_mapper.config (set it to ``/loc/ml/features``), for which
+only accurate calibration of the nav, sci, and haz cameras among each
+other is assumed, while the ``ekf_pose_topic`` must be set to an empty
+string.
 
 The input texture can be in color or grayscale, at full or reduced
 resolution, and compressed or not. 
@@ -1048,57 +1068,13 @@ resolution, and compressed or not.
 If no robot body or nav cam pose information is present, for example,
 if the EKF or localization node was not running when the image data was
 acquired, or this data was not recorded or was not reliable, the
-localization node can be started together with the streaming mapper by
-modifying the above `roslaunch` command as follows:
+localization node can be started together with the streaming mapper,
+and this node will provide updated pose information.
 
-    export ASTROBEE_ROBOT=bsharp2
-    roslaunch isaac isaac_astrobee.launch llp:=disabled \
-      nodes:=framestore,localization_node               \
-      streaming_mapper:=true output:=screen     
+Edit ``streaming_mapper.config`` and set ``nav_cam_pose_topic`` to
+``/loc/ml/features`` and let ``ekf_state_topic`` be empty.
 
-and then enabled by running in a separate terminal:
-
-    rosservice call /loc/ml/enable true
-
-Alternatively, the streaming mapper can be started first,
-without localization, as:
-
-    export ASTROBEE_WORLD=iss
-    export ASTROBEE_ROBOT=bsharp2 # the robot name should be checked
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
-    source $ISAAC_WS/devel/setup.bash
-    export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
-    export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
-    roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
-      sim_mode:=false output:=screen
-
-Ensure then that nav_cam_pose_topic is set to /loc/ml/features in
-streaming_mapper.config and that ekf_state_topic is empty. Also
-check the robot name, as earlier.
-
-Then the localization node can be started separately, as:
-    
-    export ASTROBEE_ROBOT=bsharp2
-    roslaunch astrobee astrobee.launch llp:=disabled \
-      nodes:=framestore,localization_node output:=screen
-
-with the same environment, including the robot name, and then can be
-enabled with a rosservice call as earlier.
-
-This node will expect the nav cam pose to be published on topic
-``/hw/cam_nav``. If it is on a different topic, such as
-``/mgt/img_sampler/nav_cam/image_record``, it needs to be redirected
-to this one when playing the bag, such as:
-
-    rosbag play data.bag                                 \
-      /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav \
-      /loc/ml/features:=/tmp/features
-
-Above the /loc/ml/features topic which may exist in the bag is
-redirected to /tmp/features since the currently started localization
-node will create new such features.
- 
-The localization node, if needed, will make use of a registered sparse
+The localization node will make use of a registered sparse
 map with BRISK features, histogram equalization, and a vocabulary
 database to find the nav cam poses. The command for building such a
 BRISK map from a registered SURF map is:
@@ -1126,6 +1102,52 @@ thresholds if the map has too few features. For more details on what
 the localization node expects, see build_map.md, in the section about
 running this node on a local machine.
 
+Ensure the same environment as before is present, including the robot name,
+and run:
+
+    roslaunch isaac isaac_astrobee.launch mlp:=local llp:=disabled \
+      nodes:=framestore,localization_node,localization_manager     \
+      streaming_mapper:=true output:=screen     
+
+and then enable the localization node by running in a separate
+terminal:
+
+    rosservice call /loc/ml/enable true
+
+Alternatively, the streaming mapper can be started first,
+without localization, as:
+
+    export ASTROBEE_WORLD=iss
+    export ASTROBEE_ROBOT=bsharp2 # the robot name should be checked
+    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ISAAC_WS/devel/setup.bash
+    export ISAAC_RESOURCE_DIR=${ISAAC_WS}/src/isaac/resources
+    export ISAAC_CONFIG_DIR=${ISAAC_WS}/src/isaac/config        
+    roslaunch $ISAAC_WS/src/dense_map/geometry_mapper/launch/streaming_mapper.launch \
+      sim_mode:=false output:=screen
+
+Then the localization node can be started separately, with the same
+environment, including the robot name, as:
+    
+    roslaunch astrobee astrobee.launch mlp:=local llp:=disabled  \
+      nodes:=framestore,localization_node,localization_manager   \
+      output:=screen
+
+This node should be enabled with a rosservice call as earlier.
+
+The localization node will expect the nav cam images to be published on
+topic ``/hw/cam_nav``. If it is on a different topic, such as
+``/mgt/img_sampler/nav_cam/image_record``, it needs to be redirected
+to this one when playing the bag, such as:
+
+    rosbag play data.bag                                 \
+      /mgt/img_sampler/nav_cam/image_record:=/hw/cam_nav \
+      /loc/ml/features:=/tmp/features /gnc/ekf:=/tmp/ekf
+
+Above the /loc/ml/features and /gnc/ekf topics which may exist in the
+bag are redirected to temporary topics, since the currently started
+localization node will create new camera pose information.
+
 #### The streaming mapper configuration file
 
 The ``streaming_mapper.config`` file has following fields:
@@ -1140,11 +1162,12 @@ The ``streaming_mapper.config`` file has following fields:
     /loc/ml/features. It is published by the localization node.
   - texture_cam_type: The camera that creates the texture images
     (can be nav_cam, sci_cam, haz_cam, and in simulation also
-    heat_cam, and acoustics_cam). The default is sci_cam. This
+    heat_cam and acoustics_cam). The default is sci_cam. This
     field affects the name of the topics on which the streaming
     mapper publishes its output.
-  - texture_cam_topic: The topic having the texture to overlay.
-    The default value is /hw/cam_sci/compressed. 
+  - texture_cam_topic: The topic having the images (texture) to
+    overlay. The default value is /hw/cam_sci/compressed and see
+    note in the text for other cameras. 
   - dist_between_processed_cams: Once an image is textured and 
     published, how far the camera should move (in meters) before
     it should process another texture (any images arriving
@@ -1154,9 +1177,10 @@ The ``streaming_mapper.config`` file has following fields:
     to adjust for lightning differences, then apply the gamma
     transform back. This value should be set to the maximum observed
     ISO * exposure_time. The default is 5.1. Not used with simulated 
-    data or when sci_cam_exposure_correction if false.
+    data, when sci_cam_exposure_correction if false, or other cameras
+    than sci_cam.
   - sci_cam_exposure_correction: If set to 'true', correct the
-    exposure of sci_cam images.
+    exposure of sci_cam images. Read exposures from /hw/sci_cam_exif.
   - use_single_texture: If set to 'true', use a single texture
     buffer. Sample the images by picking points on each triangle face
     with spacing pixel_size. This can take a couple of minutes to form
@@ -1175,23 +1199,44 @@ simulation.config needs to be edited as described earlier in the
 document to turn on the simulated sci cam, haz cam, or other desired
 camera.
 
-To launch the streaming mapper, one can do the following:
+When working with ISS data, more specifically the JPM module, do:
+
+    export ASTROBEE_WORLD=iss
+    /bin/cp -fv $ISAAC_WS/src/isaac/resources/geometry/iss_sim.ply \
+      $ISAAC_WS/src/isaac/resources/geometry/${ASTROBEE_WORLD}.ply
+
+to use the simulated mesh for this module.
+
+Edit ``streaming_mapper.config`` and set:
+
+    use_single_texture = false;
+
+Otherwise, the exiting simulated mesh has so many triangles that it
+will overwhelm the size of the single buffer which is meant to fit all
+textures.
+
+To launch the streaming mapper, do:
 
     source $ASTROBEE_BUILD_PATH/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
     export ASTROBEE_WORLD=iss
-    roslaunch isaac sim.launch world:=iss rviz:=true \
-      streaming_mapper:=true pose:="11.0 -7.0 5.0 0 0 0 1"   
+    roslaunch isaac sim.launch world:=iss rviz:=true        \
+      streaming_mapper:=true pose:="11.0 -7.0 5.0 0 0 0 1"  \
+      output:=screen 
 
-Then the robot can be moved in order to create images to texture as:
+It is suggested to read the documentation above for working with the
+simulator in the context of the geometry mapper for more details, such
+as how to ensure the desired camera images are seen in rviz.
+
+Then, the robot can be moved in order to create images to texture as:
 
     rosrun mobility teleop -move -pos "11.0 -5.0 5.0" -tolerance_pos 0.0001 \
       -att "0 0 0 1"
 
 With simulated data the pose and intrinsics for each camera are
-received directly from the simulator, on topics that, for example for
+received directly from the simulator, on topics that, for example, for
 sci_cam, are:
 
     /sim/sci_cam/pose
@@ -1200,7 +1245,11 @@ sci_cam, are:
 Hence, the parameters ekf_state_topic, ekf_pose_topic, and
 nav_cam_pose_topic are ignored.
 
-Note that value of `ASTROBEE_ROBOT` is not needed in this case.
+The streaming mapper will publish its results on topics mentioned
+earlier in the text.
+
+Note that value of ``ASTROBEE_ROBOT`` is not needed in this case. Any
+user-set value will be overwritten with the robot name ``sim``.
 
 ## Camera refinement
 
@@ -1509,3 +1558,5 @@ can be run as follows:
         --output_dir out 
 
 This will write out/run.obj and its associated files.
+
+Ensure that the correct robot is specified in ASTROBEE_ROBOT.
