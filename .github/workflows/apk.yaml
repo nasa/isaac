@@ -22,7 +22,7 @@ jobs:
         java -version
         unzip tools_r25.2.3-linux.zip
         tools/bin/sdkmanager --update
-        tools/bin/sdkmanager -y "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
+        yes | tools/bin/sdkmanager "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
     - name: Build apk
       run: |
         cd repo/apks/isaac_gs_ros_bridge
