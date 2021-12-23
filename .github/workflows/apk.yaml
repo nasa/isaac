@@ -5,7 +5,7 @@ name: Compile APK
 on: ['push', 'pull_request']
 
 jobs:
-  install dependencies:
+  install_dependencies:
     runs-on: ubuntu-latest
 
     steps:
