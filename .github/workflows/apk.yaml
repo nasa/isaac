@@ -26,6 +26,9 @@ jobs:
         wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip
         unzip android-ndk-r22b-linux-x86_64.zip
         mv android-ndk-r22b ndk-bundle
+        cd  ~/android-sdk/ndk-bundle/toolchains
+        ln -s aarch64-linux-android-4.9 mips64el-linux-android
+        ln -s arm-linux-androideabi-4.9 mipsel-linux-android
     - name: Build apk
       run: |
         cd repo/apks/isaac_gs_ros_bridge
