@@ -74,9 +74,9 @@ about which of the two paradigms one refers to.
 
 ## Sensors present in simulation
 
-The simulator supports the ``nav_cam``, ``sci_cam``, ``haz_cam``,
-which are analogous to the ones on the real robot, and also the
-``heat_cam`` and ``acoustics_cam`` cameras which exist only in
+The simulator supports the ``nav_cam``, ``sci_cam``, ``haz_cam``
+cameras, which are analogous to the ones on the real robot, and also
+the ``heat_cam`` and ``acoustics_cam`` cameras which exist only in
 simulation. All these have been tested with the geometry mapper and
 streaming mapper.
 
