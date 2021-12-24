@@ -29,11 +29,7 @@ jobs:
         cd  ~/android-sdk/ndk-bundle/toolchains
         ln -s aarch64-linux-android-4.9 mips64el-linux-android
         ln -s arm-linux-androideabi-4.9 mipsel-linux-android
-        mkdir ~/android-sdk/ndk
-        cd ~/android-sdk/ndk
-        ln -s ../ndk-bundle/ 22.1.7171670
-        ls -la ~/android-sdk/ndk-bundle/toolchains
     - name: Build apk
       run: |
         cd repo/apks/isaac_gs_ros_bridge
-        ANDROID_HOME=$HOME/android-sdk ANDROID_NDK_HOME=$HOME/android-sdk/ndk-bundle ./gradlew build --stacktrace --debug
+        ANDROID_HOME=$HOME/android-sdk ANDROID_NDK_HOME=$HOME/android-sdk/ndk-bundle ./gradlew build
