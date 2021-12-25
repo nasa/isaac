@@ -693,7 +693,7 @@ def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
     if not os.path.exists(texrecon_path):
         raise Exception("Cannot find: " + texrecon_path)
 
-    texrecon_dir = os.path.join(args.output_dir, cam_type + "_texture/run")
+    texrecon_dir = os.path.join(args.output_dir, cam_type + "_texture/" + cam_type)
     parent_dir = os.path.dirname(texrecon_dir)
     if os.path.isdir(parent_dir):
         # Wipe the existing directory

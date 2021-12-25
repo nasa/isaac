@@ -182,11 +182,51 @@ DEFINE_double(mesh_weight, 25.0,
               "A larger value will give more weight to the mesh constraint. "
               "Use a bigger number as depth errors are usually small fractions of a meter.");
 
+DEFINE_double(depth_mesh_weight, 25.0,
+              "A larger value will give more weight to the constraint that the depth clouds "
+              "stay close to the mesh.");
+
+DEFINE_bool(affine_haz_cam_depth_to_image, false,
+            "Assume that the haz_cam_depth_to_image_transform is an arbitrary affine transform "
+            "rather than a rotation times a scale.");
+
 DEFINE_bool(verbose, false,
             "Print the residuals and save the images and match files."
             "Stereo Pipeline's viewer can be used for visualizing these.");
 
 namespace dense_map {
+
+  int NUM_AFFINE_PARAMS = 12;
+
+  // Extract a affine transform to an array of length NUM_AFFINE_PARAMS
+  void affine_transform_to_array(Eigen::Affine3d const& aff, double* arr) {
+    Eigen::MatrixXd M = aff.matrix();
+    int count = 0;
+    // The 4th row always has 0, 0, 0, 1
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 4; col++) {
+        arr[count] = M(row, col);
+        count++;
+      }
+    }
+  }
+
+  // Convert an array of length NUM_AFFINE_PARAMS to a affine
+  // transform. Normalize the quaternion to make it into a rotation.
+  void array_to_affine_transform(Eigen::Affine3d& aff, const double* arr) {
+    Eigen::MatrixXd M = Eigen::Matrix<double, 4, 4>::Identity();
+
+    int count = 0;
+    // The 4th row always has 0, 0, 0, 1
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 4; col++) {
+        M(row, col) = arr[count];
+        count++;
+      }
+    }
+
+    aff.matrix() = M;
+  }
 
   // Calculate interpolated world to camera trans
   Eigen::Affine3d calc_world_to_cam_trans(const double* beg_world_to_ref_t,
@@ -231,11 +271,11 @@ namespace dense_map {
     Eigen::Affine3d interp_world_to_ref_aff
       = dense_map::linearInterp(alpha, beg_world_to_ref_aff, end_world_to_ref_aff);
 
-    Eigen::Affine3d interp_world_to_cam_afff = ref_to_cam_aff * interp_world_to_ref_aff;
+    Eigen::Affine3d interp_world_to_cam_aff = ref_to_cam_aff * interp_world_to_ref_aff;
 
-    // std::cout << "final trans\n" << interp_world_to_cam_afff.matrix() << std::endl;
+    // std::cout << "final trans\n" << interp_world_to_cam_aff.matrix() << std::endl;
 
-    return interp_world_to_cam_afff;
+    return interp_world_to_cam_aff;
   }
 
   // TODO(oalexan1): Store separately matches which end up being
@@ -492,7 +532,7 @@ struct BracketedDepthError {
         m_block_sizes[0] != NUM_RIGID_PARAMS  ||
         m_block_sizes[1] != NUM_RIGID_PARAMS  ||
         m_block_sizes[2] != NUM_RIGID_PARAMS  ||
-        m_block_sizes[3] != NUM_RIGID_PARAMS  ||
+        (m_block_sizes[3] != NUM_RIGID_PARAMS  && m_block_sizes[3] != NUM_AFFINE_PARAMS) ||
         m_block_sizes[4] != NUM_SCALAR_PARAMS ||
         m_block_sizes[5] != NUM_XYZ_PARAMS    ||
         m_block_sizes[6] != NUM_SCALAR_PARAMS) {
@@ -513,7 +553,10 @@ struct BracketedDepthError {
 
     // The current transform from the depth point cloud to the camera image
     Eigen::Affine3d depth_to_image;
-    array_to_rigid_transform(depth_to_image, parameters[3]);
+    if (m_block_sizes[3] == NUM_AFFINE_PARAMS)
+      array_to_affine_transform(depth_to_image, parameters[3]);
+    else
+      array_to_rigid_transform(depth_to_image, parameters[3]);
 
     // Apply the scale
     double depth_to_image_scale = parameters[4][0];
@@ -573,6 +616,109 @@ struct BracketedDepthError {
 };  // End class BracketedDepthError
 
 // An error function minimizing the product of a given weight and the
+// error between a mesh point and a transformed measured depth point. The
+// depth point needs to be transformed to world coordinates first. For
+// that one has to do pose interpolation.
+struct BracketedDepthMeshError {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  BracketedDepthMeshError(double weight,
+                          Eigen::Vector3d const& meas_depth_xyz,
+                          Eigen::Vector3d const& mesh_xyz,
+                          double left_ref_stamp, double right_ref_stamp, double cam_stamp,
+                          std::vector<int> const& block_sizes):
+    m_weight(weight),
+    m_meas_depth_xyz(meas_depth_xyz),
+    m_mesh_xyz(mesh_xyz),
+    m_left_ref_stamp(left_ref_stamp),
+    m_right_ref_stamp(right_ref_stamp),
+    m_cam_stamp(cam_stamp),
+    m_block_sizes(block_sizes) {
+    // Sanity check
+    if (m_block_sizes.size() != 6 ||
+        m_block_sizes[0] != NUM_RIGID_PARAMS  ||
+        m_block_sizes[1] != NUM_RIGID_PARAMS  ||
+        m_block_sizes[2] != NUM_RIGID_PARAMS  ||
+        (m_block_sizes[3] != NUM_RIGID_PARAMS  && m_block_sizes[3] != NUM_AFFINE_PARAMS) ||
+        m_block_sizes[4] != NUM_SCALAR_PARAMS ||
+        m_block_sizes[5] != NUM_SCALAR_PARAMS) {
+      LOG(FATAL) << "BracketedDepthMeshError: The block sizes were not set up properly.\n";
+    }
+  }
+
+  // Call to work with ceres::DynamicNumericDiffCostFunction.
+  bool operator()(double const* const* parameters, double* residuals) const {
+    // Current world to camera transform
+    Eigen::Affine3d world_to_cam_trans =
+      calc_world_to_cam_trans(parameters[0],  // beg_world_to_ref_t
+                              parameters[1],  // end_world_to_ref_t
+                              parameters[2],  // ref_to_cam_trans
+                              m_left_ref_stamp, m_right_ref_stamp,
+                              parameters[5][0],  // ref_to_cam_offset
+                              m_cam_stamp);
+
+    // The current transform from the depth point cloud to the camera image
+    Eigen::Affine3d depth_to_image;
+    if (m_block_sizes[3] == NUM_AFFINE_PARAMS)
+      array_to_affine_transform(depth_to_image, parameters[3]);
+    else
+      array_to_rigid_transform(depth_to_image, parameters[3]);
+
+    // Apply the scale
+    double depth_to_image_scale = parameters[4][0];
+    depth_to_image.linear() *= depth_to_image_scale;
+    // std::cout << "--depth to image:\n" << depth_to_image.matrix() << std::endl;
+
+    // std::cout << "--meas pt " << m_meas_depth_xyz.transpose() << std::endl;
+
+    // Convert from depth cloud coordinates to cam coordinates
+    Eigen::Vector3d M = depth_to_image * m_meas_depth_xyz;
+
+    // std::cout << "--image meas pt " << M.transpose() << std::endl;
+
+    // Convert to world coordinates
+    M = world_to_cam_trans.inverse() * M;
+    // std::cout << "--depth in world coords " << M.transpose() << std::endl;
+
+    // Compute the residuals
+    for (size_t it = 0; it < NUM_XYZ_PARAMS; it++) {
+      residuals[it] = m_weight * (m_mesh_xyz[it] - M[it]);
+      // std::cout << "--mesh residual " << residuals[it] << std::endl;
+    }
+
+    return true;
+  }
+
+  // Factory to hide the construction of the CostFunction object from the client code.
+  static ceres::CostFunction* Create(double weight,
+                                     Eigen::Vector3d const& meas_depth_xyz,
+                                     Eigen::Vector3d const& mesh_xyz,
+                                     double left_ref_stamp, double right_ref_stamp,
+                                     double cam_stamp, std::vector<int> const& block_sizes) {
+    ceres::DynamicNumericDiffCostFunction<BracketedDepthMeshError>* cost_function =
+      new ceres::DynamicNumericDiffCostFunction<BracketedDepthMeshError>
+      (new BracketedDepthMeshError(weight, meas_depth_xyz, mesh_xyz,
+                                   left_ref_stamp, right_ref_stamp,
+                                   cam_stamp, block_sizes));
+
+    // The residual size is always the same.
+    cost_function->SetNumResiduals(NUM_XYZ_PARAMS);
+
+    for (size_t i = 0; i < block_sizes.size(); i++)
+      cost_function->AddParameterBlock(block_sizes[i]);
+
+    return cost_function;
+  }
+
+ private:
+  double m_weight;                             // How much weight to give to this constraint
+  Eigen::Vector3d m_meas_depth_xyz;            // Measured depth measurement
+  Eigen::Vector3d m_mesh_xyz;                  // Point on preexisting mesh
+  double m_left_ref_stamp, m_right_ref_stamp;  // left and right ref cam timestamps
+  double m_cam_stamp;                          // Current cam timestamp
+  std::vector<int> m_block_sizes;
+};  // End class BracketedDepthMeshError
+
+// An error function minimizing the product of a given weight and the
 // error between a triangulated point and a measured depth point for
 // the ref camera. The depth point needs to be transformed to world
 // coordinates first.
@@ -584,8 +730,10 @@ struct RefDepthError {
     m_meas_depth_xyz(meas_depth_xyz),
     m_block_sizes(block_sizes) {
     // Sanity check
-    if (m_block_sizes.size() != 4 || m_block_sizes[0] != NUM_RIGID_PARAMS ||
-        m_block_sizes[1] != NUM_RIGID_PARAMS || m_block_sizes[2] != NUM_SCALAR_PARAMS ||
+    if (m_block_sizes.size() != 4 ||
+        m_block_sizes[0] != NUM_RIGID_PARAMS ||
+        (m_block_sizes[1] != NUM_RIGID_PARAMS  && m_block_sizes[1] != NUM_AFFINE_PARAMS) ||
+        m_block_sizes[2] != NUM_SCALAR_PARAMS ||
         m_block_sizes[3] != NUM_XYZ_PARAMS) {
       LOG(FATAL) << "RefDepthError: The block sizes were not set up properly.\n";
     }
@@ -599,7 +747,10 @@ struct RefDepthError {
 
     // The current transform from the depth point cloud to the camera image
     Eigen::Affine3d depth_to_image;
-    array_to_rigid_transform(depth_to_image, parameters[1]);
+    if (m_block_sizes[1] == NUM_AFFINE_PARAMS)
+      array_to_affine_transform(depth_to_image, parameters[1]);
+    else
+      array_to_rigid_transform(depth_to_image, parameters[1]);
 
     // Apply the scale
     double depth_to_image_scale = parameters[2][0];
@@ -669,7 +820,8 @@ struct XYZError {
   // TODO(oalexan1): May want to use the analytical Ceres cost function
   bool operator()(double const* const* parameters, double* residuals) const {
     // Compute the residuals
-    for (int it = 0; it < NUM_XYZ_PARAMS; it++) residuals[it] = m_weight * (parameters[0][it] - m_ref_xyz[it]);
+    for (int it = 0; it < NUM_XYZ_PARAMS; it++)
+      residuals[it] = m_weight * (parameters[0][it] - m_ref_xyz[it]);
 
     return true;
   }
@@ -679,7 +831,8 @@ struct XYZError {
                                      std::vector<int> const& block_sizes,
                                      double weight) {
     ceres::DynamicNumericDiffCostFunction<XYZError>* cost_function =
-      new ceres::DynamicNumericDiffCostFunction<XYZError>(new XYZError(ref_xyz, block_sizes, weight));
+      new ceres::DynamicNumericDiffCostFunction<XYZError>
+      (new XYZError(ref_xyz, block_sizes, weight));
 
     // The residual size is always the same
     cost_function->SetNumResiduals(NUM_XYZ_PARAMS);
@@ -696,8 +849,6 @@ struct XYZError {
   std::vector<int> m_block_sizes;
   double m_weight;
 };  // End class XYZError
-
-enum imgType { NAV_CAM, SCI_CAM, HAZ_CAM };
 
 // Calculate the rmse residual for each residual type.
 void calc_median_residuals(std::vector<double> const& residuals,
@@ -745,8 +896,10 @@ void calc_median_residuals(std::vector<double> const& residuals,
 
     int factor = raw_image_cols / calib_image_cols;
 
-    if ((raw_image_cols != calib_image_cols * factor) || (raw_image_rows != calib_image_rows * factor)) {
-      LOG(FATAL) << "Image width and height are: " << raw_image_cols << ' ' << raw_image_rows << "\n"
+    if ((raw_image_cols != calib_image_cols * factor) ||
+        (raw_image_rows != calib_image_rows * factor)) {
+      LOG(FATAL) << "Image width and height are: " << raw_image_cols << ' ' << raw_image_rows
+                 << "\n"
                  << "Calibrated image width and height are: "
                  << calib_image_cols << ' ' << calib_image_rows << "\n"
                  << "These must be equal up to an integer factor.\n";
@@ -780,6 +933,9 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // The timestamp with an adjustment added to it to be in
     // reference camera time
     double ref_timestamp;
+
+    // The timestamp of the closest cloud for this image
+    double cloud_timestamp;
 
     // Indices to look up the reference cameras bracketing this camera
     // in time. The two indices will have same value if and only if
@@ -896,8 +1052,10 @@ void calc_median_residuals(std::vector<double> const& residuals,
 
   // TODO(oalexan1): Move this to utils.
   // Intersect ray with mesh. Return true on success.
-  bool ray_mesh_intersect(Eigen::Vector2d const& undist_pix, camera::CameraParameters const& cam_params,
-                          Eigen::Affine3d const& world_to_cam, mve::TriangleMesh::Ptr const& mesh,
+  bool ray_mesh_intersect(Eigen::Vector2d const& undist_pix,
+                          camera::CameraParameters const& cam_params,
+                          Eigen::Affine3d const& world_to_cam,
+                          mve::TriangleMesh::Ptr const& mesh,
                           std::shared_ptr<BVHTree> const& bvh_tree,
                           double min_ray_dist, double max_ray_dist,
                           // Output
@@ -1093,18 +1251,27 @@ int main(int argc, char** argv) {
               << ref_to_cam_trans[it].matrix() << std::endl;
   }
 
+  // Set up the variable blocks to optimize for BracketedDepthError
+  int num_depth_params = dense_map::NUM_RIGID_PARAMS;
+  if (FLAGS_affine_haz_cam_depth_to_image) num_depth_params = dense_map::NUM_AFFINE_PARAMS;
+
   // Depth to image transforms and scales
   std::vector<Eigen::Affine3d> depth_to_image_noscale;
   std::vector<double> depth_to_image_scales = {1.0, haz_cam_depth_to_image_scale, 1.0};
   depth_to_image_noscale.push_back(Eigen::Affine3d::Identity());
   depth_to_image_noscale.push_back(haz_cam_depth_to_image_noscale);
   depth_to_image_noscale.push_back(Eigen::Affine3d::Identity());
+
   // Put in arrays, so we can optimize them
-  std::vector<double> depth_to_image_noscale_vec(num_cam_types * dense_map::NUM_RIGID_PARAMS);
-  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
-    dense_map::rigid_transform_to_array
-      (depth_to_image_noscale[cam_type],
-       &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+  std::vector<double> depth_to_image_noscale_vec(num_cam_types * num_depth_params);
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
+    if (FLAGS_affine_haz_cam_depth_to_image)
+      dense_map::affine_transform_to_array(depth_to_image_noscale[cam_type],
+                                           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+    else
+      dense_map::rigid_transform_to_array(depth_to_image_noscale[cam_type],
+                                          &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+  }
 
   // Put the intrinsics in arrays
   std::vector<double> focal_lengths(num_cam_types);
@@ -1295,7 +1462,7 @@ int main(int argc, char** argv) {
       if (!success) continue;
 
       if (depth_topics[cam_type] != "") {
-        double found_time = -1.0;
+        cam.cloud_timestamp = -1.0;  // will change
         cv::Mat cloud;
         // Look up the closest cloud in time (either before or after cam.timestamp)
         // This need not succeed.
@@ -1304,7 +1471,7 @@ int main(int argc, char** argv) {
                                // Outputs
                                cam.depth_cloud,
                                cloud_start_positions[cam_type],  // care here
-                               found_time);
+                               cam.cloud_timestamp);
       }
 
       cams.push_back(cam);
@@ -1557,7 +1724,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  // The transform from every camera to the world
+  // The transform from the world to every camera
   std::vector<Eigen::Affine3d> world_to_cam(cams.size());
   for (size_t it = 0; it < cams.size(); it++) {
     int beg_index = cams[it].beg_ref_index;
@@ -1647,7 +1814,7 @@ int main(int argc, char** argv) {
   bracketed_cam_block_sizes.push_back(num_focal_lengths);
   bracketed_cam_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);
   std::cout << "--make bracketed block sizes individual!" << std::endl;
-  bracketed_cam_block_sizes.push_back(num_distortion_params);  // must be last, will be modified later
+  bracketed_cam_block_sizes.push_back(num_distortion_params);  // will be modified later
 
   // Set up the variable blocks to optimize for RefCamError
   std::vector<int> ref_cam_block_sizes;
@@ -1656,22 +1823,31 @@ int main(int argc, char** argv) {
   ref_cam_block_sizes.push_back(num_focal_lengths);
   ref_cam_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);
   std::cout << "--make ref block sizes individual!" << std::endl;
-  ref_cam_block_sizes.push_back(num_distortion_params);  // must be last, will be modified later
+  ref_cam_block_sizes.push_back(num_distortion_params);  // will be modified later
 
-  // Set up the variable blocks to optimize for BracketedDepthError
+  // Set up variable blocks to optimize for BracketedDepthError
   std::vector<int> bracketed_depth_block_sizes;
   bracketed_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
   bracketed_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
   bracketed_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-  bracketed_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_depth_block_sizes.push_back(num_depth_params);
   bracketed_depth_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
   bracketed_depth_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
   bracketed_depth_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
 
+  // Set up the variable blocks to optimize for BracketedDepthMeshError
+  std::vector<int> bracketed_depth_mesh_block_sizes;
+  bracketed_depth_mesh_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_depth_mesh_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_depth_mesh_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  bracketed_depth_mesh_block_sizes.push_back(num_depth_params);
+  bracketed_depth_mesh_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
+  bracketed_depth_mesh_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
+
   // Set up the variable blocks to optimize for RefDepthError
   std::vector<int> ref_depth_block_sizes;
   ref_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
-  ref_depth_block_sizes.push_back(dense_map::NUM_RIGID_PARAMS);
+  ref_depth_block_sizes.push_back(num_depth_params);
   ref_depth_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
   ref_depth_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
 
@@ -1738,9 +1914,9 @@ int main(int argc, char** argv) {
         ceres::LossFunction* ref_depth_loss_function
           = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-        residual_names.push_back(cam_names[cam_type] + "_depth_x_m");
-        residual_names.push_back(cam_names[cam_type] + "_depth_y_m");
-        residual_names.push_back(cam_names[cam_type] + "_depth_z_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_tri_x_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_tri_y_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_tri_z_m");
         residual_scales.push_back(FLAGS_depth_weight);
         residual_scales.push_back(FLAGS_depth_weight);
         residual_scales.push_back(FLAGS_depth_weight);
@@ -1748,14 +1924,14 @@ int main(int argc, char** argv) {
           (ref_depth_cost_function,
            ref_depth_loss_function,
            &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
-           &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+           &depth_to_image_noscale_vec[num_depth_params * cam_type],
            &depth_to_image_scales[cam_type],
            &xyz_vec[pid][0]);
 
         if (!FLAGS_float_sparse_map)
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
-        if (!FLAGS_float_scale)
+        if (!FLAGS_float_scale || FLAGS_affine_haz_cam_depth_to_image)
           problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
 
       } else {
@@ -1819,9 +1995,9 @@ int main(int argc, char** argv) {
         ceres::LossFunction* bracketed_depth_loss_function
           = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-        residual_names.push_back(cam_names[cam_type] + "_depth_x_m");
-        residual_names.push_back(cam_names[cam_type] + "_depth_y_m");
-        residual_names.push_back(cam_names[cam_type] + "_depth_z_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_tri_x_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_tri_y_m");
+        residual_names.push_back(cam_names[cam_type] + "_depth_tri_z_m");
         residual_scales.push_back(FLAGS_depth_weight);
         residual_scales.push_back(FLAGS_depth_weight);
         residual_scales.push_back(FLAGS_depth_weight);
@@ -1831,18 +2007,20 @@ int main(int argc, char** argv) {
            &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
            &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index],
            &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
-           &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+           &depth_to_image_noscale_vec[num_depth_params * cam_type],
            &depth_to_image_scales[cam_type],
            &xyz_vec[pid][0],
            &ref_to_cam_timestamp_offsets[cam_type]);
 
+        // TODO(oalexan1): This code repeats too much. Need to keep a hash
+        // of sparse map pointers.
         if (!FLAGS_float_sparse_map) {
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
           problem.SetParameterBlockConstant
             (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index]);
         }
-        if (!FLAGS_float_scale)
+        if (!FLAGS_float_scale || FLAGS_affine_haz_cam_depth_to_image)
           problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
         if (!FLAGS_float_timestamp_offsets) {
           problem.SetParameterBlockConstant(&ref_to_cam_timestamp_offsets[cam_type]);
@@ -1879,16 +2057,76 @@ int main(int argc, char** argv) {
         // TODO(oalexan1): Think more of the range of the ray below
         double min_ray_dist = 0.0;
         double max_ray_dist = 10.0;
-        Eigen::Vector3d intersection(0.0, 0.0, 0.0);
+        Eigen::Vector3d mesh_intersect(0.0, 0.0, 0.0);
         have_mesh_intersection
           = dense_map::ray_mesh_intersect(undist_ip, cam_params[cams[cid].camera_type],
                                           world_to_cam[cid], mesh, bvh_tree,
                                           min_ray_dist, max_ray_dist,
                                           // Output
-                                          intersection);
+                                          mesh_intersect);
 
         if (have_mesh_intersection) {
-          mesh_xyz += intersection;
+          Eigen::Vector3d depth_xyz(0, 0, 0);
+          if (dense_map::depthValue(cams[cid].depth_cloud, dist_ip, depth_xyz)) {
+            int cam_type = cams[cid].camera_type;
+            int beg_ref_index = cams[cid].beg_ref_index;
+            int end_ref_index = cams[cid].end_ref_index;
+            if (cam_type != ref_cam_type) {
+              // TODO(oalexan1): Review this
+              // TODO(oalexan1): What to do when cam_type == ref_cam_type?
+              // Ensure that the depth points agree with mesh points
+              ceres::CostFunction* bracketed_depth_mesh_cost_function
+                = dense_map::BracketedDepthMeshError::Create(FLAGS_depth_mesh_weight,
+                                                             depth_xyz,
+                                                             mesh_intersect,
+                                                             ref_timestamps[beg_ref_index],
+                                                             ref_timestamps[end_ref_index],
+                                                             cams[cid].timestamp,
+                                                             bracketed_depth_mesh_block_sizes);
+
+              ceres::LossFunction* bracketed_depth_mesh_loss_function
+                = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
+
+              residual_names.push_back(cam_names[cam_type] + "_depth_mesh_x_m");
+              residual_names.push_back(cam_names[cam_type] + "_depth_mesh_y_m");
+              residual_names.push_back(cam_names[cam_type] + "_depth_mesh_z_m");
+              residual_scales.push_back(FLAGS_depth_mesh_weight);
+              residual_scales.push_back(FLAGS_depth_mesh_weight);
+              residual_scales.push_back(FLAGS_depth_mesh_weight);
+              problem.AddResidualBlock
+                (bracketed_depth_mesh_cost_function,
+                 bracketed_depth_mesh_loss_function,
+                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
+                 &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index],
+                 &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
+                 &depth_to_image_noscale_vec[num_depth_params * cam_type],
+                 &depth_to_image_scales[cam_type],
+                 &ref_to_cam_timestamp_offsets[cam_type]);
+
+              // TODO(oalexan1): This code repeats too much. Need to keep a hash
+              // of sparse map pointers.
+              if (!FLAGS_float_sparse_map) {
+                problem.SetParameterBlockConstant
+                  (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
+                problem.SetParameterBlockConstant
+                  (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index]);
+              }
+              if (!FLAGS_float_scale || FLAGS_affine_haz_cam_depth_to_image)
+                problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
+              if (!FLAGS_float_timestamp_offsets) {
+                problem.SetParameterBlockConstant(&ref_to_cam_timestamp_offsets[cam_type]);
+              } else {
+                problem.SetParameterLowerBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
+                                               lower_bound[cam_type]);
+                problem.SetParameterUpperBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
+                                               upper_bound[cam_type]);
+              }
+            }
+          }
+        }
+
+        if (have_mesh_intersection) {
+          mesh_xyz += mesh_intersect;
           num += 1;
         }
       }
@@ -1907,9 +2145,9 @@ int main(int argc, char** argv) {
         problem.AddResidualBlock(mesh_cost_function, mesh_loss_function,
                                             &xyz_vec[pid][0]);
 
-        residual_names.push_back("mesh_x_m");
-        residual_names.push_back("mesh_y_m");
-        residual_names.push_back("mesh_z_m");
+        residual_names.push_back("mesh_tri_x_m");
+        residual_names.push_back("mesh_tri_y_m");
+        residual_names.push_back("mesh_tri_z_m");
 
         residual_scales.push_back(FLAGS_mesh_weight);
         residual_scales.push_back(FLAGS_mesh_weight);
@@ -1994,14 +2232,9 @@ int main(int argc, char** argv) {
   }
 
   // Copy back the reference transforms
-  std::cout.precision(18);
-  std::cout << "--sparse map before\n" << sparse_map->cid_to_cam_t_global_[0].matrix() << std::endl;
-
   for (int cid = 0; cid < num_ref_cams; cid++)
     dense_map::array_to_rigid_transform(world_to_ref_t[cid],
                                         &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
-
-  std::cout << "--sparse map after\n" << sparse_map->cid_to_cam_t_global_[0].matrix() << std::endl;
 
   // Copy back the optimized intrinsics
   for (int it = 0; it < num_cam_types; it++) {
@@ -2010,8 +2243,8 @@ int main(int argc, char** argv) {
     cam_params[it].SetDistortion(distortions[it]);
   }
 
-  // The nav cam did not get optimized. Go back to the solution with
-  // two focal lengths, rather than the one with one focal length
+  // if the nav cam did not get optimized, go back to the solution
+  // with two focal lengths, rather than the one with one focal length
   // solved by this solver (as the average of the two).  The two focal
   // lengths are very similar, but it is not worth modifying the
   // camera model we don't plan to optimize.
@@ -2025,10 +2258,14 @@ int main(int argc, char** argv) {
        &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
 
   // Copy back the depth to image transforms without scales
-  for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
-    dense_map::array_to_rigid_transform
-      (depth_to_image_noscale[cam_type],
-       &depth_to_image_noscale_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+  for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
+    if (FLAGS_affine_haz_cam_depth_to_image)
+      dense_map::array_to_affine_transform(depth_to_image_noscale[cam_type],
+                                           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+    else
+      dense_map::array_to_rigid_transform(depth_to_image_noscale[cam_type],
+                                          &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+  }
 
   // Update the optimized depth to image (for haz cam only)
   int cam_type = 1;  // haz cam
@@ -2041,7 +2278,8 @@ int main(int argc, char** argv) {
                               ref_to_cam_timestamp_offsets,
                               haz_cam_depth_to_image_transform);
 
-  if (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != "") {
+  if (FLAGS_num_iterations > 0 &&
+      (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != "")) {
     std::cout << "Either the sparse map intrinsics or cameras got modified. "
               << "The map must be rebuilt." << std::endl;
 

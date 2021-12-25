@@ -568,7 +568,8 @@ void replace_param_val(std::string const& param_name, std::string const& param_v
   // First find the parent, if provided
   if (parent != "") {
     beg = robust_find(text, parent, beg);
-    if (beg == std::string::npos) LOG(FATAL) << "Could not find the field '" << parent << " =' in the config file.";
+    if (beg == std::string::npos) LOG(FATAL) << "Could not find the field '"
+                                             << parent << " =' in the config file.";
   }
 
   // Find the param after the parent
@@ -586,7 +587,8 @@ void replace_param_val(std::string const& param_name, std::string const& param_v
 
     beg = text.find(beg_brace, beg);
     if (beg == std::string::npos) {
-      LOG(FATAL) << "Failed to replace value for " << parent << " " << param_name << " in the config file.";
+      LOG(FATAL) << "Failed to replace value for " << parent << " " << param_name
+                 << " in the config file.";
     }
     end = beg + 1;
 
@@ -603,10 +605,10 @@ void replace_param_val(std::string const& param_name, std::string const& param_v
     }
 
   } else {
-    // No braces, then just look for the next comma
-    end = text.find(",", beg);
+    // No braces, then just look for the next comma or newline
+    end = std::min(text.find(",", beg), text.find("\n", beg));
     if (beg == std::string::npos) LOG(FATAL) << "Could not parse correctly " << param_name;
-    end--;  // go before the comma
+    end--;  // go before the found character
   }
 
   text = text.replace(beg, end - beg + 1, param_val);
