@@ -1356,8 +1356,6 @@ void calc_median_residuals(std::vector<double> const& residuals,
 }  // namespace dense_map
 
 int main(int argc, char** argv) {
-  std::cout << "--must filter by not projecting into camera!" << std::endl;
-
   ff_common::InitFreeFlyerApplication(&argc, &argv);
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
