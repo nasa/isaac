@@ -27,8 +27,9 @@
 
 // TODO(oalexan1): Must test the DepthError with no bracketing.
 
-// TODO(oalexan1): Move this to utils
-// Get rid of warning beyond our control
+// TODO(oalexan1): Move these OpenMVG headers to dense_map_utils.cc,
+// and do forward declarations in dense_map_utils.h.  Get rid of
+// warnings beyond our control
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic push
@@ -227,8 +228,8 @@ DEFINE_bool(verbose, false,
 
 namespace dense_map {
 
+  // TODO(oalexan1): Move this to utils
   int NUM_AFFINE_PARAMS = 12;
-
   // Extract a affine transform to an array of length NUM_AFFINE_PARAMS
   void affine_transform_to_array(Eigen::Affine3d const& aff, double* arr) {
     Eigen::MatrixXd M = aff.matrix();
@@ -257,64 +258,6 @@ namespace dense_map {
     }
 
     aff.matrix() = M;
-  }
-
-  // Project and save a mesh as an obj file to out_prefix.obj,
-  // out_prefix.mtl, out_prefix.png.
-  // TODO(oalexan1): Move to utils and call in orthoproject.cc.
-  void mesh_project(mve::TriangleMesh::Ptr const& mesh,
-                    std::shared_ptr<BVHTree> const& bvh_tree,
-                    cv::Mat const& image,
-                    Eigen::Affine3d const& world_to_cam,
-                    camera::CameraParameters const& cam_params,
-                    std::string const& out_prefix) {
-    boost::filesystem::path out_dir = boost::filesystem::path(out_prefix).parent_path();
-    std::cout << "--Parent path is " << out_dir.string() << std::endl;
-
-    if (out_dir.string() != "") {
-      if (!boost::filesystem::exists(out_dir))
-        if (!boost::filesystem::create_directories(out_dir) ||
-            !boost::filesystem::is_directory(out_dir))
-          LOG(FATAL) << "Failed to create directory: " << out_dir;
-    }
-
-    std::cout << "--Must read all this code!" << std::endl;
-
-    std::vector<Eigen::Vector3i> face_vec;
-    std::map<int, Eigen::Vector2d> uv_map;
-    int num_exclude_boundary_pixels = 0;
-
-    std::vector<unsigned int> const& faces = mesh->get_faces();
-    int num_faces = faces.size();
-    std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
-
-    camera::CameraModel cam(world_to_cam, cam_params);
-
-    // Find the UV coordinates and the faces having them
-    dense_map::projectTexture(mesh, bvh_tree, image, cam, num_exclude_boundary_pixels,
-                              smallest_cost_per_face, face_vec, uv_map);
-
-    std::string obj_str;
-    dense_map::formObjCustomUV(mesh, face_vec, uv_map, out_prefix, obj_str);
-
-    std::string mtl_str;
-    dense_map::formMtl(out_prefix, mtl_str);
-
-    std::string obj_file = out_prefix + ".obj";
-    std::cout << "Writing: " << obj_file << std::endl;
-    std::ofstream obj_handle(obj_file);
-    obj_handle << obj_str;
-    obj_handle.close();
-
-    std::string mtl_file = out_prefix + ".mtl";
-    std::cout << "Writing: " << mtl_file << std::endl;
-    std::ofstream mtl_handle(mtl_file);
-    mtl_handle << mtl_str;
-    mtl_handle.close();
-
-    std::string texture_file = out_prefix + ".png";
-    std::cout << "Writing: " << texture_file << std::endl;
-    cv::imwrite(texture_file, image);
   }
 
   // Calculate interpolated world to camera trans
@@ -1019,13 +962,15 @@ void calc_median_residuals(std::vector<double> const& residuals,
     int camera_type;
 
     // The timestamp for this camera (in floating point seconds since epoch)
+    // measured by the clock/cpu which is particular to this camera.
     double timestamp;
 
     // The timestamp with an adjustment added to it to be in
     // reference camera time
     double ref_timestamp;
 
-    // The timestamp of the closest cloud for this image
+    // The timestamp of the closest cloud for this image, measured
+    // with the same clock as the 'timestamp' value.
     double cloud_timestamp;
 
     // Indices to look up the reference cameras bracketing this camera
@@ -1037,11 +982,12 @@ void calc_median_residuals(std::vector<double> const& residuals,
     // The image for this camera, in grayscale
     cv::Mat image;
 
-    // The corresponding depth cloud, for an image + depth camera
+    // The corresponding depth cloud, for an image + depth camera.
+    // Will be empty and uninitialized for a camera lacking depth.
     cv::Mat depth_cloud;
   };
 
-  // Sort by timestamps in the ref camera clock
+  // Sort by timestamps adjusted to be relative to the ref camera clock
   bool timestampLess(cameraImage i, cameraImage j) {
     return (i.ref_timestamp < j.ref_timestamp);
   }
@@ -1077,20 +1023,91 @@ void calc_median_residuals(std::vector<double> const& residuals,
     return true;
   }
 
-  // Form textured meshes for given images
-  void mesh_project_images(std::vector<std::string> const& cam_names,
-                           std::vector<camera::CameraParameters> const& cam_params,
-                           std::vector<dense_map::cameraImage> const& cam_images,
-                           std::vector<Eigen::Affine3d> const& world_to_cam,
-                           mve::TriangleMesh::Ptr const& mesh,
-                           std::shared_ptr<BVHTree> const& bvh_tree,
-                           std::string const& out_dir) {
+  // Project and save a mesh as an obj file to out_prefix.obj,
+  // out_prefix.mtl, out_prefix.png.
+  // TODO(oalexan1): Move to utils and call in orthoproject.cc.
+  void mesh_project(mve::TriangleMesh::Ptr const& mesh,
+                    std::shared_ptr<BVHTree> const& bvh_tree,
+                    cv::Mat const& image,
+                    Eigen::Affine3d const& world_to_cam,
+                    camera::CameraParameters const& cam_params,
+                    std::string const& out_prefix) {
+    // Create the output directory, if needed
+    std::string out_dir = boost::filesystem::path(out_prefix).parent_path().string();
+    if (out_dir != "") dense_map::createDir(out_dir);
+
+    std::vector<Eigen::Vector3i> face_vec;
+    std::map<int, Eigen::Vector2d> uv_map;
+    int num_exclude_boundary_pixels = 0;
+
+    std::vector<unsigned int> const& faces = mesh->get_faces();
+    int num_faces = faces.size();
+    std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
+
+    camera::CameraModel cam(world_to_cam, cam_params);
+
+    // Find the UV coordinates and the faces having them
+    dense_map::projectTexture(mesh, bvh_tree, image, cam, num_exclude_boundary_pixels,
+                              smallest_cost_per_face, face_vec, uv_map);
+
+    // Strip the directory name, according to .obj file conventions.
+    std::string suffix = boost::filesystem::path(out_prefix).filename().string();
+
+    std::string obj_str;
+    dense_map::formObjCustomUV(mesh, face_vec, uv_map, suffix, obj_str);
+
+    std::string mtl_str;
+    dense_map::formMtl(suffix, mtl_str);
+
+    std::string obj_file = out_prefix + ".obj";
+    std::cout << "Writing: " << obj_file << std::endl;
+    std::ofstream obj_handle(obj_file);
+    obj_handle << obj_str;
+    obj_handle.close();
+
+    std::string mtl_file = out_prefix + ".mtl";
+    std::cout << "Writing: " << mtl_file << std::endl;
+    std::ofstream mtl_handle(mtl_file);
+    mtl_handle << mtl_str;
+    mtl_handle.close();
+
+    std::string texture_file = out_prefix + ".png";
+    std::cout << "Writing: " << texture_file << std::endl;
+    cv::imwrite(texture_file, image);
+  }
+
+  // Project given images with optimized cameras onto mesh. It is
+  // assumed that the most up-to-date cameras were copied/interpolated
+  // form the optimizer structures into the world_to_cam vector.
+  void meshProjectCameras(std::vector<std::string> const& cam_names,
+                          std::vector<camera::CameraParameters> const& cam_params,
+                          std::vector<dense_map::cameraImage> const& cam_images,
+                          std::vector<Eigen::Affine3d> const& world_to_cam,
+                          mve::TriangleMesh::Ptr const& mesh,
+                          std::shared_ptr<BVHTree> const& bvh_tree,
+                          std::string const& out_dir) {
     if (cam_names.size() != cam_params.size())
       LOG(FATAL) << "There must be as many camera names as sets of camera parameters.\n";
     if (cam_images.size() != world_to_cam.size())
       LOG(FATAL) << "There must be as many camera images as camera poses.\n";
     if (out_dir.empty())
       LOG(FATAL) << "The output directory is empty.\n";
+
+    char filename_buffer[1000];
+
+    for (size_t cid = 0; cid < cam_images.size(); cid++) {
+      double timestamp = cam_images[cid].timestamp;
+      int cam_type = cam_images[cid].camera_type;
+
+      // Must use the 10.7f format for the timestamp as everywhere else in the code
+      snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s",
+               out_dir.c_str(), timestamp, cam_names[cam_type].c_str());
+      std::string out_prefix = filename_buffer;  // convert to string
+
+      std::cout << "Creating texture for: " << out_prefix << std::endl;
+      mesh_project(mesh, bvh_tree, cam_images[cid].image, world_to_cam[cid], cam_params[cam_type],
+                   out_prefix);
+    }
   }
 
   // Rebuild the map.
@@ -1813,21 +1830,22 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Sort by the timestamp in reference camera time
+  // Sort by the timestamp in reference camera time. This is essential
+  // for matching each image to other images close in time.
   std::sort(cams.begin(), cams.end(), dense_map::timestampLess);
 
   if (FLAGS_verbose) {
-  int count = 10000;
-  std::vector<std::string> image_files;
-  for (size_t it = 0; it < cams.size(); it++) {
-    std::ostringstream oss;
-    oss << count << "_" << cams[it].camera_type << ".jpg";
-    std::string name = oss.str();
-    std::cout << "--writing " << name << std::endl;
-    cv::imwrite(name, cams[it].image);
-    count++;
-    image_files.push_back(name);
-  }
+    int count = 10000;
+    std::vector<std::string> image_files;
+    for (size_t it = 0; it < cams.size(); it++) {
+      std::ostringstream oss;
+      oss << count << "_" << cams[it].camera_type << ".jpg";
+      std::string name = oss.str();
+      std::cout << "Writing: " << name << std::endl;
+      cv::imwrite(name, cams[it].image);
+      count++;
+      image_files.push_back(name);
+    }
   }
 
   std::cout << "Detecting features." << std::endl;
@@ -2735,6 +2753,20 @@ int main(int argc, char** argv) {
 
   std::cout << "Writing: " << FLAGS_output_map << std::endl;
   sparse_map->Save(FLAGS_output_map);
+
+  if (FLAGS_out_texture_dir != "") {
+    if (FLAGS_mesh == "")
+      LOG(FATAL) << "Cannot project camera images onto a mesh if a mesh was not provided.\n";
+
+    // The transform from the world to every camera
+    std::vector<Eigen::Affine3d> world_to_cam;
+    calc_world_to_cam_transforms(  // Inputs
+      cams, world_to_ref_vec, ref_timestamps, ref_to_cam_vec, ref_to_cam_timestamp_offsets,
+      // Output
+      world_to_cam);
+    meshProjectCameras(cam_names, cam_params, cams, world_to_cam, mesh, bvh_tree,
+                       FLAGS_out_texture_dir);
+  }
 
   std::cout << "--must save matches after all filtering!" << std::endl;
 

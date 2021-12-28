@@ -453,8 +453,8 @@ double fileNameToTimestamp(std::string const& file_name) {
 
 // Create a directory unless it exists already
 void createDir(std::string const& dir) {
-  if (!boost::filesystem::create_directories(dir) && !boost::filesystem::exists(dir)) {
-    LOG(FATAL) << "Failed to create directory: " << dir;
+  if (!boost::filesystem::create_directories(dir) && !boost::filesystem::is_directory(dir)) {
+    LOG(FATAL) << "Failed to create directory: " << dir << "\n";
   }
 }
 
