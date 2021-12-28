@@ -205,7 +205,9 @@ DEFINE_double(max_reprojection_error, 15.0, "If filtering outliers, remove inter
               "after the optimization pass finishes unless disabled.");
 
 DEFINE_double(refiner_min_angle, 0.5, "If filtering outliers, remove triangulated points "
-              "for which all rays converging to it make an angle less than this.");
+              "for which all rays converging to it make an angle (in degrees) less than this."
+              "Note that some cameras in the rig may be very close to each other relative to "
+              "the points the rig images, so care is needed here.");
 
 DEFINE_bool(refiner_skip_filtering, false, "Do not do any outlier filtering.");
 
@@ -1353,6 +1355,42 @@ void calc_median_residuals(std::vector<double> const& residuals,
     match_mutex->unlock();
   }
 
+  // Find if a given feature is an inlier, and take care to check that
+  // the bookkeeping is correct.
+  int getMapValue(std::vector<std::map<int, std::map<int, int>>> const& pid_cid_fid,
+                size_t pid, int cid, int fid) {
+    if (pid_cid_fid.size() <= pid)
+      LOG(FATAL) << "Current pid is out of range.\n";
+
+    auto& cid_fid_map = pid_cid_fid[pid];  // alias
+    auto cid_it = cid_fid_map.find(cid);
+    if (cid_it == cid_fid_map.end()) LOG(FATAL) << "Current cid it out of range.\n";
+
+    auto& fid_map = cid_it->second;  // alias
+    auto fid_it = fid_map.find(fid);
+    if (fid_it == fid_map.end()) LOG(FATAL) << "Current fid is out of range.\n";
+
+    return fid_it->second;
+  }
+
+  // Set a feature to be an outlier, and take care to check that
+  // the bookkeeping is correct.
+  void setMapValue(std::vector<std::map<int, std::map<int, int>>> & pid_cid_fid,
+                size_t pid, int cid, int fid, int val) {
+    if (pid_cid_fid.size() <= pid)
+      LOG(FATAL) << "Current pid is out of range.\n";
+
+    auto& cid_fid_map = pid_cid_fid[pid];  // alias
+    auto cid_it = cid_fid_map.find(cid);
+    if (cid_it == cid_fid_map.end()) LOG(FATAL) << "Current cid it out of range.\n";
+
+    auto& fid_map = cid_it->second;  // alias
+    auto fid_it = fid_map.find(fid);
+    if (fid_it == fid_map.end()) LOG(FATAL) << "Current fid is out of range.\n";
+
+    fid_it->second = val;
+  }
+
 }  // namespace dense_map
 
 int main(int argc, char** argv) {
@@ -1378,6 +1416,12 @@ int main(int argc, char** argv) {
 
   if (FLAGS_timestamp_offsets_max_change < 0)
     LOG(FATAL) << "The timestamp offsets must be non-negative.";
+
+  if (FLAGS_refiner_min_angle <= 0.0)
+    LOG(FATAL) << "The min triangulation angle must be positive.\n";
+
+  if (FLAGS_mesh_weight <= 0.0)
+    LOG(FATAL) << "The mesh weight must be positive.\n";
 
   // We assume our camera rig has n camera types. Each can be image or
   // depth + image.  Just one camera must be the reference camera. In
@@ -1416,6 +1460,7 @@ int main(int argc, char** argv) {
     // Outputs
     cam_params, ref_to_cam_trans, ref_to_cam_timestamp_offsets, nav_cam_to_body_trans,
     haz_cam_depth_to_image_transform);
+  std::vector<camera::CameraParameters> orig_cam_params = cam_params;
 
   if (!std::isnan(FLAGS_nav_cam_to_sci_cam_offset_override_value)) {
     for (size_t it = 0; it < cam_names.size(); it++) {
@@ -1427,16 +1472,6 @@ int main(int argc, char** argv) {
       }
     }
   }
-
-  std::vector<camera::CameraParameters> orig_cam_params = cam_params;
-
-  for (size_t it = 0; it < ref_to_cam_timestamp_offsets.size(); it++) {
-    std::cout << "Ref to cam offset for " << cam_names[it] << ' '
-              << ref_to_cam_timestamp_offsets[it] << std::endl;
-  }
-
-  if (FLAGS_mesh_weight <= 0.0)
-    LOG(FATAL) << "The mesh weight must be positive.\n";
 
   mve::TriangleMesh::Ptr mesh;
   std::shared_ptr<mve::MeshInfo> mesh_info;
@@ -2068,37 +2103,26 @@ int main(int argc, char** argv) {
   // inlier becomes an outlier, it never becomes an inlier again.
   std::vector<std::map<int, std::map<int, int>>> pid_cid_fid_inlier;
   pid_cid_fid_inlier.resize(pid_to_cid_fid.size());
-  for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
-    for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
-         cid_fid++) {
-      int cid = cid_fid->first;
-      int fid = cid_fid->second;
-      pid_cid_fid_inlier[pid][cid][fid] = 1;
+  if (!FLAGS_refiner_skip_filtering) {
+    for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+      for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
+           cid_fid++) {
+        int cid = cid_fid->first;
+        int fid = cid_fid->second;
+        pid_cid_fid_inlier[pid][cid][fid] = 1;
+      }
     }
   }
 
   for (int pass = 0; pass < FLAGS_refiner_num_passes; pass++) {
+    std::cout << "\nOptimization pass " << pass + 1 << " / " << FLAGS_refiner_num_passes << std::endl;
+
     // The transform from the world to every camera
     std::vector<Eigen::Affine3d> world_to_cam;
     calc_world_to_cam_transforms(  // Inputs
       cams, world_to_ref_vec, ref_timestamps, ref_to_cam_vec, ref_to_cam_timestamp_offsets,
       // Output
       world_to_cam);
-
-    for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
-      // std::cout << std::endl;
-      // std::cout << "pid is " << pid << std::endl;
-      // std::cout << "---aaa pid size is " << pid_to_cid_fid[pid].size() << std::endl;
-      // std::cout << "zzz2 ";
-      for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
-           cid_fid++) {
-        int cid = cid_fid->first;
-        int fid = cid_fid->second;
-        // std::cout  << cid << ' ' << keypoint_vec[cid][fid].first << ' ';
-        // std::cout << keypoint_vec[cid][fid].second << " ";
-      }
-      // std::cout << std::endl;
-    }
 
     // Do multiview triangulation
     std::vector<Eigen::Vector3d> xyz_vec(pid_to_cid_fid.size());
@@ -2116,6 +2140,11 @@ int main(int argc, char** argv) {
         int cid = cid_fid->first;
         int fid = cid_fid->second;
 
+        // Triangulate inliers only
+        if (!FLAGS_refiner_skip_filtering &&
+            !dense_map::getMapValue(pid_cid_fid_inlier, pid, cid, fid))
+          continue;
+
         Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
         Eigen::Vector2d undist_ip;
         cam_params[cams[cid].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
@@ -2126,18 +2155,24 @@ int main(int argc, char** argv) {
         pix_vec.push_back(undist_ip);
       }
 
+      if (!FLAGS_refiner_skip_filtering && pix_vec.size() < 2) {
+        // If after outlier filtering less than two rays are left, can't triangulate.
+        // Must set all features for this pid to outliers.
+        for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
+             cid_fid++) {
+          int cid = cid_fid->first;
+          int fid = cid_fid->second;
+          dense_map::setMapValue(pid_cid_fid_inlier, pid, cid, fid, 0);
+        }
+
+        // Nothing else to do
+        continue;
+      }
+
       // Triangulate n rays emanating from given undistorted and centered pixels
-       xyz_vec[pid] = dense_map::Triangulate(focal_length_vec, world_to_cam_vec, pix_vec);
-       // std::cout << "--xyz " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
+      xyz_vec[pid] = dense_map::Triangulate(focal_length_vec, world_to_cam_vec, pix_vec);
+      // std::cout << "--xyz " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
     }
-
-    std::cout << "--must do two passes!" << std::endl;
-    std::cout << "--must filter by min triangulation angle and points behind camera" << std::endl;
-
-    // std::vector<std::map<int, int>> cid_fid_to_pid;
-    // sparse_mapping::InitializeCidFidToPid(cams.size(), pid_to_cid_fid, &cid_fid_to_pid);
-
-    std::cout << "---too many outliers!" << std::endl;
 
     std::cout << "must test with the ref cam having depth!" << std::endl;
 
@@ -2146,7 +2181,7 @@ int main(int argc, char** argv) {
     // of residuals (look only at pixel residuals). This structure is populated only for
     // inliers, so its size changes at each pass.
     std::vector<std::map<int, std::map<int, int>>> pid_cid_fid_to_residual;
-    pid_cid_fid_to_residual.resize(pid_to_cid_fid.size());
+    if (!FLAGS_refiner_skip_filtering) pid_cid_fid_to_residual.resize(pid_to_cid_fid.size());
 
     // Form the problem
     ceres::Problem problem;
@@ -2157,6 +2192,11 @@ int main(int argc, char** argv) {
            cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
         int cid = cid_fid->first;
         int fid = cid_fid->second;
+
+        // Deal with inliers only
+        if (!FLAGS_refiner_skip_filtering &&
+            !dense_map::getMapValue(pid_cid_fid_inlier, pid, cid, fid))
+          continue;
 
         int cam_type = cams[cid].camera_type;
         int beg_ref_index = cams[cid].beg_ref_index;
@@ -2172,8 +2212,10 @@ int main(int argc, char** argv) {
           ceres::LossFunction* ref_loss_function
             = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-          // std::cout << "--add block" << std::endl;
-          pid_cid_fid_to_residual[pid][cid][fid] = residual_names.size();
+          // Remember the index of the residuals about to create
+          if (!FLAGS_refiner_skip_filtering)
+            pid_cid_fid_to_residual[pid][cid][fid] = residual_names.size();
+
           residual_names.push_back(cam_names[cam_type] + "_pix_x");
           residual_names.push_back(cam_names[cam_type] + "_pix_y");
           residual_scales.push_back(1.0);
@@ -2206,9 +2248,9 @@ int main(int argc, char** argv) {
           ceres::LossFunction* ref_depth_loss_function
             = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-          residual_names.push_back(cam_names[cam_type] + "_depth_tri_x_m");
-          residual_names.push_back(cam_names[cam_type] + "_depth_tri_y_m");
-          residual_names.push_back(cam_names[cam_type] + "_depth_tri_z_m");
+          residual_names.push_back("depth_tri_x_m");
+          residual_names.push_back("depth_tri_y_m");
+          residual_names.push_back("depth_tri_z_m");
           residual_scales.push_back(FLAGS_depth_weight);
           residual_scales.push_back(FLAGS_depth_weight);
           residual_scales.push_back(FLAGS_depth_weight);
@@ -2238,8 +2280,10 @@ int main(int argc, char** argv) {
           ceres::LossFunction* bracketed_loss_function
             = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-          // std::cout << "--add block" << std::endl;
-          pid_cid_fid_to_residual[pid][cid][fid] = residual_names.size();
+          // Remember the index of the residuals about to create
+          if (!FLAGS_refiner_skip_filtering)
+            pid_cid_fid_to_residual[pid][cid][fid] = residual_names.size();
+
           residual_names.push_back(cam_names[cam_type] + "_pix_x");
           residual_names.push_back(cam_names[cam_type] + "_pix_y");
           residual_scales.push_back(1.0);
@@ -2339,6 +2383,11 @@ int main(int argc, char** argv) {
           int cid = cid_fid->first;
           int fid = cid_fid->second;
 
+          // Deal with inliers only
+          if (!FLAGS_refiner_skip_filtering &&
+              !dense_map::getMapValue(pid_cid_fid_inlier, pid, cid, fid))
+            continue;
+
           Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
           Eigen::Vector2d undist_ip;
           cam_params[cams[cid].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
@@ -2376,9 +2425,9 @@ int main(int argc, char** argv) {
                 ceres::LossFunction* bracketed_depth_mesh_loss_function
                   = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-                residual_names.push_back(cam_names[cam_type] + "_depth_mesh_x_m");
-                residual_names.push_back(cam_names[cam_type] + "_depth_mesh_y_m");
-                residual_names.push_back(cam_names[cam_type] + "_depth_mesh_z_m");
+                residual_names.push_back("depth_mesh_x_m");
+                residual_names.push_back("depth_mesh_y_m");
+                residual_names.push_back("depth_mesh_z_m");
                 residual_scales.push_back(FLAGS_depth_mesh_weight);
                 residual_scales.push_back(FLAGS_depth_mesh_weight);
                 residual_scales.push_back(FLAGS_depth_mesh_weight);
@@ -2449,23 +2498,24 @@ int main(int argc, char** argv) {
     // See which intrinsics from which cam to float or keep fixed
     for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
       if (intrinsics_to_float[cam_type].find("focal_length") == intrinsics_to_float[cam_type].end()) {
-        std::cout << "For " << cam_names[cam_type] << " not floating focal_length." << std::endl;
+        // std::cout << "For " << cam_names[cam_type] << " not floating focal_length." << std::endl;
         problem.SetParameterBlockConstant(&focal_lengths[cam_type]);
       } else {
-        std::cout << "For " << cam_names[cam_type] << " floating focal_length." << std::endl;
+        // std::cout << "For " << cam_names[cam_type] << " floating focal_length." << std::endl;
       }
       if (intrinsics_to_float[cam_type].find("optical_center") ==
           intrinsics_to_float[cam_type].end()) {
-        std::cout << "For " << cam_names[cam_type] << " not floating optical_center." << std::endl;
+        // std::cout << "For " << cam_names[cam_type] << " not floating optical_center." <<
+        // std::endl;
         problem.SetParameterBlockConstant(&optical_centers[cam_type][0]);
       } else {
-        std::cout << "For " << cam_names[cam_type] << " floating optical_center." << std::endl;
+        // std::cout << "For " << cam_names[cam_type] << " floating optical_center." << std::endl;
       }
       if (intrinsics_to_float[cam_type].find("distortion") == intrinsics_to_float[cam_type].end()) {
-        std::cout << "For " << cam_names[cam_type] << " not floating distortion." << std::endl;
+        // std::cout << "For " << cam_names[cam_type] << " not floating distortion." << std::endl;
         problem.SetParameterBlockConstant(&distortions[cam_type][0]);
       } else {
-        std::cout << "For " << cam_names[cam_type] << " floating distortion." << std::endl;
+        // std::cout << "For " << cam_names[cam_type] << " floating distortion." << std::endl;
       }
     }
 
@@ -2485,7 +2535,7 @@ int main(int argc, char** argv) {
     dense_map::calc_median_residuals(residuals, residual_names, "before opt");
     if (FLAGS_verbose) {
       for (size_t it = 0; it < residuals.size(); it++)
-        std::cout << "initial res " << residual_names[it] << " " << residuals[it] << std::endl;
+        std::cout << "Initial res " << residual_names[it] << " " << residuals[it] << std::endl;
     }
 
     // Solve the problem
@@ -2513,7 +2563,115 @@ int main(int argc, char** argv) {
     dense_map::calc_median_residuals(residuals, residual_names, "after opt");
     if (FLAGS_verbose) {
       for (size_t it = 0; it < residuals.size(); it++)
-        std::cout << "final res " << residual_names[it] << " " << residuals[it] << std::endl;
+        std::cout << "Final res " << residual_names[it] << " " << residuals[it] << std::endl;
+    }
+
+    // Flag outliers
+    if (!FLAGS_refiner_skip_filtering) {
+      // Before computing outliers by triangulation angle must recompute all the cameras,
+      // given the optimized parameters
+      calc_world_to_cam_transforms(  // Inputs
+        cams, world_to_ref_vec, ref_timestamps, ref_to_cam_vec, ref_to_cam_timestamp_offsets,
+        // Output
+        world_to_cam);
+
+      // Must deal with outliers by triangulation angle before
+      // removing outliers by reprojection error, as the latter will
+      // exclude some rays which form the given triangulated points.
+      int num_outliers_by_angle = 0, num_total_features = 0;
+      for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+        // Find the largest angle among any two intersecting rays
+        double max_rays_angle = 0.0;
+
+        for (auto cid_fid1 = pid_to_cid_fid[pid].begin();
+             cid_fid1 != pid_to_cid_fid[pid].end(); cid_fid1++) {
+          int cid1 = cid_fid1->first;
+          int fid1 = cid_fid1->second;
+
+          // Deal with inliers only
+          if (!dense_map::getMapValue(pid_cid_fid_inlier, pid, cid1, fid1)) continue;
+
+          num_total_features++;
+
+          Eigen::Vector3d cam_ctr1 = (world_to_cam[cid1].inverse()) * Eigen::Vector3d(0, 0, 0);
+          Eigen::Vector3d ray1 = xyz_vec[pid] - cam_ctr1;
+          ray1.normalize();
+
+          for (auto cid_fid2 = pid_to_cid_fid[pid].begin();
+               cid_fid2 != pid_to_cid_fid[pid].end(); cid_fid2++) {
+            int cid2 = cid_fid2->first;
+            int fid2 = cid_fid2->second;
+
+            // Look at each cid and next cids
+            if (cid2 <= cid1)
+              continue;
+
+            // Deal with inliers only
+            if (!dense_map::getMapValue(pid_cid_fid_inlier, pid, cid2, fid2)) continue;
+
+            Eigen::Vector3d cam_ctr2 = (world_to_cam[cid2].inverse()) * Eigen::Vector3d(0, 0, 0);
+            Eigen::Vector3d ray2 = xyz_vec[pid] - cam_ctr2;
+            ray2.normalize();
+
+            double curr_angle = (180.0 / M_PI) * acos(ray1.dot(ray2));
+
+            if (std::isnan(curr_angle) || std::isinf(curr_angle)) continue;
+
+            max_rays_angle = std::max(max_rays_angle, curr_angle);
+          }
+        }
+
+        if (max_rays_angle >= FLAGS_refiner_min_angle)
+          continue;  // This is a good triangulated point, with large angle of convergence
+
+        // Flag as outliers all the features for this cid
+        for (auto cid_fid = pid_to_cid_fid[pid].begin();
+             cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+          int cid = cid_fid->first;
+          int fid = cid_fid->second;
+
+          // Deal with inliers only
+          if (!dense_map::getMapValue(pid_cid_fid_inlier, pid, cid, fid)) continue;
+
+          num_outliers_by_angle++;
+          dense_map::setMapValue(pid_cid_fid_inlier, pid, cid, fid, 0);
+        }
+      }
+      std::cout << std::setprecision(4) << "Removed " << num_outliers_by_angle
+                << " outlier features with small angle of convergence, out of "
+                << num_total_features << " ("
+                << (100.0 * num_outliers_by_angle) / num_total_features << " %)\n";
+
+      int num_outliers_reproj = 0;
+      num_total_features = 0;  // reusing this variable
+      for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
+        for (auto cid_fid = pid_to_cid_fid[pid].begin();
+             cid_fid != pid_to_cid_fid[pid].end(); cid_fid++) {
+          int cid = cid_fid->first;
+          int fid = cid_fid->second;
+
+          // Deal with inliers only
+          if (!dense_map::getMapValue(pid_cid_fid_inlier, pid, cid, fid)) continue;
+
+          num_total_features++;
+
+          // Find the pixel residuals
+          size_t residual_index = dense_map::getMapValue(pid_cid_fid_to_residual, pid, cid, fid);
+          if (residuals.size() <= residual_index + 1) LOG(FATAL) << "Too few residuals.\n";
+
+          double res_x = residuals[residual_index + 0];
+          double res_y = residuals[residual_index + 1];
+          // NaN values will never be inliers if the comparison is set as below
+          bool is_good = (Eigen::Vector2d(res_x, res_y).norm() <= FLAGS_max_reprojection_error);
+          if (!is_good) {
+            num_outliers_reproj++;
+            dense_map::setMapValue(pid_cid_fid_inlier, pid, cid, fid, 0);
+          }
+        }
+      }
+      std::cout << std::setprecision(4) << "Removed " << num_outliers_reproj
+                << " outlier features using reprojection error, out of " << num_total_features
+                << " features (" << (100.0 * num_outliers_reproj) / num_total_features << " %)\n";
     }
 
     // Copy back the reference transforms
@@ -2528,7 +2686,7 @@ int main(int argc, char** argv) {
       cam_params[it].SetDistortion(distortions[it]);
     }
 
-    // if the nav cam did not get optimized, go back to the solution
+    // If the nav cam did not get optimized, go back to the solution
     // with two focal lengths, rather than the one with one focal length
     // solved by this solver (as the average of the two).  The two focal
     // lengths are very similar, but it is not worth modifying the
@@ -2554,7 +2712,6 @@ int main(int argc, char** argv) {
           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
     }
   }
-  std::cout << "---pass must finish here!" << std::endl;
 
   // Update the optimized depth to image (for haz cam only)
   int cam_type = 1;  // haz cam
@@ -2578,6 +2735,8 @@ int main(int argc, char** argv) {
 
   std::cout << "Writing: " << FLAGS_output_map << std::endl;
   sparse_map->Save(FLAGS_output_map);
+
+  std::cout << "--must save matches after all filtering!" << std::endl;
 
   return 0;
 } // NOLINT
