@@ -176,7 +176,7 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
 
   // Set the config path to ISAAC
   char* path;
-  if ((path = getenv("ISAAC_CONFIG_DIR")) == NULL) ROS_FATAL("Could not find the config path.");
+  if ((path = getenv("CUSTOM_CONFIG_DIR")) == NULL) ROS_FATAL("Could not find the config path.");
   config_params.SetPath(path);
 
   config_params.AddFile("dense_map/streaming_mapper.config");
