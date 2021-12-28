@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 
   // Accepted commands
   std::vector<std::string> cmd_names, cmd_vals;
-  cmd_names.push_back("takeSinglePicture");               cmd_vals.push_back("");
+  cmd_names.push_back("takePicture");                     cmd_vals.push_back("");
   cmd_names.push_back("turnOnContinuousPictureTaking");   cmd_vals.push_back("");
   cmd_names.push_back("turnOffContinuousPictureTaking");  cmd_vals.push_back("");
   cmd_names.push_back("turnOnSavingPicturesToDisk");      cmd_vals.push_back("");
