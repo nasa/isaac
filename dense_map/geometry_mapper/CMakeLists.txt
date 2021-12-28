@@ -207,6 +207,10 @@ add_executable(orthoproject tools/orthoproject.cc)
 target_link_libraries(orthoproject
     geometry_mapper_lib gflags glog)
 
+add_executable(old_orthoproject tools/old_orthoproject.cc)
+target_link_libraries(old_orthoproject
+    geometry_mapper_lib gflags glog)
+
 add_executable(streaming_mapper tools/streaming_mapper.cc)
 target_link_libraries(streaming_mapper
     geometry_mapper_lib gflags glog)
