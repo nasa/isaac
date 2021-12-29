@@ -3,3 +3,4 @@ python-catkin-tools
 ros-kinetic-eigen-conversions
 ros-kinetic-pcl-ros
 libmnl-dev
+libproj-dev
