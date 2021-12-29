@@ -1574,11 +1574,13 @@ int main(int argc, char** argv) {
   std::vector<double> depth_to_image_noscale_vec(num_cam_types * num_depth_params);
   for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
     if (FLAGS_affine_depth_to_image)
-      dense_map::affine_transform_to_array(depth_to_image_noscale[cam_type],
-                                           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+      dense_map::affine_transform_to_array
+        (depth_to_image_noscale[cam_type],
+         &depth_to_image_noscale_vec[num_depth_params * cam_type]);
     else
-      dense_map::rigid_transform_to_array(depth_to_image_noscale[cam_type],
-                                          &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+      dense_map::rigid_transform_to_array
+        (depth_to_image_noscale[cam_type],
+         &depth_to_image_noscale_vec[num_depth_params * cam_type]);
   }
 
   // Put the intrinsics in arrays
@@ -1885,7 +1887,6 @@ int main(int argc, char** argv) {
     for (size_t pair_it = 0; pair_it < image_pairs.size(); pair_it++) {
       auto pair = image_pairs[pair_it];
       int left_image_it = pair.first, right_image_it = pair.second;
-      bool verbose = true;
       if (FLAGS_refiner_skip_filtering) {
         thread_pool2.AddTask(&dense_map::matchFeatures,
                              &match_mutex,
@@ -1894,7 +1895,7 @@ int main(int argc, char** argv) {
                              cid_to_descriptor_map[right_image_it],
                              cid_to_keypoint_map[left_image_it],
                              cid_to_keypoint_map[right_image_it],
-                             verbose, &matches[pair]);
+                             FLAGS_verbose, &matches[pair]);
       } else {
         thread_pool2.AddTask(&dense_map::matchFeaturesWithCams,
                              &match_mutex,
@@ -1908,11 +1909,12 @@ int main(int argc, char** argv) {
                              cid_to_descriptor_map[right_image_it],
                              cid_to_keypoint_map[left_image_it],
                              cid_to_keypoint_map[right_image_it],
-                             verbose, &matches[pair]);
+                             FLAGS_verbose, &matches[pair]);
       }
     }
     thread_pool2.Join();
   }
+  cid_to_descriptor_map = std::vector<cv::Mat>();  // Wipe, takes memory
 
   // If feature A in image I matches feather B in image J, which matches feature C in image K,
   // then (A, B, C) belong together into a track. Build such a track.
@@ -1937,9 +1939,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::cout << "--why so many more matches than pid?" << std::endl;
   std::cout << "--test adding missing pairs!" << std::endl;
-  std::cout << "--must do two passes!" << std::endl;
 
   // Give all interest points in a given image a unique id
   // And put them in a vector with the id corresponding to the interest point
@@ -2021,7 +2021,6 @@ int main(int argc, char** argv) {
   // not needed anymore and take up a lot of RAM
   matches.clear(); matches = dense_map::MATCH_MAP();
   keypoint_map.clear(); keypoint_map.shrink_to_fit();
-  cid_to_descriptor_map.clear(); cid_to_descriptor_map.shrink_to_fit();
   cid_to_keypoint_map.clear(); cid_to_keypoint_map.shrink_to_fit();
 
   std::vector<std::map<int, int> > pid_to_cid_fid;
@@ -2037,6 +2036,7 @@ int main(int argc, char** argv) {
     openMVG::tracks::STLMAPTracks map_tracks;
     trackBuilder.ExportToSTL(map_tracks);
     match_map = openMVG::matching::PairWiseMatches();  // wipe this, no longer needed
+    trackBuilder = openMVG::tracks::TracksBuilder();   // wipe it
 
     // TODO(oalexan1): Print how many pairwise matches were there before
     // and after filtering tracks.
@@ -2057,8 +2057,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  std::cout << "--start selecting!" << std::endl;
-
   // Set up the variable blocks to optimize for BracketedCamError
   std::vector<int> bracketed_cam_block_sizes;
   int num_focal_lengths = 1;
@@ -2070,7 +2068,6 @@ int main(int argc, char** argv) {
   bracketed_cam_block_sizes.push_back(dense_map::NUM_SCALAR_PARAMS);
   bracketed_cam_block_sizes.push_back(num_focal_lengths);
   bracketed_cam_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);
-  std::cout << "--make bracketed block sizes individual!" << std::endl;
   bracketed_cam_block_sizes.push_back(num_distortion_params);  // will be modified later
 
   // Set up the variable blocks to optimize for RefCamError
@@ -2079,7 +2076,6 @@ int main(int argc, char** argv) {
   ref_cam_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
   ref_cam_block_sizes.push_back(num_focal_lengths);
   ref_cam_block_sizes.push_back(dense_map::NUM_OPT_CTR_PARAMS);
-  std::cout << "--make ref block sizes individual!" << std::endl;
   ref_cam_block_sizes.push_back(num_distortion_params);  // will be modified later
 
   // Set up variable blocks to optimize for BracketedDepthError
@@ -2112,16 +2108,13 @@ int main(int argc, char** argv) {
   std::vector<int> mesh_block_sizes;
   mesh_block_sizes.push_back(dense_map::NUM_XYZ_PARAMS);
 
-  std::cout << "---Must start passes here" << std::endl;
-  std::cout << "--After each pass must update all structures!" << std::endl;
-
   // For a given fid = pid_to_cid_fid[pid][cid], the value
   // pid_cid_fid_inlier[pid][cid][fid] will be non-zero only if this
   // pixel is an inlier. Originally all pixels are inliers. Once an
   // inlier becomes an outlier, it never becomes an inlier again.
   std::vector<std::map<int, std::map<int, int>>> pid_cid_fid_inlier;
-  pid_cid_fid_inlier.resize(pid_to_cid_fid.size());
   if (!FLAGS_refiner_skip_filtering) {
+    pid_cid_fid_inlier.resize(pid_to_cid_fid.size());
     for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
       for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
            cid_fid++) {
@@ -2133,9 +2126,10 @@ int main(int argc, char** argv) {
   }
 
   for (int pass = 0; pass < FLAGS_refiner_num_passes; pass++) {
-    std::cout << "\nOptimization pass " << pass + 1 << " / " << FLAGS_refiner_num_passes << std::endl;
+    std::cout << "\nOptimization pass " << pass + 1 << " / " << FLAGS_refiner_num_passes << "\n";
 
-    // The transform from the world to every camera
+    // The transforms from the world to all cameras must be updated
+    // given the current state of optimization
     std::vector<Eigen::Affine3d> world_to_cam;
     calc_world_to_cam_transforms(  // Inputs
       cams, world_to_ref_vec, ref_timestamps, ref_to_cam_vec, ref_to_cam_timestamp_offsets,
@@ -2350,9 +2344,9 @@ int main(int argc, char** argv) {
           ceres::LossFunction* bracketed_depth_loss_function
             = dense_map::GetLossFunction("cauchy", FLAGS_robust_threshold);
 
-          residual_names.push_back(cam_names[cam_type] + "_depth_tri_x_m");
-          residual_names.push_back(cam_names[cam_type] + "_depth_tri_y_m");
-          residual_names.push_back(cam_names[cam_type] + "_depth_tri_z_m");
+          residual_names.push_back("depth_tri_x_m");
+          residual_names.push_back("depth_tri_y_m");
+          residual_names.push_back("depth_tri_z_m");
           residual_scales.push_back(FLAGS_depth_weight);
           residual_scales.push_back(FLAGS_depth_weight);
           residual_scales.push_back(FLAGS_depth_weight);
@@ -2394,7 +2388,7 @@ int main(int argc, char** argv) {
 
       for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
         Eigen::Vector3d mesh_xyz(0, 0, 0);
-        int num = 0;
+        int num_intersections = 0;  // Number of mesh intersections given the rays for this pid
 
         for (auto cid_fid = pid_to_cid_fid[pid].begin(); cid_fid != pid_to_cid_fid[pid].end();
              cid_fid++) {
@@ -2422,6 +2416,13 @@ int main(int argc, char** argv) {
                                             mesh_intersect);
 
           if (have_mesh_intersection) {
+            mesh_xyz += mesh_intersect;
+            num_intersections += 1;
+          }
+
+          if (have_mesh_intersection) {
+            // Try to make each mesh intersection agree with corresponding depth measurement,
+            // if it exists
             Eigen::Vector3d depth_xyz(0, 0, 0);
             if (dense_map::depthValue(cams[cid].depth_cloud, dist_ip, depth_xyz)) {
               int cam_type = cams[cid].camera_type;
@@ -2480,17 +2481,13 @@ int main(int argc, char** argv) {
               }
             }
           }
-
-          if (have_mesh_intersection) {
-            mesh_xyz += mesh_intersect;
-            num += 1;
-          }
         }
 
-        if (num >= 1) {
-          mesh_xyz /= num;
+        if (num_intersections >= 1) {
+          // Average the intersections of all rays with the mesh, and try to make
+          // the triangulated point agree with the mesh intersecion
 
-          // std::cout << "--num and mesh xyz is " << num << ' ' << mesh_xyz.transpose() << std::endl;
+          mesh_xyz /= num_intersections;
 
           ceres::CostFunction* mesh_cost_function =
             dense_map::XYZError::Create(mesh_xyz, mesh_block_sizes, FLAGS_mesh_weight);
@@ -2510,12 +2507,12 @@ int main(int argc, char** argv) {
           residual_scales.push_back(FLAGS_mesh_weight);
         }
       }
-      // std::cout << "--xyz1 " << pid << ' ' << xyz_vec[pid].transpose() << std::endl;
     }
 
     // See which intrinsics from which cam to float or keep fixed
     for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
-      if (intrinsics_to_float[cam_type].find("focal_length") == intrinsics_to_float[cam_type].end()) {
+      if (intrinsics_to_float[cam_type].find("focal_length") ==
+          intrinsics_to_float[cam_type].end()) {
         // std::cout << "For " << cam_names[cam_type] << " not floating focal_length." << std::endl;
         problem.SetParameterBlockConstant(&focal_lengths[cam_type]);
       } else {
@@ -2537,7 +2534,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Evaluate the residual before optimization
+    // Evaluate the residuals before optimization
     double total_cost = 0.0;
     std::vector<double> residuals;
     ceres::Problem::EvaluateOptions eval_options;
@@ -2568,7 +2565,48 @@ int main(int argc, char** argv) {
     options.parameter_tolerance = FLAGS_parameter_tolerance;
     ceres::Solve(options, &problem, &summary);
 
-    // Evaluate the residual after optimization
+    // The optimization is done. Right away copy the optimized states to where they belong to
+    // keep all data in sync.
+
+    // Copy back the reference transforms
+    for (int cid = 0; cid < num_ref_cams; cid++)
+      dense_map::array_to_rigid_transform(world_to_ref_t[cid],
+                                          &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
+
+    // Copy back the optimized intrinsics
+    for (int it = 0; it < num_cam_types; it++) {
+      cam_params[it].SetFocalLength(Eigen::Vector2d(focal_lengths[it], focal_lengths[it]));
+      cam_params[it].SetOpticalOffset(optical_centers[it]);
+      cam_params[it].SetDistortion(distortions[it]);
+    }
+
+    // If the nav cam did not get optimized, go back to the solution
+    // with two focal lengths, rather than the one with one focal length
+    // solved by this solver (as the average of the two).  The two focal
+    // lengths are very similar, but it is not worth modifying the
+    // camera model we don't plan to optimize.
+    if (FLAGS_nav_cam_intrinsics_to_float == "" || FLAGS_num_iterations == 0)
+      cam_params[ref_cam_type] = orig_cam_params[ref_cam_type];
+
+    // Copy back the optimized extrinsics
+    for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
+      dense_map::array_to_rigid_transform
+        (ref_to_cam_trans[cam_type],
+         &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+
+    // Copy back the depth to image transforms without scales
+    for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
+      if (FLAGS_affine_depth_to_image)
+        dense_map::array_to_affine_transform
+          (depth_to_image_noscale[cam_type],
+           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+      else
+        dense_map::array_to_rigid_transform(
+          depth_to_image_noscale[cam_type],
+          &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+    }
+
+    // Evaluate the residuals after optimization
     eval_options.num_threads = 1;
     eval_options.apply_loss_function = false;  // want raw residuals
     problem.Evaluate(eval_options, &total_cost, &residuals, NULL, NULL);
@@ -2689,45 +2727,7 @@ int main(int argc, char** argv) {
       }
       std::cout << std::setprecision(4) << "Removed " << num_outliers_reproj
                 << " outlier features using reprojection error, out of " << num_total_features
-                << " features (" << (100.0 * num_outliers_reproj) / num_total_features << " %)\n";
-    }
-
-    // Copy back the reference transforms
-    for (int cid = 0; cid < num_ref_cams; cid++)
-      dense_map::array_to_rigid_transform(world_to_ref_t[cid],
-                                          &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * cid]);
-
-    // Copy back the optimized intrinsics
-    for (int it = 0; it < num_cam_types; it++) {
-      cam_params[it].SetFocalLength(Eigen::Vector2d(focal_lengths[it], focal_lengths[it]));
-      cam_params[it].SetOpticalOffset(optical_centers[it]);
-      cam_params[it].SetDistortion(distortions[it]);
-    }
-
-    // If the nav cam did not get optimized, go back to the solution
-    // with two focal lengths, rather than the one with one focal length
-    // solved by this solver (as the average of the two).  The two focal
-    // lengths are very similar, but it is not worth modifying the
-    // camera model we don't plan to optimize.
-    if (FLAGS_nav_cam_intrinsics_to_float == "" || FLAGS_num_iterations == 0)
-      cam_params[ref_cam_type] = orig_cam_params[ref_cam_type];
-
-    // Copy back the optimized extrinsics
-    for (int cam_type = 0; cam_type < num_cam_types; cam_type++)
-      dense_map::array_to_rigid_transform
-        (ref_to_cam_trans[cam_type],
-         &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
-
-    // Copy back the depth to image transforms without scales
-    for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
-      if (FLAGS_affine_depth_to_image)
-        dense_map::array_to_affine_transform
-          (depth_to_image_noscale[cam_type],
-           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
-      else
-        dense_map::array_to_rigid_transform(
-          depth_to_image_noscale[cam_type],
-          &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+                << " (" << (100.0 * num_outliers_reproj) / num_total_features << " %)\n";
     }
   }
 
