@@ -849,11 +849,6 @@ void formMtl(std::string const& out_prefix, std::string& mtl_str) {
   ofs << "Ns 0.000000\n";
   ofs << "map_Kd " << out_prefix << ".png\n";
   mtl_str = ofs.str();
-
-  std::string mtl_file = out_prefix + ".mtl";
-  std::ofstream ofs2(mtl_file.c_str());
-  ofs2 << mtl_str;
-  ofs2.close();
 }
 
 void formObjCustomUV(mve::TriangleMesh::ConstPtr mesh, std::vector<Eigen::Vector3i> const& face_vec,
@@ -1370,4 +1365,57 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
   // std::cout << "Projecting took: " << timer.get_elapsed()/1000.0 << "
   // seconds\n";
 }
+
+// Project and save a mesh as an obj file to out_prefix.obj,
+// out_prefix.mtl, out_prefix.png.
+void meshProject(mve::TriangleMesh::Ptr const& mesh,
+                 std::shared_ptr<BVHTree> const& bvh_tree,
+                 cv::Mat const& image,
+                 Eigen::Affine3d const& world_to_cam,
+                 camera::CameraParameters const& cam_params,
+                 std::string const& out_prefix) {
+  // Create the output directory, if needed
+  std::string out_dir = boost::filesystem::path(out_prefix).parent_path().string();
+  if (out_dir != "") dense_map::createDir(out_dir);
+
+  std::vector<Eigen::Vector3i> face_vec;
+  std::map<int, Eigen::Vector2d> uv_map;
+  int num_exclude_boundary_pixels = 0;
+
+  std::vector<unsigned int> const& faces = mesh->get_faces();
+  int num_faces = faces.size();
+  std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
+
+  camera::CameraModel cam(world_to_cam, cam_params);
+
+  // Find the UV coordinates and the faces having them
+  dense_map::projectTexture(mesh, bvh_tree, image, cam, num_exclude_boundary_pixels,
+                            smallest_cost_per_face, face_vec, uv_map);
+
+  // Strip the directory name, according to .obj file conventions.
+  std::string suffix = boost::filesystem::path(out_prefix).filename().string();
+
+  std::string obj_str;
+  dense_map::formObjCustomUV(mesh, face_vec, uv_map, suffix, obj_str);
+
+  std::string mtl_str;
+  dense_map::formMtl(suffix, mtl_str);
+
+  std::string obj_file = out_prefix + ".obj";
+  std::cout << "Writing: " << obj_file << std::endl;
+  std::ofstream obj_handle(obj_file);
+  obj_handle << obj_str;
+  obj_handle.close();
+
+  std::string mtl_file = out_prefix + ".mtl";
+  std::cout << "Writing: " << mtl_file << std::endl;
+  std::ofstream mtl_handle(mtl_file);
+  mtl_handle << mtl_str;
+  mtl_handle.close();
+
+  std::string texture_file = out_prefix + ".png";
+  std::cout << "Writing: " << texture_file << std::endl;
+  cv::imwrite(texture_file, image);
+}
+
 }  // namespace dense_map

@@ -46,20 +46,24 @@ DEFINE_string(camera_to_world, "",
 
 DEFINE_string(camera_name, "", "The the camera name. For example: 'sci_cam'.");
 
-DEFINE_string(output_dir, "", "The output texture directory. The texture name will be "
-              "<output_dir>/run.obj.");
+DEFINE_string(image_list, "", "The list of images to orthoproject, one per line, "
+              "unless specified individually as above.");
+
+DEFINE_string(camera_list, "", "The list of cameras to world transforms use, one per line, "
+              "unless specified individually as above.");
+
+DEFINE_string(output_prefix, "", "The output prefix. The texture name will be"
+              " <output_prefix>-<image base name without extension>.obj.");
 
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
 
-  if (FLAGS_mesh.empty() || FLAGS_image.empty() || FLAGS_camera_to_world.empty() ||
-      FLAGS_camera_name.empty() || FLAGS_output_dir.empty())
-    LOG(FATAL) << "Not all inputs were specified.";
+  if ((FLAGS_image.empty() || FLAGS_camera_to_world.empty()) &&
+      (FLAGS_image_list.empty() || FLAGS_camera_list.empty()))
+    LOG(FATAL) << "Must specify either an image and camera, or an image list and camera list.";
 
-  if (!boost::filesystem::exists(FLAGS_output_dir))
-    if (!boost::filesystem::create_directories(FLAGS_output_dir) ||
-        !boost::filesystem::is_directory(FLAGS_output_dir))
-      LOG(FATAL) << "Failed to create directory: " << FLAGS_output_dir;
+  if (FLAGS_mesh.empty() || FLAGS_camera_name.empty() || FLAGS_output_prefix.empty())
+    LOG(FATAL) << "Not all inputs were specified.";
 
   // Load the mesh
   mve::TriangleMesh::Ptr mesh;
@@ -68,9 +72,6 @@ int main(int argc, char** argv) {
   std::shared_ptr<BVHTree> bvh_tree;
   dense_map::loadMeshBuildTree(FLAGS_mesh, mesh, mesh_info, graph, bvh_tree);
 
-  std::cout << "Reading image: " << FLAGS_image << std::endl;
-  cv::Mat image = cv::imread(FLAGS_image);
-
   // Load the camera intrinsics
   config_reader::ConfigReader config;
   config.AddFile("cameras.config");
@@ -78,47 +79,36 @@ int main(int argc, char** argv) {
   std::cout << "Using camera: " << FLAGS_camera_name << std::endl;
   camera::CameraParameters cam_params(&config, FLAGS_camera_name.c_str());
 
-  std::cout << "Reading pose: " << FLAGS_camera_to_world << std::endl;
-  Eigen::Affine3d cam_to_world;
-  dense_map::readAffine(cam_to_world, FLAGS_camera_to_world);
-  std::cout << "Read pose\n" << cam_to_world.matrix() << std::endl;
+  std::vector<std::string> images, cameras;
+  if (!FLAGS_image.empty() && !FLAGS_camera_to_world.empty()) {
+    images.push_back(FLAGS_image);
+    cameras.push_back(FLAGS_camera_to_world);
+  } else {
+    std::string val;
+    std::ifstream ifs(FLAGS_image_list);
+    while (ifs >> val)
+      images.push_back(val);
+    ifs.close();
+    ifs = std::ifstream(FLAGS_camera_list);
+    while (ifs >> val)
+      cameras.push_back(val);
+    ifs.close();
+  }
 
-  std::vector<Eigen::Vector3i> face_vec;
-  std::map<int, Eigen::Vector2d> uv_map;
-  int num_exclude_boundary_pixels = 0;
+  if (images.size() != cameras.size())
+    LOG(FATAL) << "As many images as cameras must be specified.\n";
 
-  std::vector<unsigned int> const& faces = mesh->get_faces();
-  int num_faces = faces.size();
-  std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
+  for (size_t it = 0; it < images.size(); it++) {
+    cv::Mat image = cv::imread(images[it]);
 
-  camera::CameraModel cam(cam_to_world.inverse(), cam_params);
+    Eigen::Affine3d cam_to_world;
+    dense_map::readAffine(cam_to_world, cameras[it]);
 
-  // Find the UV coordinates and the faces having them
-  std::string out_prefix = "run";
-  dense_map::projectTexture(mesh, bvh_tree, image, cam, num_exclude_boundary_pixels,
-                            smallest_cost_per_face, face_vec, uv_map);
+    std::string prefix = FLAGS_output_prefix + "-" +
+      boost::filesystem::path(images[it]).stem().string();
 
-  std::string obj_str;
-  dense_map::formObjCustomUV(mesh, face_vec, uv_map, out_prefix, obj_str);
-
-  std::string mtl_str;
-  dense_map::formMtl(out_prefix, mtl_str);
-
-  std::string obj_file = FLAGS_output_dir + "/" + out_prefix + ".obj";
-  std::cout << "Writing: " << obj_file << std::endl;
-  std::ofstream obj_handle(obj_file);
-  obj_handle << obj_str;
-  obj_handle.close();
-
-  std::string mtl_file = FLAGS_output_dir + "/" + out_prefix + ".mtl";
-  std::cout << "Writing: " << mtl_file << std::endl;
-  std::ofstream mtl_handle(mtl_file);
-  mtl_handle << mtl_str;
-  mtl_handle.close();
-
-  std::string texture_file = FLAGS_output_dir + "/" + out_prefix + ".png";
-  std::cout << "Writing: " << texture_file << std::endl;
-  cv::imwrite(texture_file, image);
+    dense_map::meshProject(mesh, bvh_tree, image, cam_to_world.inverse(), cam_params, prefix);
+  }
 
   return 0;
 }

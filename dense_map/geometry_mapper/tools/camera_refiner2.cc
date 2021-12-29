@@ -1023,59 +1023,6 @@ void calc_median_residuals(std::vector<double> const& residuals,
     return true;
   }
 
-  // Project and save a mesh as an obj file to out_prefix.obj,
-  // out_prefix.mtl, out_prefix.png.
-  // TODO(oalexan1): Move to utils and call in orthoproject.cc.
-  void mesh_project(mve::TriangleMesh::Ptr const& mesh,
-                    std::shared_ptr<BVHTree> const& bvh_tree,
-                    cv::Mat const& image,
-                    Eigen::Affine3d const& world_to_cam,
-                    camera::CameraParameters const& cam_params,
-                    std::string const& out_prefix) {
-    // Create the output directory, if needed
-    std::string out_dir = boost::filesystem::path(out_prefix).parent_path().string();
-    if (out_dir != "") dense_map::createDir(out_dir);
-
-    std::vector<Eigen::Vector3i> face_vec;
-    std::map<int, Eigen::Vector2d> uv_map;
-    int num_exclude_boundary_pixels = 0;
-
-    std::vector<unsigned int> const& faces = mesh->get_faces();
-    int num_faces = faces.size();
-    std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
-
-    camera::CameraModel cam(world_to_cam, cam_params);
-
-    // Find the UV coordinates and the faces having them
-    dense_map::projectTexture(mesh, bvh_tree, image, cam, num_exclude_boundary_pixels,
-                              smallest_cost_per_face, face_vec, uv_map);
-
-    // Strip the directory name, according to .obj file conventions.
-    std::string suffix = boost::filesystem::path(out_prefix).filename().string();
-
-    std::string obj_str;
-    dense_map::formObjCustomUV(mesh, face_vec, uv_map, suffix, obj_str);
-
-    std::string mtl_str;
-    dense_map::formMtl(suffix, mtl_str);
-
-    std::string obj_file = out_prefix + ".obj";
-    std::cout << "Writing: " << obj_file << std::endl;
-    std::ofstream obj_handle(obj_file);
-    obj_handle << obj_str;
-    obj_handle.close();
-
-    std::string mtl_file = out_prefix + ".mtl";
-    std::cout << "Writing: " << mtl_file << std::endl;
-    std::ofstream mtl_handle(mtl_file);
-    mtl_handle << mtl_str;
-    mtl_handle.close();
-
-    std::string texture_file = out_prefix + ".png";
-    std::cout << "Writing: " << texture_file << std::endl;
-    cv::imwrite(texture_file, image);
-  }
-
   // Project given images with optimized cameras onto mesh. It is
   // assumed that the most up-to-date cameras were copied/interpolated
   // form the optimizer structures into the world_to_cam vector.
@@ -1105,8 +1052,8 @@ void calc_median_residuals(std::vector<double> const& residuals,
       std::string out_prefix = filename_buffer;  // convert to string
 
       std::cout << "Creating texture for: " << out_prefix << std::endl;
-      mesh_project(mesh, bvh_tree, cam_images[cid].image, world_to_cam[cid], cam_params[cam_type],
-                   out_prefix);
+      meshProject(mesh, bvh_tree, cam_images[cid].image, world_to_cam[cid], cam_params[cam_type],
+                  out_prefix);
     }
   }
 
@@ -2582,7 +2529,7 @@ int main(int argc, char** argv) {
 
     // If the nav cam did not get optimized, go back to the solution
     // with two focal lengths, rather than the one with one focal length
-    // solved by this solver (as the average of the two).  The two focal
+    // solved by this solver (as the average of the two). The two focal
     // lengths are very similar, but it is not worth modifying the
     // camera model we don't plan to optimize.
     if (FLAGS_nav_cam_intrinsics_to_float == "" || FLAGS_num_iterations == 0)

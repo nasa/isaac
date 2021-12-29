@@ -814,6 +814,9 @@ Parameters:
       value of nav_cam_to_sci_cam_timestamp_offset from the robot config
       file with this value.
     --verbose: If specified, echo all output in the terminal.
+    --texture_individual_images: If specified, in addition to a joint texture 
+      of all images create individual textures for each image and camera. Does 
+      not work with simulated cameras. For debugging.
     --save_debug_data: If specified, save many intermediate datasets
       for debugging.
 
@@ -1539,8 +1542,11 @@ can be run as follows:
         --mesh geom_dir/simplified_mesh.ply                                \
         --image geom_dir/distorted_sci_cam/1616785318.1400001.jpg          \
         --camera_to_world geom_dir/1616785318.1400001_sci_cam_to_world.txt \
-        --output_dir out 
+        --output_prefix out 
 
-This will write out/run.obj and its associated files.
+This will write out-1616785318.1400001.obj and its associated files.
 
 Ensure that the correct robot is specified in ASTROBEE_ROBOT.
+
+Alternatively, the images and cameras can be specified in lists, via
+``--image_list`` and ``--camera_list``.

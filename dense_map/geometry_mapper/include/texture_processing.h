@@ -273,6 +273,13 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
                     int num_threads, std::vector<FaceInfo> const& face_projection_info,
                     std::vector<IsaacTextureAtlas::Ptr>& texture_atlases, tex::Model& model, cv::Mat& out_texture);
 
+void meshProject(mve::TriangleMesh::Ptr const& mesh,
+                 std::shared_ptr<BVHTree> const& bvh_tree,
+                 cv::Mat const& image,
+                 Eigen::Affine3d const& world_to_cam,
+                 camera::CameraParameters const& cam_params,
+                 std::string const& out_prefix);
+
 // Save a model
 void isaac_save_model(ObjModel* obj_model, std::string const& prefix);
 

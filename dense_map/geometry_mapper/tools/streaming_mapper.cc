@@ -492,7 +492,7 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
     m_texture_mtl_msg.data.resize(mtl_len);
     std::copy(reinterpret_cast<const char*>(&mtl_str[0]),            // input beg
               reinterpret_cast<const char*>(&mtl_str[0]) + mtl_len,  // input end
-              m_texture_mtl_msg.data.begin());                         // destination
+              m_texture_mtl_msg.data.begin());                       // destination
 
     if (!use_single_texture || processed_camera_count == 0)
       texture_mtl_pub.publish(m_texture_mtl_msg);
