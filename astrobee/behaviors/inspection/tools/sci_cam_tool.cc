@@ -60,7 +60,7 @@ void publish_cmd(ros::NodeHandle & nh, ros::Publisher & cmd_pub,
   arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
   arg.s = "{\"name\": \"" + cmdName + "\"";
   if (cmdVal != "")
-    arg.s += ", \"value\": \"" + cmdVal + "\"";
+    arg.s += ", " + cmdVal;
   arg.s += "}";
   cmd_args.push_back(arg);
 
@@ -86,15 +86,15 @@ int main(int argc, char *argv[]) {
 
   // Accepted commands
   std::vector<std::string> cmd_names, cmd_vals;
-  cmd_names.push_back("takeSinglePicture");               cmd_vals.push_back("");
-  cmd_names.push_back("turnOnContinuousPictureTaking");   cmd_vals.push_back("");
-  cmd_names.push_back("turnOffContinuousPictureTaking");  cmd_vals.push_back("");
-  cmd_names.push_back("turnOnSavingPicturesToDisk");      cmd_vals.push_back("");
-  cmd_names.push_back("turnOffSavingPicturesToDisk");     cmd_vals.push_back("");
-  cmd_names.push_back("setPreviewImageWidth");            cmd_vals.push_back("640");
-  cmd_names.push_back("setPreviewImageType");             cmd_vals.push_back("color");
-  cmd_names.push_back("setFocusDistance");                cmd_vals.push_back("0.39");
-  cmd_names.push_back("setFocusMode");                    cmd_vals.push_back("manual");
+  cmd_names.push_back("takePicture");                     cmd_vals.push_back("");
+  cmd_names.push_back("setAutoExposure");                 cmd_vals.push_back("\"auto\": true");
+  cmd_names.push_back("setContinuousPictureTaking");      cmd_vals.push_back("\"continuous\": true");
+  cmd_names.push_back("setFocusDistance");                cmd_vals.push_back("\"distance\": 0.39");
+  cmd_names.push_back("setFocusMode");                    cmd_vals.push_back("\"mode\": \"manual\"");
+  cmd_names.push_back("setPublishImage");                 cmd_vals.push_back("\"publish\": true");
+  cmd_names.push_back("setPublishedImageSize");           cmd_vals.push_back("\"width\": 640, \"height\": 480");
+  cmd_names.push_back("setPublishedImageType");           cmd_vals.push_back("\"type\": \"color\"");
+  cmd_names.push_back("setSavePicturesToDisk");           cmd_vals.push_back("\"save\": true");
 
   // Initialize a ros node
   ros::init(argc, argv, "sci_cam_tool", ros::init_options::AnonymousName);

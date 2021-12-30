@@ -5,3 +5,4 @@ python3-rosdep
 ros-noetic-eigen-conversions
 ros-noetic-pcl-ros
 libmnl-dev
+libproj-dev
