@@ -21,7 +21,6 @@
 """
 A wrapper around the tools that when run together produce a textured mesh.
 """
-
 import argparse
 import os
 import re
@@ -37,7 +36,7 @@ def process_args(args):
     Set up the parser and parse the args.
     """
 
-    # Extract some paths before the args are parsed
+    # Extract some paths before the arguments are parsed
     src_path = os.path.dirname(args[0])
     exec_path = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.dirname(src_path)))
@@ -51,7 +50,7 @@ def process_args(args):
         "--ros_bag",
         dest="ros_bag",
         default="",
-        help="A ROS bag with recorded nav_cam, haz_cam, and sci_cam data.",
+        help="A ROS bag with recorded image and point cloud data.",
     )
     parser.add_argument(
         "--sparse_map",
@@ -66,35 +65,32 @@ def process_args(args):
         help="The directory where to write the processed data.",
     )
     parser.add_argument(
-        "--nav_cam_topic",
-        dest="nav_cam_topic",
-        default="/hw/cam_nav",
-        help="The nav cam topic in the bag file.",
+        "--camera_types",
+        dest="camera_types",
+        default="sci_cam nav_cam haz_cam",
+        help="Specify the cameras to use for the textures, as a list in quotes.",
+    )
+    parser.add_argument(
+        "--camera_topics",
+        dest="camera_topics",
+        default="/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int",
+        help="Specify the bag topics for the cameras to texture (in the same order as in "
+        + "--camera_types). Use a list in quotes.",
+    )
+    parser.add_argument(
+        "--undistorted_crop_wins",
+        dest="undistorted_crop_wins",
+        default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160",
+        help="The central region to keep after undistorting an image and "
+        + "before texturing. For sci_cam the numbers are at 1/4th of the full "
+        + "resolution and will be adjusted for the actual input image dimensions. "
+        + "Use a list in quotes.",
     )
     parser.add_argument(
         "--haz_cam_points_topic",
         dest="haz_cam_points_topic",
         default="/hw/depth_haz/points",
-        help="The haz cam point cloud topic in the bag file.",
-    )
-    parser.add_argument(
-        "--haz_cam_intensity_topic",
-        dest="haz_cam_intensity_topic",
-        default="/hw/depth_haz/extended/amplitude_int",
-        help="The haz cam intensity topic in the bag file.",
-    )
-    parser.add_argument(
-        "--sci_cam_topic",
-        dest="sci_cam_topic",
-        default="/hw/cam_sci",
-        help="The sci cam topic in the bag file.",
-    )
-    parser.add_argument(
-        "--camera_type",
-        dest="camera_type",
-        default="all",
-        help="Specify which cameras to process. By default, process all. "
-        + "Options: nav_cam, sci_cam.",
+        help="The depth point cloud topic in the bag file.",
     )
     parser.add_argument(
         "--start",
@@ -298,10 +294,10 @@ def process_args(args):
         + "from depth data in the current bag.",
     )
     parser.add_argument(
-        "--scicam_to_hazcam_timestamp_offset_override_value",
-        dest="scicam_to_hazcam_timestamp_offset_override_value",
+        "--nav_cam_to_sci_cam_offset_override_value",
+        dest="nav_cam_to_sci_cam_offset_override_value",
         default="",
-        help="Override the value of scicam_to_hazcam_timestamp_offset "
+        help="Override the value of nav_cam_to_sci_cam_timestamp_offset "
         + "from the robot config file with this value.",
     )
     parser.add_argument(
@@ -318,10 +314,22 @@ def process_args(args):
     )
     args = parser.parse_args()
 
-    return (src_path, exec_path, args)
+    # Parse the crop windows
+    crop_wins = args.undistorted_crop_wins.split()
+    crop_win_map = {}
+    for crop_win in crop_wins:
+        vals = crop_win.split(",")
+        if len(vals) != 3:
+            raise Exception(
+                "Invalid value for --undistorted_crop_wins: "
+                + args.undistorted_crop_wins
+            )
+        crop_win_map[vals[0]] = vals[1:]
+
+    return (src_path, exec_path, crop_win_map, args)
 
 
-def sanity_checks(geometry_mapper_path, batch_tsdf_path, args):
+def sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args):
 
     # Check if the environment was set
     for var in [
@@ -345,15 +353,42 @@ def sanity_checks(geometry_mapper_path, batch_tsdf_path, args):
             + "Specify it via --astrobee_build_dir."
         )
 
-    if args.camera_type == "nav_cam" and args.simulated_data:
-        print(
-            "Cannot apply nav cam texture with simulated cameras "
-            + "as the gazebo distorted images are not accurate enough."
-        )
-        sys.exit(1)
+    camera_types = args.camera_types.split()
 
     if args.output_dir == "":
         raise Exception("The path to the output directory was not specified.")
+
+    if len(camera_types) != len(args.camera_topics.split()):
+        raise Exception("There must be as many camera types as camera topics.")
+
+    if (not args.simulated_data) and len(camera_types) != len(
+        args.undistorted_crop_wins.split()
+    ):
+        raise Exception(
+            "There must be as many camera types as listed undistorted "
+            + "crop windows."
+        )
+
+    if args.simulated_data and "nav_cam" in camera_types:
+        raise Exception(
+            "The geometry mapper does not support nav_cam with simulated data as "
+            + "its distortion is not modeled."
+        )
+
+    if args.simulated_data and "haz_cam" not in camera_types:
+        raise Exception(
+            "The haz_cam must be one of the camera types in simulation mode "
+            + "as it is needed to read the simulated camera pose in order to "
+            + "process the depth clouds."
+        )
+
+    if not args.simulated_data:
+        for cam in camera_types:
+            if not (cam in crop_win_map):
+                raise Exception(
+                    "No crop win specified in --undistorted_crop_wins for camera: "
+                    + cam
+                )
 
 
 def mkdir_p(path):
@@ -374,13 +409,26 @@ def setup_outputs(args):
     mkdir_p(args.output_dir)
 
 
+def format_cmd(cmd):
+    """If some command arguments have spaces, quote them. Then concatenate the results."""
+    ans = ""
+    for val in cmd:
+        if " " in val or "\t" in cmd:
+            val = '"' + val + '"'
+        ans += val + " "
+    return ans
+
+
 def run_cmd(cmd, log_file, verbose=False):
     """
     Run a command and write the output to a file. In verbose mode also print to screen.
     """
-    print(" ".join(cmd) + "\n")
+
+    cmd_str = format_cmd(cmd)
+    print(cmd_str + "\n")
+
     with open(log_file, "w", buffering=0) as f:  # replace 'w' with 'wb' for Python 3
-        f.write(" ".join(cmd) + "\n")
+        f.write(cmd_str + "\n")
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         for line in iter(
             process.stdout.readline, ""
@@ -405,20 +453,14 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         geometry_mapper_path,
         "--ros_bag",
         args.ros_bag,
-        "--sparse_map",
-        args.sparse_map,
         "--output_dir",
         args.output_dir,
-        "--nav_cam_topic",
-        args.nav_cam_topic,
+        "--camera_topics",
+        args.camera_topics,
         "--haz_cam_points_topic",
         args.haz_cam_points_topic,
-        "--haz_cam_intensity_topic",
-        args.haz_cam_intensity_topic,
-        "--sci_cam_topic",
-        args.sci_cam_topic,
-        "--camera_type",
-        args.camera_type,
+        "--camera_types",
+        args.camera_types,
         "--start",
         args.start,
         "--duration",
@@ -451,17 +493,16 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
 
     if args.simulated_data:
         cmd += ["--simulated_data"]
+    else:
+        cmd += ["--sparse_map", args.sparse_map]
 
     if args.save_debug_data:
         cmd += ["--save_debug_data"]
 
-    if args.external_mesh != "":
-        cmd += ["--external_mesh", args.external_mesh]
-
-    if args.scicam_to_hazcam_timestamp_offset_override_value != "":
+    if args.nav_cam_to_sci_cam_offset_override_value != "":
         cmd += [
-            "--scicam_to_hazcam_timestamp_offset_override_value",
-            args.scicam_to_hazcam_timestamp_offset_override_value,
+            "--nav_cam_to_sci_cam_offset_override_value",
+            args.nav_cam_to_sci_cam_offset_override_value,
         ]
 
     log_file = os.path.join(args.output_dir, "geometry_mapper_log.txt")
@@ -477,11 +518,11 @@ def fuse_clouds(batch_tsdf_path, mesh, args):
     Invoke the voxblox batch_tsdf tool to fuse the depth images.
     """
 
-    haz_cam_index = os.path.join(args.output_dir, "haz_cam_index.txt")
+    depth_cam_index = os.path.join(args.output_dir, "depth_cam_index.txt")
 
     cmd = [
         batch_tsdf_path,
-        haz_cam_index,
+        depth_cam_index,
         mesh,
         args.max_ray_length,
         args.voxel_size,
@@ -594,7 +635,7 @@ def undistort_images(
     cmd = [
         undistort_image_path,
         "--undistorted_crop_win",
-        undist_crop_win,
+        str(undist_crop_win[0]) + " " + str(undist_crop_win[1]),
         "--save_bgr",
         "--robot_camera",
         cam_type,
@@ -702,7 +743,11 @@ def find_sci_cam_scale(image_file):
     return float(image_width) / float(config_width)
 
 
-def texture_mesh(src_path, cam_type, mesh, args):
+def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
+    if args.simulated_data and cam_type == "nav_cam":
+        print("Texturing nav_cam is not supported with simulated data.")
+        return "None"
+
     dist_image_list = os.path.join(args.output_dir, cam_type + "_index.txt")
     with open(dist_image_list) as f:
         image_files = f.readlines()
@@ -717,19 +762,17 @@ def texture_mesh(src_path, cam_type, mesh, args):
 
     if not args.simulated_data:
 
-        scale = 1.0
-        undist_crop_win = ""
-
-        if cam_type == "nav_cam":
-            scale = 1.0
-            undist_crop_win = "1100 776"
-        elif cam_type == "sci_cam":
-            # Deal with the fact that the robot config file may assume
-            # a different resolution than what is in the bag
+        if cam_type == "sci_cam":
+            # The sci cam needs special treatment
             scale = find_sci_cam_scale(image_files[0].rstrip())
-            crop_wd = 2 * int(round(625.0 * scale))  # an even number
-            crop_ht = 2 * int(round(500.0 * scale))  # an even number
-            undist_crop_win = str(crop_wd) + " " + str(crop_ht)
+        else:
+            scale = 1.0
+
+        # Make the crop win even, it is just easier that way
+        undist_crop_win = [
+            2 * int(round(float(crop_win_map[cam_type][0]) * scale / 2.0)),
+            2 * int(round(float(crop_win_map[cam_type][1]) * scale / 2.0)),
+        ]
 
         undistort_images(
             args, cam_type, dist_image_list, undist_dir, undist_crop_win, scale
@@ -818,14 +861,14 @@ def merge_poses_and_clouds(args):
 
 if __name__ == "__main__":
 
-    (src_path, exec_path, args) = process_args(sys.argv)
+    (src_path, exec_path, crop_win_map, args) = process_args(sys.argv)
 
     geometry_mapper_path = os.path.join(exec_path, "geometry_mapper")
     batch_tsdf_path = os.path.join(
         os.environ["HOME"], "catkin_ws/devel/lib/voxblox_ros/batch_tsdf"
     )
 
-    sanity_checks(geometry_mapper_path, batch_tsdf_path, args)
+    sanity_checks(geometry_mapper_path, batch_tsdf_path, crop_win_map, args)
 
     setup_outputs(args)
 
@@ -844,63 +887,62 @@ if __name__ == "__main__":
     # Smothing must happen before hole-filling, to remove weird
     # artifacts
     smooth_mesh = os.path.join(args.output_dir, "smooth_mesh.ply")
-    if start_step <= 2 and args.external_mesh == "":
+    if start_step <= 2 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 1
         smoothe_mesh(fused_mesh, smooth_mesh, args, attempt)
 
     # Fill holes
     hole_filled_mesh = os.path.join(args.output_dir, "hole_filled_mesh.ply")
-    if start_step <= 3 and args.external_mesh == "":
+    if start_step <= 3 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 1
         fill_holes_in_mesh(smooth_mesh, hole_filled_mesh, args, attempt)
 
     # Rm small connected components
     clean_mesh = os.path.join(args.output_dir, "clean_mesh.ply")
-    if start_step <= 4 and args.external_mesh == "":
+    if start_step <= 4 and args.external_mesh == "" and (not args.simulated_data):
         rm_connected_components(hole_filled_mesh, clean_mesh, args)
 
     # Smoothe again
     smooth_mesh2 = os.path.join(args.output_dir, "smooth_mesh2.ply")
-    if start_step <= 5 and args.external_mesh == "":
+    if start_step <= 5 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 2
         smoothe_mesh(clean_mesh, smooth_mesh2, args, attempt)
 
-    # Fill holes again. That is necessary, and should happen after smoothing.
-    # Mesh cleaning creates small holes and they can't be cleaned well
-    # without some more smoothing like above.
+    # Fill holes again. That is necessary, and should happen after
+    # smoothing.  Mesh cleaning creates small holes and they can't be
+    # cleaned well without some more smoothing like above.
     hole_filled_mesh2 = os.path.join(args.output_dir, "hole_filled_mesh2.ply")
-    if start_step <= 6 and args.external_mesh == "":
+    if start_step <= 6 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 2
         fill_holes_in_mesh(smooth_mesh2, hole_filled_mesh2, args, attempt)
 
     # Smoothe again as filling holes can make the mesh a little rough
     smooth_mesh3 = os.path.join(args.output_dir, "smooth_mesh3.ply")
-    if start_step <= 7 and args.external_mesh == "":
+    if start_step <= 7 and args.external_mesh == "" and (not args.simulated_data):
         attempt = 3
         smoothe_mesh(hole_filled_mesh2, smooth_mesh3, args, attempt)
 
     # Simplify the mesh
     simplified_mesh = os.path.join(args.output_dir, "simplified_mesh.ply")
-    if start_step <= 8 and args.external_mesh == "":
+    if start_step <= 8 and args.external_mesh == "" and (not args.simulated_data):
         simplify_mesh(smooth_mesh3, simplified_mesh, args)
 
-    if args.external_mesh != "":
-        # So that can texture on top of it
+    if args.simulated_data:
+        simplified_mesh = fused_mesh
+    elif args.external_mesh != "":
         simplified_mesh = args.external_mesh
 
-    nav_textured_mesh = ""
-    sci_textured_mesh = ""
+    textured_meshes = []
     if start_step <= 9:
-        # For simulated data texturing nav cam images is not supported
-        if (not args.simulated_data) and (
-            args.camera_type == "all" or args.camera_type == "nav_cam"
-        ):
-            nav_textured_mesh = texture_mesh(src_path, "nav_cam", simplified_mesh, args)
+        for camera_type in args.camera_types.split():
+            textured_mesh = texture_mesh(
+                src_path, camera_type, crop_win_map, simplified_mesh, args
+            )
+            textured_meshes += [textured_mesh]
 
-        if args.camera_type == "all" or args.camera_type == "sci_cam":
-            sci_textured_mesh = texture_mesh(src_path, "sci_cam", simplified_mesh, args)
-
-    if args.external_mesh == "":
+    if args.simulated_data:
+        print("Fused mesh:                           " + fused_mesh)
+    elif args.external_mesh == "":
         print("Fused mesh:                           " + fused_mesh)
         print("Smoothed mesh:                        " + smooth_mesh)
         print("Hole-filled mesh:                     " + hole_filled_mesh)
@@ -912,8 +954,7 @@ if __name__ == "__main__":
     else:
         print("External mesh: " + args.external_mesh)
 
-    if nav_textured_mesh != "":
-        print("Nav cam textured mesh:              " + nav_textured_mesh)
-
-    if sci_textured_mesh != "":
-        print("Sci cam textured mesh:              " + sci_textured_mesh)
+    count = 0
+    for camera_type in args.camera_types.split():
+        print(camera_type + " textured mesh: " + textured_meshes[count])
+        count += 1

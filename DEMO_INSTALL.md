@@ -1,8 +1,10 @@
-# Demo docker install
+Demo docker install
+=====
 
 Instructions for the full demo install
 
-### Check out
+Check out
+---------
 
 Run:
 
@@ -15,7 +17,8 @@ Run:
 
 (You can also modify the checkout location `~/ws` if you want.)
 
-### Install dependencies
+Install dependencies
+---------
 
 Install docker tools:
 
@@ -23,11 +26,13 @@ Install docker tools:
 
 Install nvidia-docker by following (the directions here)[https://github.com/NVIDIA/nvidia-docker].
 
-### Build
+Build
+---------
 
 Run `scripts/docker/build.sh` to build the docker images for the demo.
 
-### Install
+Install
+---------
 
 Run `scripts/docker/run.sh` to run the demo. Open `http://127.0.0.1:8080` in a web browser to see what is happening. Use
 `docker ps` to see the docker containers and use `docker exec -it container_name /bin/bash` to get a shell in one.

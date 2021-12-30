@@ -3,3 +3,4 @@ python-catkin-tools
 ros-melodic-eigen-conversions
 ros-melodic-pcl-ros
 libmnl-dev
+libproj-dev

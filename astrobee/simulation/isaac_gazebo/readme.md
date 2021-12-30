@@ -5,7 +5,7 @@ Simulation contains the packages where the dense maps are built
 
 This page describes the isaac gazebo plugins.
 
-# Heat cam
+### Heat cam
 
 This plugin simulates a heat-detecting camera, with the color in the
 images it produces suggestive of the temperature on the surface of the
@@ -52,10 +52,17 @@ This camera publishes the RGB heat image, its pose and intrinsics, on topics:
   /sim/heat_cam/pose
   /sim/heat_cam/info
 
-To launch the simulator and see the heat map, one can do:
+To launch the simulator and see the heat map, first set up the environment.
+The paths below may need to be adjusted for your system.
 
-  source ~/freeflyer_build/native/devel/setup.zsh
-  source ~/projects/isaac/devel/setup.zsh
+  export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
+  export ASTROBEE_BUILD_PATH=$HOME/astrobee
+  export ISAAC_WS=$HOME/isaac
+  source $ASTROBEE_BUILD_PATH/devel/setup.bash
+  source $ISAAC_WS/devel/setup.bash
+
+Then run:
+
   roslaunch isaac sim.launch world:=iss rviz:=true \
     pose:="11.2 -7.72 5.0 0 0 0 0 1"
 
@@ -72,3 +79,5 @@ at a specific time, or to take pictures continuously. Such a command
 must use the app name "gov.nasa.arc.irg.astrobee.heat_cam_image"
 (which is the "s" field in the first command argument) for it to be
 processed.
+
+\subpage acoustics_camera

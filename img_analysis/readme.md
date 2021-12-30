@@ -1,11 +1,16 @@
 \page ano Anomaly Detector
 
-## Overview
+Image Anomaly Detector
+====================
+
+Overview
+---------
 
 The Image anomaly detector contains a set of tools to analyse incoming images, using Convolutional Neural Networks,  CNN's. To build, train and test the CNN's we use PyTorch.
 
 
-## TorchLib
+TorchLib
+---------
 
 This package is needed in the anomaly/img_analysis node, such that we can analyse the image, looking for anomalies.
 The first step is to download the LibTorch ZIP archive, the link might change, best to go to https://pytorch.org/ and select Linux->LibTorch->C++/Java
@@ -23,7 +28,8 @@ To link the path, add this to your '$HOME/.bashrc' file:
 	export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/path/to/libtorch/share/cmake/Torch
 
 
-## Define and train the CNN
+Define and train the CNN
+---------
 
 The python code containing the CNN definition and training is in resources/vent_cnn.py
 
@@ -34,7 +40,8 @@ num_epochs       - number of epochs to train, default 30
 model_name       - saved model name, default "model_cnn.pt"
 trace_model_name - saved traced model name, default "traced_model_cnn.pt"
 
-### Get training data
+Get training data
+---------
 
 To get training data, a tool is available which will read the poses from a vents file and others file. The tool will change the robot's pose and take pictures automatically. For the should be activated when the simulation is spawned like so (should be spawned in an undocked position such that the dock simulation does not interfere with the manual set of the pose):
 
@@ -52,7 +59,8 @@ robot_dist          - Robot's distance to vent, standard is 1m
 train_pics_per_vent - Number of pictures taken per vent/other for train data
 test_pics_per_vent  - Number of pictures taken per vent/other for test data
 
-## Test single picture
+Test single picture
+---------
 
 There is a script, analyse_img.py, in the resources/ folder, which takes as argument the path of a picture taken with the sci_cam, processing it and outputing the classification result. This algorithm is useful to make sure that the C++ API for Pytorch is working properly.
 

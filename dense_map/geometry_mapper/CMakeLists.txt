@@ -175,6 +175,10 @@ add_executable(camera_refiner tools/camera_refiner.cc)
 target_link_libraries(camera_refiner
     geometry_mapper_lib gflags glog)
 
+add_executable(camera_refiner2 tools/camera_refiner2.cc)
+target_link_libraries(camera_refiner2
+    geometry_mapper_lib gflags glog)
+
 add_executable(extract_pc_from_bag tools/extract_pc_from_bag.cc)
 target_link_libraries(extract_pc_from_bag
     geometry_mapper_lib gflags glog)
@@ -183,8 +187,12 @@ add_executable(add_sci_cam_to_bag tools/add_sci_cam_to_bag.cc)
 target_link_libraries(add_sci_cam_to_bag
     geometry_mapper_lib gflags glog)
 
-add_executable(process_bag tools/process_bag.cc)
-target_link_libraries(process_bag
+add_executable(scale_bag tools/scale_bag.cc)
+target_link_libraries(scale_bag
+    geometry_mapper_lib gflags glog)
+
+add_executable(colorize_bag_images tools/colorize_bag_images.cc)
+target_link_libraries(colorize_bag_images
     geometry_mapper_lib gflags glog)
 
 add_executable(test_correct tools/test_correct.cc)

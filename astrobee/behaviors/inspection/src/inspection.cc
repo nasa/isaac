@@ -563,7 +563,7 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
         point.orientation.z = panorama_rotation.z();
         point.orientation.w = panorama_rotation.w();
         panorama_relative.poses.push_back(point);
-        if (tilt == -PI/2 || tilt == PI/2)
+        if ((tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) || (tilt < PI/2 + EPS && tilt > PI/2 - EPS))
           break;
       }
     }

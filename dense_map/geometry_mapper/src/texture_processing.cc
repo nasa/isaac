@@ -655,7 +655,7 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int num_thre
   omp_set_num_threads(num_threads);  // Use this many threads for all
                                      // consecutive parallel regions
 
-  std::cout << "Forming the textured model" << std::endl;
+  std::cout << "Forming the textured model, please wait ..." << std::endl;
   util::WallTimer timer;
 
   std::vector<math::Vec3f> const& vertices = mesh->get_vertices();

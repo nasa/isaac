@@ -1,26 +1,33 @@
+isaac (0.2.3) UNRELEASED; urgency=medium
+
+  * Panorama picture taking mode supported
+  * Cargo transport simulation support
+
+ -- Marina Moreira <mgouveia@ubuntu>  Mon, 13 Dec 2021 15:51:01 -0800
+
 isaac (0.2.2) testing; urgency=medium
 
   * Compatible wit 0.14.x versions, made for ISAAC 3 activity
 
- -- Astrobee Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 14 Apr 2021 10:37:25 -0800
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 14 Apr 2021 10:37:25 -0800
 
 
 isaac (0.2.1) testing; urgency=medium
 
   * Compatible wit 0.14.x versions, made for ISAAC 2 activity
 
- -- Astrobee Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 21 Jan 2021 10:37:25 -0800
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 21 Jan 2021 10:37:25 -0800
 
 
 isaac (0.2.0) testing; urgency=medium
 
-  * Compatible wit 0.14.x versions
+  * Compatible wit 0.14.x versions, made for ISAAC 1 activity
 
- -- Astrobee Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 21 Jan 2021 10:37:25 -0800
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 21 Jan 2021 10:37:25 -0800
 
 
 isaac (0.1.0) testing; urgency=medium
 
-  * Initial release
+  * Initial release. Demo June 2020.
 
- -- Astrobee Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 21 Jan 2021 10:37:25 -0800
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 21 Jan 2021 10:37:25 -0800
