@@ -33,7 +33,7 @@ At this point you need to decide where you'd like to put the ISAAC workspace and
 
 First, clone the flight software repository:
 
-    git clone --recursive ssh://git@babelfish.arc.nasa.gov:7999/isaac/isaac.git \
+    git clone --recursive https://github.com/nasa/isaac.git \
     --branch develop $ISAAC_WS/src/
 
 Checkout the submodule:
