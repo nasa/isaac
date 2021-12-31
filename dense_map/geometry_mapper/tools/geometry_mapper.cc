@@ -240,15 +240,14 @@ bool findInterpolatedPose(double desired_nav_cam_time,
         return false;
       camera::CameraModel end_localized_cam(Eigen::Vector3d(), Eigen::Matrix3d::Identity(),
                                             sparse_map->GetCameraParameters());
-      if (!sparse_map->Localize(end_image, &end_localized_cam, NULL, NULL, nearby_cid_ptr)) return false;
+      if (!sparse_map->Localize(end_image, &end_localized_cam, NULL, NULL, nearby_cid_ptr))
+        return false;
       Eigen::Affine3d end_trans = end_localized_cam.GetTransform();
 
-      for (size_t it = 0; it < nearby_cid.size(); it++) {
-        // std::cout << "nearby image: " << sparse_map->cid_to_filename_[nearby_cid[it]]
-        //           << std::endl;
-      }
       // std::cout << "localizing cloud at time " << desired_nav_cam_time << std::endl;
-      double alpha = (desired_nav_cam_time - beg_nav_cam_time) / (end_nav_cam_time - beg_nav_cam_time);
+      double alpha = (desired_nav_cam_time - beg_nav_cam_time)
+        / (end_nav_cam_time - beg_nav_cam_time);
+
       if (end_nav_cam_time == beg_nav_cam_time) alpha = 0.0;  // handle division by zero
 
       Eigen::Affine3d interp_trans = dense_map::linearInterp(alpha, beg_trans, end_trans);

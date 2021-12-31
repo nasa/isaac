@@ -1272,17 +1272,23 @@ sci cam image using the tool:
       --nav_cam_topic /mgt/img_sampler/nav_cam/image_record          \
       --sci_cam_topic /hw/cam_sci/compressed                         \
       --haz_cam_intensity_topic /hw/depth_haz/extended/amplitude_int \
-      --bracket_len 2.0 --output_nav_cam_dir nav_images
+      --bracket_len 0.6 --output_nav_cam_dir nav_images
 
-Setting up the correct robot name above is very important.
+Setting up the correct robot name for ASTROBEE_ROBOT is very important.
 
 The --bracket_len option brackets sci cam images by nav cam images so
 the length of time between these two nav cam images is at most this
 value. These nav cam images are saved. Later in camera_refiner sci cam
 and haz cam images are picked in each such a nav cam interval. (A
-camera's time is first adjusted for the time offset before any of this
-happens.) One may consider using a bracket length of 1.0 seconds if
-the bot is known to move quickly right after taking a sci cam picture.
+camera's time is first adjusted for the timestamp offset between the
+cameras.)
+
+It is important to note that the bracket length can affect the accuracy
+of calibration later, and hence it should be rather tight. Yet a tight
+bracket does not allow for wiggle room if later it is desired to tweak
+a little the timestamp offsets while still staying within the bounds,
+and it may prevent bracketing all the sci cam images and enough haz
+cam images.
 
 The option --nav_cam_to_sci_cam_offset_override_value can be
 used if the given bag is suspected to have a different value of this
@@ -1295,7 +1301,7 @@ that there should be no excessive overlap otherwise, so the images
 in the first pair better have about 3/4 or 4/5 overlap with
 images from other pairs. 
 
-If necessary, add more intermediate images manually, or re-running
+If necessary, add more intermediate images by re-running
 this tool with
 
   --max_time_between_images <val>
@@ -1387,6 +1393,10 @@ Here, $dir points to nav_images as earlier in the document.
 
 ### Running the refiner
 
+TODO(oalexan1): Rewrite this for refiner2. Mention that the choice of
+weights 1000, 0, 0 works well, and an extra tune-up can be achieved
+for bsharp2 with 20, 20, 20.
+
 Next, the refiner tool is run, as shown below. This will overwrite the
 camera calibration file, so it may be prudent to start by copying the
 existing calibration file to a new name, and set ASTROBEE_ROBOT to
@@ -1400,7 +1410,7 @@ point to that.
     source $ISAAC_WS/devel/setup.bash
     $ISAAC_WS/devel/lib/geometry_mapper/camera_refiner      \
       --ros_bag mybag.bag --sparse_map mymap.map            \
-      --num_iterations 20 --bracket_len 2.0                 \
+      --num_iterations 20 --bracket_len 0.6                 \
       --nav_cam_topic /mgt/img_sampler/nav_cam/image_record \
       --output_map output_map.map                           \
       --fix_map --skip_registration --float_scale           \
@@ -1410,7 +1420,12 @@ point to that.
       --mesh mesh.ply --mesh_weight 25                      \
       --mesh_robust_threshold 3
 
-Note how we used the same bracket length as in the image picker.
+Note how we used the same bracket length as in the image picker.  It
+is very important to note that a tight bracket should be used, as, if
+the robot moves fast and the bracket value is big, it can affect the
+accuracy of calibration. Yet a tight bracket does not allow for wiggle
+room if it is decided to vary the timestamp offset (see further down)
+while staying within the bounds given by the bracket.
 
 This tool will print some statistics showing the reprojection 
 residuals for all camera combinations. This can be helpful

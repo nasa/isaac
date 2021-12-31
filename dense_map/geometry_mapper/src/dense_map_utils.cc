@@ -77,6 +77,36 @@ void array_to_rigid_transform(Eigen::Affine3d& aff, const double* arr) {
   aff = Eigen::Affine3d(Eigen::Translation3d(arr[0], arr[1], arr[2])) * Eigen::Affine3d(R);
 }
 
+// Extract a affine transform to an array of length NUM_AFFINE_PARAMS
+void affine_transform_to_array(Eigen::Affine3d const& aff, double* arr) {
+  Eigen::MatrixXd M = aff.matrix();
+  int count = 0;
+  // The 4th row always has 0, 0, 0, 1
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 4; col++) {
+      arr[count] = M(row, col);
+      count++;
+    }
+  }
+}
+
+// Convert an array of length NUM_AFFINE_PARAMS to a affine
+// transform. Normalize the quaternion to make it into a rotation.
+void array_to_affine_transform(Eigen::Affine3d& aff, const double* arr) {
+  Eigen::MatrixXd M = Eigen::Matrix<double, 4, 4>::Identity();
+
+  int count = 0;
+  // The 4th row always has 0, 0, 0, 1
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 4; col++) {
+      M(row, col) = arr[count];
+      count++;
+    }
+    }
+
+  aff.matrix() = M;
+}
+
 // Read a 4x4 pose matrix of doubles from disk
 void readPoseMatrix(cv::Mat& pose, std::string const& filename) {
   pose = cv::Mat::zeros(4, 4, CV_64F);
