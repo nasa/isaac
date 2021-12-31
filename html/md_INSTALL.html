@@ -102,7 +102,7 @@ Machine setup</h1>
 <h1><a class="anchor" id="autotoc_md7"></a>
 Checkout the project source code</h1>
 <p>At this point you need to decide where you'd like to put the ISAAC workspace and code (<code>ISAAC_WS</code>) on your machine (add this to your .bashrc for persistency): </p><pre class="fragment">export ISAAC_WS=$HOME/isaac
-</pre><p>First, clone the flight software repository: </p><pre class="fragment">git clone --recursive ssh://git@babelfish.arc.nasa.gov:7999/isaac/isaac.git \
+</pre><p>First, clone the flight software repository: </p><pre class="fragment">git clone --recursive https://github.com/nasa/isaac.git \
 --branch develop $ISAAC_WS/src/
 </pre><p>Checkout the submodule: </p><pre class="fragment">git submodule update --init --recursive
 </pre><h1><a class="anchor" id="autotoc_md8"></a>
