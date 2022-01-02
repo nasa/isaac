@@ -939,6 +939,41 @@ void formObj(tex::Model& texture_model, std::string const& out_prefix, std::stri
   obj_str = out.str();
 }
 
+// The images from the bag may need to be resized to be the same
+// size as in the calibration file. Sometimes the full-res images
+// can be so blurry that interest point matching fails, hence the
+// resizing.
+// Similar logic to deal with differences between image size and calibrated size
+// is used further down this code.
+void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image) {
+  int raw_image_cols = image.cols;
+  int raw_image_rows = image.rows;
+  int calib_image_cols = cam_params.GetDistortedSize()[0];
+  int calib_image_rows = cam_params.GetDistortedSize()[1];
+
+  int factor = raw_image_cols / calib_image_cols;
+
+  if ((raw_image_cols != calib_image_cols * factor) ||
+      (raw_image_rows != calib_image_rows * factor)) {
+    LOG(FATAL) << "Image width and height are: " << raw_image_cols << ' ' << raw_image_rows
+               << "\n"
+               << "Calibrated image width and height are: "
+               << calib_image_cols << ' ' << calib_image_rows << "\n"
+               << "These must be equal up to an integer factor.\n";
+  }
+
+  if (factor != 1) {
+    // TODO(oalexan1): This kind of resizing may be creating aliased images.
+    cv::Mat local_image;
+    cv::resize(image, local_image, cv::Size(), 1.0/factor, 1.0/factor, cv::INTER_AREA);
+    local_image.copyTo(image);
+  }
+
+  // Check
+  if (image.cols != calib_image_cols || image.rows != calib_image_rows)
+    LOG(FATAL) << "Sci cam images have the wrong size.";
+}
+
 // Project texture and find the UV coordinates
 void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
                     camera::CameraModel const& cam, double num_exclude_boundary_pixels,
@@ -961,9 +996,12 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
   int factor = raw_image_cols / calib_image_cols;
 
-  if ((raw_image_cols != calib_image_cols * factor) || (raw_image_rows != calib_image_rows * factor)) {
-    LOG(FATAL) << "Published image width and height are: " << raw_image_cols << ' ' << raw_image_rows << "\n"
-               << "Calibrated image width and height are: " << calib_image_cols << ' ' << calib_image_rows << "\n"
+  if ((raw_image_cols != calib_image_cols * factor) ||
+      (raw_image_rows != calib_image_rows * factor)) {
+    LOG(FATAL) << "Published image width and height are: "
+               << raw_image_cols << ' ' << raw_image_rows << "\n"
+               << "Calibrated image width and height are: "
+               << calib_image_cols << ' ' << calib_image_rows << "\n"
                << "These must be equal up to an integer factor.\n";
   }
 

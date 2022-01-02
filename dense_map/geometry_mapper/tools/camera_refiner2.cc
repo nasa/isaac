@@ -133,8 +133,11 @@ DEFINE_string(sci_cam_timestamps, "",
 DEFINE_bool(float_sparse_map, false, "Optimize the sparse map, hence only the camera params.");
 
 DEFINE_bool(float_scale, false,
-            "If to optimize the scale of the clouds (use it if the "
-            "sparse map is kept fixed), or else rescaling and registration is needed.");
+            "If to optimize the scale of the clouds, part of haz_cam_depth_to_image_transform "
+            "(use it if the sparse map is kept fixed, or else rescaling and registration "
+            "of the map and extrinsics is needed). This parameter should not be used with "
+            "--affine_depth_to_image when the transform is affine, rather than rigid and a scale."
+            "See also --extrinsics_to_float.");
 
 DEFINE_bool(float_timestamp_offsets, false,
             "If to optimize the timestamp offsets among the cameras.");
@@ -157,6 +160,10 @@ DEFINE_string(sci_cam_intrinsics_to_float, "",
               "Refine 0 or more of the following intrinsics for sci_cam: focal_length, "
               "optical_center, distortion. Specify as a quoted list. "
               "For example: 'focal_length optical_center'.");
+
+DEFINE_string(extrinsics_to_float, "haz_cam sci_cam depth_to_image",
+              "Specify the cameras whose extrinsics, relative to nav_cam, to optimize. Also "
+              "consider if to float haz_cam_depth_to_image_transform.");
 
 DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
               std::numeric_limits<double>::quiet_NaN(),
@@ -219,6 +226,19 @@ DEFINE_string(out_texture_dir, "", "If non-empty and if an input mesh was provid
 DEFINE_bool(verbose, false,
             "Print the residuals and save the images and match files."
             "Stereo Pipeline's viewer can be used for visualizing these.");
+
+DEFINE_string(nav_cam_distortion_replacement, "",
+              "Replace nav_cam's distortion coefficients with this list after the initial "
+              "determination of triangulated points, and then continue with distortion optimization. "
+              "A quoted list of four or five values expected, separated by spaces, as the "
+              "replacement distortion model will have radial and tangential coefficients. "
+              "Must specify --nav_cam_distortion_win.");
+
+DEFINE_string(nav_cam_distortion_win, "1100 850", "If a nav_cam model with radial and tangential "
+              "distortion is specified, either in the config file or via "
+              "--nav_cam_distortion_replacement, fit it to this central region of the "
+              "fisheye-distorted nav_cam image. The smaller the region the easier should "
+              "be to find a good fit.");
 
 namespace dense_map {
 
@@ -822,36 +842,6 @@ void calc_median_residuals(std::vector<double> const& residuals,
   }
 }
 
-  // TODO(oalexan1): Move this to utils.
-  void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image) {
-    int raw_image_cols = image.cols;
-    int raw_image_rows = image.rows;
-    int calib_image_cols = cam_params.GetDistortedSize()[0];
-    int calib_image_rows = cam_params.GetDistortedSize()[1];
-
-    int factor = raw_image_cols / calib_image_cols;
-
-    if ((raw_image_cols != calib_image_cols * factor) ||
-        (raw_image_rows != calib_image_rows * factor)) {
-      LOG(FATAL) << "Image width and height are: " << raw_image_cols << ' ' << raw_image_rows
-                 << "\n"
-                 << "Calibrated image width and height are: "
-                 << calib_image_cols << ' ' << calib_image_rows << "\n"
-                 << "These must be equal up to an integer factor.\n";
-    }
-
-    if (factor != 1) {
-      // TODO(oalexan1): This kind of resizing may be creating aliased images.
-      cv::Mat local_image;
-      cv::resize(image, local_image, cv::Size(), 1.0/factor, 1.0/factor, cv::INTER_AREA);
-      local_image.copyTo(image);
-    }
-
-    // Check
-    if (image.cols != calib_image_cols || image.rows != calib_image_rows)
-      LOG(FATAL) << "Sci cam images have the wrong size.";
-  }
-
   typedef std::map<std::pair<int, int>, dense_map::MATCH_PAIR> MATCH_MAP;
 
   // A class to encompass all known information about a camera
@@ -1304,6 +1294,18 @@ int main(int argc, char** argv) {
   if (FLAGS_depth_mesh_weight < 0.0)
     LOG(FATAL) << "The depth mesh weight must non-negative.\n";
 
+  if (FLAGS_nav_cam_distortion_replacement != "") {
+    if (FLAGS_haz_cam_intrinsics_to_float != "" ||
+        FLAGS_sci_cam_intrinsics_to_float != "" ||
+        FLAGS_extrinsics_to_float != ""         ||
+        FLAGS_float_sparse_map                  ||
+        FLAGS_float_scale                       ||
+        FLAGS_float_timestamp_offsets)
+      LOG(FATAL) << "If replacing and optimizing the nav_cam model distortion, the rest "
+        "of the variables must be kept fixed. Once this model is found and saved, "
+        "a subsequent call to this tool may do various co-optimizations.";
+  }
+
   // We assume our camera rig has n camera types. Each can be image or
   // depth + image.  Just one camera must be the reference camera. In
   // this code it will be nav_cam.  Every camera object (class
@@ -1380,6 +1382,26 @@ int main(int argc, char** argv) {
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map =
     boost::shared_ptr<sparse_mapping::SparseMap>(new sparse_mapping::SparseMap(FLAGS_sparse_map));
 
+  // Deal with using a non-FOV model for nav_cam, if desired
+  std::vector<double> nav_dist_win = dense_map::string_to_vector(FLAGS_nav_cam_distortion_win);
+  if (nav_dist_win.size() != 0 && nav_dist_win.size() != 2)
+    LOG(FATAL) << "Must have two values in --nav_cam_distortion_win.\n";
+  Eigen::VectorXd nav_cam_distortion_replacement;
+  if (FLAGS_nav_cam_distortion_replacement != "") {
+    std::vector<double> vec = dense_map::string_to_vector(FLAGS_nav_cam_distortion_replacement);
+    if (vec.size() != 4 && vec.size() != 5)
+      LOG(FATAL) << "nav_cam distortion replacement must consist of 4 or 5 values, corresponding"
+                 << "to radial and tangential distortion coefficients.\n";
+    nav_cam_distortion_replacement
+      = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(vec.data(), vec.size());
+  }
+
+  if (FLAGS_refiner_skip_filtering &&
+      (cam_params[ref_cam_type].GetDistortion().size() > 1 ||
+       nav_cam_distortion_replacement.size() != 0))
+    LOG(FATAL) << "Must use outlier filtering if a non-fisheye lens distortion is used"
+               << "with nav_cam, as it is hard to to fit such a model at the image periphery.\n";
+
   // TODO(oalexan1): All this timestamp reading logic below should be in a function
 
   // Parse the ref timestamps from the sparse map
@@ -1415,6 +1437,29 @@ int main(int argc, char** argv) {
   dense_map::parse_intrinsics_to_float(FLAGS_nav_cam_intrinsics_to_float, intrinsics_to_float[0]);
   dense_map::parse_intrinsics_to_float(FLAGS_haz_cam_intrinsics_to_float, intrinsics_to_float[1]);
   dense_map::parse_intrinsics_to_float(FLAGS_sci_cam_intrinsics_to_float, intrinsics_to_float[2]);
+
+  std::string depth_to_image_name = "depth_to_image";
+  std::set<std::string> extrinsics_to_float;
+  dense_map::parse_extrinsics_to_float(cam_names, depth_to_image_name,
+                                       FLAGS_extrinsics_to_float, extrinsics_to_float);
+
+  if (FLAGS_float_scale && FLAGS_affine_depth_to_image)
+    LOG(FATAL) << "The options --float_scale and --affine_depth_to_image should not be used "
+               << "together. If the latter is used, the scale is always floated.\n";
+
+  if (!FLAGS_affine_depth_to_image && FLAGS_float_scale &&
+      extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
+    LOG(FATAL) << "Cannot float the scale of depth_to_image_transform unless this "
+               << "this is allowed as part of --extrinsics_to_float.\n";
+
+  if (FLAGS_nav_cam_distortion_replacement != "") {
+    if (intrinsics_to_float[ref_cam_type].find("distortion")
+        == intrinsics_to_float[ref_cam_type].end() ||
+        intrinsics_to_float[ref_cam_type].size() != 1) {
+      LOG(FATAL) << "When --nav_cam_distortion_replacement is used, must float the nav cam "
+                 << "distortion and no other nav cam intrinsics.\n";
+    }
+  }
 
   // Put in arrays, so we can optimize them
   std::vector<double> ref_to_cam_vec(num_cam_types * dense_map::NUM_RIGID_PARAMS);
@@ -1454,6 +1499,9 @@ int main(int argc, char** argv) {
   for (int it = 0; it < num_cam_types; it++) {
     focal_lengths[it] = cam_params[it].GetFocalLength();  // average the two focal lengths
     optical_centers[it] = cam_params[it].GetOpticalOffset();
+
+    if (cam_params[it].GetDistortion().size() == 0)
+      LOG(FATAL) << "The cameras are expected to have distortion.";
     distortions[it] = cam_params[it].GetDistortion();
   }
 
@@ -1613,9 +1661,10 @@ int main(int argc, char** argv) {
 
       if (!success) continue;
 
-      std::cout << std::setprecision(17) << std::fixed  << "For camera "
-                << cam_names[cam_type] << " pick timestamp "
-                << cam.timestamp << ".\n";
+      // This can be useful in checking if all the sci cams were bracketed successfully.
+      // std::cout << std::setprecision(17) << std::fixed  << "For camera "
+      //          << cam_names[cam_type] << " pick timestamp "
+      //          << cam.timestamp << ".\n";
 
       if (depth_topics[cam_type] != "") {
         cam.cloud_timestamp = -1.0;  // will change
@@ -1634,7 +1683,7 @@ int main(int argc, char** argv) {
     }  // end loop over camera types
   }    // end loop over ref images
 
-  std::cout << "Allowed timestamp offset range while respecting the bracket for given cameras:\n";
+  std::cout << "Allowed timestamp offset range while respecting the brackets for given cameras:\n";
   for (int cam_type = ref_cam_type; cam_type < num_cam_types; cam_type++) {
     if (cam_type == ref_cam_type) continue;  // bounds don't make sense here
 
@@ -1671,12 +1720,12 @@ int main(int argc, char** argv) {
     }
   }
 
-  // TODO(oalexan1): This must happen for all cameras!
-  for (size_t it = 0; it < cams.size(); it++) {
-    if (cams[it].camera_type == 2) {
-      dense_map::adjustImageSize(cam_params[2], cams[it].image);
-    }
-  }
+  // The images from the bag may need to be resized to be the same
+  // size as in the calibration file. Sometimes the full-res images
+  // can be so blurry that interest point matching fails, hence the
+  // resizing.
+  for (size_t it = 0; it < cam_params.size(); it++)
+    dense_map::adjustImageSize(cam_params[cams[it].camera_type], cams[it].image);
 
   // Sort by the timestamp in reference camera time. This is essential
   // for matching each image to other images close in time.
@@ -2002,6 +2051,25 @@ int main(int argc, char** argv) {
           continue;
 
         Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
+
+        if (cams[cid].camera_type == ref_cam_type &&
+            (nav_cam_distortion_replacement.size() != 0 ||
+             cam_params[ref_cam_type].GetDistortion().size() > 1)) {
+          // We are or shortly will be dealing with a nav cam pixel
+          // for a non-fish-eye lens. If this pixel is then in the
+          // periphery, declare it to be an outlier as it will be hard
+          // to fit with such a model.
+          Eigen::Vector2d dist_centered_ip
+            = dist_ip - cam_params[cams[cid].camera_type].GetDistortedHalfSize();
+          if (nav_dist_win.size() != 2)
+            LOG(FATAL) << "Must have two values in --nav_cam_distortion_win.\n";
+          if (std::abs(dist_centered_ip[0]) > nav_dist_win[0]/2.0 ||
+              std::abs(dist_centered_ip[1]) > nav_dist_win[1]/2.0) {
+            dense_map::setMapValue(pid_cid_fid_inlier, pid, cid, fid, 0);
+            continue;
+          }
+        }
+
         Eigen::Vector2d undist_ip;
         cam_params[cams[cid].camera_type].Convert<camera::DISTORTED, camera::UNDISTORTED_C>
           (dist_ip, &undist_ip);
@@ -2027,6 +2095,17 @@ int main(int argc, char** argv) {
 
       // Triangulate n rays emanating from given undistorted and centered pixels
       xyz_vec[pid] = dense_map::Triangulate(focal_length_vec, world_to_cam_vec, pix_vec);
+    }
+
+    if (pass == 0 && nav_cam_distortion_replacement.size() > 1) {
+      // At the first pass, right after triangulation is done with a
+      // given nav cam model, which presumably was pretty accurate,
+      // replace its distortion if desired, which we will then
+      // optimize.
+      std::cout << "Setting nav cam distortion to: " << nav_cam_distortion_replacement.transpose()
+                << ". Will proceed to optimize it.\n";
+      cam_params[ref_cam_type].SetDistortion(nav_cam_distortion_replacement);
+      distortions[ref_cam_type] = cam_params[ref_cam_type].GetDistortion();
     }
 
     // For a given fid = pid_to_cid_fid[pid][cid],
@@ -2119,6 +2198,9 @@ int main(int argc, char** argv) {
               (&world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index]);
           if (!FLAGS_float_scale || FLAGS_affine_depth_to_image)
             problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
+          if (extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
+            problem.SetParameterBlockConstant
+              (&depth_to_image_noscale_vec[num_depth_params * cam_type]);
 
         } else {
           // Other cameras, which need bracketing
@@ -2164,6 +2246,10 @@ int main(int argc, char** argv) {
                                            lower_bound[cam_type]);
             problem.SetParameterUpperBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
                                            upper_bound[cam_type]);
+          }
+          if (extrinsics_to_float.find(cam_names[cam_type]) == extrinsics_to_float.end()) {
+            problem.SetParameterBlockConstant
+              (&ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
           }
 
           Eigen::Vector3d depth_xyz(0, 0, 0);
@@ -2218,6 +2304,13 @@ int main(int argc, char** argv) {
             problem.SetParameterUpperBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
                                            upper_bound[cam_type]);
           }
+          if (extrinsics_to_float.find(cam_names[cam_type]) == extrinsics_to_float.end()) {
+            problem.SetParameterBlockConstant
+              (&ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+          }
+          if (extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
+            problem.SetParameterBlockConstant
+              (&depth_to_image_noscale_vec[num_depth_params * cam_type]);
         }
       }
     }
@@ -2316,6 +2409,13 @@ int main(int argc, char** argv) {
                   problem.SetParameterUpperBound(&ref_to_cam_timestamp_offsets[cam_type], 0,
                                                  upper_bound[cam_type]);
                 }
+                if (extrinsics_to_float.find(cam_names[cam_type]) == extrinsics_to_float.end()) {
+                  problem.SetParameterBlockConstant
+                    (&ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type]);
+                }
+                if (extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
+                  problem.SetParameterBlockConstant
+                    (&depth_to_image_noscale_vec[num_depth_params * cam_type]);
               }
             }
           }

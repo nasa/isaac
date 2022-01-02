@@ -259,6 +259,10 @@ void formObjCustomUV(mve::TriangleMesh::ConstPtr mesh, std::vector<Eigen::Vector
 
 void formMtl(std::string const& out_prefix, std::string& mtl_str);
 
+// The images from the bag may need to be resized to be the same
+// size as in the calibration file.
+void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image);
+
 // Project texture and find the UV coordinates
 void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
                     camera::CameraModel const& cam, double num_exclude_boundary_pixels,

@@ -55,6 +55,35 @@ void parse_intrinsics_to_float(std::string const& intrinsics_to_float, std::set<
   }
 }
 
+// A  function to split a string like 'haz_cam sci_cam depth_to_image' into
+// its two constituents and validate against the list of known cameras.
+void parse_extrinsics_to_float(std::vector<std::string> const& cam_names,
+                               std::string const& depth_to_image_name,
+                               std::string const& extrinsics_to_float,
+                               std::set<std::string>& extrinsics_to_float_set) {
+  extrinsics_to_float_set.clear();
+  std::string val;
+  std::istringstream is(extrinsics_to_float);
+  while (is >> val) {
+    extrinsics_to_float_set.insert(val);
+
+    // Sanity check
+    bool known_cam = false;
+    for (size_t it = 0; it < cam_names.size(); it++) {
+      if (val == cam_names[it]) {
+        known_cam = true;
+        break;
+      }
+    }
+    if (val == depth_to_image_name) known_cam = true;
+
+    if (!known_cam)
+      LOG(FATAL) << "Unknown camera: " << val << "\n";
+  }
+
+  return;
+}
+
 // Extract a rigid transform to an array of length NUM_RIGID_PARAMS
 void rigid_transform_to_array(Eigen::Affine3d const& aff, double* arr) {
   for (size_t it = 0; it < 3; it++) arr[it] = aff.translation()[it];
@@ -490,6 +519,16 @@ void createDir(std::string const& dir) {
 
 // Minor utilities for converting values to a string below
 
+// Convert a string of values separated by spaces to a vector of doubles.
+std::vector<double> string_to_vector(std::string const& str) {
+  std::istringstream iss(str);
+  std::vector<double> vals;
+  double val;
+  while (iss >> val)
+    vals.push_back(val);
+  return vals;
+}
+
 std::string number_to_string(double val) {
   std::ostringstream oss;
   oss.precision(8);
@@ -585,6 +624,44 @@ int robust_find(std::string const& text, std::string const& val, int beg) {
 
   return beg;
 }
+
+// A fragile function to determine if the value of the given parameter has a brace
+bool param_val_has_braces(std::string const& param_name, std::string const& parent,
+                          // The text to search
+                          std::string const& text) {
+  int beg = 0;
+
+  // First find the parent, if provided
+  if (parent != "") {
+    beg = robust_find(text, parent, beg);
+    if (beg == std::string::npos) LOG(FATAL) << "Could not find the field '"
+                                             << parent << " =' in the config file.";
+  }
+
+  // Find the param after the parent
+  beg = robust_find(text, param_name, beg);
+  if (beg == std::string::npos) {
+    std::string msg;
+    if (parent != "") msg = " Tried to locate it after field '" + parent + "'.";
+    LOG(FATAL) << "Could not find the field '" << param_name << " =' in the config file." << msg;
+  }
+
+  // Now we are positioned after the equal sign
+  bool has_brace = false;
+  while (beg < static_cast<int>(text.size())) {
+    if (text[beg] == ' ') {
+      beg++;
+      continue;
+    }
+
+    if (text[beg] == '{') has_brace = true;
+
+    break;
+  }
+
+  return has_brace;
+}
+
 // Replace a given parameter's value in the text. This is very fragile
 // code, particularly it does not understand that text starting with
 // "--" is a comment.
@@ -683,15 +760,26 @@ void updateConfigFile                                                           
                                                   params.GetOpticalOffset());
     replace_param_val("intrinsic_matrix", intrinsics, cam_name, "{", "}", text);
     Eigen::VectorXd cam_distortion = params.GetDistortion();
-    if (cam_distortion.size() > 1) {
-      std::string distortion_str = vector_to_string(cam_distortion);
-      replace_param_val("distortion_coeff", distortion_str, cam_name, "{", "}", text);
-    } else if (cam_distortion.size() == 1) {
-      std::string distortion_str = " " + number_to_string(cam_distortion[0]);
-      replace_param_val("distortion_coeff", distortion_str, cam_name, "", "", text);
-    } else {
+
+    // This can switch the distortion from being a number to being a vector,
+    // and vice-versa, which makes the logic more complicated.
+    std::string distortion_str;
+    if (cam_distortion.size() > 1)
+      distortion_str = vector_to_string(cam_distortion);
+    else if (cam_distortion.size() == 1)
+      distortion_str = number_to_string(cam_distortion[0]);
+    else
       LOG(FATAL) << "Camera " << cam_name << " must have distortion.";
-    }
+
+    // Note that we look at whether there are braces around param val
+    // before replacement, rather than if the replacement param val
+    // has braces.
+    if (param_val_has_braces("distortion_coeff", cam_name, text))
+      replace_param_val("distortion_coeff", distortion_str, cam_name, "{", "}", text);
+    else
+      replace_param_val("distortion_coeff", " " + distortion_str, cam_name, "", "", text);
+
+    // Next deal with extrinsics
 
     if (cam_names[it] == "nav_cam") continue;  // this will have the trivial transforms
 
