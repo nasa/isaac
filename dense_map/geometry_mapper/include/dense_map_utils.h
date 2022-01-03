@@ -41,12 +41,12 @@
 
 namespace dense_map {
 
-const int NUM_SCALAR_PARAMS  = 1;
-const int NUM_OPT_CTR_PARAMS = 2;  // optical center in x and y
-const int NUM_PIX_PARAMS = 2;
-const int NUM_XYZ_PARAMS     = 3;
-const int NUM_RIGID_PARAMS   = 7;  // quaternion (4) + translation (3)
-const int NUM_AFFINE_PARAMS  = 12;  // 3x3 matrix (9) + translation (3)
+const int NUM_SCALAR_PARAMS  = 1;  // Used to float single-value params // NOLINT
+const int NUM_OPT_CTR_PARAMS = 2;  // optical center in x and y         // NOLINT
+const int NUM_PIX_PARAMS     = 2;                                       // NOLINT
+const int NUM_XYZ_PARAMS     = 3;                                       // NOLINT
+const int NUM_RIGID_PARAMS   = 7;  // quaternion (4) + translation (3)  // NOLINT
+const int NUM_AFFINE_PARAMS  = 12; // 3x3 matrix (9) + translation (3)  // NOLINT
 
 // A  function to split a string like 'optical_center focal_length' into
 // its two constituents.
