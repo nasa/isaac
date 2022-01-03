@@ -1532,6 +1532,50 @@ This program's options are:
     --verbose: Print the residuals and save the images and match files.
       Stereo Pipeline's viewer can be used for visualizing these.
 
+### Using the refiner with a radtan model for nav_cam
+
+The camera refiner supports using a radtan distortion model for
+nav_cam, that is a model with radial and and tangenetial distortion,
+just like for haz_cam and sci_cam, but the default nav_cam distortion
+model is fisheye. One can edit the robot config file and replace the
+fisheye model with a desired radial + tangential distortion model (4
+or 5 coeffecients are needed) then run the refiner.
+
+Since it is not easy to find a good initial set of such coefficients,
+the refiner has the option of computing such a model which best fits
+the given fisheye model. For that, the refiner is started with the
+fisheye model, this model is used to set up the problem, including
+triangulating the 3D points after feature detection, then the fisheye
+model is replaced on-the-fly with desired 4 or 5 coefficients of the
+radtan model via the option --nav_cam_distortion_replacement, to which
+one can pass, for example, "0 0 0 0". These coefficients will then be
+optimized while keeping the rest of the variables fixed (nav cam focal
+length and optical center, intrinsics of other cameras, and all the
+extrinsics). The new best-fit distortion model will be written to disk
+at the end, replacing the fisheye model, and from then on the new
+model can be used for further calibration experiments just as with the
+fisheye model.
+
+Since it is expected that fitting such a model is harder at the
+periphery, where the distortion is stronger, the camera refiner has
+the option --nav_cam_num_exclude_boundary_pixels can be used to
+restrict the nav cam view to a central region of given dimensions when
+such such optimization takes place (whether the new model type is fit
+on the fly or read from disk when already determined). If a
+satisfactory solution is found and it is desired to later use the
+geometry mapper with such a model, note its option
+``--undistorted_crop_wins``, and one should keep in mind that that the
+restricted region specified earlier may not exactly be the region to
+be used with the geomety mapper, since the former is specified in
+distorted pixels and this one in undistorted pixels.
+
+All this logic was tested and was shown to work in a satisfactory way,
+but no thorough attept was made at validating that a radtan distortion
+model, while having more degrees of freedom, would out-perform the
+fisheye model. That is rather unlikely, since given sufficiently many
+images with good overlap, the effect of the peripherial region where
+the fisheye lens distortion may not perform perfectly may be small.
+
 ## Orthoprojecting images
 
 Given a camera image, its pose, and a mesh, a useful operation is to
@@ -1557,6 +1601,7 @@ can be run as follows:
         --mesh geom_dir/simplified_mesh.ply                                \
         --image geom_dir/distorted_sci_cam/1616785318.1400001.jpg          \
         --camera_to_world geom_dir/1616785318.1400001_sci_cam_to_world.txt \
+        --num_exclude_boundary_pixels 0                                    \
         --output_prefix out 
 
 This will write out-1616785318.1400001.obj and its associated files.

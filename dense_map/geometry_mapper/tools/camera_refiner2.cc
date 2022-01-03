@@ -130,7 +130,10 @@ DEFINE_string(sci_cam_timestamps, "",
               "Use only these sci cam timestamps. Must be "
               "a file with one timestamp per line.");
 
-DEFINE_bool(float_sparse_map, false, "Optimize the sparse map, hence only the camera params.");
+DEFINE_bool(float_sparse_map, false,
+            "Optimize the sparse map. This should be avoided as it can invalidate the scales "
+            "of the extrinsics and the registration. It should at least be used with big mesh "
+            "weights to attenuate those effects.");
 
 DEFINE_bool(float_scale, false,
             "If to optimize the scale of the clouds, part of haz_cam_depth_to_image_transform "
@@ -229,16 +232,17 @@ DEFINE_bool(verbose, false,
 
 DEFINE_string(nav_cam_distortion_replacement, "",
               "Replace nav_cam's distortion coefficients with this list after the initial "
-              "determination of triangulated points, and then continue with distortion optimization. "
-              "A quoted list of four or five values expected, separated by spaces, as the "
-              "replacement distortion model will have radial and tangential coefficients. "
-              "Must specify --nav_cam_distortion_win.");
+              "determination of triangulated points, and then continue with distortion "
+              "optimization. A quoted list of four or five values expected, separated by "
+              "spaces, as the replacement distortion model will have radial and tangential "
+              "coefficients. Set a positive --nav_cam_num_exclude_boundary_pixels.");
 
-DEFINE_string(nav_cam_distortion_win, "1100 850", "If a nav_cam model with radial and tangential "
-              "distortion is specified, either in the config file or via "
-              "--nav_cam_distortion_replacement, fit it to this central region of the "
-              "fisheye-distorted nav_cam image. The smaller the region the easier should "
-              "be to find a good fit.");
+DEFINE_int32(nav_cam_num_exclude_boundary_pixels, 0,
+             "Flag as outliers nav cam pixels closer than this to the boundary, and ignore "
+             "that boundary region when texturing with the --out_texture_dir option. "
+             "This may improve the calibration accuracy, especially if switching from fisheye "
+             "to radtan distortion for nav_cam. See also the geometry_mapper "
+             "--undistorted_crop_wins option.");
 
 namespace dense_map {
 
@@ -379,7 +383,7 @@ struct BracketedCamError {
       (new BracketedCamError(meas_dist_pix, left_ref_stamp, right_ref_stamp,
                              cam_stamp, block_sizes, cam_params));
 
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add, except
     // for distortion, which is last
@@ -472,7 +476,7 @@ struct RefCamError {
       (new RefCamError(meas_dist_pix, block_sizes, cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add, except
     // for distortion, which is last
@@ -923,6 +927,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
                           std::vector<Eigen::Affine3d> const& world_to_cam,
                           mve::TriangleMesh::Ptr const& mesh,
                           std::shared_ptr<BVHTree> const& bvh_tree,
+                          int ref_camera_type, int nav_cam_num_exclude_boundary_pixels,
                           std::string const& out_dir) {
     if (cam_names.size() != cam_params.size())
       LOG(FATAL) << "There must be as many camera names as sets of camera parameters.\n";
@@ -937,6 +942,10 @@ void calc_median_residuals(std::vector<double> const& residuals,
       double timestamp = cam_images[cid].timestamp;
       int cam_type = cam_images[cid].camera_type;
 
+      int num_exclude_boundary_pixels = 0;
+      if (cam_type == ref_camera_type)
+        num_exclude_boundary_pixels = nav_cam_num_exclude_boundary_pixels;
+
       // Must use the 10.7f format for the timestamp as everywhere else in the code
       snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f_%s",
                out_dir.c_str(), timestamp, cam_names[cam_type].c_str());
@@ -944,7 +953,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
 
       std::cout << "Creating texture for: " << out_prefix << std::endl;
       meshProject(mesh, bvh_tree, cam_images[cid].image, world_to_cam[cid], cam_params[cam_type],
-                  out_prefix);
+                  num_exclude_boundary_pixels, out_prefix);
     }
   }
 
@@ -1294,6 +1303,9 @@ int main(int argc, char** argv) {
   if (FLAGS_depth_mesh_weight < 0.0)
     LOG(FATAL) << "The depth mesh weight must non-negative.\n";
 
+  if (FLAGS_nav_cam_num_exclude_boundary_pixels < 0)
+    LOG(FATAL) << "Must have a non-negative value for --nav_cam_num_exclude_boundary_pixels.\n";
+
   if (FLAGS_nav_cam_distortion_replacement != "") {
     if (FLAGS_haz_cam_intrinsics_to_float != "" ||
         FLAGS_sci_cam_intrinsics_to_float != "" ||
@@ -1383,9 +1395,6 @@ int main(int argc, char** argv) {
     boost::shared_ptr<sparse_mapping::SparseMap>(new sparse_mapping::SparseMap(FLAGS_sparse_map));
 
   // Deal with using a non-FOV model for nav_cam, if desired
-  std::vector<double> nav_dist_win = dense_map::string_to_vector(FLAGS_nav_cam_distortion_win);
-  if (nav_dist_win.size() != 0 && nav_dist_win.size() != 2)
-    LOG(FATAL) << "Must have two values in --nav_cam_distortion_win.\n";
   Eigen::VectorXd nav_cam_distortion_replacement;
   if (FLAGS_nav_cam_distortion_replacement != "") {
     std::vector<double> vec = dense_map::string_to_vector(FLAGS_nav_cam_distortion_replacement);
@@ -1755,6 +1764,7 @@ int main(int argc, char** argv) {
   if (!gflags::GetCommandLineOption("num_threads", &num_threads))
     LOG(FATAL) << "Failed to get the value of --num_threads in Astrobee software.\n";
   std::cout << "Using " << num_threads << " threads for feature detection/matching." << std::endl;
+  std::cout << "Note that this step uses a huge amount of memory." << std::endl;
 
   std::cout << "Detecting features." << std::endl;
 
@@ -2033,9 +2043,6 @@ int main(int argc, char** argv) {
     std::vector<Eigen::Vector3d> xyz_vec(pid_to_cid_fid.size());
 
     for (size_t pid = 0; pid < pid_to_cid_fid.size(); pid++) {
-      Eigen::Vector3d mesh_xyz(0, 0, 0);
-      int num = 0;
-
       std::vector<double> focal_length_vec;
       std::vector<Eigen::Affine3d> world_to_cam_vec;
       std::vector<Eigen::Vector2d> pix_vec;
@@ -2052,19 +2059,14 @@ int main(int argc, char** argv) {
 
         Eigen::Vector2d dist_ip(keypoint_vec[cid][fid].first, keypoint_vec[cid][fid].second);
 
-        if (cams[cid].camera_type == ref_cam_type &&
-            (nav_cam_distortion_replacement.size() != 0 ||
-             cam_params[ref_cam_type].GetDistortion().size() > 1)) {
-          // We are or shortly will be dealing with a nav cam pixel
-          // for a non-fish-eye lens. If this pixel is then in the
-          // periphery, declare it to be an outlier as it will be hard
-          // to fit with such a model.
-          Eigen::Vector2d dist_centered_ip
-            = dist_ip - cam_params[cams[cid].camera_type].GetDistortedHalfSize();
-          if (nav_dist_win.size() != 2)
-            LOG(FATAL) << "Must have two values in --nav_cam_distortion_win.\n";
-          if (std::abs(dist_centered_ip[0]) > nav_dist_win[0]/2.0 ||
-              std::abs(dist_centered_ip[1]) > nav_dist_win[1]/2.0) {
+        if (cams[cid].camera_type == ref_cam_type) {
+          // Flag as outliers pixels at the nav_cam boundary, if desired. This
+          // is especially important when the nav_cam uses the radtan
+          // model instead of fisheye.
+          Eigen::Vector2i dist_size = cam_params[cams[cid].camera_type].GetDistortedSize();
+          int excl = FLAGS_nav_cam_num_exclude_boundary_pixels;
+          if (dist_ip.x() < excl || dist_ip.x() > dist_size[0] - 1 - excl ||
+              dist_ip.y() < excl || dist_ip.y() > dist_size[1] - 1 - excl) {
             dense_map::setMapValue(pid_cid_fid_inlier, pid, cid, fid, 0);
             continue;
           }
@@ -2702,8 +2704,8 @@ int main(int argc, char** argv) {
       cams, world_to_ref_vec, ref_timestamps, ref_to_cam_vec, ref_to_cam_timestamp_offsets,
       // Output
       world_to_cam);
-    meshProjectCameras(cam_names, cam_params, cams, world_to_cam, mesh, bvh_tree,
-                       FLAGS_out_texture_dir);
+    meshProjectCameras(cam_names, cam_params, cams, world_to_cam, mesh, bvh_tree, ref_cam_type,
+                       FLAGS_nav_cam_num_exclude_boundary_pixels, FLAGS_out_texture_dir);
   }
 
   return 0;

@@ -52,6 +52,9 @@ DEFINE_string(image_list, "", "The list of images to orthoproject, one per line,
 DEFINE_string(camera_list, "", "The list of cameras to world transforms use, one per line, "
               "unless specified individually as above.");
 
+DEFINE_int32(num_exclude_boundary_pixels, 0,
+             "Exclude pixels closer to the boundary than this when texturing.");
+
 DEFINE_string(output_prefix, "", "The output prefix. The texture name will be"
               " <output_prefix>-<image base name without extension>.obj.");
 
@@ -107,7 +110,8 @@ int main(int argc, char** argv) {
     std::string prefix = FLAGS_output_prefix + "-" +
       boost::filesystem::path(images[it]).stem().string();
 
-    dense_map::meshProject(mesh, bvh_tree, image, cam_to_world.inverse(), cam_params, prefix);
+    dense_map::meshProject(mesh, bvh_tree, image, cam_to_world.inverse(), cam_params,
+                           FLAGS_num_exclude_boundary_pixels, prefix);
   }
 
   return 0;

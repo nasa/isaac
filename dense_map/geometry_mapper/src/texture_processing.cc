@@ -283,7 +283,8 @@ math::Vec3f eigen_to_vec3f(Eigen::Vector3d const& V) {
   return v;
 }
 
-void calculate_texture_size(double height_factor, std::list<IsaacTexturePatch::ConstPtr> const& texture_patches,
+void calculate_texture_size(double height_factor,
+                              std::list<IsaacTexturePatch::ConstPtr> const& texture_patches,
                             int& texture_width, int& texture_height) {
   int64_t total_area = 0;
   int max_width = 0;
@@ -975,10 +976,12 @@ void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image
 }
 
 // Project texture and find the UV coordinates
-void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
+void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
+                    cv::Mat const& image,
                     camera::CameraModel const& cam, double num_exclude_boundary_pixels,
                     // outputs
-                    std::vector<double>& smallest_cost_per_face, std::vector<Eigen::Vector3i>& face_vec,
+                    std::vector<double>& smallest_cost_per_face,
+                    std::vector<Eigen::Vector3i>& face_vec,
                     std::map<int, Eigen::Vector2d>& uv_map) {
   // Wipe the outputs
   face_vec.clear();
@@ -1012,12 +1015,14 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
   std::vector<math::Vec3f> const& vertices = mesh->get_vertices();
   std::vector<math::Vec3f> const& mesh_normals = mesh->get_vertex_normals();
-  if (vertices.size() != mesh_normals.size()) LOG(FATAL) << "A mesh must have as many vertices as vertex normals.";
+  if (vertices.size() != mesh_normals.size())
+    LOG(FATAL) << "A mesh must have as many vertices as vertex normals.";
 
   std::vector<unsigned int> const& faces = mesh->get_faces();
   std::vector<math::Vec3f> const& face_normals = mesh->get_face_normals();
 
-  if (smallest_cost_per_face.size() != faces.size()) LOG(FATAL) << "There must be one cost value per face.";
+  if (smallest_cost_per_face.size() != faces.size())
+    LOG(FATAL) << "There must be one cost value per face.";
 
 #pragma omp parallel for
   for (std::size_t face_id = 0; face_id < faces.size() / 3; face_id++) {
@@ -1086,7 +1091,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
       }
 
       // Get the undistorted pixel
-      Eigen::Vector2d undist_centered_pix = cam.GetParameters().GetFocalVector().cwiseProduct(cam_pt.hnormalized());
+      Eigen::Vector2d undist_centered_pix =
+        cam.GetParameters().GetFocalVector().cwiseProduct(cam_pt.hnormalized());
       if (std::abs(undist_centered_pix[0]) > cam.GetParameters().GetUndistortedHalfSize()[0] ||
           std::abs(undist_centered_pix[1]) > cam.GetParameters().GetUndistortedHalfSize()[1]) {
         // If we are out of acceptable undistorted region, there's some uncertainty whether
@@ -1097,7 +1103,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
       // Get the distorted pixel value
       Eigen::Vector2d dist_pix;
-      cam.GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED>(undist_centered_pix, &dist_pix);
+      cam.GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED>
+        (undist_centered_pix, &dist_pix);
 
       // Skip pixels that don't project in the image
       if (dist_pix.x() < num_exclude_boundary_pixels ||
@@ -1411,6 +1418,7 @@ void meshProject(mve::TriangleMesh::Ptr const& mesh,
                  cv::Mat const& image,
                  Eigen::Affine3d const& world_to_cam,
                  camera::CameraParameters const& cam_params,
+                 int num_exclude_boundary_pixels,
                  std::string const& out_prefix) {
   // Create the output directory, if needed
   std::string out_dir = boost::filesystem::path(out_prefix).parent_path().string();
@@ -1418,7 +1426,6 @@ void meshProject(mve::TriangleMesh::Ptr const& mesh,
 
   std::vector<Eigen::Vector3i> face_vec;
   std::map<int, Eigen::Vector2d> uv_map;
-  int num_exclude_boundary_pixels = 0;
 
   std::vector<unsigned int> const& faces = mesh->get_faces();
   int num_faces = faces.size();
