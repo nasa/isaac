@@ -132,7 +132,7 @@ DEFINE_string(sci_cam_timestamps, "",
 DEFINE_bool(float_sparse_map, false,
             "Optimize the sparse map. This should be avoided as it can invalidate the scales "
             "of the extrinsics and the registration. It should at least be used with big mesh "
-            "weights to attenuate those effects.");
+            "weights to attenuate those effects. See also: --registration.");
 
 DEFINE_bool(float_scale, false,
             "If to optimize the scale of the clouds, part of haz_cam_depth_to_image_transform "
@@ -242,6 +242,16 @@ DEFINE_int32(nav_cam_num_exclude_boundary_pixels, 0,
              "This may improve the calibration accuracy, especially if switching from fisheye "
              "to radtan distortion for nav_cam. See also the geometry_mapper "
              "--undistorted_crop_wins option.");
+
+DEFINE_bool(registration, false,
+            "If true, and registration control points for the sparse map exist and are specified "
+            "by --hugin_file and --xyz_file, re-register the sparse map at the end. All the "
+            "extrinsics, including depth_to_image_transform, will be scaled accordingly."
+            "This is not needed if the nav_cam intrinsics and the sparse map do not change.");
+
+DEFINE_string(hugin_file, "", "The path to the hugin .pto file used for sparse map registration.");
+
+DEFINE_string(xyz_file, "", "The path to the xyz file used for sparse map registration.");
 
 namespace dense_map {
 
@@ -1317,6 +1327,9 @@ int main(int argc, char** argv) {
         "a subsequent call to this tool may do various co-optimizations.";
   }
 
+  if (FLAGS_registration && (FLAGS_xyz_file.empty() || FLAGS_hugin_file.empty()))
+    LOG(FATAL) << "In order to register the map, the hugin and xyz file must be specified.";
+
   // We assume our camera rig has n camera types. Each can be image or
   // depth + image.  Just one camera must be the reference camera. In
   // this code it will be nav_cam.  Every camera object (class
@@ -1384,10 +1397,12 @@ int main(int argc, char** argv) {
   double haz_cam_depth_to_image_scale
     = pow(haz_cam_depth_to_image_transform.matrix().determinant(), 1.0 / 3.0);
 
-  // Since we will keep the scale fixed, vary the part of the transform without
-  // the scale, while adding the scale each time before the transform is applied
-  Eigen::Affine3d haz_cam_depth_to_image_noscale = haz_cam_depth_to_image_transform;
-  haz_cam_depth_to_image_noscale.linear() /= haz_cam_depth_to_image_scale;
+  // Separate the initial scale. This is convenient if
+  // haz_cam_depth_to_image is scale * rotation + translation and if
+  // it is desired to keep the scale fixed. In either case, the scale
+  // will be multiplied back when needed.
+  Eigen::Affine3d haz_cam_normalized_depth_to_image = haz_cam_depth_to_image_transform;
+  haz_cam_normalized_depth_to_image.linear() /= haz_cam_depth_to_image_scale;
 
   // Read the sparse map
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map =
@@ -1481,23 +1496,23 @@ int main(int argc, char** argv) {
   if (FLAGS_affine_depth_to_image) num_depth_params = dense_map::NUM_AFFINE_PARAMS;
 
   // Depth to image transforms and scales
-  std::vector<Eigen::Affine3d> depth_to_image_noscale;
+  std::vector<Eigen::Affine3d> normalized_depth_to_image;
   std::vector<double> depth_to_image_scales = {1.0, haz_cam_depth_to_image_scale, 1.0};
-  depth_to_image_noscale.push_back(Eigen::Affine3d::Identity());
-  depth_to_image_noscale.push_back(haz_cam_depth_to_image_noscale);
-  depth_to_image_noscale.push_back(Eigen::Affine3d::Identity());
+  normalized_depth_to_image.push_back(Eigen::Affine3d::Identity());
+  normalized_depth_to_image.push_back(haz_cam_normalized_depth_to_image);
+  normalized_depth_to_image.push_back(Eigen::Affine3d::Identity());
 
   // Put in arrays, so we can optimize them
-  std::vector<double> depth_to_image_noscale_vec(num_cam_types * num_depth_params);
+  std::vector<double> normalized_depth_to_image_vec(num_cam_types * num_depth_params);
   for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
     if (FLAGS_affine_depth_to_image)
       dense_map::affine_transform_to_array
-        (depth_to_image_noscale[cam_type],
-         &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+        (normalized_depth_to_image[cam_type],
+         &normalized_depth_to_image_vec[num_depth_params * cam_type]);
     else
       dense_map::rigid_transform_to_array
-        (depth_to_image_noscale[cam_type],
-         &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+        (normalized_depth_to_image[cam_type],
+         &normalized_depth_to_image_vec[num_depth_params * cam_type]);
   }
 
   // Put the intrinsics in arrays
@@ -2186,7 +2201,7 @@ int main(int argc, char** argv) {
             (ref_depth_cost_function,
              ref_depth_loss_function,
              &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
-             &depth_to_image_noscale_vec[num_depth_params * cam_type],
+             &normalized_depth_to_image_vec[num_depth_params * cam_type],
              &depth_to_image_scales[cam_type],
              &xyz_vec[pid][0]);
 
@@ -2197,7 +2212,7 @@ int main(int argc, char** argv) {
             problem.SetParameterBlockConstant(&depth_to_image_scales[cam_type]);
           if (extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
             problem.SetParameterBlockConstant
-              (&depth_to_image_noscale_vec[num_depth_params * cam_type]);
+              (&normalized_depth_to_image_vec[num_depth_params * cam_type]);
 
         } else {
           // Other cameras, which need bracketing
@@ -2278,7 +2293,7 @@ int main(int argc, char** argv) {
              &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
              &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index],
              &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
-             &depth_to_image_noscale_vec[num_depth_params * cam_type],
+             &normalized_depth_to_image_vec[num_depth_params * cam_type],
              &depth_to_image_scales[cam_type],
              &xyz_vec[pid][0],
              &ref_to_cam_timestamp_offsets[cam_type]);
@@ -2307,7 +2322,7 @@ int main(int argc, char** argv) {
           }
           if (extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
             problem.SetParameterBlockConstant
-              (&depth_to_image_noscale_vec[num_depth_params * cam_type]);
+              (&normalized_depth_to_image_vec[num_depth_params * cam_type]);
         }
       }
     }
@@ -2384,7 +2399,7 @@ int main(int argc, char** argv) {
                    &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * beg_ref_index],
                    &world_to_ref_vec[dense_map::NUM_RIGID_PARAMS * end_ref_index],
                    &ref_to_cam_vec[dense_map::NUM_RIGID_PARAMS * cam_type],
-                   &depth_to_image_noscale_vec[num_depth_params * cam_type],
+                   &normalized_depth_to_image_vec[num_depth_params * cam_type],
                    &depth_to_image_scales[cam_type],
                    &ref_to_cam_timestamp_offsets[cam_type]);
 
@@ -2412,7 +2427,7 @@ int main(int argc, char** argv) {
                 }
                 if (extrinsics_to_float.find(depth_to_image_name) == extrinsics_to_float.end())
                   problem.SetParameterBlockConstant
-                    (&depth_to_image_noscale_vec[num_depth_params * cam_type]);
+                    (&normalized_depth_to_image_vec[num_depth_params * cam_type]);
               }
             }
           }
@@ -2533,12 +2548,12 @@ int main(int argc, char** argv) {
     for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
       if (FLAGS_affine_depth_to_image)
         dense_map::array_to_affine_transform
-          (depth_to_image_noscale[cam_type],
-           &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+          (normalized_depth_to_image[cam_type],
+           &normalized_depth_to_image_vec[num_depth_params * cam_type]);
       else
         dense_map::array_to_rigid_transform(
-          depth_to_image_noscale[cam_type],
-          &depth_to_image_noscale_vec[num_depth_params * cam_type]);
+          normalized_depth_to_image[cam_type],
+          &normalized_depth_to_image_vec[num_depth_params * cam_type]);
     }
 
     // Evaluate the residuals after optimization
@@ -2666,25 +2681,48 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Update the optimized depth to image (for haz cam only)
-  int cam_type = 1;  // haz cam
-  haz_cam_depth_to_image_scale = depth_to_image_scales[cam_type];
-  haz_cam_depth_to_image_transform = depth_to_image_noscale[cam_type];
-  haz_cam_depth_to_image_transform.linear() *= haz_cam_depth_to_image_scale;
-
-  dense_map::updateConfigFile(cam_names, "haz_cam_depth_to_image_transform",
-                              cam_params, ref_to_cam_trans,
-                              ref_to_cam_timestamp_offsets,
-                              haz_cam_depth_to_image_transform);
-
-  if (FLAGS_num_iterations > 0 &&
-      (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != "")) {
+  bool map_changed = (FLAGS_num_iterations > 0 &&
+                      (FLAGS_float_sparse_map || FLAGS_nav_cam_intrinsics_to_float != ""));
+  if (map_changed) {
     std::cout << "Either the sparse map intrinsics or cameras got modified. "
               << "The map must be rebuilt." << std::endl;
 
     dense_map::RebuildMap(FLAGS_output_map,  // Will be used for temporary saving of aux data
                           cam_params[ref_cam_type], sparse_map);
   }
+
+  if (FLAGS_registration) {
+    std::cout << "Redoing registration of the obtained map and adjusting all extrinsics.\n";
+    std::vector<std::string> data_files;
+    data_files.push_back(FLAGS_hugin_file);
+    data_files.push_back(FLAGS_xyz_file);
+    bool verification = false;
+    double map_scale
+      = sparse_mapping::RegistrationOrVerification(data_files, verification, sparse_map.get());
+
+    std::cout << "Registration resulted in a scale adjustment of: " << map_scale << ".\n";
+    // We do not change depth_to_image_scales since multiplying the
+    // affine component of normalized_depth_to_image is enough.
+    for (int cam_type = 0; cam_type < num_cam_types; cam_type++) {
+      // This transform is affine, so both the linear and translation parts need a scale
+      normalized_depth_to_image[cam_type].linear() *= map_scale;
+      normalized_depth_to_image[cam_type].translation() *= map_scale;
+      // This is a rotation + translation, so only the translation needs the scale
+      ref_to_cam_trans[cam_type].translation() *= map_scale;
+    }
+  }
+
+  // Update the optimized depth to image (for haz cam only)
+  int cam_type = 1;  // haz cam
+  haz_cam_depth_to_image_scale = depth_to_image_scales[cam_type];
+  haz_cam_depth_to_image_transform = normalized_depth_to_image[cam_type];
+  haz_cam_depth_to_image_transform.linear() *= haz_cam_depth_to_image_scale;
+
+  // Update the config file
+  dense_map::updateConfigFile(cam_names, "haz_cam_depth_to_image_transform",
+                              cam_params, ref_to_cam_trans,
+                              ref_to_cam_timestamp_offsets,
+                              haz_cam_depth_to_image_transform);
 
   std::cout << "Writing: " << FLAGS_output_map << std::endl;
   sparse_map->Save(FLAGS_output_map);
