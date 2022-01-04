@@ -259,19 +259,36 @@ void formObjCustomUV(mve::TriangleMesh::ConstPtr mesh, std::vector<Eigen::Vector
 
 void formMtl(std::string const& out_prefix, std::string& mtl_str);
 
+// The images from the bag may need to be resized to be the same
+// size as in the calibration file.
+void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image);
+
 // Project texture and find the UV coordinates
-void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
-                    camera::CameraModel const& cam, double num_exclude_boundary_pixels,
+void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
+                    cv::Mat const& image, camera::CameraModel const& cam,
+                    double num_exclude_boundary_pixels,
                     // outputs
-                    std::vector<double>& smallest_cost_per_face, std::vector<Eigen::Vector3i>& face_vec,
+                    std::vector<double>& smallest_cost_per_face,
+                    std::vector<Eigen::Vector3i>& face_vec,
                     std::map<int, Eigen::Vector2d>& uv_map);
 
 // Project texture on a texture model that was pre-filled already, so
 // only the texture pixel values need to be computed
-void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
-                    camera::CameraModel const& cam, std::vector<double>& smallest_cost_per_face, double pixel_size,
-                    int num_threads, std::vector<FaceInfo> const& face_projection_info,
-                    std::vector<IsaacTextureAtlas::Ptr>& texture_atlases, tex::Model& model, cv::Mat& out_texture);
+void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
+                    cv::Mat const& image, camera::CameraModel const& cam,
+                    std::vector<double>& smallest_cost_per_face,
+                    double pixel_size, int num_threads,
+                    std::vector<FaceInfo> const& face_projection_info,
+                    std::vector<IsaacTextureAtlas::Ptr>& texture_atlases, tex::Model& model,
+                    cv::Mat& out_texture);
+
+void meshProject(mve::TriangleMesh::Ptr const& mesh,
+                 std::shared_ptr<BVHTree> const& bvh_tree,
+                 cv::Mat const& image,
+                 Eigen::Affine3d const& world_to_cam,
+                 camera::CameraParameters const& cam_params,
+                 int num_exclude_boundary_pixels,
+                 std::string const& out_prefix);
 
 // Save a model
 void isaac_save_model(ObjModel* obj_model, std::string const& prefix);

@@ -240,7 +240,7 @@ struct DepthToHazError {
         new DepthToHazError(nav_pix, depth_xyz, block_sizes, haz_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {
@@ -303,7 +303,7 @@ struct NavError {
       new ceres::DynamicNumericDiffCostFunction<NavError>(new NavError(nav_pix, block_sizes, nav_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {
@@ -406,7 +406,7 @@ struct DepthToNavError {
         new DepthToNavError(nav_pix, depth_xyz, alpha, match_left, block_sizes, nav_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {
@@ -528,7 +528,7 @@ struct DepthToSciError {
         new DepthToSciError(dist_sci_pix, depth_xyz, alpha_haz, alpha_sci, block_sizes, sci_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {
@@ -629,7 +629,7 @@ struct SciError {
         new SciError(dist_sci_pix, alpha, block_sizes, sci_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {

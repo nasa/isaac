@@ -93,6 +93,8 @@ suffix = "_" + args.camera_type + "_to_world.txt"
 # run into old files
 index_file = os.path.join(args.camera_dir, args.camera_type + "_index.txt")
 
+camera_files = []
+
 with open(index_file, "r") as f:
     for image_file in f:
         image_file = image_file.rstrip()
@@ -103,6 +105,7 @@ with open(index_file, "r") as f:
             print("Expecting a .jpg file, but got: " + image_file)
 
         in_cam = os.path.join(args.camera_dir, m.group(1) + suffix)
+        camera_files.append(in_cam)
 
         out_cam = args.undistorted_image_dir + "/" + os.path.basename(in_cam)
 
@@ -120,13 +123,13 @@ with open(index_file, "r") as f:
         M = np.linalg.inv(M)  # world to camera
 
         print("Writing: " + out_cam)
-        with open(out_cam, "w") as f:
+        with open(out_cam, "w") as g:
 
             # translation
-            f.write("%0.17g %0.17g %0.17g " % (M[0][3], M[1][3], M[2][3]))
+            g.write("%0.17g %0.17g %0.17g " % (M[0][3], M[1][3], M[2][3]))
 
             # rotation
-            f.write(
+            g.write(
                 "%0.17g %0.17g %0.17g %0.17g %0.17g %0.17g %0.17g %0.17g %0.17g\n"
                 % (
                     M[0][0],
@@ -142,7 +145,15 @@ with open(index_file, "r") as f:
             )
 
             # normaized inrinsics
-            f.write(
+            g.write(
                 "%0.17g %0.17g %0.17g %0.17g %0.17g %0.17g\n"
                 % (nf, d0, d1, paspect, ncx, ncy)
             )
+
+# Save the name of the camera transforms. This will be used later
+# for individual texturing of each image and camera.
+camera_list = os.path.join(args.camera_dir, args.camera_type + "_transforms.txt")
+with open(camera_list, "w") as f:
+    print("Writing: " + camera_list)
+    for camera in camera_files:
+        f.write(camera + "\n")

@@ -283,7 +283,8 @@ math::Vec3f eigen_to_vec3f(Eigen::Vector3d const& V) {
   return v;
 }
 
-void calculate_texture_size(double height_factor, std::list<IsaacTexturePatch::ConstPtr> const& texture_patches,
+void calculate_texture_size(double height_factor,
+                              std::list<IsaacTexturePatch::ConstPtr> const& texture_patches,
                             int& texture_width, int& texture_height) {
   int64_t total_area = 0;
   int max_width = 0;
@@ -849,11 +850,6 @@ void formMtl(std::string const& out_prefix, std::string& mtl_str) {
   ofs << "Ns 0.000000\n";
   ofs << "map_Kd " << out_prefix << ".png\n";
   mtl_str = ofs.str();
-
-  std::string mtl_file = out_prefix + ".mtl";
-  std::ofstream ofs2(mtl_file.c_str());
-  ofs2 << mtl_str;
-  ofs2.close();
 }
 
 void formObjCustomUV(mve::TriangleMesh::ConstPtr mesh, std::vector<Eigen::Vector3i> const& face_vec,
@@ -944,11 +940,48 @@ void formObj(tex::Model& texture_model, std::string const& out_prefix, std::stri
   obj_str = out.str();
 }
 
+// The images from the bag may need to be resized to be the same
+// size as in the calibration file. Sometimes the full-res images
+// can be so blurry that interest point matching fails, hence the
+// resizing.
+// Similar logic to deal with differences between image size and calibrated size
+// is used further down this code.
+void adjustImageSize(camera::CameraParameters const& cam_params, cv::Mat & image) {
+  int raw_image_cols = image.cols;
+  int raw_image_rows = image.rows;
+  int calib_image_cols = cam_params.GetDistortedSize()[0];
+  int calib_image_rows = cam_params.GetDistortedSize()[1];
+
+  int factor = raw_image_cols / calib_image_cols;
+
+  if ((raw_image_cols != calib_image_cols * factor) ||
+      (raw_image_rows != calib_image_rows * factor)) {
+    LOG(FATAL) << "Image width and height are: " << raw_image_cols << ' ' << raw_image_rows
+               << "\n"
+               << "Calibrated image width and height are: "
+               << calib_image_cols << ' ' << calib_image_rows << "\n"
+               << "These must be equal up to an integer factor.\n";
+  }
+
+  if (factor != 1) {
+    // TODO(oalexan1): This kind of resizing may be creating aliased images.
+    cv::Mat local_image;
+    cv::resize(image, local_image, cv::Size(), 1.0/factor, 1.0/factor, cv::INTER_AREA);
+    local_image.copyTo(image);
+  }
+
+  // Check
+  if (image.cols != calib_image_cols || image.rows != calib_image_rows)
+    LOG(FATAL) << "Sci cam images have the wrong size.";
+}
+
 // Project texture and find the UV coordinates
-void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
+void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
+                    cv::Mat const& image,
                     camera::CameraModel const& cam, double num_exclude_boundary_pixels,
                     // outputs
-                    std::vector<double>& smallest_cost_per_face, std::vector<Eigen::Vector3i>& face_vec,
+                    std::vector<double>& smallest_cost_per_face,
+                    std::vector<Eigen::Vector3i>& face_vec,
                     std::map<int, Eigen::Vector2d>& uv_map) {
   // Wipe the outputs
   face_vec.clear();
@@ -966,9 +999,12 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
   int factor = raw_image_cols / calib_image_cols;
 
-  if ((raw_image_cols != calib_image_cols * factor) || (raw_image_rows != calib_image_rows * factor)) {
-    LOG(FATAL) << "Published image width and height are: " << raw_image_cols << ' ' << raw_image_rows << "\n"
-               << "Calibrated image width and height are: " << calib_image_cols << ' ' << calib_image_rows << "\n"
+  if ((raw_image_cols != calib_image_cols * factor) ||
+      (raw_image_rows != calib_image_rows * factor)) {
+    LOG(FATAL) << "Published image width and height are: "
+               << raw_image_cols << ' ' << raw_image_rows << "\n"
+               << "Calibrated image width and height are: "
+               << calib_image_cols << ' ' << calib_image_rows << "\n"
                << "These must be equal up to an integer factor.\n";
   }
 
@@ -979,12 +1015,14 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
   std::vector<math::Vec3f> const& vertices = mesh->get_vertices();
   std::vector<math::Vec3f> const& mesh_normals = mesh->get_vertex_normals();
-  if (vertices.size() != mesh_normals.size()) LOG(FATAL) << "A mesh must have as many vertices as vertex normals.";
+  if (vertices.size() != mesh_normals.size())
+    LOG(FATAL) << "A mesh must have as many vertices as vertex normals.";
 
   std::vector<unsigned int> const& faces = mesh->get_faces();
   std::vector<math::Vec3f> const& face_normals = mesh->get_face_normals();
 
-  if (smallest_cost_per_face.size() != faces.size()) LOG(FATAL) << "There must be one cost value per face.";
+  if (smallest_cost_per_face.size() != faces.size())
+    LOG(FATAL) << "There must be one cost value per face.";
 
 #pragma omp parallel for
   for (std::size_t face_id = 0; face_id < faces.size() / 3; face_id++) {
@@ -1053,7 +1091,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
       }
 
       // Get the undistorted pixel
-      Eigen::Vector2d undist_centered_pix = cam.GetParameters().GetFocalVector().cwiseProduct(cam_pt.hnormalized());
+      Eigen::Vector2d undist_centered_pix =
+        cam.GetParameters().GetFocalVector().cwiseProduct(cam_pt.hnormalized());
       if (std::abs(undist_centered_pix[0]) > cam.GetParameters().GetUndistortedHalfSize()[0] ||
           std::abs(undist_centered_pix[1]) > cam.GetParameters().GetUndistortedHalfSize()[1]) {
         // If we are out of acceptable undistorted region, there's some uncertainty whether
@@ -1064,7 +1103,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
       // Get the distorted pixel value
       Eigen::Vector2d dist_pix;
-      cam.GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED>(undist_centered_pix, &dist_pix);
+      cam.GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED>
+        (undist_centered_pix, &dist_pix);
 
       // Skip pixels that don't project in the image
       if (dist_pix.x() < num_exclude_boundary_pixels ||
@@ -1107,10 +1147,12 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
 // Project texture using a texture model that was already pre-filled, so
 // just update pixel values
-void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
-                    camera::CameraModel const& cam, std::vector<double>& smallest_cost_per_face, double pixel_size,
+void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
+                    cv::Mat const& image, camera::CameraModel const& cam,
+                    std::vector<double>& smallest_cost_per_face, double pixel_size,
                     int num_threads, std::vector<FaceInfo> const& face_projection_info,
-                    std::vector<IsaacTextureAtlas::Ptr>& texture_atlases, tex::Model& model, cv::Mat& out_texture) {
+                    std::vector<IsaacTextureAtlas::Ptr>& texture_atlases, tex::Model& model,
+                    cv::Mat& out_texture) {
   omp_set_dynamic(0);                // Explicitly disable dynamic teams
   omp_set_num_threads(num_threads);  // Use this many threads for all
                                      // consecutive parallel regions
@@ -1128,9 +1170,12 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
   int calib_image_rows = cam.GetParameters().GetDistortedSize()[1];
 
   int factor = raw_image_cols / calib_image_cols;
-  if ((raw_image_cols != calib_image_cols * factor) || (raw_image_rows != calib_image_rows * factor)) {
-    LOG(FATAL) << "Published image width and height are: " << raw_image_cols << ' ' << raw_image_rows << "\n"
-               << "Calibrated image width and height are: " << calib_image_cols << ' ' << calib_image_rows << "\n"
+  if ((raw_image_cols != calib_image_cols * factor) ||
+      (raw_image_rows != calib_image_rows * factor)) {
+    LOG(FATAL) << "Published image width and height are: "
+               << raw_image_cols << ' ' << raw_image_rows << "\n"
+               << "Calibrated image width and height are: "
+               << calib_image_cols << ' ' << calib_image_rows << "\n"
                << "These must be equal up to an integer factor.\n";
   }
 
@@ -1143,18 +1188,21 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
   // Blank the image
   texture->fill(0);
 
-  if (texture->channels() != NUM_CHANNELS) throw util::Exception("Wrong number of channels in the texture image.");
+  if (texture->channels() != NUM_CHANNELS)
+    throw util::Exception("Wrong number of channels in the texture image.");
 
   Eigen::Vector3d cam_ctr = cam.GetPosition();
 
   std::vector<math::Vec3f> const& vertices = mesh->get_vertices();
   std::vector<math::Vec3f> const& mesh_normals = mesh->get_vertex_normals();
-  if (vertices.size() != mesh_normals.size()) LOG(FATAL) << "A mesh must have as many vertices as vertex normals.";
+  if (vertices.size() != mesh_normals.size())
+    LOG(FATAL) << "A mesh must have as many vertices as vertex normals.";
 
   std::vector<unsigned int> const& faces = mesh->get_faces();
   std::vector<math::Vec3f> const& face_normals = mesh->get_face_normals();
 
-  if (smallest_cost_per_face.size() != faces.size()) LOG(FATAL) << "There must be one cost value per face.";
+  if (smallest_cost_per_face.size() != faces.size())
+    LOG(FATAL) << "There must be one cost value per face.";
 
 #pragma omp parallel for
   for (std::size_t face_id = 0; face_id < faces.size() / 3; face_id++) {
@@ -1222,7 +1270,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
       }
 
       // Get the undistorted pixel
-      Eigen::Vector2d undist_centered_pix = cam.GetParameters().GetFocalVector().cwiseProduct(cam_pt.hnormalized());
+      Eigen::Vector2d undist_centered_pix
+        = cam.GetParameters().GetFocalVector().cwiseProduct(cam_pt.hnormalized());
       if (std::abs(undist_centered_pix[0]) > cam.GetParameters().GetUndistortedHalfSize()[0] ||
           std::abs(undist_centered_pix[1]) > cam.GetParameters().GetUndistortedHalfSize()[1]) {
         // If we are out of acceptable undistorted region, there's some uncertainty whether
@@ -1233,7 +1282,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
       // Get the distorted pixel value
       Eigen::Vector2d dist_pix;
-      cam.GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED>(undist_centered_pix, &dist_pix);
+      cam.GetParameters().Convert<camera::UNDISTORTED_C,
+        camera::DISTORTED>(undist_centered_pix, &dist_pix);
 
       // Skip pixels that don't project in the image
       if (dist_pix.x() < 0 || dist_pix.x() > calib_image_cols - 1 || dist_pix.y() < 0 ||
@@ -1360,4 +1410,57 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
   // std::cout << "Projecting took: " << timer.get_elapsed()/1000.0 << "
   // seconds\n";
 }
+
+// Project and save a mesh as an obj file to out_prefix.obj,
+// out_prefix.mtl, out_prefix.png.
+void meshProject(mve::TriangleMesh::Ptr const& mesh,
+                 std::shared_ptr<BVHTree> const& bvh_tree,
+                 cv::Mat const& image,
+                 Eigen::Affine3d const& world_to_cam,
+                 camera::CameraParameters const& cam_params,
+                 int num_exclude_boundary_pixels,
+                 std::string const& out_prefix) {
+  // Create the output directory, if needed
+  std::string out_dir = boost::filesystem::path(out_prefix).parent_path().string();
+  if (out_dir != "") dense_map::createDir(out_dir);
+
+  std::vector<Eigen::Vector3i> face_vec;
+  std::map<int, Eigen::Vector2d> uv_map;
+
+  std::vector<unsigned int> const& faces = mesh->get_faces();
+  int num_faces = faces.size();
+  std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
+
+  camera::CameraModel cam(world_to_cam, cam_params);
+
+  // Find the UV coordinates and the faces having them
+  dense_map::projectTexture(mesh, bvh_tree, image, cam, num_exclude_boundary_pixels,
+                            smallest_cost_per_face, face_vec, uv_map);
+
+  // Strip the directory name, according to .obj file conventions.
+  std::string suffix = boost::filesystem::path(out_prefix).filename().string();
+
+  std::string obj_str;
+  dense_map::formObjCustomUV(mesh, face_vec, uv_map, suffix, obj_str);
+
+  std::string mtl_str;
+  dense_map::formMtl(suffix, mtl_str);
+
+  std::string obj_file = out_prefix + ".obj";
+  std::cout << "Writing: " << obj_file << std::endl;
+  std::ofstream obj_handle(obj_file);
+  obj_handle << obj_str;
+  obj_handle.close();
+
+  std::string mtl_file = out_prefix + ".mtl";
+  std::cout << "Writing: " << mtl_file << std::endl;
+  std::ofstream mtl_handle(mtl_file);
+  mtl_handle << mtl_str;
+  mtl_handle.close();
+
+  std::string texture_file = out_prefix + ".png";
+  std::cout << "Writing: " << texture_file << std::endl;
+  cv::imwrite(texture_file, image);
+}
+
 }  // namespace dense_map

@@ -113,9 +113,9 @@ class StreamingMapper {
   camera::CameraParameters m_texture_cam_params;
   sensor_msgs::Image m_texture_obj_msg, m_texture_mtl_msg;
 
-  double m_navcam_to_texture_cam_timestamp_offset;
-  Eigen::MatrixXd m_texture_cam_to_navcam_trans;
-  Eigen::MatrixXd m_navcam_to_body_trans;
+  double m_nav_cam_to_texture_cam_timestamp_offset;
+  Eigen::MatrixXd m_texture_cam_to_nav_cam_trans;
+  Eigen::MatrixXd m_nav_cam_to_body_trans;
 
   std::string nav_cam_pose_topic, ekf_state_topic, ekf_pose_topic, texture_cam_topic,
     sci_cam_exif_topic, m_texture_cam_type, mesh_file;
@@ -164,9 +164,9 @@ class StreamingMapper {
 
 StreamingMapper::StreamingMapper()
     : m_texture_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0)),
-      m_navcam_to_texture_cam_timestamp_offset(0.0),
-      m_texture_cam_to_navcam_trans(Eigen::MatrixXd::Identity(4, 4)),
-      m_navcam_to_body_trans(Eigen::MatrixXd::Identity(4, 4)),
+      m_nav_cam_to_texture_cam_timestamp_offset(0.0),
+      m_texture_cam_to_nav_cam_trans(Eigen::MatrixXd::Identity(4, 4)),
+      m_nav_cam_to_body_trans(Eigen::MatrixXd::Identity(4, 4)),
       m_last_processed_cam_ctr(Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0)),
       m_processed_camera_count(0) {}
 
@@ -196,29 +196,29 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
     std::vector<Eigen::Affine3d>          nav_to_cam_trans;
     std::vector<double>                   nav_to_cam_timestamp_offsets;
     Eigen::Affine3d                       hazcam_depth_to_image_transform;
-    Eigen::Affine3d                       navcam_to_body_trans;
+    Eigen::Affine3d                       nav_cam_to_body_trans;
 
     dense_map::readConfigFile(  // Inputs
       cam_names,
       "nav_cam_transform",  // this is the nav cam to body transform
       "haz_cam_depth_to_image_transform",
       // Outputs
-      cam_params, nav_to_cam_trans, nav_to_cam_timestamp_offsets, navcam_to_body_trans,
+      cam_params, nav_to_cam_trans, nav_to_cam_timestamp_offsets, nav_cam_to_body_trans,
       hazcam_depth_to_image_transform);
 
-    m_navcam_to_body_trans = navcam_to_body_trans.matrix();
+    m_nav_cam_to_body_trans = nav_cam_to_body_trans.matrix();
 
     {
       // Note the lock, because m_texture_cam_params is a shared resource
       const std::lock_guard<std::mutex> lock(texture_cam_info_lock);
 
       // Index 0 below, based on the order in cam_names
-      m_texture_cam_to_navcam_trans            = nav_to_cam_trans[0].inverse().matrix();
-      m_navcam_to_texture_cam_timestamp_offset = nav_to_cam_timestamp_offsets[0];
-      m_texture_cam_params                     = cam_params[0];
+      m_texture_cam_to_nav_cam_trans            = nav_to_cam_trans[0].inverse().matrix();
+      m_nav_cam_to_texture_cam_timestamp_offset = nav_to_cam_timestamp_offsets[0];
+      m_texture_cam_params                      = cam_params[0];
 
-      std::cout << "m_navcam_to_texture_cam_timestamp_offset: "
-                << m_navcam_to_texture_cam_timestamp_offset << "\n";
+      std::cout << "nav_cam_to_texture_cam_timestamp_offset: "
+                << m_nav_cam_to_texture_cam_timestamp_offset << "\n";
       std::cout << "texture cam focal vector: "
                 << m_texture_cam_params.GetFocalVector().transpose() << "\n";
     }
@@ -228,7 +228,8 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
   std::string mapper_img_topic = "/ism/" + m_texture_cam_type + "/img";
   std::string mapper_obj_topic = "/ism/" + m_texture_cam_type + "/obj";
   std::string mapper_mtl_topic = "/ism/" + m_texture_cam_type + "/mtl";
-  ROS_INFO_STREAM("Publishing topics: " << mapper_img_topic << ' ' << mapper_obj_topic << ' ' << mapper_mtl_topic);
+  ROS_INFO_STREAM("Publishing topics: " << mapper_img_topic << ' '
+                  << mapper_obj_topic << ' ' << mapper_mtl_topic);
   texture_img_pub = nh.advertise<sensor_msgs::Image>(mapper_img_topic, 1);
   texture_obj_pub = nh.advertise<sensor_msgs::Image>(mapper_obj_topic, 1);
   texture_mtl_pub = nh.advertise<sensor_msgs::Image>(mapper_mtl_topic, 1);
@@ -345,23 +346,29 @@ void StreamingMapper::ReadParams(ros::NodeHandle const& nh) {
   ROS_INFO_STREAM("Texture camera type = " << m_texture_cam_type);
   ROS_INFO_STREAM("Mesh = " << mesh_file);
   if (!m_sim_mode) {
-    int num = (!nav_cam_pose_topic.empty()) + (!ekf_state_topic.empty()) + (!ekf_pose_topic.empty());
+    int num = (!nav_cam_pose_topic.empty()) + (!ekf_state_topic.empty()) +
+      (!ekf_pose_topic.empty());
     if (num != 1)
       LOG(FATAL) << "Must specify exactly only one of nav_cam_pose_topic, "
                  << "ekf_state_topic, ekf_pose_topic.";
-
-    ROS_INFO_STREAM("dist_between_processed_cams = " << dist_between_processed_cams);
-    ROS_INFO_STREAM("max_iso_times_exposure      = " << max_iso_times_exposure);
-    ROS_INFO_STREAM("use_single_texture          = " << use_single_texture);
-    ROS_INFO_STREAM("sci_cam_exposure_correction = " << m_sci_cam_exp_corr);
-    ROS_INFO_STREAM("pixel_size                  = " << pixel_size);
-    ROS_INFO_STREAM("num_threads                 = " << num_threads);
-    ROS_INFO_STREAM("sim_mode                    = " << m_sim_mode);
-    ROS_INFO_STREAM("save_to_disk                = " << save_to_disk);
-    ROS_INFO_STREAM("num_exclude_boundary_pixels = " << num_exclude_boundary_pixels);
-    ROS_INFO_STREAM("ASTROBEE_ROBOT              = " << getenv("ASTROBEE_ROBOT"));
-    ROS_INFO_STREAM("ASTROBEE_WORLD              = " << getenv("ASTROBEE_WORLD"));
   }
+
+  if (m_sim_mode && m_texture_cam_type == "nav_cam")
+    LOG(FATAL) << "The streaming mapper does not support nav_cam with simulated data as "
+               << "its distortion is not modeled.\n";
+
+  ROS_INFO_STREAM("Streaming mapper parameters:");
+  ROS_INFO_STREAM("dist_between_processed_cams = " << dist_between_processed_cams);
+  ROS_INFO_STREAM("max_iso_times_exposure      = " << max_iso_times_exposure);
+  ROS_INFO_STREAM("use_single_texture          = " << use_single_texture);
+  ROS_INFO_STREAM("sci_cam_exposure_correction = " << m_sci_cam_exp_corr);
+  ROS_INFO_STREAM("pixel_size                  = " << pixel_size);
+  ROS_INFO_STREAM("num_threads                 = " << num_threads);
+  ROS_INFO_STREAM("sim_mode                    = " << m_sim_mode);
+  ROS_INFO_STREAM("save_to_disk                = " << save_to_disk);
+  ROS_INFO_STREAM("num_exclude_boundary_pixels = " << num_exclude_boundary_pixels);
+  ROS_INFO_STREAM("ASTROBEE_ROBOT              = " << getenv("ASTROBEE_ROBOT"));
+  ROS_INFO_STREAM("ASTROBEE_WORLD              = " << getenv("ASTROBEE_WORLD"));
 
   // For a camera like sci_cam, the word "sci" better be part of texture_cam_topic.
   std::string cam_name = m_texture_cam_type.substr(0, 3);
@@ -485,7 +492,7 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
     m_texture_mtl_msg.data.resize(mtl_len);
     std::copy(reinterpret_cast<const char*>(&mtl_str[0]),            // input beg
               reinterpret_cast<const char*>(&mtl_str[0]) + mtl_len,  // input end
-              m_texture_mtl_msg.data.begin());                         // destination
+              m_texture_mtl_msg.data.begin());                       // destination
 
     if (!use_single_texture || processed_camera_count == 0)
       texture_mtl_pub.publish(m_texture_mtl_msg);
@@ -577,13 +584,13 @@ void StreamingMapper::AddTextureCamPose(double nav_cam_timestamp, Eigen::Affine3
 
   // Must compensate for the fact that the nav cam, haz cam, and texture cam all
   // have some time delay among them
-  double texture_cam_timestamp = nav_cam_timestamp + m_navcam_to_texture_cam_timestamp_offset;
+  double texture_cam_timestamp = nav_cam_timestamp + m_nav_cam_to_texture_cam_timestamp_offset;
 
   // Keep in mind that nav_cam_pose is the transform from the nav cam
   // to the world.  Hence the matrices are multiplied in the order as
   // below.
   Eigen::Affine3d texture_cam_pose;
-  texture_cam_pose.matrix() = nav_cam_pose.matrix() * m_texture_cam_to_navcam_trans;
+  texture_cam_pose.matrix() = nav_cam_pose.matrix() * m_texture_cam_to_nav_cam_trans;
   {
     // Add the latest pose. Use a lock.
     const std::lock_guard<std::mutex> lock(texture_cam_pose_lock);
@@ -617,10 +624,10 @@ void StreamingMapper::EkfStateCallback(ff_msgs::EkfState::ConstPtr const& ekf_st
   tf::poseMsgToEigen(ekf_state->pose, body_pose);
 
   // Convert from body pose (body to world transform) to nav cam pose (nav cam to world transform)
-  // Use the equation: body_to_world = navcam_to_world * body_to_navcam, written equivalently as:
-  // navcam_to_world = body_to_world * navcam_to_body
+  // Use the equation: body_to_world = nav_cam_to_world * body_to_nav_cam, written equivalently as:
+  // nav_cam_to_world = body_to_world * nav_cam_to_body
   Eigen::Affine3d nav_cam_pose;
-  nav_cam_pose.matrix() = body_pose.matrix() * m_navcam_to_body_trans;
+  nav_cam_pose.matrix() = body_pose.matrix() * m_nav_cam_to_body_trans;
   StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
 }
 
@@ -633,10 +640,10 @@ void StreamingMapper::EkfPoseCallback(geometry_msgs::PoseStamped::ConstPtr const
   tf::poseMsgToEigen(ekf_pose->pose, body_pose);
 
   // Convert from body pose (body to world transform) to nav cam pose (nav cam to world transform)
-  // Use the equation: body_to_world = navcam_to_world * body_to_navcam, written equivalently as:
-  // navcam_to_world = body_to_world * navcam_to_body
+  // Use the equation: body_to_world = nav_cam_to_world * body_to_nav_cam, written equivalently as:
+  // nav_cam_to_world = body_to_world * nav_cam_to_body
   Eigen::Affine3d nav_cam_pose;
-  nav_cam_pose.matrix() = body_pose.matrix() * m_navcam_to_body_trans;
+  nav_cam_pose.matrix() = body_pose.matrix() * m_nav_cam_to_body_trans;
   StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
 }
 

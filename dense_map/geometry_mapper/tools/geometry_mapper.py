@@ -83,8 +83,8 @@ def process_args(args):
         default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160",
         help="The central region to keep after undistorting an image and "
         + "before texturing. For sci_cam the numbers are at 1/4th of the full "
-        + "resolution and will be adjusted for the actual input image dimensions. "
-        + "Use a list in quotes.",
+        + "resolution (resolution of calibration) and will be adjusted for the "
+        + "actual input image dimensions. Use a list in quotes.",
     )
     parser.add_argument(
         "--haz_cam_points_topic",
@@ -312,6 +312,15 @@ def process_args(args):
         action="store_true",
         help="Save many intermediate datasets for debugging.",
     )
+
+    parser.add_argument(
+        "--texture_individual_images",
+        dest="texture_individual_images",
+        action="store_true",
+        help="If specified, in addition to a joint texture of all images create individual "
+        + "textures for each image and camera. Does not work with simulated cameras. For debugging.",
+    )
+
     args = parser.parse_args()
 
     # Parse the crop windows
@@ -681,6 +690,30 @@ def create_texrecon_cameras(args, src_path, undist_dir, cam_type):
     run_cmd(cmd, log_file, verbose=args.verbose)
 
 
+def texture_individual_images(args, exec_path, mesh, dist_image_list, cam_type):
+
+    camera_list = os.path.join(args.output_dir, cam_type + "_transforms.txt")
+    orthoproject_path = os.path.join(exec_path, "orthoproject")
+
+    cmd = [
+        orthoproject_path,
+        "-mesh",
+        mesh,
+        "-image_list",
+        dist_image_list,
+        "-camera_list",
+        camera_list,
+        "--camera_name",
+        cam_type,
+        "-output_prefix",
+        args.output_dir + "/" + cam_type,
+    ]
+
+    log_file = os.path.join(args.output_dir, "orthoproject_log.txt")
+    print("Projecting individual images. Writing the output log to: " + log_file)
+    run_cmd(cmd, log_file, verbose=args.verbose)
+
+
 def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
 
     # That is one long path
@@ -693,7 +726,7 @@ def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
     if not os.path.exists(texrecon_path):
         raise Exception("Cannot find: " + texrecon_path)
 
-    texrecon_dir = os.path.join(args.output_dir, cam_type + "_texture/run")
+    texrecon_dir = os.path.join(args.output_dir, cam_type + "_texture/" + cam_type)
     parent_dir = os.path.dirname(texrecon_dir)
     if os.path.isdir(parent_dir):
         # Wipe the existing directory
@@ -743,7 +776,7 @@ def find_sci_cam_scale(image_file):
     return float(image_width) / float(config_width)
 
 
-def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
+def texture_mesh(src_path, exec_path, cam_type, crop_win_map, mesh, args):
     if args.simulated_data and cam_type == "nav_cam":
         print("Texturing nav_cam is not supported with simulated data.")
         return "None"
@@ -778,6 +811,10 @@ def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
             args, cam_type, dist_image_list, undist_dir, undist_crop_win, scale
         )
         create_texrecon_cameras(args, src_path, undist_dir, cam_type)
+
+        if args.texture_individual_images:
+            texture_individual_images(args, exec_path, mesh, dist_image_list, cam_type)
+
         textured_mesh = run_texrecon(args, src_path, mesh, undist_dir, cam_type)
     else:
         # Simulated images don't have distortion
@@ -936,7 +973,7 @@ if __name__ == "__main__":
     if start_step <= 9:
         for camera_type in args.camera_types.split():
             textured_mesh = texture_mesh(
-                src_path, camera_type, crop_win_map, simplified_mesh, args
+                src_path, exec_path, camera_type, crop_win_map, simplified_mesh, args
             )
             textured_meshes += [textured_mesh]
 

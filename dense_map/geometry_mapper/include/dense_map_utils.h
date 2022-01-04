@@ -41,15 +41,24 @@
 
 namespace dense_map {
 
-const int NUM_SCALAR_PARAMS = 1;
-const int NUM_OPT_CTR_PARAMS = 2;  // optical center in x and y
-const int NUM_RESIDUALS = 2;       // Same as pixel size
-const int NUM_XYZ_PARAMS = 3;
-const int NUM_RIGID_PARAMS = 7;  // (quaternion (4) + translation (3))
+const int NUM_SCALAR_PARAMS  = 1;  // Used to float single-value params // NOLINT
+const int NUM_OPT_CTR_PARAMS = 2;  // optical center in x and y         // NOLINT
+const int NUM_PIX_PARAMS     = 2;                                       // NOLINT
+const int NUM_XYZ_PARAMS     = 3;                                       // NOLINT
+const int NUM_RIGID_PARAMS   = 7;  // quaternion (4) + translation (3)  // NOLINT
+const int NUM_AFFINE_PARAMS  = 12; // 3x3 matrix (9) + translation (3)  // NOLINT
 
 // A  function to split a string like 'optical_center focal_length' into
 // its two constituents.
-void parse_intrinsics_to_float(std::string const& intrinsics_to_float, std::set<std::string>& intrinsics_to_float_set);
+void parse_intrinsics_to_float(std::string const& intrinsics_to_float,
+                                 std::set<std::string>& intrinsics_to_float_set);
+
+// A  function to split a string like 'haz_cam sci_cam' into
+// its two constituents and validate against the list of known cameras.
+void parse_extrinsics_to_float(std::vector<std::string> const& cam_names,
+                               std::string const& depth_to_image_name,
+                               std::string const& extrinsics_to_float,
+                               std::set<std::string>& extrinsics_to_float_set);
 
 // Extract a rigid transform to an array of length NUM_RIGID_PARAMS
 void rigid_transform_to_array(Eigen::Affine3d const& aff, double* arr);
@@ -57,6 +66,12 @@ void rigid_transform_to_array(Eigen::Affine3d const& aff, double* arr);
 // Convert an array of length NUM_RIGID_PARAMS to a rigid
 // transform. Normalize the quaternion to make it into a rotation.
 void array_to_rigid_transform(Eigen::Affine3d& aff, const double* arr);
+
+void affine_transform_to_array(Eigen::Affine3d const& aff, double* arr);
+void array_to_affine_transform(Eigen::Affine3d& aff, const double* arr);
+
+// Convert a string of values separated by spaces to a vector of doubles.
+std::vector<double> string_to_vector(std::string const& str);
 
 // Read a 4x4 pose matrix of doubles from disk
 void readPoseMatrix(cv::Mat& pose, std::string const& filename);
@@ -100,12 +115,14 @@ void updateConfigFile                                                           
  Eigen::Affine3d                       const& haz_cam_depth_to_image_trans);    // NOLINT
 
 // Given two poses aff0 and aff1, and 0 <= alpha <= 1, do linear interpolation.
-Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::Affine3d const& aff1);
+Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0,
+                               Eigen::Affine3d const& aff1);
 
 // Given a set of poses indexed by timestamp in an std::map, find the
 // interpolated pose at desired timestamp. This is efficient
 // only for very small maps. Else use the StampedPoseStorage class.
-bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses, Eigen::Affine3d& interp_pose);
+bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses,
+                    Eigen::Affine3d& interp_pose);
 
 // A class to store timestamped poses, implementing O(log(n)) linear
 // interpolation at a desired timestamp. For fast access, keep the
