@@ -127,8 +127,7 @@ DEFINE_double(bracket_len, 0.6,
 DEFINE_int32(num_opt_threads, 16, "How many threads to use in the optimization.");
 
 DEFINE_string(sci_cam_timestamps, "",
-              "Use only these sci cam timestamps. Must be "
-              "a file with one timestamp per line.");
+              "Use only these sci cam timestamps. Must be a file with one timestamp per line.");
 
 DEFINE_bool(float_sparse_map, false,
             "Optimize the sparse map. This should be avoided as it can invalidate the scales "
@@ -1580,12 +1579,6 @@ int main(int argc, char** argv) {
           LOG(FATAL) << std::fixed << std::setprecision(17)
                      << "Cannot look up camera at time " << cam.timestamp << ".\n";
 
-        // See if to skip this timestamp
-        if (!cam_timestamps_to_use[cam_type].empty() &&
-            cam_timestamps_to_use[cam_type].find(cam.timestamp) ==
-            cam_timestamps_to_use[cam_type].end())
-          continue;
-
         success = true;
 
       } else {
@@ -1658,20 +1651,22 @@ int main(int argc, char** argv) {
 
         upper_bound[cam_type] = std::min(upper_bound[cam_type], best_time - left_timestamp);
         lower_bound[cam_type] = std::max(lower_bound[cam_type], best_time - right_timestamp);
-
-        // See if to skip this timestamp
-        if (!cam_timestamps_to_use[cam_type].empty() &&
-            cam_timestamps_to_use[cam_type].find(cam.timestamp) ==
-            cam_timestamps_to_use[cam_type].end())
-          continue;
-
         success = true;
+      }
+
+      // See if to skip this timestamp
+      if (!cam_timestamps_to_use[cam_type].empty() &&
+          cam_timestamps_to_use[cam_type].find(cam.timestamp) ==
+          cam_timestamps_to_use[cam_type].end()) {
+        std::cout << std::setprecision(17) << "For " << cam_names[cam_type]
+                  << " skipping timestamp: " << cam.timestamp << std::endl;
+        continue;
       }
 
       if (!success) continue;
 
       // This can be useful in checking if all the sci cams were bracketed successfully.
-      // std::cout << std::setprecision(17) << std::fixed  << "For camera "
+      // std::cout << std::setprecision(17) << "For camera "
       //          << cam_names[cam_type] << " pick timestamp "
       //          << cam.timestamp << ".\n";
 

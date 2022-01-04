@@ -831,8 +831,9 @@ with Meshlab:
   - data_dir/hole_filled_mesh2.ply: A further hole-filled mesh.
   - data_dir/simplified_mesh.ply: The simplified mesh.
   - data_dir/smooth_mesh3.ply: A further smoothed version of the mesh.
-  - data_dir/nav_cam_texture/run.obj: The mesh overlayed with the nav cam texture.
   - data_dir/sci_cam_texture/run.obj: The mesh overlayed with the sci cam texture.
+  - data_dir/nav_cam_texture/run.obj: The mesh overlayed with the nav cam texture.
+  - data_dir/haz_cam_texture/run.obj: The mesh overlayed with the haz cam texture.
 
 (Several passes of smoothing and hole-filling, as done above, appear
 necessary from experiments.)
