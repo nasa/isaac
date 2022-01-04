@@ -178,6 +178,15 @@
 
     </group>
 
+  <env unless="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
+       name="CUSTOM_CONFIG_DIR" value="optenv('ISAAC_CONFIG_DIR','')" />
+  <env if="$(eval optenv('CUSTOM_CONFIG_DIR','')=='')"
+       name="CUSTOM_CONFIG_DIR" value="$(find isaac)/config" />
+  <env unless="$(eval optenv('ISAAC_RESOURCE_DIR','')=='')"
+       name="CUSTOM_RESOURCE_DIR" value="optenv('ISAAC_RESOURCE_DIR','')" />
+  <env if="$(eval optenv('CUSTOM_RESOURCE_DIR','')=='')"
+       name="CUSTOM_RESOURCE_DIR" value="$(find isaac)/resources" />
+
     <!-- ILP --> 
     <group unless="$(eval arg('ilp')=='disabled')">
 
