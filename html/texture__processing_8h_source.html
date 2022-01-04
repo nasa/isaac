@@ -347,26 +347,43 @@ $(document).ready(function(){initNavTree('texture__processing_8h_source.html',''
 <div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160; </div>
 <div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160;<span class="keywordtype">void</span> formMtl(std::string <span class="keyword">const</span>&amp; out_prefix, std::string&amp; mtl_str);</div>
 <div class="line"><a name="l00261"></a><span class="lineno">  261</span>&#160; </div>
-<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;<span class="comment">// Project texture and find the UV coordinates</span></div>
-<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;<span class="keywordtype">void</span> projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr&lt;BVHTree&gt; bvh_tree, cv::Mat <span class="keyword">const</span>&amp; image,</div>
-<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;                    camera::CameraModel <span class="keyword">const</span>&amp; cam, <span class="keywordtype">double</span> num_exclude_boundary_pixels,</div>
-<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160;                    <span class="comment">// outputs</span></div>
-<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;                    std::vector&lt;double&gt;&amp; smallest_cost_per_face, std::vector&lt;Eigen::Vector3i&gt;&amp; face_vec,</div>
-<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;                    std::map&lt;int, Eigen::Vector2d&gt;&amp; uv_map);</div>
-<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160; </div>
-<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160;<span class="comment">// Project texture on a texture model that was pre-filled already, so</span></div>
-<div class="line"><a name="l00270"></a><span class="lineno">  270</span>&#160;<span class="comment">// only the texture pixel values need to be computed</span></div>
-<div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160;<span class="keywordtype">void</span> projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr&lt;BVHTree&gt; bvh_tree, cv::Mat <span class="keyword">const</span>&amp; image,</div>
-<div class="line"><a name="l00272"></a><span class="lineno">  272</span>&#160;                    camera::CameraModel <span class="keyword">const</span>&amp; cam, std::vector&lt;double&gt;&amp; smallest_cost_per_face, <span class="keywordtype">double</span> pixel_size,</div>
-<div class="line"><a name="l00273"></a><span class="lineno">  273</span>&#160;                    <span class="keywordtype">int</span> num_threads, std::vector&lt;FaceInfo&gt; <span class="keyword">const</span>&amp; face_projection_info,</div>
-<div class="line"><a name="l00274"></a><span class="lineno">  274</span>&#160;                    std::vector&lt;IsaacTextureAtlas::Ptr&gt;&amp; texture_atlases, tex::Model&amp; model, cv::Mat&amp; out_texture);</div>
-<div class="line"><a name="l00275"></a><span class="lineno">  275</span>&#160; </div>
-<div class="line"><a name="l00276"></a><span class="lineno">  276</span>&#160;<span class="comment">// Save a model</span></div>
-<div class="line"><a name="l00277"></a><span class="lineno">  277</span>&#160;<span class="keywordtype">void</span> isaac_save_model(ObjModel* obj_model, std::string <span class="keyword">const</span>&amp; prefix);</div>
-<div class="line"><a name="l00278"></a><span class="lineno">  278</span>&#160; </div>
-<div class="line"><a name="l00279"></a><span class="lineno">  279</span>&#160;}  <span class="comment">// namespace dense_map</span></div>
-<div class="line"><a name="l00280"></a><span class="lineno">  280</span>&#160; </div>
-<div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;<span class="preprocessor">#endif  // TEXTURE_PROCESSING_H_</span></div>
+<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;<span class="comment">// The images from the bag may need to be resized to be the same</span></div>
+<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;<span class="comment">// size as in the calibration file.</span></div>
+<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;<span class="keywordtype">void</span> adjustImageSize(camera::CameraParameters <span class="keyword">const</span>&amp; cam_params, cv::Mat &amp; image);</div>
+<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160; </div>
+<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;<span class="comment">// Project texture and find the UV coordinates</span></div>
+<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;<span class="keywordtype">void</span> projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr&lt;BVHTree&gt; bvh_tree,</div>
+<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160;                    cv::Mat <span class="keyword">const</span>&amp; image, camera::CameraModel <span class="keyword">const</span>&amp; cam,</div>
+<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160;                    <span class="keywordtype">double</span> num_exclude_boundary_pixels,</div>
+<div class="line"><a name="l00270"></a><span class="lineno">  270</span>&#160;                    <span class="comment">// outputs</span></div>
+<div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160;                    std::vector&lt;double&gt;&amp; smallest_cost_per_face,</div>
+<div class="line"><a name="l00272"></a><span class="lineno">  272</span>&#160;                    std::vector&lt;Eigen::Vector3i&gt;&amp; face_vec,</div>
+<div class="line"><a name="l00273"></a><span class="lineno">  273</span>&#160;                    std::map&lt;int, Eigen::Vector2d&gt;&amp; uv_map);</div>
+<div class="line"><a name="l00274"></a><span class="lineno">  274</span>&#160; </div>
+<div class="line"><a name="l00275"></a><span class="lineno">  275</span>&#160;<span class="comment">// Project texture on a texture model that was pre-filled already, so</span></div>
+<div class="line"><a name="l00276"></a><span class="lineno">  276</span>&#160;<span class="comment">// only the texture pixel values need to be computed</span></div>
+<div class="line"><a name="l00277"></a><span class="lineno">  277</span>&#160;<span class="keywordtype">void</span> projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr&lt;BVHTree&gt; bvh_tree,</div>
+<div class="line"><a name="l00278"></a><span class="lineno">  278</span>&#160;                    cv::Mat <span class="keyword">const</span>&amp; image, camera::CameraModel <span class="keyword">const</span>&amp; cam,</div>
+<div class="line"><a name="l00279"></a><span class="lineno">  279</span>&#160;                    std::vector&lt;double&gt;&amp; smallest_cost_per_face,</div>
+<div class="line"><a name="l00280"></a><span class="lineno">  280</span>&#160;                    <span class="keywordtype">double</span> pixel_size, <span class="keywordtype">int</span> num_threads,</div>
+<div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;                    std::vector&lt;FaceInfo&gt; <span class="keyword">const</span>&amp; face_projection_info,</div>
+<div class="line"><a name="l00282"></a><span class="lineno">  282</span>&#160;                    std::vector&lt;IsaacTextureAtlas::Ptr&gt;&amp; texture_atlases, tex::Model&amp; model,</div>
+<div class="line"><a name="l00283"></a><span class="lineno">  283</span>&#160;                    cv::Mat&amp; out_texture);</div>
+<div class="line"><a name="l00284"></a><span class="lineno">  284</span>&#160; </div>
+<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;<span class="keywordtype">void</span> meshProject(mve::TriangleMesh::Ptr <span class="keyword">const</span>&amp; mesh,</div>
+<div class="line"><a name="l00286"></a><span class="lineno">  286</span>&#160;                 std::shared_ptr&lt;BVHTree&gt; <span class="keyword">const</span>&amp; bvh_tree,</div>
+<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;                 cv::Mat <span class="keyword">const</span>&amp; image,</div>
+<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;                 Eigen::Affine3d <span class="keyword">const</span>&amp; world_to_cam,</div>
+<div class="line"><a name="l00289"></a><span class="lineno">  289</span>&#160;                 camera::CameraParameters <span class="keyword">const</span>&amp; cam_params,</div>
+<div class="line"><a name="l00290"></a><span class="lineno">  290</span>&#160;                 <span class="keywordtype">int</span> num_exclude_boundary_pixels,</div>
+<div class="line"><a name="l00291"></a><span class="lineno">  291</span>&#160;                 std::string <span class="keyword">const</span>&amp; out_prefix);</div>
+<div class="line"><a name="l00292"></a><span class="lineno">  292</span>&#160; </div>
+<div class="line"><a name="l00293"></a><span class="lineno">  293</span>&#160;<span class="comment">// Save a model</span></div>
+<div class="line"><a name="l00294"></a><span class="lineno">  294</span>&#160;<span class="keywordtype">void</span> isaac_save_model(ObjModel* obj_model, std::string <span class="keyword">const</span>&amp; prefix);</div>
+<div class="line"><a name="l00295"></a><span class="lineno">  295</span>&#160; </div>
+<div class="line"><a name="l00296"></a><span class="lineno">  296</span>&#160;}  <span class="comment">// namespace dense_map</span></div>
+<div class="line"><a name="l00297"></a><span class="lineno">  297</span>&#160; </div>
+<div class="line"><a name="l00298"></a><span class="lineno">  298</span>&#160;<span class="preprocessor">#endif  // TEXTURE_PROCESSING_H_</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <div class="ttc" id="aclassdense__map_1_1IsaacTexturePatch_html_a289b434b3aea37b29415132b9b0fdd7b"><div class="ttname"><a href="classdense__map_1_1IsaacTexturePatch.html#a289b434b3aea37b29415132b9b0fdd7b">dense_map::IsaacTexturePatch::IsaacTexturePatch</a></div><div class="ttdeci">IsaacTexturePatch(int _label, std::vector&lt; std::size_t &gt; const &amp;faces, std::vector&lt; math::Vec2f &gt; const &amp;texcoords, int width, int height)</div><div class="ttdef"><b>Definition:</b> texture_processing.h:139</div></div>

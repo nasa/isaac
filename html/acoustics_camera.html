@@ -121,11 +121,11 @@ ROS communication</h3>
 </pre><p>to get the robot pose. It publishes its image, camera pose, and camera intrinsics on topics: </p><pre class="fragment">/hw/cam_acoustics
 /sim/acoustics_cam/pose
 /sim/acoustics_cam/info
-</pre><p>By default, the camera takes pictures as often as it can (see the configuration below), which is rarely, in fact, as it is slow. It listens however to the topic </p><pre class="fragment">/comm/dds/command
+</pre><p>By default, the camera takes pictures as often as it can (see the configuration below), which is rarely, in fact, as it is slow. It listens however to the topic: </p><pre class="fragment">/comm/dds/command
 </pre><p>for guest science commands that may tell it to take a single picture at a specific time, or to take pictures continuously. Such a command must use the app name "gov.nasa.arc.irg.astrobee.acoustics_cam_image" (which is the "s" field in the first command argument) for it to be processed.</p>
 <h3><a class="anchor" id="autotoc_md35"></a>
 Configuration</h3>
-<p>The behavior of this camera is described in </p><pre class="fragment"> $ISAAC_WS/src/astrobee/simulation/acoustics_cam/acoustics_cam.json
+<p>The behavior of this camera is described in: </p><pre class="fragment"> $ISAAC_WS/src/astrobee/simulation/acoustics_cam/acoustics_cam.json
 </pre><p>It has the following entries:</p>
 <ul>
 <li>room_corners: the min and max coordinates of the simulated room in which the directional microphone takes measurements. Since the room is assumed to be anechoic, so there is no reflection from room walls, the precise room dimensions are not important, as long as the room is big enough to contain the sources of sound and the possible positions of the microphone and the robot carrying it.</li>
