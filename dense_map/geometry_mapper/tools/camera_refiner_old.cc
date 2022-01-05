@@ -17,9 +17,22 @@
  * under the License.
  */
 
-// TODO(oalexan1): Consider adding a haz cam to haz cam
-// reprojection error in the camera refiner. There will be more
-// haz to haz matches than haz to nav or haz to sci.
+// This is an old version of camera_refiner which could only match each sci and haz
+// image to its two bracketing nav_cam images. It is still functional, hence it is kept,
+// but the new camera_refiner performs better. It used to be invoked like this:
+//
+//     $ISAAC_WS/devel/lib/geometry_mapper/camera_refiner      \
+//       --ros_bag mybag.bag --sparse_map mymap.map            \
+//       --num_iterations 20 --bracket_len 0.6                 \
+//       --nav_cam_topic /mgt/img_sampler/nav_cam/image_record \
+//       --output_map output_map.map                           \
+//       --fix_map --skip_registration --float_scale           \
+//       --timestamp_interpolation --robust_threshold 3        \
+//       --sci_cam_intrinsics_to_float                         \
+//         'focal_length optical_center distortion'            \
+//       --mesh mesh.ply --mesh_weight 25                      \
+//       --mesh_robust_threshold 3
+
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
 #include <ceres/problem.h>

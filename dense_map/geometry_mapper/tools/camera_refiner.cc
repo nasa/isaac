@@ -18,7 +18,7 @@
  */
 
 // TODO(oalexan1): Move these OpenMVG headers to dense_map_utils.cc,
-// and do forward declarations in dense_map_utils.h.  Get rid of
+// and do forward declarations in dense_map_utils.h. Get rid of
 // warnings beyond our control
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -81,16 +81,17 @@
 #include <iostream>
 #include <fstream>
 
-DEFINE_string(ros_bag, "", "A ROS bag with recorded nav_cam, haz_cam, and "
-              "full-resolution sci_cam data.");
+DEFINE_string(ros_bag, "", "A ROS bag with recorded nav_cam, haz_cam intensity, "
+              "full-resolution sci_cam, and haz_cam depth clouds.");
 
 DEFINE_string(sparse_map, "",
               "A registered SURF sparse map made with some of the ROS bag data, "
-              "and including nav cam images closely bracketing the sci cam images.");
+              "including nav cam images closely bracketing the sci cam images.");
 
 DEFINE_string(output_map, "", "Output file containing the updated map.");
 
-DEFINE_string(nav_cam_topic, "/hw/cam_nav", "The nav cam topic in the bag file.");
+DEFINE_string(nav_cam_topic, "/mgt/img_sampler/nav_cam/image_record",
+              "The nav cam topic in the bag file.");
 
 DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points",
               "The depth point cloud topic in the bag file.");
@@ -104,17 +105,15 @@ DEFINE_int32(num_overlaps, 10, "How many images (of all camera types) close and 
              "time to match to given image.");
 
 DEFINE_double(max_haz_cam_image_to_depth_timestamp_diff, 0.2,
-              "Use depth haz cam clouds that are within this distance in "
-              "time from the nearest haz cam intensity image.");
+              "Use a haz cam depth cloud only if it is within this distance in time "
+              "from the nearest haz cam intensity image.");
 
 DEFINE_double(robust_threshold, 3.0,
-              "Pixel errors much larger than this will be exponentially attenuated "
-              "to affect less the cost function.");
+              "Residual pixel errors and 3D point residuals (the latter multiplied "
+              "by corresponding weight) much larger than this will be "
+              "exponentially attenuated to affect less the cost function.\n");
 
 DEFINE_int32(num_iterations, 20, "How many solver iterations to perform in calibration.");
-
-DEFINE_double(parameter_tolerance, 1e-12, "Stop when the optimization variables change by "
-              "less than this.");
 
 DEFINE_double(bracket_len, 0.6,
               "Lookup sci and haz cam images only between consecutive nav cam images "
@@ -122,17 +121,23 @@ DEFINE_double(bracket_len, 0.6,
               "for the timestamp offset between these cameras. It is assumed the robot "
               "moves slowly and uniformly during this time. A large value here will "
               "make the refiner compute a poor solution but a small value will prevent "
-              "enough images being bracketed.");
+              "enough sci_cam images being bracketed.");
 
-DEFINE_int32(num_opt_threads, 16, "How many threads to use in the optimization.");
+DEFINE_string(nav_cam_intrinsics_to_float, "",
+              "Refine given nav_cam intrinsics. Specify as a quoted list. "
+              "For example: 'focal_length optical_center distortion'.");
 
-DEFINE_string(sci_cam_timestamps, "",
-              "Use only these sci cam timestamps. Must be a file with one timestamp per line.");
+DEFINE_string(haz_cam_intrinsics_to_float, "",
+              "Refine given haz_cam intrinsics. Specify as a quoted list. "
+              "For example: 'focal_length optical_center distortion'.");
 
-DEFINE_bool(float_sparse_map, false,
-            "Optimize the sparse map. This should be avoided as it can invalidate the scales "
-            "of the extrinsics and the registration. It should at least be used with big mesh "
-            "weights to attenuate those effects. See also: --registration.");
+DEFINE_string(sci_cam_intrinsics_to_float, "",
+              "Refine given sci_cam intrinsics. Specify as a quoted list. "
+              "For example: 'focal_length optical_center distortion'.");
+
+DEFINE_string(extrinsics_to_float, "haz_cam sci_cam depth_to_image",
+              "Specify the cameras whose extrinsics, relative to nav_cam, to optimize. Also "
+              "consider if to float the haz_cam depth_to_image transform.");
 
 DEFINE_bool(float_scale, false,
             "If to optimize the scale of the clouds, part of haz_cam_depth_to_image_transform "
@@ -141,31 +146,24 @@ DEFINE_bool(float_scale, false,
             "--affine_depth_to_image when the transform is affine, rather than rigid and a scale."
             "See also --extrinsics_to_float.");
 
+DEFINE_bool(float_sparse_map, false,
+            "Optimize the sparse map. This should be avoided as it can invalidate the scales "
+            "of the extrinsics and the registration. It should at least be used with big mesh "
+            "weights to attenuate those effects. See also: --registration.");
+
 DEFINE_bool(float_timestamp_offsets, false,
             "If to optimize the timestamp offsets among the cameras.");
+
+DEFINE_int32(nav_cam_num_exclude_boundary_pixels, 0,
+             "Flag as outliers nav cam pixels closer than this to the boundary, and ignore "
+             "that boundary region when texturing with the --out_texture_dir option. "
+             "This may improve the calibration accuracy, especially if switching from fisheye "
+             "to radtan distortion for nav_cam. See also the geometry_mapper "
+             "--undistorted_crop_wins option.");
 
 DEFINE_double(timestamp_offsets_max_change, 1.0,
               "If floating the timestamp offsets, do not let them change by more than this "
               "(measured in seconds). Existing image bracketing acts as an additional constraint.");
-
-DEFINE_string(nav_cam_intrinsics_to_float, "",
-              "Refine 0 or more of the following intrinsics for nav_cam: focal_length, "
-              "optical_center, distortion. Specify as a quoted list. "
-              "For example: 'focal_length optical_center'.");
-
-DEFINE_string(haz_cam_intrinsics_to_float, "",
-              "Refine 0 or more of the following intrinsics for haz_cam: focal_length, "
-              "optical_center, distortion. Specify as a quoted list. "
-              "For example: 'focal_length optical_center'.");
-
-DEFINE_string(sci_cam_intrinsics_to_float, "",
-              "Refine 0 or more of the following intrinsics for sci_cam: focal_length, "
-              "optical_center, distortion. Specify as a quoted list. "
-              "For example: 'focal_length optical_center'.");
-
-DEFINE_string(extrinsics_to_float, "haz_cam sci_cam depth_to_image",
-              "Specify the cameras whose extrinsics, relative to nav_cam, to optimize. Also "
-              "consider if to float haz_cam_depth_to_image_transform.");
 
 DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
               std::numeric_limits<double>::quiet_NaN(),
@@ -178,11 +176,11 @@ DEFINE_double(depth_tri_weight, 1000.0,
               "order of 0.01 meters while reprojection errors are on the order of 1 pixel.");
 
 DEFINE_string(mesh, "",
-              "Use this geometry mapper mesh from a previous run to help constrain "
-              "the calibration.");
+              "Use this geometry mapper mesh from a previous geometry mapper run to help constrain "
+              "the calibration (e.g., use fused_mesh.ply).");
 
 DEFINE_double(mesh_tri_weight, 0.0,
-              "A larger value will give more weight to the constraint that triangulated points. "
+              "A larger value will give more weight to the constraint that triangulated points "
               "stay close to a preexisting mesh. Not suggested by default.");
 
 DEFINE_double(depth_mesh_weight, 0.0,
@@ -205,15 +203,19 @@ DEFINE_double(initial_max_reprojection_error, 300.0, "If filtering outliers, rem
 
 DEFINE_double(max_reprojection_error, 25.0, "If filtering outliers, remove interest points for "
               "which the reprojection error, in pixels, is larger than this. This filtering "
-              "happens after the optimization pass finishes unless disabled. It is better to not "
+              "happens after each optimization pass finishes, unless disabled. It is better to not "
               "filter too aggressively unless confident of the solution.");
 
 DEFINE_double(refiner_min_angle, 0.5, "If filtering outliers, remove triangulated points "
               "for which all rays converging to it make an angle (in degrees) less than this."
               "Note that some cameras in the rig may be very close to each other relative to "
-              "the points the rig images, so care is needed here.");
+              "the triangulated points, so care is needed here.");
 
 DEFINE_bool(refiner_skip_filtering, false, "Do not do any outlier filtering.");
+
+DEFINE_string(out_texture_dir, "", "If non-empty and if an input mesh was provided, "
+              "project the camera images using the optimized poses onto the mesh "
+              "and write the obtained .obj files in the given directory.");
 
 DEFINE_double(min_ray_dist, 0.0, "The minimum search distance from a starting point along a ray "
               "when intersecting the ray with a mesh, in meters (if applicable).");
@@ -221,27 +223,12 @@ DEFINE_double(min_ray_dist, 0.0, "The minimum search distance from a starting po
 DEFINE_double(max_ray_dist, 100.0, "The maximum search distance from a starting point along a ray "
               "when intersecting the ray with a mesh, in meters (if applicable).");
 
-DEFINE_string(out_texture_dir, "", "If non-empty and if an input mesh was provided, "
-              "project the camera images using the optimized poses onto the mesh "
-              "and write the obtained .obj files in the given directory.");
-
-DEFINE_bool(verbose, false,
-            "Print the residuals and save the images and match files."
-            "Stereo Pipeline's viewer can be used for visualizing these.");
-
 DEFINE_string(nav_cam_distortion_replacement, "",
               "Replace nav_cam's distortion coefficients with this list after the initial "
               "determination of triangulated points, and then continue with distortion "
               "optimization. A quoted list of four or five values expected, separated by "
               "spaces, as the replacement distortion model will have radial and tangential "
               "coefficients. Set a positive --nav_cam_num_exclude_boundary_pixels.");
-
-DEFINE_int32(nav_cam_num_exclude_boundary_pixels, 0,
-             "Flag as outliers nav cam pixels closer than this to the boundary, and ignore "
-             "that boundary region when texturing with the --out_texture_dir option. "
-             "This may improve the calibration accuracy, especially if switching from fisheye "
-             "to radtan distortion for nav_cam. See also the geometry_mapper "
-             "--undistorted_crop_wins option.");
 
 DEFINE_bool(registration, false,
             "If true, and registration control points for the sparse map exist and are specified "
@@ -252,6 +239,18 @@ DEFINE_bool(registration, false,
 DEFINE_string(hugin_file, "", "The path to the hugin .pto file used for sparse map registration.");
 
 DEFINE_string(xyz_file, "", "The path to the xyz file used for sparse map registration.");
+
+DEFINE_double(parameter_tolerance, 1e-12, "Stop when the optimization variables change by "
+              "less than this.");
+
+DEFINE_int32(num_opt_threads, 16, "How many threads to use in the optimization.");
+
+DEFINE_string(sci_cam_timestamps, "",
+              "Use only these sci cam timestamps. Must be a file with one timestamp per line.");
+
+DEFINE_bool(verbose, false,
+            "Print the residuals and save the images and match files."
+            "Stereo Pipeline's viewer can be used for visualizing these.");
 
 namespace dense_map {
 
@@ -272,7 +271,7 @@ Eigen::Affine3d calc_world_to_cam_trans(const double* beg_world_to_ref_t,
   Eigen::Affine3d ref_to_cam_aff;
   array_to_rigid_transform(ref_to_cam_aff, ref_to_cam_trans);
 
-  // Covert from cam time to ref time and normalize.  It is very
+  // Covert from cam time to ref time and normalize. It is very
   // important that below we subtract the big numbers from each
   // other first, which are the timestamps, then subtract whatever
   // else is necessary. Otherwise we get problems with numerical
@@ -506,7 +505,7 @@ struct RefCamError {
 };  // End class RefCamError
 
 // An error function minimizing the product of a given weight and the
-// error between a triangulated point and a measured depth point.  The
+// error between a triangulated point and a measured depth point. The
 // depth point needs to be transformed to world coordinates first. For
 // that one has to do pose interpolation.
 struct BracketedDepthError {
@@ -1331,11 +1330,11 @@ int main(int argc, char** argv) {
     LOG(FATAL) << "In order to register the map, the hugin and xyz file must be specified.";
 
   // We assume our camera rig has n camera types. Each can be image or
-  // depth + image.  Just one camera must be the reference camera. In
-  // this code it will be nav_cam.  Every camera object (class
+  // depth + image. Just one camera must be the reference camera. In
+  // this code it will be nav_cam. Every camera object (class
   // cameraImage) knows its type (an index), which can be used to look
   // up its intrinsics, image topic, depth topic (if present),
-  // ref_to_cam_timestamp_offset, and ref_to_cam_transform.  A camera
+  // ref_to_cam_timestamp_offset, and ref_to_cam_transform. A camera
   // object also stores its image, depth cloud (if present), its
   // timestamp, and indices pointing to its left and right ref
   // bracketing cameras.
@@ -1728,7 +1727,7 @@ int main(int argc, char** argv) {
                                        + FLAGS_timestamp_offsets_max_change);
 
       // Tighten a bit to ensure we don't exceed things when we add
-      // and subtract timestamps later.  Note that timestamps are
+      // and subtract timestamps later. Note that timestamps are
       // measured in seconds and fractions of a second since epoch and
       // can be quite large so precision loss can easily happen.
       lower_bound[cam_type] += 1.0e-5;
