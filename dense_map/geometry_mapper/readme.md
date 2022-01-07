@@ -383,7 +383,7 @@ builds upon the instructions used in the doc referenced right above.)
 
 Note that above we assume that the image sampler was used to collect a
 subset of the nav cam images. Otherwise the nav cam topic would be
-/hw/cam_nav.
+``/hw/cam_nav``.
 
 This will create three directories with the corners extracted from the
 nav, haz, and sci cameras.
@@ -636,8 +636,8 @@ also given further down this document.
 This SURF map will be used with the geometry mapper. Rebuild it with
 BRISK features, to be used with the streaming mapper. Examine the
 BRISK obtained map. If it does not have enough features, rebuild it
-with a lower value of -default_brisk_threshold and
--max_brisk_threshold (For example, use 70 instead of the default of
+with a lower value of ``--default_brisk_threshold`` and
+``--max_brisk_threshold`` (For example, use 70 instead of the default of
 90. This may make the sparse map bigger.)
 
 It is suggested to not use the ``--histogram_equalization`` flag for the
@@ -683,7 +683,7 @@ Ensure that the bot name is correct below. Set ``ASTROBEE_SOURCE_PATH``,
       --sparse_map nav_data.map                                             \
       --camera_types "sci_cam nav_cam haz_cam"                              \
       --camera_topics "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int"\
-      --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160" \
+      --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200" \
       --haz_cam_points_topic /hw/depth_haz/points                           \
       --start 0                                                             \
       --duration 1e+10                                                      \
@@ -724,7 +724,7 @@ Parameters:
       numbers are at 1/4th of the full resolution (resolution of
       calibration) and will be adjusted for the actual input image
       dimensions. Use a list in quotes. The default is
-      "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
+      "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200".
     --haz_cam_points_topic: The depth point cloud topic in the bag file.
     --start: How many seconds into the bag to start processing the data.
     --duration: For how many seconds to do the processing.
@@ -858,13 +858,13 @@ restricted to the range of timestamps contained within the sparse map
 `--duration``).
 
 If this tool is too slow, or if localization fails, consider adjusting
-the --localization_options above. For example, to make localization
+the ``--localization_options`` above. For example, to make localization
 work better (which will make the program slower) decrease the value of
---default_surf_threshold, and increase --early_break_landmarks,
---min_surf_features, and --max_surf_features. To make it faster,
+``--default_surf_threshold``, and increase ``--early_break_landmarks``,
+``--min_surf_features``, and ``--max_surf_features``. To make it faster,
 do the opposite. 
 
-The values of --depth_exclude_columns and --depth_exclude_rows
+The values of ``--depth_exclude_columns`` and ``--depth_exclude_rows``
 can be adjusted to remove rows and columns at the margins
 which may result in a nicer mesh. If, for example, the bot
 moves upwards or downwards, there is little loss in removing
@@ -874,18 +874,18 @@ with good lateral overlap, removing some columns won't result
 in much loss but may remove some noise. 
 
 If it is desired to use only a precise subset of the sci cam images,
-specify those with the option --sci_cam_timestamps.
+specify those with the option ``--sci_cam_timestamps``.
 
 If several acquisitions were performed, and the geometry mapper was
 run with each of them, those can be merged by invoking the
-geometry mapper with the option --merge_maps.
+geometry mapper with the option ``--merge_maps``.
 
 The geometry mapper can run with a previously created mesh if invoked
-with the option --external_mesh. 
+with the option ``--external_mesh``. 
 
 The most time-consuming part of the geometry mapper is computing the
 initial poses, which is the earliest step, or step 0. To resume the
-geometry mapper at any step, use the option '--start_step num'. For
+geometry mapper at any step, use the option ``--start_step num``. For
 example, one may want to apply further smoothing to the mesh or more
 hole-filling, before resuming with the next steps.
 
@@ -979,7 +979,7 @@ To run the streaming mapper with real data for the given bot, do:
 Wait until it finishes forming the texture model, which may take 
 30 seconds on more.
 
-Ensure that the ASTROBEE_ROBOT name is correct above.
+Ensure that the ``ASTROBEE_ROBOT`` name is correct above.
 
 This node will load the mesh produced by the geometry mapper from 
 
@@ -1005,11 +1005,11 @@ default, is ``sci_cam``. Its image topic must be set, which, for
 
 while for ``haz_cam`` is:
 
-   /hw/depth_haz/extended/amplitude_int
+    /hw/depth_haz/extended/amplitude_int
 
 For ``nav_cam`` the image topic is either
 
-   /mgt/img_sampler/nav_cam/image_record
+    /mgt/img_sampler/nav_cam/image_record
 
 if the images are played from a bag which recorded the images produced
 with the image sampler, or
@@ -1239,8 +1239,8 @@ sci_cam, are:
     /sim/sci_cam/pose
     /sim/sci_cam/info
 
-Hence, the parameters ekf_state_topic, ekf_pose_topic, and
-nav_cam_pose_topic are ignored.
+Hence, the parameters ``ekf_state_topic``, ``ekf_pose_topic``, and
+``nav_cam_pose_topic`` are ignored.
 
 The streaming mapper will publish its results on topics mentioned
 earlier in the text.
@@ -1470,22 +1470,22 @@ This tool will print some statistics showing the residual errors
 before and after each optimization pass (before outlier removal at the
 end of the pass), as follows:
 
-The 25, 50, 75, and 100th percentile residual stats after opt
-depth_mesh_x_m: 0.0013406233 0.0032581503 0.008524976 1.1929607 (3551 residuals)
-depth_mesh_y_m: 0.0013847081 0.0030440421 0.0069465355 1.8053954 (3551 residuals)
-depth_mesh_z_m: 0.00095448611 0.001959229 0.003519088 0.37953008 (3551 residuals)
-depth_tri_x_m: 0.0016825461 0.0038125877 0.0081855522 2.3030685 (3573 residuals)
-depth_tri_y_m: 0.0018114713 0.0042167015 0.0095410033 2.5599911 (3573 residuals)
-depth_tri_z_m: 0.0012253625 0.0026915793 0.0054980693 0.82675259 (3573 residuals)
-haz_cam_pix_x: 0.27697292 0.5747702 1.1103665 74339.066 (3716 residuals)
-haz_cam_pix_y: 0.11680463 0.28538243 0.63062182 26071.257 (3716 residuals)
-mesh_tri_x_m: 0.00054776584 0.0019058208 0.0062554694 4.7597716 (24034 residuals)
-mesh_tri_y_m: 0.0004664598 0.0018264008 0.0061599388 3.669907 (24034 residuals)
-mesh_tri_z_m: 0.00015713815 0.00064641858 0.0021773666 1.062293 (24034 residuals)
-nav_cam_pix_x: 0.080328781 0.21718455 0.48093808 618.45992 (206598 residuals)
-nav_cam_pix_y: 0.096269135 0.23056959 0.4939937 476.99626 (206598 residuals)
-sci_cam_pix_x: 0.048502913 0.23643751 0.53009189 20.129477 (623 residuals)
-sci_cam_pix_y: 0.21452953 0.47693424 1.0187402 25.362118 (623 residuals)
+    The 25, 50, 75, and 100th percentile residual stats after opt
+    depth_mesh_x_m: 0.0015756 0.004064 0.0099792 1.1882 (3566 residuals)
+    depth_mesh_y_m: 0.0015745 0.0036734 0.0088576 1.8041 (3566 residuals)
+    depth_mesh_z_m: 0.00091998 0.0019874 0.0038565 0.37353 (3566 residuals)
+    depth_tri_x_m: 0.00066995 0.0021602 0.0065155 2.7389 (3578 residuals)
+    depth_tri_y_m: 0.00069529 0.0022702 0.0069424 2.6967 (3578 residuals)
+    depth_tri_z_m: 0.00051406 0.0016069 0.0044358 1.1036 (3578 residuals)
+    haz_cam_pix_x: 0.23413 0.51717 1.0606 10353 (3723 residuals)
+    haz_cam_pix_y: 0.14605 0.33521 0.67331 1040.7 (3723 residuals)
+    mesh_tri_x_m: 0.0030461 0.0097438 0.023452 4.7647 (24231 residuals)
+    mesh_tri_y_m: 0.0027831 0.0085864 0.020538 3.1248 (24231 residuals)
+    mesh_tri_z_m: 0.00088227 0.0026434 0.0063236 1.1076 (24231 residuals)
+    nav_cam_pix_x: 0.055205 0.15801 0.37068 36.164 (206561 residuals)
+    nav_cam_pix_y: 0.096944 0.23234 0.49844 495.14 (206561 residuals)
+    sci_cam_pix_x: 0.020412 0.10584 0.29013 38.499 (635 residuals)
+    sci_cam_pix_y: 0.1585 0.34267 0.71541 30.158 (635 residuals)
 
 These can be helpful in figuring out if the calibration result is good.
 The errors whose name ends in "_m" are in meters and measure
@@ -1504,9 +1504,9 @@ nav_cam_to_sci_cam_timestamp_offset, which can be non-zero if the HLP
 and MLP/LLP processors are not synchronized (the sci_cam pictures are
 acquired with the HLP and nav_cam with MLP/LLP). If this value is not
 known well, this tool can be run with zero or more iterations and
-various values of
+various values of:
 
-  --nav_cam_to_sci_cam_offset_override_value <val>
+    --nav_cam_to_sci_cam_offset_override_value <val>
 
 to see which value gives the smallest residuals. 
 
@@ -1796,9 +1796,9 @@ can be run as follows:
         --num_exclude_boundary_pixels 0                                    \
         --output_prefix out 
 
-This will write out-1616785318.1400001.obj and its associated files.
+This will write ``out-1616785318.1400001.obj`` and its associated files.
 
-Ensure that the correct robot is specified in ASTROBEE_ROBOT.
+Ensure that the correct robot is specified in ``ASTROBEE_ROBOT``.
 
 Alternatively, the images and cameras can be specified in lists, via
 ``--image_list`` and ``--camera_list``.
