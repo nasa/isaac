@@ -225,7 +225,7 @@ rosrun kalibr kalibr_calibrate_cameras                                          
   --target $ASTROBEE_SOURCE_PATH/scripts/calibrate/config/granite_april_tag.yaml \
   --bag calibration.bag --dont-show-report --verbose                             \
   --target_corners_dirs calib_nav calib_haz calib_sci
-</pre><p>Note that above we assume that the image sampler was used to collect a subset of the nav cam images. Otherwise the nav cam topic would be /hw/cam_nav.</p>
+</pre><p>Note that above we assume that the image sampler was used to collect a subset of the nav cam images. Otherwise the nav cam topic would be <code>/hw/cam_nav</code>.</p>
 <p>This will create three directories with the corners extracted from the nav, haz, and sci cameras.</p>
 <p>Next, set up the environment: </p><pre class="fragment">export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
 export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
@@ -381,7 +381,7 @@ Map building and registration</h2>
 </p>
 <p>If the map to be built is large, consider using the Theia SfM software. See the <a href="https://nasa.github.io/astrobee/html/theia_map.html">Theia documentation</a> for how to use this package to create Astrobee sparse maps.</p>
 <p>An example for how to build a map in the context of calibration is also given further down this document.</p>
-<p>This SURF map will be used with the geometry mapper. Rebuild it with BRISK features, to be used with the streaming mapper. Examine the BRISK obtained map. If it does not have enough features, rebuild it with a lower value of -default_brisk_threshold and -max_brisk_threshold (For example, use 70 instead of the default of</p><ol type="1">
+<p>This SURF map will be used with the geometry mapper. Rebuild it with BRISK features, to be used with the streaming mapper. Examine the BRISK obtained map. If it does not have enough features, rebuild it with a lower value of <code>--default_brisk_threshold</code> and <code>--max_brisk_threshold</code> (For example, use 70 instead of the default of</p><ol type="1">
 <li>This may make the sparse map bigger.)</li>
 </ol>
 <p>It is suggested to not use the <code>--histogram_equalization</code> flag for the SURF map, but to use it with the BRISK map.</p>
@@ -405,7 +405,7 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   --sparse_map nav_data.map                                             \
   --camera_types "sci_cam nav_cam haz_cam"                              \
   --camera_topics "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int"\
-  --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160" \
+  --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200" \
   --haz_cam_points_topic /hw/depth_haz/points                           \
   --start 0                                                             \
   --duration 1e+10                                                      \
@@ -443,7 +443,7 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
   numbers are at 1/4th of the full resolution (resolution of
   calibration) and will be adjusted for the actual input image
   dimensions. Use a list in quotes. The default is
-  "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160".
+  "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200".
 --haz_cam_points_topic: The depth point cloud topic in the bag file.
 --start: How many seconds into the bag to start processing the data.
 --duration: For how many seconds to do the processing.
@@ -561,12 +561,12 @@ python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
 <p>Intermediate products are the undistorted nav cam and sci cam images. It is suggested to review those in an image viewer, such as 'eog' and delete some of them if they cause artifacts. After that, the last part of the pipeline (invocation of the texrecon tool) can be redone.</p>
 <p>To run this tool it is suggested to pick a portion of the bag where the images face the wall as much as possible, so one may need to change the <code>--start</code> and <code>--duration</code> values.</p>
 <p>Unless the flag <code>--use_brisk_map</code> is set, the data processing will be restricted to the range of timestamps contained within the sparse map (this is another restriction, in addition to <code>--start</code> and <code>--duration</code>`).</p>
-<p>If this tool is too slow, or if localization fails, consider adjusting the &ndash;localization_options above. For example, to make localization work better (which will make the program slower) decrease the value of &ndash;default_surf_threshold, and increase &ndash;early_break_landmarks, &ndash;min_surf_features, and &ndash;max_surf_features. To make it faster, do the opposite.</p>
-<p>The values of &ndash;depth_exclude_columns and &ndash;depth_exclude_rows can be adjusted to remove rows and columns at the margins which may result in a nicer mesh. If, for example, the bot moves upwards or downwards, there is little loss in removing some rows at the margins as they will be filled in from other depth readings. Then, if there are several up-down scans with good lateral overlap, removing some columns won't result in much loss but may remove some noise.</p>
-<p>If it is desired to use only a precise subset of the sci cam images, specify those with the option &ndash;sci_cam_timestamps.</p>
-<p>If several acquisitions were performed, and the geometry mapper was run with each of them, those can be merged by invoking the geometry mapper with the option &ndash;merge_maps.</p>
-<p>The geometry mapper can run with a previously created mesh if invoked with the option &ndash;external_mesh.</p>
-<p>The most time-consuming part of the geometry mapper is computing the initial poses, which is the earliest step, or step 0. To resume the geometry mapper at any step, use the option '&ndash;start_step num'. For example, one may want to apply further smoothing to the mesh or more hole-filling, before resuming with the next steps.</p>
+<p>If this tool is too slow, or if localization fails, consider adjusting the <code>--localization_options</code> above. For example, to make localization work better (which will make the program slower) decrease the value of <code>--default_surf_threshold</code>, and increase <code>--early_break_landmarks</code>, <code>--min_surf_features</code>, and <code>--max_surf_features</code>. To make it faster, do the opposite.</p>
+<p>The values of <code>--depth_exclude_columns</code> and <code>--depth_exclude_rows</code> can be adjusted to remove rows and columns at the margins which may result in a nicer mesh. If, for example, the bot moves upwards or downwards, there is little loss in removing some rows at the margins as they will be filled in from other depth readings. Then, if there are several up-down scans with good lateral overlap, removing some columns won't result in much loss but may remove some noise.</p>
+<p>If it is desired to use only a precise subset of the sci cam images, specify those with the option <code>--sci_cam_timestamps</code>.</p>
+<p>If several acquisitions were performed, and the geometry mapper was run with each of them, those can be merged by invoking the geometry mapper with the option <code>--merge_maps</code>.</p>
+<p>The geometry mapper can run with a previously created mesh if invoked with the option <code>--external_mesh</code>.</p>
+<p>The most time-consuming part of the geometry mapper is computing the initial poses, which is the earliest step, or step 0. To resume the geometry mapper at any step, use the option <code>--start_step num</code>. For example, one may want to apply further smoothing to the mesh or more hole-filling, before resuming with the next steps.</p>
 <p>For a given camera type to be textured it must have entries in <code>cameras.config</code> and the robot config file (such as <code>bumble.config</code>), which are analogous to existing <code>nav_cam_to_sci_cam_timestamp_offset</code>, <code>nav_cam_to_sci_cam_transform</code>, and <code>sci_cam</code> intrinsics, with "sci" replaced by your camera name. The geometry mapper arguments <code>--camera_types</code>, <code>--camera_topics</code>, and <code>--undistorted_crop_wins</code> must be populated accordingly, with some careful choice to be made for the last one. Images for the desired camera must be present in the bag file at the the specified topic.</p>
 <h2><a class="anchor" id="autotoc_md57"></a>
 With simulated data</h2>
@@ -608,17 +608,15 @@ export ASTROBEE_ROBOT=bsharp2
 roslaunch isaac isaac_astrobee.launch llp:=disabled nodes:=framestore \
   streaming_mapper:=true output:=screen     
 </pre><p>Wait until it finishes forming the texture model, which may take 30 seconds on more.</p>
-<p>Ensure that the ASTROBEE_ROBOT name is correct above.</p>
+<p>Ensure that the <code>ASTROBEE_ROBOT</code> name is correct above.</p>
 <p>This node will load the mesh produced by the geometry mapper from </p><pre class="fragment">$ISAAC_WS/src/isaac/resources/geometry/${ASTROBEE_WORLD}.ply
 </pre><p>If an updated geometry mapper mesh exists, it should be copied to that location first.</p>
 <p>The tool will read the configuration options from: </p><pre class="fragment">$ISAAC_WS/src/isaac/config/dense_map/streaming_mapper.config
 </pre><p>By default, as specified in that file, it will listen to the robot body pose being published at: </p><pre class="fragment">/gnc/ekf
 </pre><p>That config file specifies the the camera image to texture, which, by default, is <code>sci_cam</code>. Its image topic must be set, which, for <code>sci_cam</code> is normally </p><pre class="fragment">/hw/cam_sci/compressed
-</pre><p>while for <code>haz_cam</code> is:</p>
-<p>/hw/depth_haz/extended/amplitude_int</p>
-<p>For <code>nav_cam</code> the image topic is either</p>
-<p>/mgt/img_sampler/nav_cam/image_record</p>
-<p>if the images are played from a bag which recorded the images produced with the image sampler, or </p><pre class="fragment">/hw/cam_nav
+</pre><p>while for <code>haz_cam</code> is: </p><pre class="fragment">/hw/depth_haz/extended/amplitude_int
+</pre><p>For <code>nav_cam</code> the image topic is either </p><pre class="fragment">/mgt/img_sampler/nav_cam/image_record
+</pre><p>if the images are played from a bag which recorded the images produced with the image sampler, or </p><pre class="fragment">/hw/cam_nav
 </pre><p>if no image sampler was used. The rest of the cameras usually follow the convention on the line above.</p>
 <p>For the sci cam, the streaming mapper also expects image exposure data on the topic: </p><pre class="fragment">/hw/sci_cam_exif
 </pre><p>to do exposure correction, unless in simulation mode or <code>sci_cam_exposure_correction</code> is set to false. This is not needed for other cameras.</p>
@@ -698,7 +696,7 @@ roslaunch isaac sim.launch world:=iss rviz:=true        \
   -att "0 0 0 1"
 </pre><p>With simulated data the pose and intrinsics for each camera are received directly from the simulator, on topics that, for example, for sci_cam, are: </p><pre class="fragment">/sim/sci_cam/pose
 /sim/sci_cam/info
-</pre><p>Hence, the parameters ekf_state_topic, ekf_pose_topic, and nav_cam_pose_topic are ignored.</p>
+</pre><p>Hence, the parameters <code>ekf_state_topic</code>, <code>ekf_pose_topic</code>, and <code>nav_cam_pose_topic</code> are ignored.</p>
 <p>The streaming mapper will publish its results on topics mentioned earlier in the text.</p>
 <p>Note that value of <code>ASTROBEE_ROBOT</code> is not needed in this case. Any user-set value will be overwritten with the robot name <code>sim</code>.</p>
 <h2><a class="anchor" id="autotoc_md64"></a>
@@ -791,12 +789,25 @@ $ISAAC_WS/devel/lib/geometry_mapper/camera_refiner      \
 <p>Sometimes such a mesh can help with convergence, but should not be used in a first attempt at calibration. It was not used for the final bumble robot calibration, when the weights were as above, but was used for the bsharp2 robot, when all three weights above were set to 25.</p>
 <p>Note that sometimes it is desired to not change the nav_cam intrinsics, such as for the bumble robot, as existing ISS maps depend on it, and then one should set <code>--nav_cam_intrinsics_to_float ""</code> above.</p>
 <p>We used the same bracket length as in the image picker. It is very important to note that a tight bracket should be used, as, if the robot moves fast and the bracket value is big, it can affect the accuracy of calibration. Yet a tight bracket does not allow for wiggle room if it is decided to vary the timestamp offset (see further down) while staying within the bounds given by the bracket.</p>
-<p>This tool will print some statistics showing the residual errors before and after each optimization pass (before outlier removal at the end of the pass), as follows:</p>
-<p>The 25, 50, 75, and 100th percentile residual stats after opt depth_mesh_x_m: 0.0013406233 0.0032581503 0.008524976 1.1929607 (3551 residuals) depth_mesh_y_m: 0.0013847081 0.0030440421 0.0069465355 1.8053954 (3551 residuals) depth_mesh_z_m: 0.00095448611 0.001959229 0.003519088 0.37953008 (3551 residuals) depth_tri_x_m: 0.0016825461 0.0038125877 0.0081855522 2.3030685 (3573 residuals) depth_tri_y_m: 0.0018114713 0.0042167015 0.0095410033 2.5599911 (3573 residuals) depth_tri_z_m: 0.0012253625 0.0026915793 0.0054980693 0.82675259 (3573 residuals) haz_cam_pix_x: 0.27697292 0.5747702 1.1103665 74339.066 (3716 residuals) haz_cam_pix_y: 0.11680463 0.28538243 0.63062182 26071.257 (3716 residuals) mesh_tri_x_m: 0.00054776584 0.0019058208 0.0062554694 4.7597716 (24034 residuals) mesh_tri_y_m: 0.0004664598 0.0018264008 0.0061599388 3.669907 (24034 residuals) mesh_tri_z_m: 0.00015713815 0.00064641858 0.0021773666 1.062293 (24034 residuals) nav_cam_pix_x: 0.080328781 0.21718455 0.48093808 618.45992 (206598 residuals) nav_cam_pix_y: 0.096269135 0.23056959 0.4939937 476.99626 (206598 residuals) sci_cam_pix_x: 0.048502913 0.23643751 0.53009189 20.129477 (623 residuals) sci_cam_pix_y: 0.21452953 0.47693424 1.0187402 25.362118 (623 residuals)</p>
-<p>These can be helpful in figuring out if the calibration result is good. The errors whose name ends in "_m" are in meters and measure the absolute differences between the depth clouds and mesh (depth_mesh), between depth clouds and triangulated points (depth_tri), and between mesh points and triangulated points (mesh_tri), in x, y, and z, respectively. The <code>mesh</code> residuals will be printed only if a mesh is passed on input and if the mesh-related weights are positive. Some outliers are unavoidable, hence some of these numbers can be big even if the calibration overall does well (the robust threshold does not allow outliers to dominate).</p>
-<p>A source of errors (apart from inaccurate intrinsics, extrinsics, or insufficiently good modeling of the cameras) can be the nav_cam_to_sci_cam_timestamp_offset, which can be non-zero if the HLP and MLP/LLP processors are not synchronized (the sci_cam pictures are acquired with the HLP and nav_cam with MLP/LLP). If this value is not known well, this tool can be run with zero or more iterations and various values of</p>
-<p>&ndash;nav_cam_to_sci_cam_offset_override_value &lt;val&gt;</p>
-<p>to see which value gives the smallest residuals.</p>
+<p>This tool will print some statistics showing the residual errors before and after each optimization pass (before outlier removal at the end of the pass), as follows: </p><pre class="fragment">The 25, 50, 75, and 100th percentile residual stats after opt
+depth_mesh_x_m: 0.0015756 0.004064 0.0099792 1.1882 (3566 residuals)
+depth_mesh_y_m: 0.0015745 0.0036734 0.0088576 1.8041 (3566 residuals)
+depth_mesh_z_m: 0.00091998 0.0019874 0.0038565 0.37353 (3566 residuals)
+depth_tri_x_m: 0.00066995 0.0021602 0.0065155 2.7389 (3578 residuals)
+depth_tri_y_m: 0.00069529 0.0022702 0.0069424 2.6967 (3578 residuals)
+depth_tri_z_m: 0.00051406 0.0016069 0.0044358 1.1036 (3578 residuals)
+haz_cam_pix_x: 0.23413 0.51717 1.0606 10353 (3723 residuals)
+haz_cam_pix_y: 0.14605 0.33521 0.67331 1040.7 (3723 residuals)
+mesh_tri_x_m: 0.0030461 0.0097438 0.023452 4.7647 (24231 residuals)
+mesh_tri_y_m: 0.0027831 0.0085864 0.020538 3.1248 (24231 residuals)
+mesh_tri_z_m: 0.00088227 0.0026434 0.0063236 1.1076 (24231 residuals)
+nav_cam_pix_x: 0.055205 0.15801 0.37068 36.164 (206561 residuals)
+nav_cam_pix_y: 0.096944 0.23234 0.49844 495.14 (206561 residuals)
+sci_cam_pix_x: 0.020412 0.10584 0.29013 38.499 (635 residuals)
+sci_cam_pix_y: 0.1585 0.34267 0.71541 30.158 (635 residuals)
+</pre><p>These can be helpful in figuring out if the calibration result is good. The errors whose name ends in "_m" are in meters and measure the absolute differences between the depth clouds and mesh (depth_mesh), between depth clouds and triangulated points (depth_tri), and between mesh points and triangulated points (mesh_tri), in x, y, and z, respectively. The <code>mesh</code> residuals will be printed only if a mesh is passed on input and if the mesh-related weights are positive. Some outliers are unavoidable, hence some of these numbers can be big even if the calibration overall does well (the robust threshold does not allow outliers to dominate).</p>
+<p>A source of errors (apart from inaccurate intrinsics, extrinsics, or insufficiently good modeling of the cameras) can be the nav_cam_to_sci_cam_timestamp_offset, which can be non-zero if the HLP and MLP/LLP processors are not synchronized (the sci_cam pictures are acquired with the HLP and nav_cam with MLP/LLP). If this value is not known well, this tool can be run with zero or more iterations and various values of: </p><pre class="fragment">--nav_cam_to_sci_cam_offset_override_value &lt;val&gt;
+</pre><p>to see which value gives the smallest residuals.</p>
 <p>If the <code>--out_texture_dir</code> option is specified, the tool will create textured meshes for each image and optimized camera at the end. Ideally those textured meshes will agree among each other.</p>
 <p>This program's options are: </p><pre class="fragment">--ros_bag (string, default = "")
   A ROS bag with recorded nav_cam, haz_cam intensity,
@@ -1030,8 +1041,8 @@ $ISAAC_WS/devel/lib/geometry_mapper/orthoproject                       \
     --camera_to_world geom_dir/1616785318.1400001_sci_cam_to_world.txt \
     --num_exclude_boundary_pixels 0                                    \
     --output_prefix out 
-</pre><p>This will write out-1616785318.1400001.obj and its associated files.</p>
-<p>Ensure that the correct robot is specified in ASTROBEE_ROBOT.</p>
+</pre><p>This will write <code>out-1616785318.1400001.obj</code> and its associated files.</p>
+<p>Ensure that the correct robot is specified in <code>ASTROBEE_ROBOT</code>.</p>
 <p>Alternatively, the images and cameras can be specified in lists, via <code>--image_list</code> and <code>--camera_list</code>. </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
