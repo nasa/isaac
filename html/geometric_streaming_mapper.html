@@ -377,11 +377,11 @@ Data extraction</h2>
    -use_timestamp_as_image_name
 </pre><h2><a class="anchor" id="autotoc_md54"></a>
 Map building and registration</h2>
-<p>Build and register a SURF sparse map with the nav cam images. (This is needed only with real data.)</p>
-<p>An example for how to collect images and build a map is shown later in this doc, in the section about camera refinement. See also the reference documentation in </p><pre class="fragment">$ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
-</pre><p>and also in build_map.md in that repository.</p>
-<p>If the map to be built is large, consider using the Theia SfM software. Its usage is described in: </p><pre class="fragment">https://nasa.github.io/astrobee/html/theia_map.html
-</pre><p>This SURF map will be used with the geometry mapper. Rebuild it with BRISK features, to be used with the streaming mapper. Examine the BRISK obtained map. If it does not have enough features, rebuild it with a lower value of -default_brisk_threshold and -max_brisk_threshold (For example, use 70 instead of the default of</p><ol type="1">
+<p>Build and register a SURF sparse map with the nav cam images. (This is needed only with real data.) See the <a href="https://nasa.github.io/astrobee/html/sparsemapping.html">sparse mapping</a> documentation in the Astrobee repository, with more details given in the <a href="https://nasa.github.io/astrobee/html/map_building.html">map building</a> page. <br  />
+</p>
+<p>If the map to be built is large, consider using the Theia SfM software. See the <a href="https://nasa.github.io/astrobee/html/theia_map.html">Theia documentation</a> for how to use this package to create Astrobee sparse maps.</p>
+<p>An example for how to build a map in the context of calibration is also given further down this document.</p>
+<p>This SURF map will be used with the geometry mapper. Rebuild it with BRISK features, to be used with the streaming mapper. Examine the BRISK obtained map. If it does not have enough features, rebuild it with a lower value of -default_brisk_threshold and -max_brisk_threshold (For example, use 70 instead of the default of</p><ol type="1">
 <li>This may make the sparse map bigger.)</li>
 </ol>
 <p>It is suggested to not use the <code>--histogram_equalization</code> flag for the SURF map, but to use it with the BRISK map.</p>
