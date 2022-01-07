@@ -58,6 +58,7 @@ void parse_intrinsics_to_float(std::string const& intrinsics_to_float, std::set<
 // A  function to split a string like 'haz_cam sci_cam depth_to_image' into
 // its two constituents and validate against the list of known cameras.
 void parse_extrinsics_to_float(std::vector<std::string> const& cam_names,
+                               std::string const& ref_cam_name,
                                std::string const& depth_to_image_name,
                                std::string const& extrinsics_to_float,
                                std::set<std::string>& extrinsics_to_float_set) {
@@ -80,6 +81,9 @@ void parse_extrinsics_to_float(std::vector<std::string> const& cam_names,
     if (!known_cam)
       LOG(FATAL) << "Unknown camera: " << val << "\n";
   }
+
+  if (extrinsics_to_float_set.find(ref_cam_name) != extrinsics_to_float_set.end())
+    LOG(FATAL) << "There exists no extrinsics transform from " << ref_cam_name << " to itself.\n";
 
   return;
 }
@@ -362,6 +366,19 @@ bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const
   if (left_time == right_time) alpha = 0.0;  // handle division by 0
   interp_pose = linearInterp(alpha, poses.find(left_time)->second, poses.find(right_time)->second);
   return true;
+}
+
+// Implement some heuristic to find the maximum rotation angle that can result
+// from applying the given transform. It is assumed that the transform is not
+// too different from the identity.
+double maxRotationAngle(Eigen::Affine3d const& T) {
+  Eigen::Vector3d angles = T.linear().eulerAngles(0, 1, 2);
+
+  // Angles close to +/-pi can result even if the matrix is close to identity
+  for (size_t it = 0; it < 3; it++)
+    angles[it] = std::min(std::abs(angles[it]), std::abs(M_PI - std::abs(angles[it])));
+  double angle_norm = (180.0 / M_PI) * angles.norm();
+  return angle_norm;
 }
 
 void StampedPoseStorage::addPose(Eigen::Affine3d const& pose, double timestamp) {

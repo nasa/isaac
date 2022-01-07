@@ -56,6 +56,7 @@ void parse_intrinsics_to_float(std::string const& intrinsics_to_float,
 // A  function to split a string like 'haz_cam sci_cam' into
 // its two constituents and validate against the list of known cameras.
 void parse_extrinsics_to_float(std::vector<std::string> const& cam_names,
+                               std::string const& ref_cam_name,
                                std::string const& depth_to_image_name,
                                std::string const& extrinsics_to_float,
                                std::set<std::string>& extrinsics_to_float_set);
@@ -123,6 +124,11 @@ Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0,
 // only for very small maps. Else use the StampedPoseStorage class.
 bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses,
                     Eigen::Affine3d& interp_pose);
+
+// Implement some heuristic to find the maximum rotation angle that can result
+// from applying the given transform. It is assumed that the transform is not
+// too different from the identity.
+double maxRotationAngle(Eigen::Affine3d const& T);
 
 // A class to store timestamped poses, implementing O(log(n)) linear
 // interpolation at a desired timestamp. For fast access, keep the

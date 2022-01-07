@@ -115,8 +115,15 @@ def process_args(args):
         "--dist_between_processed_cams",
         dest="dist_between_processed_cams",
         default="0.1",
-        help="Once an image or depth image is processed, how far the camera "
-        + "should move (in meters) before it should process more data.",
+        help="Once an image or depth cloud is processed, process a new one whenever either "
+        + "the camera moves by more than this distance, in meters, or the angle changes by more "
+        + "than --angle_between_processed_cams, in degrees.",
+    )
+    parser.add_argument(
+        "--angle_between_processed_cams",
+        dest="angle_between_processed_cams",
+        default="5.0",
+        help="See --dist_between_processed_cams.",
     )
     parser.add_argument(
         "--sci_cam_timestamps",
@@ -180,8 +187,8 @@ def process_args(args):
         "--voxel_size",
         dest="voxel_size",
         default="0.01",
-        help="When fusing the depth point clouds use a voxel of this size, "
-        + "in meters.",
+        help="The grid size used for binning depth cloud points and creating the mesh. "
+        + "Measured in meters.",
     )
     parser.add_argument(
         "--voxblox_integrator",
@@ -478,6 +485,8 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.sampling_spacing_seconds,
         "--dist_between_processed_cams",
         args.dist_between_processed_cams,
+        "--angle_between_processed_cams",
+        args.angle_between_processed_cams,
         "--max_iso_times_exposure",
         args.max_iso_times_exposure,
         "--depth_exclude_columns",
@@ -490,6 +499,10 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.depth_hole_fill_diameter,
         "--reliability_weight_exponent",
         args.reliability_weight_exponent,
+        "--max_ray_length",
+        args.max_ray_length,
+        "--voxel_size",
+        args.voxel_size,
         "--median_filters",
         args.median_filters,
     ] + args.localization_options.split(" ")

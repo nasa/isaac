@@ -175,8 +175,8 @@ add_executable(camera_refiner tools/camera_refiner.cc)
 target_link_libraries(camera_refiner
     geometry_mapper_lib gflags glog)
 
-add_executable(camera_refiner2 tools/camera_refiner2.cc)
-target_link_libraries(camera_refiner2
+add_executable(camera_refiner_old tools/camera_refiner_old.cc)
+target_link_libraries(camera_refiner_old
     geometry_mapper_lib gflags glog)
 
 add_executable(extract_pc_from_bag tools/extract_pc_from_bag.cc)
