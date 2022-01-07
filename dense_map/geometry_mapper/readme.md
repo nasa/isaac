@@ -620,20 +620,18 @@ do:
 ## Map building and registration
 
 Build and register a SURF sparse map with the nav cam images. (This is
-needed only with real data.) 
-
-An example for how to collect images and build a map is shown later in
-this doc, in the section about camera refinement. See also the
-reference documentation in
-
-    $ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
-
-and also in build_map.md in that repository. 
+needed only with real data.) See the 
+[sparse mapping](https://nasa.github.io/astrobee/html/sparsemapping.html) 
+documentation in the Astrobee repository, with more details given in
+the [map building](https://nasa.github.io/astrobee/html/map_building.html)
+page.  
 
 If the map to be built is large, consider using the Theia SfM
-software. Its usage is described in:
+software. See the [Theia documentation](https://nasa.github.io/astrobee/html/theia_map.html)
+for how to use this package to create Astrobee sparse maps.
 
-    https://nasa.github.io/astrobee/html/theia_map.html
+An example for how to build a map in the context of calibration is
+also given further down this document.
 
 This SURF map will be used with the geometry mapper. Rebuild it with
 BRISK features, to be used with the streaming mapper. Examine the
