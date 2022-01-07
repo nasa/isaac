@@ -36,7 +36,7 @@ var idm =
         [ "Camera refinement", "geometric_streaming_mapper.html#autotoc_md64", [
           [ "Image selection", "geometric_streaming_mapper.html#autotoc_md65", null ],
           [ "Map building and registration", "geometric_streaming_mapper.html#autotoc_md66", null ],
-          [ "Running the refiner", "geometric_streaming_mapper.html#autotoc_md67", null ],
+          [ "Running camera_refiner", "geometric_streaming_mapper.html#autotoc_md67", null ],
           [ "Using the refiner with a radtan model for nav_cam", "geometric_streaming_mapper.html#autotoc_md68", null ]
         ] ],
         [ "Orthoprojecting images", "geometric_streaming_mapper.html#autotoc_md69", null ]
