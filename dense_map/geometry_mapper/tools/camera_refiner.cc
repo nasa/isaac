@@ -1462,7 +1462,7 @@ int main(int argc, char** argv) {
 
   std::string depth_to_image_name = "depth_to_image";
   std::set<std::string> extrinsics_to_float;
-  dense_map::parse_extrinsics_to_float(cam_names, depth_to_image_name,
+  dense_map::parse_extrinsics_to_float(cam_names, cam_names[ref_cam_type], depth_to_image_name,
                                        FLAGS_extrinsics_to_float, extrinsics_to_float);
 
   if (FLAGS_float_scale && FLAGS_affine_depth_to_image)

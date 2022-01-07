@@ -19,8 +19,8 @@ coming from an Astrobee robot. The two main tools are:
 The following environmental variables should be set up (please adjust
 them for your particular configuration):
 
-    export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
-    export ASTROBEE_BUILD_PATH=$HOME/astrobee
+    export ASTROBEE_WS=$HOME/astrobee
+    export ASTROBEE_SOURCE_PATH=$ASTROBEE_WS/src
     export ISAAC_WS=$HOME/isaac
 
 ## Robot sensors
@@ -234,7 +234,7 @@ earlier in the text.
 
 Start the simulator, such as:
 
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     roslaunch isaac sim.launch rviz:=true      \
       pose:="11.0 -7.0 5.0 0 0 0 1" world:=iss
@@ -593,8 +593,8 @@ down this document, in the section on camera refinement.
 
 Nav cam images can be extracted from a bag as follows:
 
-    $ASTROBEE_BUILD_PATH/devel/lib/localization_node/extract_image_bag \
-      mydata.bag -image_topic /mgt/img_sampler/nav_cam/image_record    \
+    $ASTROBEE_WS/devel/lib/localization_node/extract_image_bag       \
+      mydata.bag -image_topic /mgt/img_sampler/nav_cam/image_record  \
       -output_directory nav_data -use_timestamp_as_image_name
 
 The last option, ``-use_timestamp_as_image_name``, must not be missed.
@@ -606,8 +606,8 @@ sampler was not used, the nav cam topic would be /hw/cam_nav.
 
 To extract the sci cam data, if necessary, do:
 
-    $ASTROBEE_BUILD_PATH/devel/lib/localization_node/extract_image_bag \
-     mydata.bag -image_topic /hw/cam_sci/compressed                    \
+    $ASTROBEE_WS/devel/lib/localization_node/extract_image_bag \
+     mydata.bag -image_topic /hw/cam_sci/compressed            \
      -output_directory sci_data -use_timestamp_as_image_name
 
 To extract the depth clouds, which may be useful for debugging purposes,
@@ -629,6 +629,11 @@ reference documentation in
     $ASTROBEE_SOURCE_PATH/localization/sparse_mapping/readme.md
 
 and also in build_map.md in that repository. 
+
+If the map to be built is large, consider using the Theia SfM
+software. Its usage is described in:
+
+    https://nasa.github.io/astrobee/html/theia_map.html
 
 This SURF map will be used with the geometry mapper. Rebuild it with
 BRISK features, to be used with the streaming mapper. Examine the
@@ -667,13 +672,13 @@ details further down). The geometry mapper can handle both color and
 grayscale images, and, for sci cam, both full and reduced resolution.
 
 Ensure that the bot name is correct below. Set ``ASTROBEE_SOURCE_PATH``,
-`ASTROBEE_BUILD_PATH``, and ``ISAAC_WS`` as earlier. Run:
+`ASTROBEE_WS``, and ``ISAAC_WS`` as earlier. Run:
 
     export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
     export ASTROBEE_WORLD=iss
     export ASTROBEE_ROBOT=bsharp2
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     python $ISAAC_WS/src/dense_map/geometry_mapper/tools/geometry_mapper.py \
       --ros_bag data.bag                                                    \
@@ -686,6 +691,7 @@ Ensure that the bot name is correct below. Set ``ASTROBEE_SOURCE_PATH``,
       --duration 1e+10                                                      \
       --sampling_spacing_seconds 5                                          \
       --dist_between_processed_cams 0.1                                     \
+      --angle_between_processed_cams 5.0                                    \
       --depth_exclude_columns 0                                             \
       --depth_exclude_rows 0                                                \
       --foreshortening_delta 5.0                                            \
@@ -698,7 +704,7 @@ Ensure that the bot name is correct below. Set ``ASTROBEE_SOURCE_PATH``,
       --max_iso_times_exposure 5.1                                          \
       --smoothing_time 5e-6                                                 \
       --max_num_hole_edges 8000                                             \
-      --max_hole_diameter 1.8                                               \
+      --max_hole_diameter 0.3                                               \
       --num_min_faces_in_component 100                                      \
       --num_components_to_keep 100                                          \
       --edge_keep_ratio 0.2                                                 \
@@ -726,9 +732,12 @@ Parameters:
     --duration: For how many seconds to do the processing.
     --sampling_spacing_seconds: How frequently to sample the sci and haz 
       cameras, in seconds. The default is 2.
-    --dist_between_processed_cams: Once an image or depth image is processed, 
-      how far the camera should move (in meters) before it should process 
-      more data. The default is 0.1 meters.
+    --dist_between_processed_cams: Once an image or depth cloud is processed, 
+      process a new one whenever either the camera moves by more than this 
+      distance, in meters, or the angle changes by more than 
+      --angle_between_processed_cams, in degrees. The default is 0.1.
+    --angle_between_processed_cams: See --dist_between_processed_cams. The
+      default is 5.0. 
     --sci_cam_timestamps: Process only these sci cam timestamps (rather than 
       any in the bag using --dist_between_processed_cams, etc.). Must be 
       a file with one timestamp per line. 
@@ -761,7 +770,8 @@ Parameters:
     --voxblox_integrator: When fusing the depth point clouds use
       this VoxBlox method. Options are: "merged", "simple", and
       "fast". The default is "merged".
-    --voxel_size is the grid size used for binning the points, in meters.
+    --voxel_size: The grid size used for binning depth cloud points and 
+      creating the mesh. Measured in meters.
     --max_iso_times_exposure: Apply the inverse gamma transform to
       images, multiply them by max_iso_times_exposure/ISO/exposure_time
       to adjust for lightning differences, then apply the gamma
@@ -793,9 +803,6 @@ Parameters:
       reliable. In this case one must specify carefully the range of
       times in the bag to use as it will no longer be constrained by
       the timestamps in the map.
-    --sci_cam_timestamps: Process only these sci cam timestamps (rather than 
-      any in the bag using --dist_between_processed_cams, etc.). Must be a 
-      file with one timestamp per line.
     --start_step: Start processing at this step. Useful for resuming
       work. Values: 0 (determine poses), 1 (fuse meshes), 2 (smoothe
       mesh), 3 (fill holes), 4 (clean mesh and rm small connected
@@ -938,6 +945,7 @@ Example of running the geometry mapper with simulated data:
       --output_dir data_dir                                                 \
       --sampling_spacing_seconds 2                                          \
       --dist_between_processed_cams 0.1                                     \
+      --angle_between_processed_cams 5.0                                    \
       --verbose
 
 It is important to check for the correct names for the camera image
@@ -961,7 +969,7 @@ obtained textured model to be visualized.
 
 To run the streaming mapper with real data for the given bot, do:
 
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
@@ -1084,7 +1092,7 @@ database to find the nav cam poses. The command for building such a
 BRISK map from a registered SURF map is:
 
     cp surf_map.map brisk_map.map 
-    $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/build_map         \
+    $ASTROBEE_WS/devel/lib/sparse_mapping/build_map                 \
       --output_map brisk_map.map --rebuild --histogram_equalization \
       --vocab_db
 
@@ -1157,9 +1165,12 @@ The ``streaming_mapper.config`` file has following fields:
     overlay. The default value is /hw/cam_sci/compressed and see
     note in the text for other cameras. 
   - dist_between_processed_cams: Once an image is textured and 
-    published, how far the camera should move (in meters) before
-    it should process another texture (any images arriving
-    in between will be ignored). The default is 0.1 meters.
+    published, process a new one whenever either the camera moves by
+    more than this distance, in meters, or the angle changes by more
+    than angle_between_processed_cams, in degrees. The default is
+    0.1.
+  - angle_between_processed_cams: See: dist_between_processed_cams. 
+    The default is 5.0. 
   - max_iso_times_exposure: Apply the inverse gamma transform to
     images, multiply them by max_iso_times_exposure/ISO/exposure_time
     to adjust for lightning differences, then apply the gamma
@@ -1205,7 +1216,7 @@ textures.
 
 To launch the streaming mapper, do:
 
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
@@ -1270,7 +1281,7 @@ image using the image_picker tool:
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
     export ASTROBEE_WORLD=iss
     export ASTROBEE_ROBOT=bsharp2
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     $ISAAC_WS/devel/lib/geometry_mapper/image_picker                 \
       --ros_bag mybag.bag                                            \
@@ -1332,7 +1343,7 @@ above:
     dir=nav_images
     images=$(ls $dir/*jpg)
     surf_map=${dir}_surf.map
-    $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/build_map         \
+    $ASTROBEE_WS/devel/lib/sparse_mapping/build_map                 \
       --output_map $surf_map --feature_detection --feature_matching \
       --track_building --incremental_ba  --bundle_adjustment        \
       --min_valid_angle 1.0 --num_subsequent_images 20 $images 
@@ -1342,6 +1353,10 @@ each sci cam and haz cam bracketing will be very similar, and this
 will prevent having too many features which result in small
 convergence angles between the rays, which may make map-building less
 stable.
+
+If the map makes a closed loop, and, for example, image 80 becomes
+similar to image 0, one should increase --num_subsequent_images to
+perhaps 90. This would result in increased runtime but a better map.
 
 Register the map. That can be done, for example, by merging this map
 with a registered map, bundle-adjusting the obtained map,
@@ -1361,7 +1376,7 @@ as one navigates through the map in the viewer). A submap of the
 registered map can then be extracted, without bundle-adjustment (to
 not affect the registration) as:
 
-    $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/extract_submap \
+    $ASTROBEE_WS/devel/lib/sparse_mapping/extract_submap       \
       --skip_bundle_adjustment --input_map registered_map.map  \
       --output_map registered_submap.map                       \
       --skip_bundle_adjustment                                 \
@@ -1379,18 +1394,18 @@ registration.)
 Our map can be merged into this map without modifying the first map,
 and hence keeping its registration, as:
 
-    $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/merge_maps \
-      --fix_first_map                                        \
-      --num_image_overlaps_at_endpoints 200                  \
-      --min_valid_angle 1.0                                  \
-      registered_submap.map $surf_map                        \
+    $ASTROBEE_WS/devel/lib/sparse_mapping/merge_maps \
+      --fix_first_map                                \
+      --num_image_overlaps_at_endpoints 200          \
+      --min_valid_angle 1.0                          \
+      registered_submap.map $surf_map                \
       --output_map merged.map
 
 The desired now-registered map can then be extracted as:
 
-    $ASTROBEE_BUILD_PATH/devel/lib/sparse_mapping/extract_submap \
-      --skip_bundle_adjustment                                   \
-      --input_map merged.map --output_map ${dir}_surf_reg.map    \
+    $ASTROBEE_WS/devel/lib/sparse_mapping/extract_submap      \
+      --skip_bundle_adjustment                                \
+      --input_map merged.map --output_map ${dir}_surf_reg.map \
       ${dir}/*jpg
 
 Here, $dir points to nav_images as earlier in the document.
@@ -1406,7 +1421,7 @@ point to that.
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
     export ASTROBEE_WORLD=iss
     export ASTROBEE_ROBOT=bsharp2
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
 
     float="optical_center focal_length distortion"
@@ -1428,7 +1443,7 @@ point to that.
       --out_texture_dir out_texture_dir               
 
 Here it was chosen to pass in a mesh from a previous invocation of the
-geometry mapper for this robot and the given registred sparse map (for
+geometry mapper for this robot and the given registered sparse map (for
 example, the ``fused.ply`` mesh can be used). That is optional, and it
 is needed only one adds to camera_refiner the constraints that the
 triangulated points and haz cam clouds stay close to the mesh, when
@@ -1767,9 +1782,9 @@ A geometry mapper run directory has all the inputs this tool needs. It
 can be run as follows:
 
     export ASTROBEE_SOURCE_PATH=$HOME/projects/astrobee/src
-    export ASTROBEE_BUILD_PATH=$HOME/projects/astrobee
+    export ASTROBEE_WS=$HOME/projects/astrobee
     export ISAAC_WS=$HOME/projects/isaac
-    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ASTROBEE_WS/devel/setup.bash
     source $ISAAC_WS/devel/setup.bash
     export ASTROBEE_RESOURCE_DIR=$ASTROBEE_SOURCE_PATH/astrobee/resources
     export ASTROBEE_CONFIG_DIR=$ASTROBEE_SOURCE_PATH/astrobee/config
