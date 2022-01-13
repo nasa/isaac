@@ -640,19 +640,23 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       }
       // Save command
       case isaac_msgs::InspectionGoal::SAVE:
-        std::ofstream myfile;
-        std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
-        myfile.open(path);
-        for (int i = 0; i < goal_.inspect_poses.poses.size(); i++) {
-          myfile << goal_.inspect_poses.poses[i].position.x << " "
-                 << goal_.inspect_poses.poses[i].position.y << " "
-                 << goal_.inspect_poses.poses[i].position.z << " "
-                 << goal_.inspect_poses.poses[i].orientation.x << " "
-                 << goal_.inspect_poses.poses[i].orientation.y << " "
-                 << goal_.inspect_poses.poses[i].orientation.z << " "
-                 << goal_.inspect_poses.poses[i].orientation.w<< "\n";
+        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size()) {
+          std::ofstream myfile;
+          std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
+          myfile.open(path);
+          for (int i = goal_counter_; i < goal_.inspect_poses.poses.size(); i++) {
+            myfile << goal_.inspect_poses.poses[i].position.x << " "
+                   << goal_.inspect_poses.poses[i].position.y << " "
+                   << goal_.inspect_poses.poses[i].position.z << " "
+                   << goal_.inspect_poses.poses[i].orientation.x << " "
+                   << goal_.inspect_poses.poses[i].orientation.y << " "
+                   << goal_.inspect_poses.poses[i].orientation.z << " "
+                   << goal_.inspect_poses.poses[i].orientation.w << "\n";
+          }
+          myfile.close();
+        } else {
+          NODELET_ERROR_STREAM("Nothing to save");
         }
-        myfile.close();
         return;
       }
     }
