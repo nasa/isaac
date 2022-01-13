@@ -10,6 +10,6 @@ var searchData=
   ['intrinsicsdeptherror_76',['IntrinsicsDepthError',['../structdense__map_1_1IntrinsicsDepthError.html',1,'dense_map']]],
   ['intrinsicserror_77',['IntrinsicsError',['../structdense__map_1_1IntrinsicsError.html',1,'dense_map']]],
   ['isaactextureatlas_78',['IsaacTextureAtlas',['../classdense__map_1_1IsaacTextureAtlas.html',1,'dense_map']]],
-  ['isaactexturepatch_79',['IsaacTexturePatch',['../classdense__map_1_1IsaacTexturePatch.html',1,'dense_map::IsaacTexturePatch'],['../classdense__map_1_1IsaacTexturePatch.html#a289b434b3aea37b29415132b9b0fdd7b',1,'dense_map::IsaacTexturePatch::IsaacTexturePatch()']]],
+  ['isaactexturepatch_79',['IsaacTexturePatch',['../classdense__map_1_1IsaacTexturePatch.html',1,'dense_map::IsaacTexturePatch'],['../classdense__map_1_1IsaacTexturePatch.html#ac945c055a71ed22a1ab949af6909d948',1,'dense_map::IsaacTexturePatch::IsaacTexturePatch()']]],
   ['ix_80',['ix',['../structdense__map_1_1InterestPoint.html#a0de012c89b0f9f289802960698e32ab5',1,'dense_map::InterestPoint']]]
 ];
