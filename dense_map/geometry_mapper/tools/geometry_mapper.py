@@ -80,7 +80,7 @@ def process_args(args):
     parser.add_argument(
         "--undistorted_crop_wins",
         dest="undistorted_crop_wins",
-        default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160",
+        default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200",
         help="The central region to keep after undistorting an image and "
         + "before texturing. For sci_cam the numbers are at 1/4th of the full "
         + "resolution (resolution of calibration) and will be adjusted for the "
@@ -153,7 +153,7 @@ def process_args(args):
         default="5.0",
         help="A smaller value here will result in holes in depth images "
         + "being filled more aggressively but potentially with more artifacts "
-        + "in foreshortened regions.",
+        + "in foreshortened regions. Works only with positive --depth_hole_fill_diameter.",
     )
     parser.add_argument(
         "--median_filters",
@@ -167,9 +167,12 @@ def process_args(args):
     parser.add_argument(
         "--depth_hole_fill_diameter",
         dest="depth_hole_fill_diameter",
-        default="30",
-        help="Fill holes in the depth point clouds with this diameter, in pixels. This happens before the clouds are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh later (--max_hole_diameter).",
-    )
+        default="0",
+        help="Fill holes in the depth point clouds with this diameter, in pixels. "
+        + "This happens before the clouds are fused. If set to a positive value it "
+        + "can fill really big holes but may introduce artifacts. It is better to "
+        + "leave the hole-filling for later, once the mesh is fused (see "
+        + "--max_hole_diameter).")
     parser.add_argument(
         "--reliability_weight_exponent",
         dest="reliability_weight_exponent",
@@ -213,6 +216,16 @@ def process_args(args):
         default="0.00005",
         help="A larger value will result in a smoother mesh.",
     )
+    
+    parser.add_argument(
+        "--no_boundary_erosion",
+        dest="no_boundary_erosion",
+        action="store_true",
+        help="Do not erode the boundary when smoothing the mesh. Erosion may help with "
+        + "making the mesh more regular and easier to hole-fill, but may be undesirable "
+        + "in regions which don't get to be hole-filled.",
+        )
+
     parser.add_argument(
         "--max_num_hole_edges",
         dest="max_num_hole_edges",
@@ -567,7 +580,11 @@ def smoothe_mesh(input_mesh, output_mesh, args, attempt):
         raise Exception("Cannot find the smoothing tool:" + smoothe_mesh_path)
 
     num_iterations = "1"
-    smoothe_boundary = "1"
+    if args.no_boundary_erosion:
+        smoothe_boundary = "0"
+    else:
+        smoothe_boundary = "1"
+        
     cmd = [
         smoothe_mesh_path,
         num_iterations,
