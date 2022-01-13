@@ -109,6 +109,60 @@ The acoustics camera and how to enable it is documented at:
 
     $ISAAC_WS/src/astrobee/simulation/acoustics_cam/readme.md
 
+## Adding support for new cameras
+
+For an actual camera, rather than a simulated one, the files:
+
+    $ASTROBEE_SOURCE_PATH/astrobee/config/cameras.config
+    $ASTROBEE_SOURCE_PATH/astrobee/config/geometry.config
+    $ASTROBEE_SOURCE_PATH/astrobee/config/transforms.config
+    $ASTROBEE_SOURCE_PATH/astrobee/config/robots/robotName.config
+
+should be modified and entities added, mirroring ``sci_cam``, so having
+fields for intrinsics, extrinsics (nav cam to given cam transform),
+timestamp offset (by default it should be 0), and body to given camera
+transform.
+
+Note the first three config files above are used by any robot, while
+the last one refers only to the robot that is desired to use with the
+new camera. The Lua-based processing of config files is tolerant of
+the fact that a different robot config file lacks a new camera's
+settings even if the shared config files define them. For a camera
+that is expected to be present on all robots, each robot config file
+should be changed, but otherwise just a desired robot's file can be
+modified, in addition to the shared files.
+
+For a simulated camera, the above is not necessary. Instead, that
+camera must define the topics:
+
+    /sim/some_cam/pose
+    /sim/some_cam/info
+  
+where the desired camera was named ``some_cam``, having the camera 
+poses and camera intrinsics info, respectively. It is suggested to
+follow the example of ``heat_cam`` or ``sci_cam`` when creating
+such a simulated camera.
+
+Then, whether the camera is real or simulated, a topic is expected
+on which its images will be published, for example, named:
+
+    /hw/cam_some
+
+which then need to be passed to the geometry and streaming mappers,
+per the documentation for these tools.
+
+To visualize images published by your camera in ``rviz``, appropriate
+entities must be added in ``iss.rviz``, etc.
+
+Uncompressed or compressed images are supported, but for the latter
+adjustments must be made, mirroring ``sci_cam``. For example, the
+image topic should be:
+
+    /hw/cam_some/compressed
+
+except in ``iss.rviz``, where the suffix ``/compressed`` is not
+needed, but instead the one sets ``Transport Hint: compressed``.
+
 ## Compiling the software
 
 It is assumed that by now the Astrobee and ISAAC software is compiled.
@@ -696,7 +750,7 @@ Ensure that the bot name is correct below. Set ``ASTROBEE_SOURCE_PATH``,
       --median_filters "7 0.1 25 0.1"                                       \
       --reliability_weight_exponent 2                                       \
       --voxblox_integrator merged                                           \
-      --depth_hole_fill_diameter 30.0                                       \
+      --depth_hole_fill_diameter 0                                          \
       --max_ray_length 2.5                                                  \
       --voxel_size 0.01                                                     \
       --max_iso_times_exposure 5.1                                          \
@@ -747,17 +801,19 @@ Parameters:
       The default is 0.
     --foreshortening_delta: A smaller value here will result in holes
       in depth images being filled more aggressively but potentially
-      with more artifacts in foreshortened regions.
+      with more artifacts in foreshortened regions. Works only with
+      positive --depth_hole_fill_diameter.
     --median_filters: Given a list "w1 d1 w2 d2 ... ", remove a depth
       image point if it differs, in the Manhattan norm, from the median
       of cloud points in the pixel window of size wi centered at it by
-      more than di. This removes points sticking out for each such i. The
-      default is "7 0.1 25 0.1".
+      more than di. This removes points sticking out for each such
+      i. The default is "7 0.1 25 0.1".
     --depth_hole_fill_diameter: Fill holes in the depth point clouds
-      with this diameter, in pixels. This happens before the clouds
-      are fused. It is suggested to not make this too big, as more
-      hole-filling happens on the fused mesh later (see
-      --max_hole_diameter). The default is 30.
+      with this diameter, in pixels. This happens before the clouds are
+      fused. If set to a positive value it can fill really big holes but
+      may introduce artifacts. It is better to leave the hole-filling
+      for later, once the mesh is fused (see --max_hole_diameter).
+      The default is 0.
     --reliability_weight_exponent: A larger value will give more
       weight to depth points corresponding to pixels closer to depth
       image center, which are considered more reliable. The default is
@@ -775,12 +831,16 @@ Parameters:
       to adjust for lightning differences, then apply the gamma
       transform back. This value should be set to the maximum observed
       ISO * exposure_time. The default is 5.1. Not used with simulated data.
-    --smoothing_time: A larger value will result in a smoother mesh. The default 
-      is 0.00005.
-    --max_num_hole_edges: Close holes in the mesh which have no more than this 
-      many edges. The default is 1000.
-    --max_hole_diameter: The diameter (in meters) of the largest hole in the
-      mesh to fill. The default is 0.3.
+    --smoothing_time: A larger value will result in a smoother mesh. The 
+      default is 0.00005.
+    --no_boundary_erosion: Do not erode the boundary when smoothing
+      the mesh. Erosion may help with making the mesh more regular and
+      easier to hole-fill, but may be undesirable in regions which
+      don't get to be hole-filled.
+    --max_num_hole_edges: Close holes in the mesh which have no more
+      than this many edges. The default is 1000.
+    --max_hole_diameter: The diameter (in meters) of the largest hole
+      in the mesh to fill. The default is 0.3.
     --num_min_faces_in_component: Keep only connected mesh components with 
       at least this many faces.
     --num_components_to_keep: How many of the largest connected components 
@@ -1017,7 +1077,8 @@ with the image sampler, or
     /hw/cam_nav
 
 if no image sampler was used. The rest of the cameras usually follow
-the convention on the line above.
+the convention on the line above, for example, the ``heat_cam`` topic
+is ``/hw/cam_heat``.
 
 For the sci cam, the streaming mapper also expects image exposure data
 on the topic:
@@ -1116,8 +1177,8 @@ Ensure the same environment as before is present, including the robot name,
 and run:
 
     roslaunch isaac isaac_astrobee.launch mlp:=local llp:=disabled \
-      nodes:=framestore,localization_node,localization_manager     \
-      streaming_mapper:=true output:=screen     
+      nodes:=framestore,localization_node streaming_mapper:=true   \
+      output:=screen     
 
 Wait until the textured model is created, which can take a minute.
 
