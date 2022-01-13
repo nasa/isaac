@@ -592,8 +592,8 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec5d const& Zero, int w
 // ray from the existing point to the new point being almost parallel
 // to existing nearby rays (emanating from camera center) which is not
 // good.
-void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec5d const& Zero, int radius1, int radius2,
-               double foreshortening_delta) {
+void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec5d const& Zero, int radius1,
+               int radius2, double foreshortening_delta) {
   // Copy depthMat to workMat, with the latter unchanged below
   depthMat.copyTo(workMat);
 
@@ -1416,16 +1416,18 @@ DEFINE_int32(depth_exclude_rows, 0,
              "at margins to avoid some distortion of that data.");
 DEFINE_double(foreshortening_delta, 5.0,
               "A smaller value here will result in holes in depth images being filled more "
-              "aggressively but potentially with more artifacts in foreshortened regions.");
+              "aggressively but potentially with more artifacts in foreshortened regions."
+              "Works only with positive --depth_hole_fill_diameter.");
 DEFINE_string(median_filters, "7 0.1 25 0.1",
               "Given a list 'w1 d1 w2 d2 ... ', remove a depth image point "
               "if it differs, in the Manhattan norm, from the median of cloud points "
               "in the pixel window of size wi centered at it by more than di. This "
               "removes points sticking out for each such i.");
-DEFINE_double(depth_hole_fill_diameter, 30.0,
-              "Fill holes in the depth point clouds with this diameter, in pixels. This happens before the clouds "
-              "are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh "
-              "later (--max_hole_diameter).");
+DEFINE_double(depth_hole_fill_diameter, 0.0,
+              "Fill holes in the depth point clouds with this diameter, in pixels. This happens "
+              "before the clouds are fused. If set to a positive value it can fill really big "
+              "holes but may introduce artifacts. It is better to leave the hole-filling for "
+              "later, once the mesh is fused (see --max_hole_diameter).");
 DEFINE_double(reliability_weight_exponent, 2.0,
               "A larger value will give more weight to depth points corresponding to "
               "pixels closer to depth image center, which are considered more reliable.");

@@ -295,13 +295,13 @@ int main(int argc, char** argv) {
 
   // Write the images to disk
   std::cout << "Writing the images to: " << FLAGS_output_nav_cam_dir << std::endl;
+  int bag_pos = 0;
   bool save_grayscale = true;  // For feature matching need grayscale
   for (size_t nav_it = 0; nav_it < nav_cam_timestamps.size(); nav_it++) {
-    double found_time = -1.0;    // won't be used, but expected by the api
-    int bag_pos = 0;             // reset this each time
+    double found_time = -1.0;
     cv::Mat image;
-    if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs,
-                                save_grayscale, image, bag_pos,
+    if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs, save_grayscale, image,
+                                bag_pos,  // will change each time
                                 found_time))
       LOG(FATAL) << "Could not find image at the desired time.";
 
@@ -309,6 +309,7 @@ int main(int argc, char** argv) {
     snprintf(filename_buffer, sizeof(filename_buffer), "%s/%10.7f.jpg",
              FLAGS_output_nav_cam_dir.c_str(),
              nav_cam_timestamps[nav_it]);
+    std::cout << "Writing: " << filename_buffer << std::endl;
     cv::imwrite(filename_buffer, image);
   }
   return 0;
