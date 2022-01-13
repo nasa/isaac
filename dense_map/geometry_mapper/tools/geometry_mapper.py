@@ -172,7 +172,8 @@ def process_args(args):
         + "This happens before the clouds are fused. If set to a positive value it "
         + "can fill really big holes but may introduce artifacts. It is better to "
         + "leave the hole-filling for later, once the mesh is fused (see "
-        + "--max_hole_diameter).")
+        + "--max_hole_diameter).",
+    )
     parser.add_argument(
         "--reliability_weight_exponent",
         dest="reliability_weight_exponent",
@@ -216,7 +217,7 @@ def process_args(args):
         default="0.00005",
         help="A larger value will result in a smoother mesh.",
     )
-    
+
     parser.add_argument(
         "--no_boundary_erosion",
         dest="no_boundary_erosion",
@@ -224,7 +225,7 @@ def process_args(args):
         help="Do not erode the boundary when smoothing the mesh. Erosion may help with "
         + "making the mesh more regular and easier to hole-fill, but may be undesirable "
         + "in regions which don't get to be hole-filled.",
-        )
+    )
 
     parser.add_argument(
         "--max_num_hole_edges",
@@ -584,7 +585,7 @@ def smoothe_mesh(input_mesh, output_mesh, args, attempt):
         smoothe_boundary = "0"
     else:
         smoothe_boundary = "1"
-        
+
     cmd = [
         smoothe_mesh_path,
         num_iterations,
