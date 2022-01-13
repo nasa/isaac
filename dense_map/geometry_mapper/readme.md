@@ -1037,7 +1037,7 @@ To run the streaming mapper with real data for the given bot, do:
       streaming_mapper:=true output:=screen     
 
 Wait until it finishes forming the texture model, which may take 
-30 seconds on more.
+30 seconds, or up to 3 minutes for very large meshes.
 
 Ensure that the ``ASTROBEE_ROBOT`` name is correct above.
 

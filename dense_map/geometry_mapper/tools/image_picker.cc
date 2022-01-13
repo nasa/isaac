@@ -300,8 +300,7 @@ int main(int argc, char** argv) {
   for (size_t nav_it = 0; nav_it < nav_cam_timestamps.size(); nav_it++) {
     double found_time = -1.0;
     cv::Mat image;
-    if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs, save_grayscale,
-                                image,
+    if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs, save_grayscale, image,
                                 bag_pos,  // will change each time
                                 found_time))
       LOG(FATAL) << "Could not find image at the desired time.";
