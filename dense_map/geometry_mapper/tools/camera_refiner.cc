@@ -847,7 +847,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
     if (len == 0)
       std::cout << name << ": " << "none";
     else
-      std::cout << std::setprecision(8)
+      std::cout << std::setprecision(5)
                 << name << ": " << vals[it1] << ' ' << vals[it2] << ' '
                 << vals[it3] << ' ' << vals[it4];
     std::cout << " (" << len << " residuals)" << std::endl;

@@ -285,7 +285,8 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
   } else {
     ROS_INFO_STREAM("Subscribing to uncompressed image topic: " << texture_cam_topic);
     uncompressed_texture_image_sub =
-      image_transport->subscribe(texture_cam_topic, 2, &StreamingMapper::UncompressedTextureCallback, this);
+      image_transport->subscribe(texture_cam_topic, 2,
+                                 &StreamingMapper::UncompressedTextureCallback, this);
   }
 
   // Load the mesh
@@ -389,9 +390,11 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
                                           camera::CameraModel const& cam,
                                           std::vector<double>& smallest_cost_per_face,
                                           std::string const& out_prefix) {
-  omp_set_dynamic(0);                // Explicitly disable dynamic teams
-  omp_set_num_threads(num_threads);  // Use this many threads for all consecutive
-                                     // parallel regions
+  // Explicitly disable dynamic determination of number of threads
+  omp_set_dynamic(0);
+
+  // Use this many threads for all consecutive parallel regions
+  omp_set_num_threads(num_threads);
 
   // Colorize the image if grayscale. Careful here to avoid making a
   // copy if we don't need one.  Keep img_ptr pointing at the final
@@ -421,9 +424,6 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
     img_ptr = &scaled_image;
   }
 
-  // std::cout << "Exposure correction took " << timer1.get_elapsed()/1000.0 <<
-  // " seconds\n";
-
   // Prepare the image for publishing
   sensor_msgs::ImagePtr msg;
   std::vector<Eigen::Vector3i> face_vec;
@@ -436,8 +436,7 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
 
     msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *img_ptr).toImageMsg();
   } else {
-    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, smallest_cost_per_face,
-                              pixel_size, num_threads,
+    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, smallest_cost_per_face, pixel_size, num_threads,
                               face_projection_info, texture_atlases, texture_model, model_texture);
     // Note that the output image has an alpha channel
     msg = cv_bridge::CvImage(std_msgs::Header(), "bgra8", model_texture).toImageMsg();
@@ -572,8 +571,10 @@ void StreamingMapper::TextureCamSimInfoCallback(const sensor_msgs::CameraInfo::C
 
     // std::cout << "Received the camera info at time: " << info->header.stamp.toSec() << "\n";
     m_texture_cam_params =
-      camera::CameraParameters(Eigen::Vector2i(image_width, image_height), Eigen::Vector2d(focal_length, focal_length),
-                               Eigen::Vector2d(optical_center_x, optical_center_y), distortion);
+      camera::CameraParameters(Eigen::Vector2i(image_width, image_height),
+                               Eigen::Vector2d(focal_length, focal_length),
+                               Eigen::Vector2d(optical_center_x, optical_center_y),
+                               distortion);
   }
 }
 
@@ -694,7 +695,8 @@ void StreamingMapper::WipeOldImages() {
     num_to_keep = 25;  // something in the middle
   }
 
-  while (texture_cam_images.size() > num_to_keep) texture_cam_images.erase(texture_cam_images.begin());
+  while (texture_cam_images.size() > num_to_keep)
+    texture_cam_images.erase(texture_cam_images.begin());
 
   // There is a second wiping in this code in a different place. After
   // an image is processed it will be wiped together with any images
@@ -854,6 +856,7 @@ void StreamingMapper::ProcessingLoop() {
       continue;
     }
 
+
     util::WallTimer timer;
 
     // All is good with this timestamp. We may still not want to process it,
@@ -887,13 +890,12 @@ void StreamingMapper::ProcessingLoop() {
                             curr_dist_bw_cams < m_dist_between_processed_cams  &&
                             angle_diff        < m_angle_between_processed_cams);
     if (skip_processing) {
-      // std::cout << "Skipping this camera." << std::endl;
       continue;
     }
 
     // May need to keep this comment long term
     // std::cout << "Processing the streaming camera image at time stamp "
-    //           << texture_cam_image_timestamp << std::endl;
+    //          << texture_cam_image_timestamp << std::endl;
 
     double iso = -1.0, exposure = -1.0;
     if (need_exif) {
