@@ -73,7 +73,7 @@ DEFINE_double(max_time_between_images, 1.0e+10,
               "Select additional nav cam images to make the timestamps between any two "
               "consecutive such images be no more than this.");
 
-DEFINE_double(bracket_len, 2.0,
+DEFINE_double(bracket_len, 0.6,
               "Lookup sci and haz cam images only between consecutive nav cam images "
               "whose distance in time is no more than this (in seconds). It is assumed "
               "the robot moves slowly and uniformly during this time.");
@@ -137,14 +137,17 @@ int main(int argc, char** argv) {
   double nav_cam_to_haz_cam_timestamp_offset = nav_to_cam_timestamp_offset[1];
   double nav_cam_to_sci_cam_timestamp_offset = nav_to_cam_timestamp_offset[2];
 
-  std::cout << "nav_cam_to_haz_cam_timestamp_offset = " << nav_cam_to_haz_cam_timestamp_offset << "\n";
-  std::cout << "nav_cam_to_sci_cam_timestamp_offset = " << nav_cam_to_sci_cam_timestamp_offset << "\n";
+  std::cout << "nav_cam_to_haz_cam_timestamp_offset = " << nav_cam_to_haz_cam_timestamp_offset
+            << "\n";
+  std::cout << "nav_cam_to_sci_cam_timestamp_offset = " << nav_cam_to_sci_cam_timestamp_offset
+            << "\n";
 
   // TODO(oalexan1): Make the logic below into functions
 
   // Read the haz cam data we will need
   double haz_cam_start_time = -1.0;
-  std::vector<rosbag::MessageInstance> const& haz_cam_intensity_msgs = haz_cam_intensity_handle.bag_msgs;
+  std::vector<rosbag::MessageInstance> const& haz_cam_intensity_msgs
+    = haz_cam_intensity_handle.bag_msgs;
   for (size_t it = 0; it < haz_cam_intensity_msgs.size(); it++) {
     sensor_msgs::Image::ConstPtr image_msg
       = haz_cam_intensity_msgs[it].instantiate<sensor_msgs::Image>();
@@ -166,6 +169,7 @@ int main(int argc, char** argv) {
   // Read the sci cam data we will need (images and clouds)
   std::vector<rosbag::MessageInstance> const& sci_cam_msgs = sci_cam_handle.bag_msgs;
   std::cout << "Number of sci cam images " << sci_cam_msgs.size() << std::endl;
+  std::set<double> sci_cam_set;
   for (size_t it = 0; it < sci_cam_msgs.size(); it++) {
     sensor_msgs::Image::ConstPtr image_msg = sci_cam_msgs[it].instantiate<sensor_msgs::Image>();
     if (image_msg) {
@@ -178,6 +182,7 @@ int main(int argc, char** argv) {
     if (comp_image_msg) {
       double sci_cam_time = comp_image_msg->header.stamp.toSec();
       all_sci_cam_timestamps.push_back(sci_cam_time);
+      sci_cam_set.insert(sci_cam_time);
     }
   }
   if (all_sci_cam_timestamps.empty()) LOG(FATAL) << "No sci cam timestamps.";
@@ -196,10 +201,12 @@ int main(int argc, char** argv) {
       }
     }
   }
+
+  std::vector<double> sci_cam_timestamps_plus_extra = all_sci_cam_timestamps;
   for (size_t extra_it = 0; extra_it < extra_sci_cam_timestamps.size(); extra_it++) {
-    all_sci_cam_timestamps.push_back(extra_sci_cam_timestamps[extra_it]);
+    sci_cam_timestamps_plus_extra.push_back(extra_sci_cam_timestamps[extra_it]);
   }
-  std::sort(all_sci_cam_timestamps.begin(), all_sci_cam_timestamps.end());
+  std::sort(sci_cam_timestamps_plus_extra.begin(), sci_cam_timestamps_plus_extra.end());
 
   // Read the nav cam data we will need
   std::vector<rosbag::MessageInstance> const& nav_cam_msgs = nav_cam_handle.bag_msgs;
@@ -227,13 +234,15 @@ int main(int argc, char** argv) {
   // time in the list of nav and sci messages.
   // Keep the nav image whose time plus FLAGS_bracket_len is <= the given sci cam image.
   int num_nav = all_nav_cam_timestamps.size();
-  int num_sci = all_sci_cam_timestamps.size();
+  int num_sci_plus_extra = sci_cam_timestamps_plus_extra.size();
+  int num_sci = sci_cam_set.size();
   int nav_cam_pos = 0;  // used to narrow down the lookup
-  for (int sci_it = 0; sci_it < num_sci; sci_it++) {
+  int num_bracketed_sci_cams = 0;
+  for (int sci_it = 0; sci_it < num_sci_plus_extra; sci_it++) {
     for (int nav_it1 = nav_cam_pos; nav_it1 < num_nav; nav_it1++) {
       // Adjust for timestamp offsets
       double t1 = all_nav_cam_timestamps[nav_it1];
-      double s = all_sci_cam_timestamps[sci_it] - nav_cam_to_sci_cam_timestamp_offset;
+      double s = sci_cam_timestamps_plus_extra[sci_it] - nav_cam_to_sci_cam_timestamp_offset;
 
       bool is_good1 = (t1 >= s - d/2.0 && t1 <= s);
 
@@ -242,14 +251,27 @@ int main(int argc, char** argv) {
         nav_cam_pos = nav_it1;  // save this for the future
 
         // Now get the right bracket
-        for (size_t nav_it2 = num_nav - 1; nav_it2 >= 0; nav_it2--) {
+        // Use an int counter, as with unsigned int values subtracting is dangerous
+        for (int nav_it2 = num_nav - 1; nav_it2 >= 0; nav_it2--) {
           double t2 = all_nav_cam_timestamps[nav_it2];
 
           bool is_good2 = (s < t2 && t2 <= s + d/2.0);
           if (is_good2) {
             nav_cam_timestamps.push_back(all_nav_cam_timestamps[nav_it1]);
             nav_cam_timestamps.push_back(all_nav_cam_timestamps[nav_it2]);
-            std::cout << "sci - nav1 and nav2 - sci: " << s - t1 << ' ' << t2 - s << std::endl;
+            std::cout << std::setprecision(17) << std::fixed << "For ";
+            if (sci_cam_set.find(sci_cam_timestamps_plus_extra[sci_it]) != sci_cam_set.end())
+              std::cout << "sci_cam ";
+            else
+              std::cout << "extra   ";
+            std::cout << "timestamp "
+                      << sci_cam_timestamps_plus_extra[sci_it] << std::setprecision(4)
+                      << ", adj_stamp - nav1 and nav2 - adj_stamp: " << s - t1 << ' ' << t2 - s
+                      << std::endl;
+
+            if (sci_cam_set.find(sci_cam_timestamps_plus_extra[sci_it]) != sci_cam_set.end())
+              num_bracketed_sci_cams++;
+
             break;  // Found what we needed, stop this loop
           }
         }
@@ -259,17 +281,27 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (num_bracketed_sci_cams == num_sci)
+    std::cout << "Bracketed all " << num_sci << " sci_cam timestamps." << std::endl;
+  else
+    std::cout << "Bracketed only " << num_bracketed_sci_cams << " sci cam timestamps "
+              << "out of " << num_sci << ", not counting the extra timestamps. "
+              << "Perhaps a bigger bracket may be desired but that may result in inaccurate "
+              << "timestamp interpolation later. Ensure existing images are removed before new "
+              << "ones are added.\n";
+
   // Ensure the timestamps are sorted
   std::sort(nav_cam_timestamps.begin(), nav_cam_timestamps.end());
 
   // Write the images to disk
+  std::cout << "Writing the images to: " << FLAGS_output_nav_cam_dir << std::endl;
+  int bag_pos = 0;
   bool save_grayscale = true;  // For feature matching need grayscale
   for (size_t nav_it = 0; nav_it < nav_cam_timestamps.size(); nav_it++) {
-    double found_time = -1.0;    // won't be used, but expected by the api
-    int bag_pos = 0;             // reset this each time
+    double found_time = -1.0;
     cv::Mat image;
-    if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs,
-                                save_grayscale, image, bag_pos,
+    if (!dense_map::lookupImage(nav_cam_timestamps[nav_it], nav_cam_handle.bag_msgs, save_grayscale, image,
+                                bag_pos,  // will change each time
                                 found_time))
       LOG(FATAL) << "Could not find image at the desired time.";
 

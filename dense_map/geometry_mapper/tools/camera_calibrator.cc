@@ -232,7 +232,7 @@ struct IntrinsicsError {
         new IntrinsicsError(pix, xyz, block_sizes, orig_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {
@@ -318,7 +318,7 @@ struct IntrinsicsDepthError {
         new IntrinsicsDepthError(pix, xyz, block_sizes, orig_cam_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {
@@ -395,7 +395,7 @@ struct ExtrinsicsError {
         new ExtrinsicsError(target_corner_pixel, target_corner_meas, interp_world_to_cam1, block_sizes, cam2_params));
 
     // The residual size is always the same.
-    cost_function->SetNumResiduals(NUM_RESIDUALS);
+    cost_function->SetNumResiduals(NUM_PIX_PARAMS);
 
     // The camera wrapper knows all of the block sizes to add.
     for (size_t i = 0; i < block_sizes.size(); i++) {

@@ -240,15 +240,14 @@ bool findInterpolatedPose(double desired_nav_cam_time,
         return false;
       camera::CameraModel end_localized_cam(Eigen::Vector3d(), Eigen::Matrix3d::Identity(),
                                             sparse_map->GetCameraParameters());
-      if (!sparse_map->Localize(end_image, &end_localized_cam, NULL, NULL, nearby_cid_ptr)) return false;
+      if (!sparse_map->Localize(end_image, &end_localized_cam, NULL, NULL, nearby_cid_ptr))
+        return false;
       Eigen::Affine3d end_trans = end_localized_cam.GetTransform();
 
-      for (size_t it = 0; it < nearby_cid.size(); it++) {
-        // std::cout << "nearby image: " << sparse_map->cid_to_filename_[nearby_cid[it]]
-        //           << std::endl;
-      }
       // std::cout << "localizing cloud at time " << desired_nav_cam_time << std::endl;
-      double alpha = (desired_nav_cam_time - beg_nav_cam_time) / (end_nav_cam_time - beg_nav_cam_time);
+      double alpha = (desired_nav_cam_time - beg_nav_cam_time)
+        / (end_nav_cam_time - beg_nav_cam_time);
+
       if (end_nav_cam_time == beg_nav_cam_time) alpha = 0.0;  // handle division by zero
 
       Eigen::Affine3d interp_trans = dense_map::linearInterp(alpha, beg_trans, end_trans);
@@ -356,13 +355,17 @@ double median_mesh_edge(cv::Mat const& depthMat) {
 // Add points on edges and inside triangles having distances longer
 // than the median edge length times a factor. Store the combined set
 // in depthMat by adding further rows to it.
-void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, Vec5d const& Zero) {
+void add_extra_pts(cv::Mat& depthMat, cv::Mat& workMat, double voxel_size, Vec5d const& Zero) {
   double median_len = median_mesh_edge(depthMat);
 
   if (median_len <= 0) return;  // should not happen
 
   // Add points if lengths are more than this
-  double min_len = 1.3 * median_len;
+  double min_len = std::min(1.3 * median_len, 0.9 * voxel_size);
+
+  // There is no point in this being way smaller than the voxels these
+  // points will end up being binned into.
+  min_len = std::max(min_len, 0.4 * voxel_size);
 
   std::vector<Vec5d> points;
 
@@ -589,8 +592,8 @@ void median_filter(cv::Mat& depthMat, cv::Mat& workMat, Vec5d const& Zero, int w
 // ray from the existing point to the new point being almost parallel
 // to existing nearby rays (emanating from camera center) which is not
 // good.
-void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec5d const& Zero, int radius1, int radius2,
-               double foreshortening_delta) {
+void hole_fill(cv::Mat& depthMat, cv::Mat& workMat, double sigma, Vec5d const& Zero, int radius1,
+               int radius2, double foreshortening_delta) {
   // Copy depthMat to workMat, with the latter unchanged below
   depthMat.copyTo(workMat);
 
@@ -789,8 +792,20 @@ void smooth_additions(cv::Mat const& origMat, cv::Mat& depthMat, cv::Mat& workMa
 }
 
 // Add weights which are higher at image center and decrease towards
-// boundary. This makes voxblox blend better.
-void calc_weights(cv::Mat& depthMat, double exponent, bool simulated_data) {
+// boundary. This makes voxblox blend better. Need a lot of care, as
+// voxblox does not like weights under 1e-6 or so, neither ones above
+// 1e+6, since it treats them as floats.
+void calc_weights(cv::Mat& depthMat, double reliability_weight_exponent,
+                  double max_ray_length, bool simulated_data) {
+  // The weights defined below decay too fast, causing problems for voxblox.
+  // Hence multiply them all by something to normalize them somewhat. This
+  // factor should not be too big either, per the earlier note.
+  double factor = 1.0;
+  if (!simulated_data) {
+    factor = Eigen::Vector2d(depthMat.rows / 2.0, depthMat.cols / 2.0).norm();
+    factor = pow(factor, reliability_weight_exponent/2.0);
+  }
+
   for (int row = 0; row < depthMat.rows; row++) {
 #pragma omp parallel for
     for (int col = 0; col < depthMat.cols; col++) {
@@ -804,11 +819,14 @@ void calc_weights(cv::Mat& depthMat, double exponent, bool simulated_data) {
       float weight = 1.0;
       if (!simulated_data) {
         // Some kind of function decaying from center
-        weight = 1.0 / pow(1.0 + dist_sq, exponent/2.0);
+        weight = factor / pow(1.0 + dist_sq, reliability_weight_exponent/2.0);
 
         // Also, points that are further in z are given less weight
         double z = depthMat.at<Vec5d>(row, col)[2];
-        weight *= 1.0 / (0.001 + z * z);
+
+        // Likely max_ray_length is between 1 and 10, and then this factor
+        // is between 0.1 and 10.
+        weight *= max_ray_length / (0.001 + z * z);
 
         // Make sure the weight does not get too small as voxblox
         // will read it as a float. Here making the weights
@@ -827,6 +845,7 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg,
                            bool simulated_data, int depth_exclude_columns, int depth_exclude_rows,
                            double foreshortening_delta, double depth_hole_fill_diameter,
                            double reliability_weight_exponent,
+                           double max_ray_length, double voxel_size,
                            std::vector<double> const& median_filter_params, bool save_debug_data,
                            const char* filename_buffer,
                            Eigen::MatrixXd const& desired_cam_to_world_trans) {
@@ -862,11 +881,16 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg,
       double y = pc.points[count].y;
       double z = pc.points[count].z;
 
-      // Pick first channel. The precise color of the depth cloud is not important.
-      // It will be wiped later during smoothing and hole-filling anyway.
+      // Pick the first image channel. The precise color of the depth
+      // cloud is not important.  It will be wiped later during
+      // smoothing and hole-filling anyway.
       double i = haz_cam_intensity.at<cv::Vec3b>(row, col)[0];
-      bool skip = (col < depth_exclude_columns || depthMat.cols - col < depth_exclude_columns ||
-                   row < depth_exclude_rows || depthMat.rows - row < depth_exclude_rows);
+
+      double ray_len = Eigen::Vector3d(x, y, z).norm();
+      // Exclude points at the boundary or points further than max_ray_length.
+      bool skip = (col < depth_exclude_columns || depthMat.cols - 1 - col < depth_exclude_columns ||
+                   row < depth_exclude_rows    || depthMat.rows - 1 - row < depth_exclude_rows    ||
+                   ray_len > max_ray_length || std::isnan(ray_len) || std::isinf(ray_len));
 
       if ((x == 0 && y == 0 && z == 0) || skip)
         depthMat.at<Vec5d>(row, col) = Zero;
@@ -905,12 +929,12 @@ void save_proc_depth_cloud(sensor_msgs::PointCloud2::ConstPtr pc_msg,
 
   // This is the right place at which to add weights, before adding
   // extra points messes up with the number of rows in in depthMat.
-  calc_weights(depthMat, reliability_weight_exponent, simulated_data);
+  calc_weights(depthMat, reliability_weight_exponent, max_ray_length, simulated_data);
 
   // Add extra points, but only if we are committed to manipulating the
   // depth cloud to start with
   if (depth_hole_fill_diameter > 0 && !simulated_data)
-    add_extra_pts(depthMat, workMat, Zero);
+    add_extra_pts(depthMat, workMat, voxel_size, Zero);
 
   if (save_debug_data) {
     // Save the updated depthMat as a mesh (for debugging)
@@ -1053,7 +1077,8 @@ void saveCameraPoses(
   Eigen::Affine3d const& nav_cam_to_desired_cam_trans,
   Eigen::Affine3d& haz_cam_depth_to_image_transform, int depth_exclude_columns,
   int depth_exclude_rows, double foreshortening_delta, double depth_hole_fill_diameter,
-  double reliability_weight_exponent, std::vector<double> const& median_filter_params,
+  double reliability_weight_exponent, double max_ray_length, double voxel_size,
+  std::vector<double> const& median_filter_params,
   std::vector<rosbag::MessageInstance> const& desired_cam_msgs,
   std::vector<rosbag::MessageInstance> const& nav_cam_msgs,  // always needed when not doing sim
   std::vector<rosbag::MessageInstance> const& haz_cam_points_msgs,
@@ -1061,6 +1086,7 @@ void saveCameraPoses(
   std::map<double, std::vector<double>> const& sci_cam_exif, std::string const& output_dir,
   std::string const& desired_cam_dir, double start, double duration,
   double sampling_spacing_seconds, double dist_between_processed_cams,
+  double angle_between_processed_cams,
   std::set<double> const& sci_cam_timestamps, double max_iso_times_exposure,
   boost::shared_ptr<sparse_mapping::SparseMap> sparse_map, bool use_brisk_map,
   bool do_haz_cam_image,
@@ -1105,6 +1131,7 @@ void saveCameraPoses(
 
   // This is used to ensure cameras are not too close
   Eigen::Vector3d prev_cam_ctr(std::numeric_limits<double>::quiet_NaN(), 0, 0);
+  Eigen::Affine3d prev_trans = Eigen::Affine3d::Identity();
 
   // Compute the starting bag time as the timestamp of the first cloud
   for (auto& m : haz_cam_points_msgs) {
@@ -1207,18 +1234,26 @@ void saveCameraPoses(
     // Success localizing. Update the time at which it took place for next time.
     prev_time = curr_time;
 
-    std::cout << "Time elapsed since the bag started: " << curr_time - beg_time << "\n";
+    std::cout << "Time elapsed since the bag started: " << curr_time - beg_time << " seconds.\n";
 
     // See if to skip some images if the robot did not move much
     Eigen::Affine3d curr_trans;
     curr_trans.matrix() = desired_cam_to_world_trans;
     Eigen::Vector3d curr_cam_ctr = curr_trans.translation();
     double curr_dist_bw_cams = (prev_cam_ctr - curr_cam_ctr).norm();
-    if (!std::isnan(prev_cam_ctr[0]) && !custom_sci_timestamps &&
-        curr_dist_bw_cams < dist_between_processed_cams) {
-      std::cout << "Distance to previously processed camera is "
-                << curr_dist_bw_cams << ", skipping it."
-                << std::endl;
+    Eigen::Affine3d world_pose_change = curr_trans * (prev_trans.inverse());
+    double angle_diff = dense_map::maxRotationAngle(world_pose_change);
+    if (!std::isnan(prev_cam_ctr[0]))
+      std::cout << std::setprecision(4)
+                << "Position and orientation changes relative to prev. processed cam are "
+                << curr_dist_bw_cams  << " m and " << angle_diff <<" deg.\n";
+
+    bool skip_processing = (!std::isnan(prev_cam_ctr[0])                      &&
+                            !custom_sci_timestamps                            &&
+                            curr_dist_bw_cams < dist_between_processed_cams   &&
+                            angle_diff        < angle_between_processed_cams);
+    if (skip_processing) {
+      std::cout << "Skipping this camera." << std::endl;
       continue;
     }
 
@@ -1281,7 +1316,8 @@ void saveCameraPoses(
                             simulated_data,
                             depth_exclude_columns, depth_exclude_rows,
                             foreshortening_delta, depth_hole_fill_diameter,
-                            reliability_weight_exponent, median_filter_params,
+                            reliability_weight_exponent, max_ray_length,
+                            voxel_size, median_filter_params,
                             save_debug_data, filename_buffer,
                             desired_cam_to_world_trans);
 
@@ -1291,6 +1327,7 @@ void saveCameraPoses(
 
     // Update the previous camera center
     prev_cam_ctr = curr_cam_ctr;
+    prev_trans   = curr_trans;
   }
 
   std::cout << "Wrote: " << index_file << std::endl;
@@ -1356,12 +1393,15 @@ DEFINE_double(sampling_spacing_seconds, 0.5,
               "Spacing to use, in seconds, between consecutive depth images in "
               "the bag that are processed.");
 DEFINE_double(dist_between_processed_cams, 0.1,
-              "Once an image or depth image is processed, how far the camera "
-              "should move (in meters) before it should process more data.");
+              "Once an image or depth cloud is processed, "
+              "process a new one whenever either the camera moves by more than this "
+              "distance, in meters, or the angle changes by more than "
+              "--angle_between_processed_cams, in degrees.");
+DEFINE_double(angle_between_processed_cams, 5.0, "See --dist_between_processed_cams.");
 DEFINE_string(sci_cam_timestamps, "",
-              "Process only these sci cam timestamps (rather than "
-              "any in the bag using --dist_between_processed_cams, etc.). Must be "
-              "a file with one timestamp per line.");
+              "Process only these sci cam timestamps (rather than any in the bag using "
+              "--dist_between_processed_cams, etc.). Must be a file with one timestamp "
+              "per line.");
 DEFINE_double(max_iso_times_exposure, 5.1,
               "Apply the inverse gamma transform to "
               "images, multiply them by max_iso_times_exposure/ISO/exposure_time "
@@ -1376,19 +1416,27 @@ DEFINE_int32(depth_exclude_rows, 0,
              "at margins to avoid some distortion of that data.");
 DEFINE_double(foreshortening_delta, 5.0,
               "A smaller value here will result in holes in depth images being filled more "
-              "aggressively but potentially with more artifacts in foreshortened regions.");
+              "aggressively but potentially with more artifacts in foreshortened regions."
+              "Works only with positive --depth_hole_fill_diameter.");
 DEFINE_string(median_filters, "7 0.1 25 0.1",
               "Given a list 'w1 d1 w2 d2 ... ', remove a depth image point "
               "if it differs, in the Manhattan norm, from the median of cloud points "
               "in the pixel window of size wi centered at it by more than di. This "
               "removes points sticking out for each such i.");
-DEFINE_double(depth_hole_fill_diameter, 30.0,
-              "Fill holes in the depth point clouds with this diameter, in pixels. This happens before the clouds "
-              "are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh "
-              "later (--max_hole_diameter).");
+DEFINE_double(depth_hole_fill_diameter, 0.0,
+              "Fill holes in the depth point clouds with this diameter, in pixels. This happens "
+              "before the clouds are fused. If set to a positive value it can fill really big "
+              "holes but may introduce artifacts. It is better to leave the hole-filling for "
+              "later, once the mesh is fused (see --max_hole_diameter).");
 DEFINE_double(reliability_weight_exponent, 2.0,
               "A larger value will give more weight to depth points corresponding to "
               "pixels closer to depth image center, which are considered more reliable.");
+DEFINE_double(max_ray_length, 2.0,
+              "Process haz cam depth image points no further than "
+              "this distance from the camera.");
+DEFINE_double(voxel_size, 0.01,
+              "The grid size used for binning depth cloud points and creating the mesh. "
+              "Measured in meters.");
 DEFINE_bool(simulated_data, false,
             "If specified, use data recorded in simulation. "
             "Then haz and sci camera poses and intrinsics should be recorded in the bag file.");
@@ -1614,13 +1662,15 @@ int main(int argc, char** argv) {
                     nav_to_cam_trans[it], haz_cam_depth_to_image_transform,            // NOLINT
                     FLAGS_depth_exclude_columns, FLAGS_depth_exclude_rows,             // NOLINT
                     FLAGS_foreshortening_delta, FLAGS_depth_hole_fill_diameter,        // NOLINT
-                    FLAGS_reliability_weight_exponent, median_filter_params,           // NOLINT
+                    FLAGS_reliability_weight_exponent, FLAGS_max_ray_length,           // NOLINT
+                    FLAGS_voxel_size, median_filter_params,                            // NOLINT
                     bag_handles[cam_type]->bag_msgs,   // desired cam msgs             // NOLINT
                     *nav_cam_msgs_ptr,                 // nav msgs                     // NOLINT
                     haz_cam_points_handle.bag_msgs, nav_cam_bag_timestamps,            // NOLINT
                     sci_cam_exif, FLAGS_output_dir,                                    // NOLINT
                     cam_dirs[cam_type], FLAGS_start, FLAGS_duration,                   // NOLINT
                     FLAGS_sampling_spacing_seconds, FLAGS_dist_between_processed_cams, // NOLINT
+                    FLAGS_angle_between_processed_cams,                                // NOLINT
                     sci_cam_timestamps, FLAGS_max_iso_times_exposure,                  // NOLINT
                     sparse_map, FLAGS_use_brisk_map,                                   // NOLINT
                     do_haz_cam_image, sim_cam_poses[it], FLAGS_save_debug_data);       // NOLINT

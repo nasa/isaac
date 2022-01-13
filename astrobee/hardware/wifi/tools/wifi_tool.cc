@@ -56,7 +56,7 @@ class WifiTool {
     // Read the configuration
     config_reader::ConfigReader config_params;
     // Set the config path to ISAAC
-    char *path = getenv("ISAAC_CONFIG_DIR");
+    char *path = getenv("CUSTOM_CONFIG_DIR");
     if (path != NULL)
       config_params.SetPath(path);
     config_params.AddFile("hw/wifi.config");

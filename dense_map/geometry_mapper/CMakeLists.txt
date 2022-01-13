@@ -91,10 +91,11 @@ set(TEXRECON_DIR ${CMAKE_BINARY_DIR}/texrecon)
 ExternalProject_Add(texrecon	
     PREFIX ${TEXRECON_DIR}
     GIT_REPOSITORY https://github.com/oleg-alexandrov/mvs-texturing.git
-    GIT_TAG b6bac86
+    GIT_TAG 015a2ac
     CMAKE_ARGS -DCMAKE_VERBOSE_MAKEFILE=TRUE -DCMAKE_CXX_FLAGS=-fPIC
-    BUILD_COMMAND $(MAKE) # Per: https://cmake.org/pipermail/cmake/2011-April/043772.html
-    # Set some options below to not have it always recreate CMakeLists files
+    BUILD_COMMAND $(MAKE)
+    # Per: https://cmake.org/pipermail/cmake/2011-April/043772.html,
+    # set some options below to not have it always recreate CMakeLists files
     BUILD_ALWAYS 0
     UPDATE_COMMAND ""
     INSTALL_COMMAND cmake -E echo "Skipping install step for texrecon."
@@ -175,8 +176,8 @@ add_executable(camera_refiner tools/camera_refiner.cc)
 target_link_libraries(camera_refiner
     geometry_mapper_lib gflags glog)
 
-add_executable(camera_refiner2 tools/camera_refiner2.cc)
-target_link_libraries(camera_refiner2
+add_executable(camera_refiner_old tools/camera_refiner_old.cc)
+target_link_libraries(camera_refiner_old
     geometry_mapper_lib gflags glog)
 
 add_executable(extract_pc_from_bag tools/extract_pc_from_bag.cc)
@@ -205,6 +206,10 @@ target_link_libraries(image_picker
 
 add_executable(orthoproject tools/orthoproject.cc)
 target_link_libraries(orthoproject
+    geometry_mapper_lib gflags glog)
+
+add_executable(old_orthoproject tools/old_orthoproject.cc)
+target_link_libraries(old_orthoproject
     geometry_mapper_lib gflags glog)
 
 add_executable(streaming_mapper tools/streaming_mapper.cc)

@@ -80,11 +80,11 @@ def process_args(args):
     parser.add_argument(
         "--undistorted_crop_wins",
         dest="undistorted_crop_wins",
-        default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,210,160",
+        default="sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200",
         help="The central region to keep after undistorting an image and "
         + "before texturing. For sci_cam the numbers are at 1/4th of the full "
-        + "resolution and will be adjusted for the actual input image dimensions. "
-        + "Use a list in quotes.",
+        + "resolution (resolution of calibration) and will be adjusted for the "
+        + "actual input image dimensions. Use a list in quotes.",
     )
     parser.add_argument(
         "--haz_cam_points_topic",
@@ -115,8 +115,15 @@ def process_args(args):
         "--dist_between_processed_cams",
         dest="dist_between_processed_cams",
         default="0.1",
-        help="Once an image or depth image is processed, how far the camera "
-        + "should move (in meters) before it should process more data.",
+        help="Once an image or depth cloud is processed, process a new one whenever either "
+        + "the camera moves by more than this distance, in meters, or the angle changes by more "
+        + "than --angle_between_processed_cams, in degrees.",
+    )
+    parser.add_argument(
+        "--angle_between_processed_cams",
+        dest="angle_between_processed_cams",
+        default="5.0",
+        help="See --dist_between_processed_cams.",
     )
     parser.add_argument(
         "--sci_cam_timestamps",
@@ -146,7 +153,7 @@ def process_args(args):
         default="5.0",
         help="A smaller value here will result in holes in depth images "
         + "being filled more aggressively but potentially with more artifacts "
-        + "in foreshortened regions.",
+        + "in foreshortened regions. Works only with positive --depth_hole_fill_diameter.",
     )
     parser.add_argument(
         "--median_filters",
@@ -160,8 +167,12 @@ def process_args(args):
     parser.add_argument(
         "--depth_hole_fill_diameter",
         dest="depth_hole_fill_diameter",
-        default="30",
-        help="Fill holes in the depth point clouds with this diameter, in pixels. This happens before the clouds are fused. It is suggested to not make this too big, as more hole-filling happens on the fused mesh later (--max_hole_diameter).",
+        default="0",
+        help="Fill holes in the depth point clouds with this diameter, in pixels. "
+        + "This happens before the clouds are fused. If set to a positive value it "
+        + "can fill really big holes but may introduce artifacts. It is better to "
+        + "leave the hole-filling for later, once the mesh is fused (see "
+        + "--max_hole_diameter).",
     )
     parser.add_argument(
         "--reliability_weight_exponent",
@@ -180,8 +191,8 @@ def process_args(args):
         "--voxel_size",
         dest="voxel_size",
         default="0.01",
-        help="When fusing the depth point clouds use a voxel of this size, "
-        + "in meters.",
+        help="The grid size used for binning depth cloud points and creating the mesh. "
+        + "Measured in meters.",
     )
     parser.add_argument(
         "--voxblox_integrator",
@@ -206,6 +217,16 @@ def process_args(args):
         default="0.00005",
         help="A larger value will result in a smoother mesh.",
     )
+
+    parser.add_argument(
+        "--no_boundary_erosion",
+        dest="no_boundary_erosion",
+        action="store_true",
+        help="Do not erode the boundary when smoothing the mesh. Erosion may help with "
+        + "making the mesh more regular and easier to hole-fill, but may be undesirable "
+        + "in regions which don't get to be hole-filled.",
+    )
+
     parser.add_argument(
         "--max_num_hole_edges",
         dest="max_num_hole_edges",
@@ -312,6 +333,15 @@ def process_args(args):
         action="store_true",
         help="Save many intermediate datasets for debugging.",
     )
+
+    parser.add_argument(
+        "--texture_individual_images",
+        dest="texture_individual_images",
+        action="store_true",
+        help="If specified, in addition to a joint texture of all images create individual "
+        + "textures for each image and camera. Does not work with simulated cameras. For debugging.",
+    )
+
     args = parser.parse_args()
 
     # Parse the crop windows
@@ -469,6 +499,8 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.sampling_spacing_seconds,
         "--dist_between_processed_cams",
         args.dist_between_processed_cams,
+        "--angle_between_processed_cams",
+        args.angle_between_processed_cams,
         "--max_iso_times_exposure",
         args.max_iso_times_exposure,
         "--depth_exclude_columns",
@@ -481,6 +513,10 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.depth_hole_fill_diameter,
         "--reliability_weight_exponent",
         args.reliability_weight_exponent,
+        "--max_ray_length",
+        args.max_ray_length,
+        "--voxel_size",
+        args.voxel_size,
         "--median_filters",
         args.median_filters,
     ] + args.localization_options.split(" ")
@@ -545,7 +581,11 @@ def smoothe_mesh(input_mesh, output_mesh, args, attempt):
         raise Exception("Cannot find the smoothing tool:" + smoothe_mesh_path)
 
     num_iterations = "1"
-    smoothe_boundary = "1"
+    if args.no_boundary_erosion:
+        smoothe_boundary = "0"
+    else:
+        smoothe_boundary = "1"
+
     cmd = [
         smoothe_mesh_path,
         num_iterations,
@@ -681,6 +721,30 @@ def create_texrecon_cameras(args, src_path, undist_dir, cam_type):
     run_cmd(cmd, log_file, verbose=args.verbose)
 
 
+def texture_individual_images(args, exec_path, mesh, dist_image_list, cam_type):
+
+    camera_list = os.path.join(args.output_dir, cam_type + "_transforms.txt")
+    orthoproject_path = os.path.join(exec_path, "orthoproject")
+
+    cmd = [
+        orthoproject_path,
+        "-mesh",
+        mesh,
+        "-image_list",
+        dist_image_list,
+        "-camera_list",
+        camera_list,
+        "--camera_name",
+        cam_type,
+        "-output_prefix",
+        args.output_dir + "/" + cam_type,
+    ]
+
+    log_file = os.path.join(args.output_dir, "orthoproject_log.txt")
+    print("Projecting individual images. Writing the output log to: " + log_file)
+    run_cmd(cmd, log_file, verbose=args.verbose)
+
+
 def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
 
     # That is one long path
@@ -693,7 +757,7 @@ def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
     if not os.path.exists(texrecon_path):
         raise Exception("Cannot find: " + texrecon_path)
 
-    texrecon_dir = os.path.join(args.output_dir, cam_type + "_texture/run")
+    texrecon_dir = os.path.join(args.output_dir, cam_type + "_texture/" + cam_type)
     parent_dir = os.path.dirname(texrecon_dir)
     if os.path.isdir(parent_dir):
         # Wipe the existing directory
@@ -743,7 +807,7 @@ def find_sci_cam_scale(image_file):
     return float(image_width) / float(config_width)
 
 
-def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
+def texture_mesh(src_path, exec_path, cam_type, crop_win_map, mesh, args):
     if args.simulated_data and cam_type == "nav_cam":
         print("Texturing nav_cam is not supported with simulated data.")
         return "None"
@@ -778,6 +842,10 @@ def texture_mesh(src_path, cam_type, crop_win_map, mesh, args):
             args, cam_type, dist_image_list, undist_dir, undist_crop_win, scale
         )
         create_texrecon_cameras(args, src_path, undist_dir, cam_type)
+
+        if args.texture_individual_images:
+            texture_individual_images(args, exec_path, mesh, dist_image_list, cam_type)
+
         textured_mesh = run_texrecon(args, src_path, mesh, undist_dir, cam_type)
     else:
         # Simulated images don't have distortion
@@ -936,7 +1004,7 @@ if __name__ == "__main__":
     if start_step <= 9:
         for camera_type in args.camera_types.split():
             textured_mesh = texture_mesh(
-                src_path, camera_type, crop_win_map, simplified_mesh, args
+                src_path, exec_path, camera_type, crop_win_map, simplified_mesh, args
             )
             textured_meshes += [textured_mesh]
 

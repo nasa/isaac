@@ -43,7 +43,7 @@ class WifiMapperNode{
     nh_ = nh;
     // Set the config path to ISAAC
     char *path;
-    if ((path = getenv("ISAAC_CONFIG_DIR")) == NULL)
+    if ((path = getenv("CUSTOM_CONFIG_DIR")) == NULL)
       ROS_FATAL("Could not find the config path.");
     config_params_.SetPath(path);
 

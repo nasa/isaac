@@ -21,8 +21,8 @@
   <env if="$(eval optenv('ASTROBEE_CONFIG_DIR','')=='')"
        name="ASTROBEE_CONFIG_DIR" value="$(find astrobee)/config" />
   <!-- ISAAC -->
-  <env if="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
-       name="ISAAC_CONFIG_DIR" value="$(find isaac)/config" />
+  <env if="$(eval optenv('CUSTOM_CONFIG_DIR','')=='')"
+       name="CUSTOM_CONFIG_DIR" value="$(find isaac)/config" />
   <env if="$(eval optenv('ISAAC_CNN_DIR','')=='')"
        name="ISAAC_CNN_DIR" value="$(find img_analysis)/resources" />
 
