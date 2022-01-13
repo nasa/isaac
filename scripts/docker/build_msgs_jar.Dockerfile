@@ -46,10 +46,10 @@ RUN ["/bin/bash", "-c", "cd /src/msgs \
   && . devel/setup.bash \
   && genjava_message_artifacts --verbose -p ff_msgs ff_hw_msgs isaac_msgs isaac_hw_msgs"]
 
-# Copy over the apk source code
-COPY apks /src/msgs/src/
+# # Copy over the apk source code
+# COPY apks /src/msgs/src/
 
-# Copy msgs .jar files and build apk
-RUN find /src/msgs/devel/share/maven -name *.jar | xargs cp -t /src/msgs/src//isaac_gs_ros_bridge/app/libs \
-  && cd /src/msgs/src/isaac_gs_ros_bridge \
-  && ANDROID_HOME=$HOME/android-sdk ./gradlew build
+# # Copy msgs .jar files and build apk
+# RUN find /src/msgs/devel/share/maven -name *.jar | xargs cp -t /src/msgs/src//isaac_gs_ros_bridge/app/libs \
+#   && cd /src/msgs/src/isaac_gs_ros_bridge \
+#   && ANDROID_HOME=$HOME/android-sdk ./gradlew build

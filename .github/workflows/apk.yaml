@@ -9,11 +9,49 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-    - name: Checkout
+    - name: Checkout Astrobee
       uses: actions/checkout@v2
       with:
-        path: repo/
-    - name: Install dependencies
+        repository: nasa/astrobee
+        path: astrobee/
+
+    - name: Checkout ISAAC
+      uses: actions/checkout@v2
+      with:
+        path: isaac/
+
+
+    - name: Build code for isaac:astrobee Ubuntu 16
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+                                 --build-arg UBUNTU_VERSION=16.04
+                                 --build-arg ROS_VERSION=kinetic
+                                 --build-arg PYTHON=''
+                                 --build-arg REMOTE=ghcr.io/nasa
+                                 -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu16.04
+
+    - name: Build code for isaac:latest Ubuntu 16
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+                              --build-arg UBUNTU_VERSION=16.04
+                              --build-arg ROS_VERSION=kinetic
+                              --build-arg PYTHON=''
+                              --build-arg REMOTE=ghcr.io/nasa
+                              -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu16.04
+
+    - name: Build msg jars isaac:astrobee Ubuntu 16
+      run: docker build isaac -f isaac/scripts/docker/build_msgs_jar.Dockerfile
+                              --build-arg UBUNTU_VERSION=16.04
+                              --build-arg ROS_VERSION=kinetic
+                              --build-arg PYTHON=''
+                              --build-arg REMOTE=ghcr.io/nasa
+                              -t ghcr.io/${{ github.repository_owner }}/isaac:latest-msgs-jar-ubuntu16.04
+
+    - name: Copy jar files
+      run: |
+        docker cp $(docker create --rm ghcr.io/${{ github.repository_owner }}/isaac:latest-msgs-jar-ubuntu16.04):/src/msgs/devel/share/maven/ .
+        ls
+        find maven -name *.jar | xargs cp -t isaac/src/msgs/src/isaac_gs_ros_bridge/app/libs
+
+    - name: Install APK dependencies
       run: |
         sudo apt-get install -y libc6-dev-i386 lib32z1 openjdk-8-jdk
         mkdir $HOME/android-sdk
@@ -29,7 +67,7 @@ jobs:
         cd  ~/android-sdk/ndk-bundle/toolchains
         ln -s aarch64-linux-android-4.9 mips64el-linux-android
         ln -s arm-linux-androideabi-4.9 mipsel-linux-android
-    - name: Build apk
+    - name: Build APK
       run: |
         cd repo/apks/isaac_gs_ros_bridge
         ANDROID_HOME=$HOME/android-sdk ANDROID_NDK_HOME=$HOME/android-sdk/ndk-bundle ./gradlew build
