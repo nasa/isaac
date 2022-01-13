@@ -31,13 +31,13 @@ RUN apt-get update && apt-get install -y \
   ros-kinetic-rosjava \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Android
-RUN mkdir $HOME/android-sdk \
-  && cd $HOME/android-sdk \
-  && wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip \
-  && unzip tools_r25.2.3-linux.zip \
-  && tools/bin/sdkmanager --update \
-  && yes | tools/bin/sdkmanager "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
+# # Install Android
+# RUN mkdir $HOME/android-sdk \
+#   && cd $HOME/android-sdk \
+#   && wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip \
+#   && unzip tools_r25.2.3-linux.zip \
+#   && tools/bin/sdkmanager --update \
+#   && yes | tools/bin/sdkmanager "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
 
 # Compile msg jar files, genjava_message_artifacts only works with bash
 RUN ["/bin/bash", "-c", "cd /src/msgs \

@@ -48,7 +48,7 @@ jobs:
       run: |
         docker cp $(docker create --rm ghcr.io/${{ github.repository_owner }}/isaac:latest-msgs-jar-ubuntu16.04):/src/msgs/devel/share/maven/ .
         ls
-        find maven -name *.jar | xargs cp -t isaac/isaac_gs_ros_bridge/app/libs
+        find maven -name *.jar | xargs cp -t isaac/apks/isaac_gs_ros_bridge/app/libs
 
     - name: Install APK dependencies
       run: |
