@@ -90,14 +90,12 @@ jobs:
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu18.04
+                          -t isaac/astrobee:msgs-ubuntu18.04
         docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu18.04
+                          -t isaac/isaac:msgs-ubuntu18.04
   build-focal:
 
     runs-on: ubuntu-20.04
@@ -137,11 +135,9 @@ jobs:
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu20.04
+                          -t isaac/astrobee:msgs-ubuntu20.04
         docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04
+                          -t isaac/isaac:msgs-ubuntu20.04
