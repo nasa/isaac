@@ -151,23 +151,23 @@ docker build ${astrobee_source:-${rootdir}} \
             --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
             --build-arg ROS_VERSION=${ROS_VERSION} \
             --build-arg PYTHON=${PYTHON} \
-            -t astrobee:msgs-ubuntu${UBUNTU_VERSION}
+            -t isaac/astrobee:msgs-ubuntu${UBUNTU_VERSION}
 docker build ${isaac_source:-${rootdir}} \
             -f ${isaac_source:-${rootdir}}/scripts/docker/isaac_msgs.Dockerfile \
             --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
             --build-arg ROS_VERSION=${ROS_VERSION} \
             --build-arg PYTHON=${PYTHON} \
-            -t isaac:msgs-ubuntu${UBUNTU_VERSION}
+            -t isaac/isaac:msgs-ubuntu${UBUNTU_VERSION}
 
-# Build IDI and MAST
-export IDI_PATH=${idi_source}
-export MAST_PATH=${mast_source}
-export UBUNTU_VERSION=${UBUNTU_VERSION}
-export ROS_VERSION=${ROS_VERSION}
-export PYTHON=${PYTHON}
+# # Build IDI and MAST
+# export IDI_PATH=${idi_source}
+# export MAST_PATH=${mast_source}
+# export UBUNTU_VERSION=${UBUNTU_VERSION}
+# export ROS_VERSION=${ROS_VERSION}
+# export PYTHON=${PYTHON}
 
-if [ $mast == 1 ]; then
-	docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${IDI_PATH}/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml build
-else
-	docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${IDI_PATH}/idi.docker-compose.yml build
-fi
+# if [ $mast == 1 ]; then
+# 	docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${IDI_PATH}/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml build
+# else
+# 	docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${IDI_PATH}/idi.docker-compose.yml build
+# fi

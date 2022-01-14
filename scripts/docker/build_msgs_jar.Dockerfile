@@ -31,25 +31,9 @@ RUN apt-get update && apt-get install -y \
   ros-kinetic-rosjava \
   && rm -rf /var/lib/apt/lists/*
 
-# # Install Android
-# RUN mkdir $HOME/android-sdk \
-#   && cd $HOME/android-sdk \
-#   && wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip \
-#   && unzip tools_r25.2.3-linux.zip \
-#   && tools/bin/sdkmanager --update \
-#   && yes | tools/bin/sdkmanager "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
-
 # Compile msg jar files, genjava_message_artifacts only works with bash
 RUN ["/bin/bash", "-c", "cd /src/msgs \
   && catkin config \
   && catkin build \
   && . devel/setup.bash \
   && genjava_message_artifacts --verbose -p ff_msgs ff_hw_msgs isaac_msgs isaac_hw_msgs"]
-
-# # Copy over the apk source code
-# COPY apks /src/msgs/src/
-
-# # Copy msgs .jar files and build apk
-# RUN find /src/msgs/devel/share/maven -name *.jar | xargs cp -t /src/msgs/src//isaac_gs_ros_bridge/app/libs \
-#   && cd /src/msgs/src/isaac_gs_ros_bridge \
-#   && ANDROID_HOME=$HOME/android-sdk ./gradlew build

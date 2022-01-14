@@ -21,28 +21,26 @@ jobs:
         path: isaac/
 
 
-    - name: Build code for isaac:astrobee Ubuntu 16
+    - name: Build image isaac/astrobee:msgs-ubuntu16.04
       run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
                                  --build-arg UBUNTU_VERSION=16.04
                                  --build-arg ROS_VERSION=kinetic
                                  --build-arg PYTHON=''
-                                 -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu16.04
+                                 -t isaac/astrobee:msgs-ubuntu16.04
 
-    - name: Build code for isaac:latest Ubuntu 16
+    - name: Build image isaac/isaac:msgs-ubuntu16.04
       run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                               --build-arg UBUNTU_VERSION=16.04
                               --build-arg ROS_VERSION=kinetic
                               --build-arg PYTHON=''
-                              --build-arg REMOTE=ghcr.io/nasa
-                              -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu16.04
+                              -t isaac/isaac:msgs-ubuntu16.04
 
-    - name: Build msg jars isaac:astrobee Ubuntu 16
+    - name: Build image isaac/isaac:latest-msgs-jar-ubuntu16.04
       run: docker build isaac -f isaac/scripts/docker/build_msgs_jar.Dockerfile
                               --build-arg UBUNTU_VERSION=16.04
                               --build-arg ROS_VERSION=kinetic
                               --build-arg PYTHON=''
-                              --build-arg REMOTE=ghcr.io/nasa
-                              -t ghcr.io/${{ github.repository_owner }}/isaac:latest-msgs-jar-ubuntu16.04
+                              -t isaac/isaac:latest-msgs-jar-ubuntu16.04
 
     - name: Copy jar files
       run: |
