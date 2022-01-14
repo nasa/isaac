@@ -40,15 +40,15 @@ jobs:
                           --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu16.04
 
-    - name: Build messages dockers for Ubuntu 16
-      run: |
-        docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+    - name: Build messages dockers for Ubuntu 16 (astrobee)
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu16.04
-        docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+
+    - name: Build messages dockers for Ubuntu 16 (isaac)
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
@@ -99,15 +99,15 @@ jobs:
                           --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu18.04
 
-    - name: Build messages dockers for Ubuntu 18
-      run: |
-        docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+    - name: Build messages dockers for Ubuntu 18 (astrobee)
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu18.04
-        docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+
+    - name: Build messages dockers for Ubuntu 18 (isaac)
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=3
@@ -158,15 +158,15 @@ jobs:
                           --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu20.04
 
-    - name: Build messages dockers for Ubuntu 20
-      run: |
-        docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+    - name: Build messages dockers for Ubuntu 20 (astrobee)
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu20.04
-        docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+
+    - name: Build messages dockers for Ubuntu 20 (isaac)
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
