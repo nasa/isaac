@@ -21,7 +21,7 @@
 
 ARG UBUNTU_VERSION=16.04
 ARG REMOTE=isaac
-FROM ${REMOTE}/astrobee:msgs-ubuntu${UBUNTU_VERSION}
+FROM ${REMOTE}/isaac:astrobee-msgs-ubuntu${UBUNTU_VERSION}
 
 ARG ROS_VERSION=kinetic
 ARG PYTHON=""
