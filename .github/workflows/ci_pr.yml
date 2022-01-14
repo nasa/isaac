@@ -39,20 +39,18 @@ jobs:
                           --build-arg PYTHON=''
                           -t isaac:latest-ubuntu16.04
 
-    - name: Build messages dockers for Ubuntu 16
-      run: |
-        docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+    - name: Build messages image isaac/astrobee:msgs-ubuntu16.04
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/astrobee:msgs-ubuntu16.04
-        docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+                          -t isaac/astrobee:msgs-ubuntu16.04
+    - name: Build messages image isaac/isaac:msgs-ubuntu16.04
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu16.04
+                          -t isaac/isaac:msgs-ubuntu16.04
   build-bionic:
 
     runs-on: ubuntu-18.04
