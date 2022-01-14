@@ -18,6 +18,7 @@ jobs:
     - name: Checkout ISAAC
       uses: actions/checkout@v2
       with:
+        submodules: recursive
         path: isaac/
 
 
@@ -44,7 +45,7 @@ jobs:
 
     - name: Copy jar files
       run: |
-        docker cp $(docker create --rm ghcr.io/${{ github.repository_owner }}/isaac:latest-msgs-jar-ubuntu16.04):/src/msgs/devel/share/maven/ .
+        docker cp $(docker create --rm isaac/isaac:latest-msgs-jar-ubuntu16.04):/src/msgs/devel/share/maven/ .
         ls -l isaac/apks/isaac_gs_ros_bridge/app/libs/
         rm isaac/apks/isaac_gs_ros_bridge/app/libs/*msgs*
         ls -l isaac/apks/isaac_gs_ros_bridge/app/libs/
