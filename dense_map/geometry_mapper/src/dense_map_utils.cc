@@ -24,17 +24,6 @@
 
 #include <dense_map_utils.h>
 
-// Get rid of warning beyond our control
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic push
-#include <openMVG/multiview/projection.hpp>
-#include <openMVG/multiview/rotation_averaging_l1.hpp>
-#include <openMVG/multiview/triangulation_nview.hpp>
-#include <openMVG/numeric/numeric.h>
-#include <openMVG/tracks/tracks.hpp>
-#pragma GCC diagnostic pop
-
 #include <boost/filesystem.hpp>
 
 #include <iostream>
@@ -44,7 +33,8 @@ namespace dense_map {
 
 // A  function to split a string like 'optical_center focal_length' into
 // its two constituents.
-void parse_intrinsics_to_float(std::string const& intrinsics_to_float, std::set<std::string>& intrinsics_to_float_set) {
+void parse_intrinsics_to_float(std::string const& intrinsics_to_float,
+                               std::set<std::string>& intrinsics_to_float_set) {
   intrinsics_to_float_set.clear();
   std::string val;
   std::istringstream is(intrinsics_to_float);
@@ -952,58 +942,6 @@ void pickTimestampsInBounds(std::vector<double> const& timestamps, double left_b
   out_timestamps.push_back(local_timestamps.back());
 
   return;
-}
-
-// Triangulate rays emanating from given undistorted and centered pixels
-Eigen::Vector3d TriangulatePair(double focal_length1, double focal_length2,
-                                Eigen::Affine3d const& world_to_cam1,
-                                Eigen::Affine3d const& world_to_cam2,
-                                Eigen::Vector2d const& pix1,
-                                Eigen::Vector2d const& pix2) {
-  Eigen::Matrix3d k1;
-  k1 << focal_length1, 0, 0, 0, focal_length1, 0, 0, 0, 1;
-
-  Eigen::Matrix3d k2;
-  k2 << focal_length2, 0, 0, 0, focal_length2, 0, 0, 0, 1;
-
-  openMVG::Mat34 cid_to_p1, cid_to_p2;
-  openMVG::P_From_KRt(k1, world_to_cam1.linear(), world_to_cam1.translation(), &cid_to_p1);
-  openMVG::P_From_KRt(k2, world_to_cam2.linear(), world_to_cam2.translation(), &cid_to_p2);
-
-  openMVG::Triangulation tri;
-  tri.add(cid_to_p1, pix1);
-  tri.add(cid_to_p2, pix2);
-
-  Eigen::Vector3d solution = tri.compute();
-  return solution;
-}
-
-// Triangulate n rays emanating from given undistorted and centered pixels
-Eigen::Vector3d Triangulate(std::vector<double>          const& focal_length_vec,
-                            std::vector<Eigen::Affine3d> const& world_to_cam_vec,
-                            std::vector<Eigen::Vector2d> const& pix_vec) {
-  if (focal_length_vec.size() != world_to_cam_vec.size() ||
-      focal_length_vec.size() != pix_vec.size())
-    LOG(FATAL) << "All inputs to Triangulate() must have the same size.";
-
-  if (focal_length_vec.size() <= 1)
-    LOG(FATAL) << "At least two rays must be passed to Triangulate().";
-
-  openMVG::Triangulation tri;
-
-  for (size_t it = 0; it < focal_length_vec.size(); it++) {
-    Eigen::Matrix3d k;
-    k << focal_length_vec[it], 0, 0, 0, focal_length_vec[it], 0, 0, 0, 1;
-
-    openMVG::Mat34 cid_to_p;
-    openMVG::P_From_KRt(k, world_to_cam_vec[it].linear(), world_to_cam_vec[it].translation(),
-                        &cid_to_p);
-
-    tri.add(cid_to_p, pix_vec[it]);
-  }
-
-  Eigen::Vector3d solution = tri.compute();
-  return solution;
 }
 
 // A debug utility for saving a camera in a format ASP understands.

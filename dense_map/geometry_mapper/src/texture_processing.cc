@@ -55,6 +55,14 @@
 #include <utility>
 #include <set>
 
+// TODO(oalexan1): Consider applying TILE_PADDING not to at the atlas
+// forming stage, when the patch is padded, but earlier, right when
+// the patch is created from a mesh triangle. That will ensure that
+// while the same overall buffer is used, the padding region will have
+// actual image samples, which may improve the rendering in meshlab
+// when one zooms out, where now for some reason the triangle edges
+// show up.  Can test the output with the test_texture_gen tool.
+
 namespace dense_map {
 
 // Use int64_t values as much as possible when it comes to dealing with
@@ -64,7 +72,7 @@ const int64_t NUM_CHANNELS = 4;  // BRGA
 const int64_t TILE_PADDING = 4;
 
 IsaacTextureAtlas::IsaacTextureAtlas(int64_t width, int64_t height)
-    : width(width), height(height), determined_height(0), padding(TILE_PADDING), finalized(false) {
+    : width(width), height(height), determined_height(0), finalized(false) {
   bin = RectangularBin::create(width, height);
 
   // Do not create the image buffer yet, we don't need it until after its precise
@@ -102,8 +110,8 @@ bool IsaacTextureAtlas::insert(IsaacTexturePatch::ConstPtr texture_patch) {
 
   assert(bin != NULL);
 
-  int64_t width = texture_patch->get_width() + 2 * padding;
-  int64_t height = texture_patch->get_height() + 2 * padding;
+  int64_t width = texture_patch->get_width() + 2 * TILE_PADDING;
+  int64_t height = texture_patch->get_height() + 2 * TILE_PADDING;
   Rect<int64_t> rect = Rect<int64_t>(0, 0, width, height);
   if (!bin->insert(&rect)) return false;
 
@@ -112,22 +120,22 @@ bool IsaacTextureAtlas::insert(IsaacTexturePatch::ConstPtr texture_patch) {
 
   // Note how we don't bother to do any copying, as at this stage we
   // only care for the structure
-  // copy_into(patch_image, rect.min_x, rect.min_y, image, padding);
+  // copy_into(patch_image, rect.min_x, rect.min_y, image, TILE_PADDING);
 
   IsaacTexturePatch::Faces const& patch_faces = texture_patch->get_faces();              // alias
   IsaacTexturePatch::Texcoords const& patch_texcoords = texture_patch->get_texcoords();  // alias
 
   // Calculate where the patch will go after insertion
-  math::Vec2f offset = math::Vec2f(rect.min_x + padding, rect.min_y + padding);
+  Eigen::Vector2d offset = Eigen::Vector2d(rect.min_x + TILE_PADDING, rect.min_y + TILE_PADDING);
 
   faces.insert(faces.end(), patch_faces.begin(), patch_faces.end());
 
   // Insert the texcoords in the right place
   for (std::size_t i = 0; i < patch_faces.size(); i++) {
     for (int64_t j = 0; j < 3; j++) {
-      math::Vec2f rel_texcoord(patch_texcoords[i * 3 + j]);
+      Eigen::Vector2d rel_texcoord(patch_texcoords[i * 3 + j]);
 
-      math::Vec2f texcoord = rel_texcoord + offset;
+      Eigen::Vector2d texcoord = rel_texcoord + offset;
 
       // Delay this normalization until we know the final width and
       // height of the atlas.
@@ -142,12 +150,12 @@ bool IsaacTextureAtlas::insert(IsaacTexturePatch::ConstPtr texture_patch) {
 }
 
 struct VectorCompare {
-  bool operator()(math::Vec2f const& lhs, math::Vec2f const& rhs) const {
+  bool operator()(Eigen::Vector2d const& lhs, Eigen::Vector2d const& rhs) const {
     return lhs[0] < rhs[0] || (lhs[0] == rhs[0] && lhs[1] < rhs[1]);
   }
 };
 
-typedef std::map<math::Vec2f, std::size_t, VectorCompare> TexcoordMap;
+typedef std::map<Eigen::Vector2d, std::size_t, VectorCompare> TexcoordMap;
 
 void IsaacTextureAtlas::merge_texcoords() {
   Texcoords tmp;
@@ -155,7 +163,7 @@ void IsaacTextureAtlas::merge_texcoords() {
 
   // Do not remove duplicates, as that messes up the book-keeping
   TexcoordMap texcoord_map;
-  for (math::Vec2f const& texcoord : tmp) {
+  for (Eigen::Vector2d const& texcoord : tmp) {
     TexcoordMap::iterator iter = texcoord_map.find(texcoord);
     // if (iter == texcoord_map.end()) {
     std::size_t texcoord_id = this->texcoords.size();
@@ -170,10 +178,11 @@ void IsaacTextureAtlas::merge_texcoords() {
 
 // Set the final height by removing unused space. Allocate the image buffer.
 void IsaacTextureAtlas::resize_atlas() {
-  // Round up a little to make it a multiple of 2 * padding. Not strictly necessary
+  // Round up a little to make it a multiple of 2 * TILE_PADDING. Not strictly necessary
   // but looks nicer that way.
+  int64_t factor = 2 * TILE_PADDING;
   this->determined_height
-    = (2 * padding) * (ceil(this->determined_height / static_cast<double>(2 * padding)));
+    = factor * ceil(this->determined_height / static_cast<double>(factor));
 
   this->determined_height = std::min(this->height, this->determined_height);
   this->height = this->determined_height;
@@ -200,18 +209,18 @@ void IsaacTextureAtlas::finalize() {
 
 void isaac_build_model(mve::TriangleMesh::ConstPtr mesh,
                        std::vector<IsaacTextureAtlas::Ptr> const& texture_atlases,
-                       ObjModel* obj_model) {
+                       IsaacObjModel* obj_model) {
   mve::TriangleMesh::VertexList const& mesh_vertices = mesh->get_vertices();
   mve::TriangleMesh::NormalList const& mesh_normals = mesh->get_vertex_normals();
   mve::TriangleMesh::FaceList const& mesh_faces = mesh->get_faces();
 
-  ObjModel::Vertices& vertices = obj_model->get_vertices();
+  IsaacObjModel::Vertices& vertices = obj_model->get_vertices();
   vertices.insert(vertices.begin(), mesh_vertices.begin(), mesh_vertices.end());
-  ObjModel::Normals& normals = obj_model->get_normals();
+  IsaacObjModel::Normals& normals = obj_model->get_normals();
   normals.insert(normals.begin(), mesh_normals.begin(), mesh_normals.end());
-  ObjModel::TexCoords& texcoords = obj_model->get_texcoords();
+  IsaacObjModel::TexCoords& texcoords = obj_model->get_texcoords();
 
-  ObjModel::Groups& groups = obj_model->get_groups();
+  IsaacObjModel::Groups& groups = obj_model->get_groups();
   MaterialLib& material_lib = obj_model->get_material_lib();
 
   for (IsaacTextureAtlas::Ptr texture_atlas : texture_atlases) {
@@ -221,8 +230,8 @@ void isaac_build_model(mve::TriangleMesh::ConstPtr mesh,
     material.diffuse_map = texture_atlas->get_image();
     material_lib.push_back(material);
 
-    groups.push_back(ObjModel::Group());
-    ObjModel::Group& group = groups.back();
+    groups.push_back(IsaacObjModel::Group());
+    IsaacObjModel::Group& group = groups.back();
     group.material_name = material.name;
 
     IsaacTextureAtlas::Faces const& atlas_faces = texture_atlas->get_faces();
@@ -244,8 +253,8 @@ void isaac_build_model(mve::TriangleMesh::ConstPtr mesh,
                                     texcoord_id_offset + atlas_texcoord_ids[i * 3 + 1],
                                     texcoord_id_offset + atlas_texcoord_ids[i * 3 + 2]};
 
-      group.faces.push_back(ObjModel::Face());
-      ObjModel::Face& face = group.faces.back();
+      group.faces.push_back(IsaacObjModel::Face());
+      IsaacObjModel::Face& face = group.faces.back();
       std::copy(vertex_ids, vertex_ids + 3, face.vertex_ids);
       std::copy(texcoord_ids, texcoord_ids + 3, face.texcoord_ids);
       std::copy(normal_ids, normal_ids + 3, face.normal_ids);
@@ -292,29 +301,46 @@ math::Vec3f eigen_to_vec3f(Eigen::Vector3d const& V) {
   return v;
 }
 
-void calculate_texture_size(double height_factor, std::list<IsaacTexturePatch::ConstPtr> const& texture_patches,
+void calculate_texture_size(double height_factor,
+                            std::list<IsaacTexturePatch::ConstPtr> const& texture_patches,
                             int64_t& texture_width, int64_t& texture_height) {
   int64_t total_area = 0;  // this can be huge and may overflow with 32 bit int
-  int64_t max_width = 0;
-  int64_t max_height = 0;
-  int64_t padding = TILE_PADDING;
-
+  int64_t max_patch_width = 0;
+  int64_t max_patch_height = 0;
   for (IsaacTexturePatch::ConstPtr texture_patch : texture_patches) {
-    int64_t width = texture_patch->get_width() + 2 * padding;
-    int64_t height = texture_patch->get_height() + 2 * padding;
+    int64_t width  = texture_patch->get_width()  + 2 * TILE_PADDING;
+    int64_t height = texture_patch->get_height() + 2 * TILE_PADDING;
 
-    max_width = std::max(max_width, width);
-    max_height = std::max(max_height, height);
+    max_patch_width = std::max(max_patch_width, width);
+    max_patch_height = std::max(max_patch_height, height);
 
     int64_t area = width * height;
     total_area += area;
   }
 
-  texture_width = std::max(4L * 1024L, max_width);
-  texture_height = ceil(static_cast<double>(total_area / texture_width));
-  texture_height = std::max(texture_height, max_height);
+  // Estimate rough dimensions of the atlas. This can't be precise,
+  // since those little tiles may not fit with no gaps between
+  // them. The height will be first over-estimated later, and then
+  // re-adjusted in due time.
 
-  // This is a heuristic but it works well-enough the first time
+  // It is good to aim for roughly square dimensions, as otherwise one
+  // dimension may be too big, which may result in loss of precision
+  // in texcoords as those get scaled by image dimensions.
+  texture_width  = ceil(sqrt(static_cast<double>(total_area)));
+  texture_height = ceil(static_cast<double>(total_area / texture_width));
+
+  // Adjust to ensure even the biggest patch can fit
+  texture_width  = std::max(texture_width,  max_patch_width);
+  texture_height = std::max(texture_height, max_patch_height);
+
+  // Round up a little to make the dims a multiple of 2 *
+  // TILE_PADDING. Not strictly necessary but looks nicer that way.
+  int64_t factor = 2 * TILE_PADDING;
+  texture_width  = factor * ceil(texture_width / static_cast<double>(factor));
+  texture_height = factor * ceil(texture_height / static_cast<double>(factor));
+
+  // Give the height a margin to overestimate it. It will be adjusted after we finish
+  // putting all patches in the atlas.
   texture_height *= height_factor;
 }
 
@@ -366,13 +392,13 @@ void merge_texture_atlases(std::vector<IsaacTextureAtlas::Ptr>* texture_atlases)
   dest_coords.clear();
   for (size_t atlas_it = 0; atlas_it < prev_atlases.size(); atlas_it++) {
     IsaacTextureAtlas::Texcoords& prev_coords = prev_atlases[atlas_it]->get_texcoords();
-    math::Vec2f offset = math::Vec2f(0, texcoord_start);
+    Eigen::Vector2d offset = Eigen::Vector2d(0, texcoord_start);
 
     IsaacTextureAtlas::Faces& prev_faces = prev_atlases[atlas_it]->get_faces();
     for (size_t face_it = 0; face_it < prev_faces.size(); face_it++) {
       for (int64_t j = 0; j < 3; j++) {
-        math::Vec2f rel_texcoord(prev_coords[face_it * 3 + j]);
-        math::Vec2f texcoord = rel_texcoord + offset;
+        Eigen::Vector2d rel_texcoord(prev_coords[face_it * 3 + j]);
+        Eigen::Vector2d texcoord = rel_texcoord + offset;
         dest_coords.push_back(texcoord);
       }
     }
@@ -465,13 +491,13 @@ void generate_texture_atlases(double height_factor,
   return;
 }
 
-void isaac_save_model(ObjModel* obj_model, std::string const& prefix) {
+void isaac_save_model(IsaacObjModel* obj_model, std::string const& prefix) {
   int64_t OBJ_INDEX_OFFSET = 1;
 
-  ObjModel::Vertices const& vertices = obj_model->get_vertices();
-  ObjModel::Normals const& normals = obj_model->get_normals();
-  ObjModel::TexCoords const& texcoords = obj_model->get_texcoords();
-  ObjModel::Groups const& groups = obj_model->get_groups();
+  IsaacObjModel::Vertices const& vertices = obj_model->get_vertices();
+  IsaacObjModel::Normals const& normals = obj_model->get_normals();
+  IsaacObjModel::TexCoords const& texcoords = obj_model->get_texcoords();
+  IsaacObjModel::Groups const& groups = obj_model->get_groups();
   MaterialLib const& material_lib = obj_model->get_material_lib();
 
   material_lib.save_to_files(prefix);
@@ -480,31 +506,31 @@ void isaac_save_model(ObjModel* obj_model, std::string const& prefix) {
   std::ofstream out((prefix + ".obj").c_str());
   if (!out.good()) throw util::FileException(prefix + ".obj", std::strerror(errno));
 
-  out << "mtllib " << name << ".mtl" << '\n';
+  out << "mtllib " << name << ".mtl" << "\n";
 
-  out << std::fixed << std::setprecision(8);
-  for (std::size_t i = 0; i < vertices.size(); i++) {
-    out << "v " << vertices[i][0] << " " << vertices[i][1] << " " << vertices[i][2] << '\n';
-  }
+  out << std::setprecision(16);
+  for (std::size_t i = 0; i < vertices.size(); i++)
+    out << "v " << vertices[i][0] << " " << vertices[i][1] << " " << vertices[i][2] << "\n";
 
-  for (std::size_t i = 0; i < texcoords.size(); i++) {
-    out << "vt " << texcoords[i][0] << " " << 1.0f - texcoords[i][1] << '\n';
-  }
+  // Here use 1.0 rather than 1.0f to not lose precision
+  for (std::size_t i = 0; i < texcoords.size(); i++)
+    out << "vt " << texcoords[i][0] << " " << 1.0 - texcoords[i][1] << "\n";
 
-  for (std::size_t i = 0; i < normals.size(); i++) {
-    out << "vn " << normals[i][0] << " " << normals[i][1] << " " << normals[i][2] << '\n';
-  }
+  for (std::size_t i = 0; i < normals.size(); i++)
+    out << "vn " << normals[i][0] << " " << normals[i][1] << " " << normals[i][2] << "\n";
 
   for (std::size_t i = 0; i < groups.size(); i++) {
-    out << "usemtl " << groups[i].material_name << '\n';
+    out << "usemtl " << groups[i].material_name << "\n";
     for (std::size_t j = 0; j < groups[i].faces.size(); j++) {
-      ObjModel::Face const& face = groups[i].faces[j];
+      IsaacObjModel::Face const& face = groups[i].faces[j];
       out << "f";
       for (std::size_t k = 0; k < 3; ++k) {
-        out << " " << face.vertex_ids[k] + OBJ_INDEX_OFFSET << "/" << face.texcoord_ids[k] + OBJ_INDEX_OFFSET << "/"
-            << face.normal_ids[k] + OBJ_INDEX_OFFSET;
+        out << " "
+            << face.vertex_ids[k] + OBJ_INDEX_OFFSET << "/"   // NOLINT
+            << face.texcoord_ids[k] + OBJ_INDEX_OFFSET << "/" // NOLINT
+            << face.normal_ids[k] + OBJ_INDEX_OFFSET;         // NOLINT
       }
-      out << '\n';
+      out << "\n";
     }
   }
   out.close();
@@ -662,11 +688,13 @@ Triangle bias_triangle(Triangle const& tri, double bias) {
 
 void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_threads,
                // outputs
-               std::vector<FaceInfo>& face_projection_info, std::vector<IsaacTextureAtlas::Ptr>& texture_atlases,
-               tex::Model& model) {
-  omp_set_dynamic(0);                // Explicitly disable dynamic teams
-  omp_set_num_threads(num_threads);  // Use this many threads for all
-                                     // consecutive parallel regions
+               std::vector<FaceInfo>& face_projection_info,
+               std::vector<IsaacTextureAtlas::Ptr>& texture_atlases,
+               IsaacObjModel& model) {
+  // Explicitly disable dynamic determination of number of threads
+  omp_set_dynamic(0);
+  // Use this many threads for all consecutive parallel regions
+  omp_set_num_threads(num_threads);
 
   std::cout << "Forming the textured model, please wait ..." << std::endl;
   util::WallTimer timer;
@@ -687,8 +715,9 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
 
   // Store here texture coords before they get packed in the model.
   // Ensure that this is initialized.
-  ObjModel::TexCoords input_texcoords(3 * num_faces);
-  for (size_t it = 0; it < input_texcoords.size(); it++) input_texcoords[it] = math::Vec2f(0.0f, 0.0f);
+  std::vector<Eigen::Vector2d> input_texcoords(3 * num_faces);
+  for (size_t it = 0; it < input_texcoords.size(); it++)
+    input_texcoords[it] = Eigen::Vector2d(0.0, 0.0);
 
   std::vector<IsaacTexturePatch::ConstPtr> texture_patches(num_faces);
 
@@ -705,7 +734,7 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
 
     std::vector<std::size_t> patch_faces(1);
     patch_faces[0] = face_id;
-    std::vector<math::Vec2f> face_texcoords(3);
+    std::vector<Eigen::Vector2d> face_texcoords(3);
 
     // Convert the triangle corners to Eigen so that we have double precision
     std::vector<Eigen::Vector3d> V(3);
@@ -714,21 +743,6 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
     // The area of the given face
     double area = 0.5 * ((V[1] - V[0]).cross(V[2] - V[0])).norm();
     total_area += area;
-
-#if 0
-    // TODO(oalexan1): Sort this out
-    if (area == 0.0) {
-      std::cout << "Bad vertex " << V[0].transpose() << std::endl;
-      // Ignore degenerate faces
-      face_projection_info[face_id].valid = false;
-      int64_t width = 0, height = 0;  // later such patches will be ignored
-      for (size_t v_it = 0; v_it < 3; v_it++)
-        face_texcoords[v_it] = math::Vec2f(0.0f, 0.0f);  // ensure this is initialized
-      texture_patches[face_id] = IsaacTexturePatch::create(face_id, patch_faces, face_texcoords,
-                                                           width, height);
-      continue;
-    }
-#endif
 
     // Compute the double precision normal, as we will do a lot of
     // careful math. It agrees with the pre-existing float normal.
@@ -771,19 +785,20 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
       }
     }
 
-    // Put a little padding just in case
-    int64_t padding = 1;
-    min_y -= padding * pixel_size;
-    max_y += padding * pixel_size;
-    min_z -= padding * pixel_size;
-    max_z += padding * pixel_size;
+    FaceInfo& F = face_projection_info[face_id];  // alias
+
+    // Put a little padding just in case (its value is 1 in the constructor)
+    min_y -= F.face_info_padding * pixel_size;
+    max_y += F.face_info_padding * pixel_size;
+    min_z -= F.face_info_padding * pixel_size;
+    max_z += F.face_info_padding * pixel_size;
 
     int64_t width = ceil((max_y - min_y) / pixel_size) + 1;
     int64_t height = ceil((max_z - min_z) / pixel_size) + 1;
 
     // Record where the triangle vertices will be in the sampled bounding box of the face
     for (size_t v_it = 0; v_it < 3; v_it++)
-      face_texcoords[v_it] = math::Vec2f((TransformedVertices[v_it][1] - min_y) / pixel_size,
+      face_texcoords[v_it] = Eigen::Vector2d((TransformedVertices[v_it][1] - min_y) / pixel_size,
                                          (TransformedVertices[v_it][2] - min_z) / pixel_size);
 
     // Append these to the bigger list
@@ -793,7 +808,6 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
 
     // Store the info that we will need later to find where a little tile
     // should go.
-    FaceInfo& F = face_projection_info[face_id];  // alias
     F.x = x;
     F.min_y = min_y;
     F.min_z = min_z;
@@ -801,7 +815,6 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
     F.height = height;
     F.TransformedVertices   = TransformedVertices;
     F.YZPlaneToTriangleFace = YZPlaneToTriangleFace;
-    F.padding = padding;
 
     // Form a little rectangle, which later will be inserted in the right place
     // in the texture atlas
@@ -844,7 +857,7 @@ void formModel(mve::TriangleMesh::ConstPtr mesh, double pixel_size, int64_t num_
 
   // These texcoords and the ones above are related by a scale transform + translation
   // that transform that can change depending on which atlas we are on.
-  ObjModel::TexCoords const& model_texcoords = model.get_texcoords();
+  IsaacObjModel::TexCoords const& model_texcoords = model.get_texcoords();
 
   // The two vectors below would be equal if we process the mesh fully,
   // and not so unless we stop early.
@@ -906,19 +919,17 @@ void formObjCustomUV(mve::TriangleMesh::ConstPtr mesh, std::vector<Eigen::Vector
 
   out << "mtllib " << out_prefix << ".mtl\n";
 
-  out << std::fixed << std::setprecision(8);
+  out << std::setprecision(16);
   for (std::size_t i = 0; i < vertices.size(); i++) {
-    out << "v " << vertices[i][0] << " " << vertices[i][1] << " " << vertices[i][2] << '\n';
+    out << "v " << vertices[i][0] << " " << vertices[i][1] << " " << vertices[i][2] << "\n";
   }
 
-  for (auto it = uv_map.begin(); it != uv_map.end(); it++) {
-    out << "vt " << (it->second)[0] << " " << (it->second)[1] << '\n';
-  }
+  for (auto it = uv_map.begin(); it != uv_map.end(); it++)
+    out << "vt " << (it->second)[0] << " " << (it->second)[1] << "\n";
 
-  for (std::size_t i = 0; i < mesh_normals.size(); i++) {
+  for (std::size_t i = 0; i < mesh_normals.size(); i++)
     out << "vn " << mesh_normals[i][0] << " " << mesh_normals[i][1] << " "
-        << mesh_normals[i][2] << '\n';
-  }
+        << mesh_normals[i][2] << "\n";
 
   int64_t OBJ_INDEX_OFFSET = 1;  // have indices start from 1
   for (std::size_t j = 0; j < face_vec.size(); j++) {
@@ -928,39 +939,42 @@ void formObjCustomUV(mve::TriangleMesh::ConstPtr mesh, std::vector<Eigen::Vector
           << vertex_to_uv[face_vec[j][k]] + OBJ_INDEX_OFFSET << "/"
           << face_vec[j][k] + OBJ_INDEX_OFFSET;
     }
-    out << '\n';
+    out << "\n";
   }
   obj_str = out.str();
 }
 
-void formObj(tex::Model& texture_model, std::string const& out_prefix, std::string& obj_str) {
+void formObj(IsaacObjModel& texture_model, std::string const& out_prefix, std::string& obj_str) {
   std::vector<math::Vec3f> const& vertices = texture_model.get_vertices();
-  std::vector<math::Vec2f> const& texcoords = texture_model.get_texcoords();
+  std::vector<Eigen::Vector2d> const& texcoords = texture_model.get_texcoords();
   std::vector<math::Vec3f> const& normals = texture_model.get_normals();
-  std::vector<ObjModel::Group> const& groups = texture_model.get_groups();
+  std::vector<IsaacObjModel::Group> const& groups = texture_model.get_groups();
 
   std::ostringstream out;
 
   out << "mtllib " << out_prefix << ".mtl\n";
 
-  out << std::fixed << std::setprecision(8);
+  // Must have high precision, as otherwise for large .obj files a loss of precision
+  // will happen when the normalized texcoords are not saved with enough digits
+  // and then on loading are multiplied back by the large texture dimensions.
+  out << std::setprecision(16);
 
   for (std::size_t i = 0; i < vertices.size(); i++)
-    out << "v " << vertices[i][0] << " " << vertices[i][1] << " " << vertices[i][2] << '\n';
+    out << "v " << vertices[i][0] << " " << vertices[i][1] << " " << vertices[i][2] << "\n";
 
+  // Here use 1.0 rather than 1.0f to not lose precision
   for (std::size_t i = 0; i < texcoords.size(); i++)
-    out << "vt " << texcoords[i][0] << " " << 1.0f - texcoords[i][1] << '\n';
+    out << "vt " << texcoords[i][0] << " " << 1.0 - texcoords[i][1] << "\n";
 
-  for (std::size_t i = 0; i < normals.size(); i++) {
-    out << "vn " << normals[i][0] << " " << normals[i][1] << " " << normals[i][2] << '\n';
-  }
+  for (std::size_t i = 0; i < normals.size(); i++)
+    out << "vn " << normals[i][0] << " " << normals[i][1] << " " << normals[i][2] << "\n";
 
   int64_t OBJ_INDEX_OFFSET = 1;  // have indices start from 1
 
   for (std::size_t i = 0; i < groups.size(); i++) {
-    out << "usemtl " << groups[i].material_name << '\n';
+    out << "usemtl " << groups[i].material_name << "\n";
     for (std::size_t j = 0; j < groups[i].faces.size(); j++) {
-      ObjModel::Face const& face = groups[i].faces[j];
+      IsaacObjModel::Face const& face = groups[i].faces[j];
       out << "f";
       for (std::size_t k = 0; k < 3; ++k) {
         out << " "                                             // NOLINT
@@ -968,7 +982,7 @@ void formObj(tex::Model& texture_model, std::string const& out_prefix, std::stri
             << face.texcoord_ids[k] + OBJ_INDEX_OFFSET << "/"  // NOLINT
             << face.normal_ids[k]   + OBJ_INDEX_OFFSET;        // NOLINT
       }
-      out << '\n';
+      out << "\n";
     }
   }
 
@@ -1182,13 +1196,16 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
 // Project texture using a texture model that was already pre-filled, so
 // just update pixel values
-void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree, cv::Mat const& image,
-                    camera::CameraModel const& cam, std::vector<double>& smallest_cost_per_face, double pixel_size,
+void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
+                    cv::Mat const& image, camera::CameraModel const& cam,
+                    std::vector<double>& smallest_cost_per_face, double pixel_size,
                     int64_t num_threads, std::vector<FaceInfo> const& face_projection_info,
-                    std::vector<IsaacTextureAtlas::Ptr>& texture_atlases, tex::Model& model, cv::Mat& out_texture) {
-  omp_set_dynamic(0);                // Explicitly disable dynamic teams
-  omp_set_num_threads(num_threads);  // Use this many threads for all
-                                     // consecutive parallel regions
+                    std::vector<IsaacTextureAtlas::Ptr>& texture_atlases,
+                    IsaacObjModel& model, cv::Mat& out_texture) {
+  // Explicitly disable dynamic determination of number of threads
+  omp_set_dynamic(0);
+  // Use this many threads for all consecutive parallel regions
+  omp_set_num_threads(num_threads);
 
   util::WallTimer timer;
 
@@ -1353,9 +1370,9 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
     // The vertices of the face transformed to a y-z plane (ignore the x)
     Triangle tri(TV[0][1], TV[0][2], TV[1][1], TV[1][2], TV[2][1], TV[2][2]);
 
-    // Apply a 1.5 * pixel_size bias * padding to ensure all the pixels around
+    // Apply a 1.5 * pixel_size bias * F.face_info_padding to ensure all the pixels around
     // the triangle are sampled well.
-    tri = bias_triangle(tri, 1.5 * pixel_size * F.padding);
+    tri = bias_triangle(tri, 1.5 * pixel_size * F.face_info_padding);
 
     for (int64_t iz = 0; iz < F.height; iz++) {
       double out_y0 = -1.0, out_y1 = -1.0;
@@ -1366,7 +1383,8 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
 
       int64_t min_iy = std::max(static_cast<int64_t>(floor((out_y0 - F.min_y) / pixel_size)), 0L);
       int64_t max_iy =
-        std::min(static_cast<int64_t>(ceil((out_y1 - F.min_y) / pixel_size)), static_cast<int64_t>(F.width) - 1L);
+        std::min(static_cast<int64_t>(ceil((out_y1 - F.min_y) / pixel_size)),
+                 static_cast<int64_t>(F.width) - 1L);
 
       for (int64_t iy = min_iy; iy <= max_iy; iy++) {
         // The point in the plane in which we do the book-keeping
@@ -1448,10 +1466,57 @@ void projectTexture(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> b
   // seconds\n";
 }
 
+// Intersect ray with a mesh. Return true on success.
+bool ray_mesh_intersect(Eigen::Vector2d const& dist_pix,
+                        camera::CameraParameters const& cam_params,
+                        Eigen::Affine3d const& world_to_cam,
+                        mve::TriangleMesh::Ptr const& mesh,
+                        std::shared_ptr<BVHTree> const& bvh_tree,
+                        double min_ray_dist, double max_ray_dist,
+                        // Output
+                        Eigen::Vector3d& intersection) {
+  // Initialize the output
+  intersection = Eigen::Vector3d(0.0, 0.0, 0.0);
+
+  // Undistort the pixel
+  Eigen::Vector2d undist_centered_pix;
+  cam_params.Convert<camera::DISTORTED, camera::UNDISTORTED_C>
+    (dist_pix, &undist_centered_pix);
+
+  // Ray from camera going through the undistorted and centered pixel
+  Eigen::Vector3d cam_ray(undist_centered_pix.x() / cam_params.GetFocalVector()[0],
+                          undist_centered_pix.y() / cam_params.GetFocalVector()[1], 1.0);
+  cam_ray.normalize();
+
+  Eigen::Affine3d cam_to_world = world_to_cam.inverse();
+  Eigen::Vector3d world_ray = cam_to_world.linear() * cam_ray;
+  Eigen::Vector3d cam_ctr = cam_to_world.translation();
+
+  // Set up the ray structure for the mesh
+  BVHTree::Ray bvh_ray;
+  bvh_ray.origin = dense_map::eigen_to_vec3f(cam_ctr);
+  bvh_ray.dir = dense_map::eigen_to_vec3f(world_ray);
+  bvh_ray.dir.normalize();
+
+  bvh_ray.tmin = min_ray_dist;
+  bvh_ray.tmax = max_ray_dist;
+
+  // Intersect the ray with the mesh
+  BVHTree::Hit hit;
+  if (bvh_tree->intersect(bvh_ray, &hit)) {
+    double cam_to_mesh_dist = hit.t;
+    intersection = cam_ctr + cam_to_mesh_dist * world_ray;
+    return true;
+  }
+
+  return false;
+}
+
 // Project and save a mesh as an obj file to out_prefix.obj,
 // out_prefix.mtl, out_prefix.png.
-void meshProject(mve::TriangleMesh::Ptr const& mesh, std::shared_ptr<BVHTree> const& bvh_tree, cv::Mat const& image,
-                 Eigen::Affine3d const& world_to_cam, camera::CameraParameters const& cam_params,
+void meshProject(mve::TriangleMesh::Ptr const& mesh, std::shared_ptr<BVHTree> const& bvh_tree,
+                 cv::Mat const& image, Eigen::Affine3d const& world_to_cam,
+                 camera::CameraParameters const& cam_params,
                  int64_t num_exclude_boundary_pixels, std::string const& out_prefix) {
   // Create the output directory, if needed
   std::string out_dir = boost::filesystem::path(out_prefix).parent_path().string();

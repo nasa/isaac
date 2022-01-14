@@ -33,7 +33,11 @@
 
 #include <cmath>
 
-// Project a given image and camera onto a given mesh, and save an .obj file
+// Test creating a texture the way the streaming_mapper does it, but
+// without involving ROS. Hence, create a single shared texture buffer
+// which will be used for any image, then use it with one image. This
+// is different than the orthoproject tool, which creates a texture
+// buffer specific to each image with no reserve space.
 
 DEFINE_string(mesh, "", "The mesh to project onto.");
 
@@ -46,24 +50,17 @@ DEFINE_string(camera_to_world, "",
 
 DEFINE_string(camera_name, "", "The the camera name. For example: 'sci_cam'.");
 
-DEFINE_string(image_list, "", "The list of images to orthoproject, one per line, "
-              "unless specified individually as above.");
-
-DEFINE_string(camera_list, "", "The list of cameras to world transforms use, one per line, "
-              "unless specified individually as above.");
-
 DEFINE_int32(num_exclude_boundary_pixels, 0,
              "Exclude pixels closer to the boundary than this when texturing.");
 
-DEFINE_string(output_prefix, "", "The output prefix. The texture name will be"
-              " <output_prefix>-<image base name without extension>.obj.");
+DEFINE_string(output_prefix, "", "The output prefix. The textured mesh name will be"
+              " <output_prefix>.obj.");
 
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
 
-  if ((FLAGS_image.empty() || FLAGS_camera_to_world.empty()) &&
-      (FLAGS_image_list.empty() || FLAGS_camera_list.empty()))
-    LOG(FATAL) << "Must specify either an image and camera, or an image list and camera list.";
+  if (FLAGS_image.empty() || FLAGS_camera_to_world.empty())
+    LOG(FATAL) << "Must specify an image and camera.";
 
   if (FLAGS_mesh.empty() || FLAGS_camera_name.empty() || FLAGS_output_prefix.empty())
     LOG(FATAL) << "Not all inputs were specified.";
@@ -82,37 +79,56 @@ int main(int argc, char** argv) {
   std::cout << "Using camera: " << FLAGS_camera_name << std::endl;
   camera::CameraParameters cam_params(&config, FLAGS_camera_name.c_str());
 
-  std::vector<std::string> images, cameras;
-  if (!FLAGS_image.empty() && !FLAGS_camera_to_world.empty()) {
-    images.push_back(FLAGS_image);
-    cameras.push_back(FLAGS_camera_to_world);
-  } else {
-    std::string val;
-    std::ifstream ifs(FLAGS_image_list);
-    while (ifs >> val)
-      images.push_back(val);
-    ifs.close();
-    ifs = std::ifstream(FLAGS_camera_list);
-    while (ifs >> val)
-      cameras.push_back(val);
-    ifs.close();
-  }
+  // Read image and camera_to_world
+  cv::Mat image = cv::imread(FLAGS_image);
+  Eigen::Affine3d cam_to_world;
+  dense_map::readAffine(cam_to_world, FLAGS_camera_to_world);
 
-  if (images.size() != cameras.size())
-    LOG(FATAL) << "As many images as cameras must be specified.\n";
+  double pixel_size = 0.001;
+  int num_threads = 48;
+  std::vector<unsigned int> const& faces = mesh->get_faces();
+  int num_faces = faces.size();
+  std::vector<double> smallest_cost_per_face(num_faces, 1.0e+100);
+  std::vector<dense_map::FaceInfo> face_projection_info;
+  dense_map::IsaacObjModel texture_model;
+  std::vector<dense_map::IsaacTextureAtlas::Ptr> texture_atlases;
+  cv::Mat model_texture;
 
-  for (size_t it = 0; it < images.size(); it++) {
-    cv::Mat image = cv::imread(images[it]);
+  // Form the model
+  dense_map::formModel(mesh, pixel_size, num_threads, face_projection_info,
+                       texture_atlases, texture_model);
 
-    Eigen::Affine3d cam_to_world;
-    dense_map::readAffine(cam_to_world, cameras[it]);
+  // Set up the camera
+  camera::CameraModel cam(cam_to_world.inverse(), cam_params);
 
-    std::string prefix = FLAGS_output_prefix + "-" +
-      boost::filesystem::path(images[it]).stem().string();
+  // Project a single image
+  dense_map::projectTexture(mesh, bvh_tree, image, cam, smallest_cost_per_face,
+                            pixel_size, num_threads, face_projection_info, texture_atlases,
+                            texture_model, model_texture);
+  std::string mtl_str;
+  dense_map::formMtl(FLAGS_output_prefix, mtl_str);
+  std::string obj_str;
+  dense_map::formObj(texture_model, FLAGS_output_prefix, obj_str);
 
-    dense_map::meshProject(mesh, bvh_tree, image, cam_to_world.inverse(), cam_params,
-                           FLAGS_num_exclude_boundary_pixels, prefix);
-  }
+  // Create the output directory, if needed
+  std::string out_dir = boost::filesystem::path(FLAGS_output_prefix).parent_path().string();
+  if (out_dir != "") dense_map::createDir(out_dir);
+
+  std::string obj_file = FLAGS_output_prefix + ".obj";
+  std::cout << "Writing: " << obj_file << std::endl;
+  std::ofstream obj_handle(obj_file);
+  obj_handle << obj_str;
+  obj_handle.close();
+
+  std::string mtl_file = FLAGS_output_prefix + ".mtl";
+  std::cout << "Writing: " << mtl_file << std::endl;
+  std::ofstream mtl_handle(mtl_file);
+  mtl_handle << mtl_str;
+  mtl_handle.close();
+
+  std::string png_file = FLAGS_output_prefix + ".png";
+  std::cout << "Writing: " << png_file << std::endl;
+  cv::imwrite(png_file, model_texture);
 
   return 0;
 }

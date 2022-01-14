@@ -216,16 +216,6 @@ void pickTimestampsInBounds(std::vector<double> const& timestamps, double left_b
 // Must always have NUM_EXIF the last.
 enum ExifData { TIMESTAMP = 0, EXPOSURE_TIME, ISO, APERTURE, FOCAL_LENGTH, NUM_EXIF };
 
-// Triangulate two rays emanating from given undistorted and centered pixels
-Eigen::Vector3d TriangulatePair(double focal_length1, double focal_length2, Eigen::Affine3d const& world_to_cam1,
-                                Eigen::Affine3d const& world_to_cam2, Eigen::Vector2d const& pix1,
-                                Eigen::Vector2d const& pix2);
-
-// Triangulate n rays emanating from given undistorted and centered pixels
-Eigen::Vector3d Triangulate(std::vector<double> const& focal_length_vec,
-                            std::vector<Eigen::Affine3d> const& world_to_cam_vec,
-                            std::vector<Eigen::Vector2d> const& pix_vec);
-
 // A utility for saving a camera in a format ASP understands.
 // TODO(oalexan1): Expose the sci cam intrinsics rather than having
 // them hard-coded.
