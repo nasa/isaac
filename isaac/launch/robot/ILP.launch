@@ -65,7 +65,16 @@
   </include>
 
   <!-- Framestore for isaac specific tf -->
-  <node name="isaac_transforms" pkg="framestore" type="custom_transforms" output="screen"/>
+  <include file="$(find ff_util)/launch/ff_nodelet.launch">
+    <arg name="class" value="mobility/FrameStore" />
+    <arg name="name" value="isaac_framestore" />
+    <arg name="manager" value="mlp_mobility" />
+    <arg name="spurn" value="$(arg spurn)" />
+    <arg name="nodes" value="$(arg nodes)" />
+    <arg name="extra" value="$(arg extra)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="default" value="true" />
+  </include>
 
   <!-- Launch driver nodes, if required -->
   <group if="$(arg drivers)">

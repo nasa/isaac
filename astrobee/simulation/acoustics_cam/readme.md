@@ -1,8 +1,6 @@
 \page acoustics_camera Acoustics camera
 
-# Acoustics camera
-
-## Overview
+### Overview
 
 This camera simulates a microphone array, or, in other words, a
 directional microphone. Its readings are assembled into a spherical
@@ -19,31 +17,35 @@ from. The reading at a pixel of that camera is the value of the
 microphone measurement in the direction of the ray going from the
 microphone (and camera) center through that pixel.
 
-## Installation
+### Installation
 
 The acoustics camera depends on the pyroomacoustics package. This
 package can be installed together with its dependencies in a Python
 2.7 environment using the command:
 
-  pip install numpy==1.15.4 scipy==0.18 pillow==6 PyWavelets==0.4.0 \
-    networkx==1.8 matplotlib==2.0.0 scikit-image==0.14              \
-    pyroomacoustics==0.3.1
+    pip install numpy==1.15.4 scipy==0.18 pillow==6 PyWavelets==0.4.0 \
+      networkx==1.8 matplotlib==2.0.0 scikit-image==0.14              \
+      pyroomacoustics==0.3.1
 
 It would normally install itself in:
 
-  $HOME/.local/lib/python2.7/site-packages/pyroomacoustics
+    $HOME/.local/lib/python2.7/site-packages/pyroomacoustics
 
-## Running the acoustics camera
+### Running the acoustics camera
 
-The acoustics camera ROS node can be run as part of the simulator as:
+The acoustics camera ROS node can be run as part of the simulator. For that,
+first set up the environment along the lines of:
 
-  source ~/astrobee_build/native/devel/setup.zsh
-  source ~/projects/isaac/devel/setup.zsh 
-  roslaunch isaac sim.launch world:=iss rviz:=true acoustics_cam:=true \
-    pose:="11.2 -7.72 5.0 0 0 0 0 1"
+    export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
+    export ASTROBEE_BUILD_PATH=$HOME/astrobee
+    export ISAAC_WS=$HOME/isaac
+    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ISAAC_WS/devel/setup.bash
 
-Here we assume that the astrobee build is in `~/astrobee_build` and that 
-the ISAAC build is in `~/projects/isaac`.
+then run:
+
+    roslaunch isaac sim.launch world:=iss rviz:=true acoustics_cam:=true \
+      pose:="11.2 -7.72 5.0 0 0 0 0 1"
 
 One must ensure that the "DEBUG: AcousticsCam" image checkbox is
 checked in RViz upon launch, to be able to visualize this image. If it
@@ -52,40 +54,40 @@ should be saved from the RViz menu, and the simulation should be
 restarted.
 
 It is also possible to start the simulator without this camera,
-and then launch it separately via:
+and then launch this camera separately as:
 
-  source ~/astrobee_build/native/devel/setup.zsh
-  source ~/projects/isaac/devel/setup.zsh 
-  roslaunch acoustics_cam acoustics_cam.launch output:=screen
+    source $ASTROBEE_BUILD_PATH/devel/setup.bash
+    source $ISAAC_WS/devel/setup.bash
+    roslaunch acoustics_cam acoustics_cam.launch output:=screen
 
 The acoustics camera can be run without ROS as:
 
-  ~/projects/isaac/src/isaac/hardware/acoustics_cam/nodes/acoustics_cam debug_mode
+    $ISAAC_WS/src/astrobee/simulation/acoustics_cam/nodes/acoustics_cam debug_mode
 
-In that case, it assumes that the robot pose is the value set in the
+In that case it assumes that the robot pose is the value set in the
 field "debug_robot_pose" in acoustics_cam.json (see below). In this
 mode it will only create a plot of the acoustics cam image. The
 sources of sounds will be represented as crosses in this plot, and the
 camera (microphone) position will be shown as a star.
 
-## ROS communication
+### ROS communication
 
 The acoustics camera subscribes to
 
-  /loc/truth/pose
+    /loc/truth/pose
 
 to get the robot pose. It publishes its image, camera pose, and camera
 intrinsics on topics:
 
-  /hw/cam_acoustics
-  /sim/acoustics_cam/pose
-  /sim/acoustics_cam/info
+    /hw/cam_acoustics
+    /sim/acoustics_cam/pose
+    /sim/acoustics_cam/info
 
 By default, the camera takes pictures as often as it can (see the
 configuration below), which is rarely, in fact, as it is slow. It
-listens however to the topic 
+listens however to the topic:
 
-  /comm/dds/command
+    /comm/dds/command
 
 for guest science commands that may tell it to take a single picture
 at a specific time, or to take pictures continuously. Such a command
@@ -93,11 +95,11 @@ must use the app name "gov.nasa.arc.irg.astrobee.acoustics_cam_image"
 (which is the "s" field in the first command argument) for it to be
 processed.
 
-## Configuration
+### Configuration
 
-The behavior of this camera is described in 
+The behavior of this camera is described in:
 
- isaac/hardware/acoustics_cam/acoustics_cam.json
+     $ISAAC_WS/src/astrobee/simulation/acoustics_cam/acoustics_cam.json
 
 It has the following entries:
 

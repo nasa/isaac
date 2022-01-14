@@ -21,7 +21,6 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
-#include <pcl_ros/point_cloud.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -77,9 +76,12 @@ class StreamingMapper {
   void ReadParams(ros::NodeHandle const& nh);
 
   void publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
-                           double max_iso_times_exposure, double iso, double exposure, int processed_camera_count,
-                           cv::Mat const& image, double image_timestamp, camera::CameraModel const& cam,
-                           std::vector<double>& smallest_cost_per_face, std::string const& out_prefix);
+                           double max_iso_times_exposure, double iso, double exposure,
+                           int processed_camera_count,
+                           cv::Mat const& image, double image_timestamp,
+                           camera::CameraModel const& cam,
+                           std::vector<double>& smallest_cost_per_face,
+                           std::string const& out_prefix);
 
   void TextureCamSimPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& pose);
   void TextureCamSimInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& info);
@@ -89,7 +91,7 @@ class StreamingMapper {
   void SciCamExifCallback(std_msgs::Float64MultiArray::ConstPtr const& exif);
   void CompressedTextureCallback(const sensor_msgs::CompressedImageConstPtr& msg);
   void UncompressedTextureCallback(const sensor_msgs::ImageConstPtr& msg);
-  void AddTextureCamPose(double nav_cam_timestamp, Eigen::Affine3d const& nav_cam_pose);
+  void AddTextureCamPose(double nav_cam_timestamp, Eigen::Affine3d const& nav_cam_to_world);
   void WipeOldImages();
 
   std::shared_ptr<image_transport::ImageTransport> image_transport;
@@ -109,37 +111,39 @@ class StreamingMapper {
   config_reader::ConfigReader config_params;
 
   camera::CameraParameters m_texture_cam_params;
-  sensor_msgs::Image texture_obj_msg, texture_mtl_msg;
+  sensor_msgs::Image m_texture_obj_msg, m_texture_mtl_msg;
 
-  double navcam_to_texture_cam_timestamp_offset;
-  Eigen::MatrixXd texture_cam_to_navcam_trans;
-  Eigen::MatrixXd navcam_to_body_trans;
+  double m_nav_cam_to_texture_cam_timestamp_offset;
+  Eigen::MatrixXd m_texture_cam_to_nav_cam_trans;
+  Eigen::MatrixXd m_nav_cam_to_body_trans;
 
-  std::string nav_cam_pose_topic, ekf_state_topic, ekf_pose_topic, texture_cam_topic, sci_cam_exif_topic,
-    texture_cam_type, mesh_file;
-  bool sim_mode, save_to_disk, use_single_texture;
+  std::string nav_cam_pose_topic, ekf_state_topic, ekf_pose_topic, texture_cam_topic,
+    sci_cam_exif_topic, m_texture_cam_type, mesh_file;
+  bool m_sim_mode, save_to_disk, m_sci_cam_exp_corr, use_single_texture;
 
   // For meshing
   mve::TriangleMesh::Ptr mesh;
   std::shared_ptr<mve::MeshInfo> mesh_info;
-  std::shared_ptr<tex::Graph> graph;  // TODO(oalexan1): Is this necessary?
+  std::shared_ptr<tex::Graph> graph;
   std::shared_ptr<BVHTree> bvh_tree;
 
   // Each callback must have a lock
-  std::mutex nav_cam_pose_lock, texture_cam_pose_lock, texture_cam_info_lock, texture_cam_image_lock, sci_cam_exif_lock;
+  std::mutex nav_cam_pose_lock, texture_cam_pose_lock, texture_cam_info_lock,
+    texture_cam_image_lock, sci_cam_exif_lock;
 
   // Data indexed by timestamp
   std::map<double, Eigen::Affine3d> nav_cam_localization_poses;
   std::map<double, Eigen::Affine3d> nav_cam_landmark_poses;
-  std::map<double, Eigen::Affine3d> texture_cam_poses;
+  std::map<double, Eigen::Affine3d> texture_cam_to_world_map;
   std::map<double, cv::Mat> texture_cam_images;
   std::map<double, std::vector<double> > sci_cam_exif;
 
   // For processing pictures as the camera moves along
-  double dist_between_processed_cams, max_iso_times_exposure;
-  Eigen::Vector3d last_processed_cam_ctr;
-  std::vector<double> smallest_cost_per_face;
-  int processed_camera_count;
+  double m_dist_between_processed_cams, m_angle_between_processed_cams, m_max_iso_times_exposure;
+  Eigen::Vector3d m_prev_cam_ctr;
+  Eigen::Affine3d m_prev_cam_to_world;
+  std::vector<double> m_smallest_cost_per_face;
+  int m_processed_camera_count;
   double num_exclude_boundary_pixels;
 
   // The info for each face which allows one later to project an image onto
@@ -161,11 +165,12 @@ class StreamingMapper {
 
 StreamingMapper::StreamingMapper()
     : m_texture_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0)),
-      navcam_to_texture_cam_timestamp_offset(0.0),
-      texture_cam_to_navcam_trans(Eigen::MatrixXd::Identity(4, 4)),
-      navcam_to_body_trans(Eigen::MatrixXd::Identity(4, 4)),
-      last_processed_cam_ctr(Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0)),
-      processed_camera_count(0) {}
+      m_nav_cam_to_texture_cam_timestamp_offset(0.0),
+      m_texture_cam_to_nav_cam_trans(Eigen::MatrixXd::Identity(4, 4)),
+      m_nav_cam_to_body_trans(Eigen::MatrixXd::Identity(4, 4)),
+      m_prev_cam_ctr(Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0)),
+      m_prev_cam_to_world(Eigen::Affine3d::Identity()),
+      m_processed_camera_count(0) {}
 
 StreamingMapper::~StreamingMapper(void) { thread->join(); }
 
@@ -176,7 +181,8 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
 
   // Set the config path to ISAAC
   char* path;
-  if ((path = getenv("CUSTOM_CONFIG_DIR")) == NULL) ROS_FATAL("Could not find the config path.");
+  if ((path = getenv("CUSTOM_CONFIG_DIR")) == NULL)
+    ROS_FATAL("Could not find the config path. Ensure that CUSTOM_CONFIG_DIR was set.");
   config_params.SetPath(path);
 
   config_params.AddFile("dense_map/streaming_mapper.config");
@@ -185,87 +191,64 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
   StreamingMapper::ReadParams(nh);
 
   // Read configuration data
-  if (!sim_mode) {
-    Eigen::MatrixXd hazcam_to_navcam_trans;
-    Eigen::MatrixXd scicam_to_hazcam_trans;
-    Eigen::Affine3d hazcam_depth_to_image_transform;
-    double navcam_to_hazcam_timestamp_offset, scicam_to_hazcam_timestamp_offset;
+  if (!m_sim_mode) {
+    // Read the bot config file
+    std::vector<std::string> cam_names = {m_texture_cam_type};
+    std::vector<camera::CameraParameters> cam_params;
+    std::vector<Eigen::Affine3d>          nav_to_cam_trans;
+    std::vector<double>                   nav_to_cam_timestamp_offsets;
+    Eigen::Affine3d                       hazcam_depth_to_image_transform;
+    Eigen::Affine3d                       nav_cam_to_body_trans;
 
-    camera::CameraParameters nav_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0));
-    camera::CameraParameters haz_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0));
-    camera::CameraParameters sci_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0), Eigen::Vector2d(0, 0));
+    dense_map::readConfigFile(  // Inputs
+      cam_names,
+      "nav_cam_transform",  // this is the nav cam to body transform
+      "haz_cam_depth_to_image_transform",
+      // Outputs
+      cam_params, nav_to_cam_trans, nav_to_cam_timestamp_offsets, nav_cam_to_body_trans,
+      hazcam_depth_to_image_transform);
+
+    m_nav_cam_to_body_trans = nav_cam_to_body_trans.matrix();
 
     {
       // Note the lock, because m_texture_cam_params is a shared resource
       const std::lock_guard<std::mutex> lock(texture_cam_info_lock);
-      dense_map::readConfigFile("navcam_to_hazcam_timestamp_offset", "scicam_to_hazcam_timestamp_offset",
-                                "hazcam_to_navcam_transform", "scicam_to_hazcam_transform", "nav_cam_transform",
-                                "hazcam_depth_to_image_transform", navcam_to_hazcam_timestamp_offset,
-                                scicam_to_hazcam_timestamp_offset, hazcam_to_navcam_trans, scicam_to_hazcam_trans,
-                                navcam_to_body_trans, hazcam_depth_to_image_transform, nav_cam_params, haz_cam_params,
-                                sci_cam_params);
 
-      // Transform to convert from given camera to nav camera coordinates
-      if (texture_cam_type == "nav_cam") {
-        texture_cam_to_navcam_trans = Eigen::MatrixXd::Identity(4, 4);
-        navcam_to_texture_cam_timestamp_offset = 0.0;
-        m_texture_cam_params = nav_cam_params;
-      } else if (texture_cam_type == "haz_cam") {
-        texture_cam_to_navcam_trans = hazcam_to_navcam_trans;
-        navcam_to_texture_cam_timestamp_offset = navcam_to_hazcam_timestamp_offset;
-        m_texture_cam_params = haz_cam_params;
-      } else if (texture_cam_type == "sci_cam") {
-        texture_cam_to_navcam_trans = hazcam_to_navcam_trans * scicam_to_hazcam_trans;
-        navcam_to_texture_cam_timestamp_offset = navcam_to_hazcam_timestamp_offset - scicam_to_hazcam_timestamp_offset;
-        m_texture_cam_params = sci_cam_params;
-      } else {
-        LOG(FATAL) << "Invalid texture cam type: " << texture_cam_type;
-      }
+      // Index 0 below, based on the order in cam_names
+      m_texture_cam_to_nav_cam_trans            = nav_to_cam_trans[0].inverse().matrix();
+      m_nav_cam_to_texture_cam_timestamp_offset = nav_to_cam_timestamp_offsets[0];
+      m_texture_cam_params                      = cam_params[0];
 
-#if 0
-      std::cout << "hazcam_to_navcam_trans\n" << hazcam_to_navcam_trans << "\n";
-      std::cout << "scicam_to_hazcam_trans\n" << scicam_to_hazcam_trans << "\n";
-      std::cout << "texture_cam_to_navcam_trans\n" << texture_cam_to_navcam_trans << "\n";
-      std::cout << "navcam_to_hazcam_timestamp_offset: "
-                << navcam_to_hazcam_timestamp_offset
-                << "\n";
-      std::cout << "scicam_to_hazcam_timestamp_offset: "
-                << scicam_to_hazcam_timestamp_offset
-                << "\n";
-      std::cout << "hazcam_depth_to_image_transform\n"
-                << hazcam_depth_to_image_transform.matrix()
-                << "\n";
-
-      std::cout << "navcam_to_texture_cam_timestamp_offset: "
-                << navcam_to_texture_cam_timestamp_offset << "\n";
-      std::cout << "texture cam focal vector: "
-                << m_texture_cam_params.GetFocalVector().transpose() << "\n";
-#endif
+      ROS_INFO_STREAM("nav_cam_to_texture_cam_timestamp_offset: "
+                      << m_nav_cam_to_texture_cam_timestamp_offset << "\n");
     }
   }
 
   // Set up the publishers
-  std::string mapper_img_topic = "/ism/" + texture_cam_type + "/img";
-  std::string mapper_obj_topic = "/ism/" + texture_cam_type + "/obj";
-  std::string mapper_mtl_topic = "/ism/" + texture_cam_type + "/mtl";
-  ROS_INFO_STREAM("Publishing topics: " << mapper_img_topic << ' ' << mapper_obj_topic << ' ' << mapper_mtl_topic);
+  std::string mapper_img_topic = "/ism/" + m_texture_cam_type + "/img";
+  std::string mapper_obj_topic = "/ism/" + m_texture_cam_type + "/obj";
+  std::string mapper_mtl_topic = "/ism/" + m_texture_cam_type + "/mtl";
+  ROS_INFO_STREAM("Publishing topics: " << mapper_img_topic << ' '
+                  << mapper_obj_topic << ' ' << mapper_mtl_topic);
   texture_img_pub = nh.advertise<sensor_msgs::Image>(mapper_img_topic, 1);
   texture_obj_pub = nh.advertise<sensor_msgs::Image>(mapper_obj_topic, 1);
   texture_mtl_pub = nh.advertise<sensor_msgs::Image>(mapper_mtl_topic, 1);
 
   // Set up the subscribers
-  if (sim_mode) {
+  if (m_sim_mode) {
     // Subscribe to the simulated texture cam image pose and intrinsics.
     // Keep a bunch of them in the queue.
     // The name of these topics are TOPIC_HAZ_CAM_SIM_POSE, etc., in ff_names.h.
-    std::string texture_cam_sim_pose_topic = "/sim/" + texture_cam_type + "/pose";
-    std::string texture_cam_sim_info_topic = "/sim/" + texture_cam_type + "/info";
-    ROS_INFO_STREAM("Subscribing to  " << texture_cam_sim_pose_topic);
-    ROS_INFO_STREAM("Subscribing to  " << texture_cam_sim_info_topic);
+    std::string texture_cam_sim_pose_topic = "/sim/" + m_texture_cam_type + "/pose";
+    std::string texture_cam_sim_info_topic = "/sim/" + m_texture_cam_type + "/info";
+    ROS_INFO_STREAM("Subscribing to: " << texture_cam_sim_pose_topic);
+    ROS_INFO_STREAM("Subscribing to: " << texture_cam_sim_info_topic);
     texture_cam_pose_sub =
-      nh.subscribe(texture_cam_sim_pose_topic, 10, &StreamingMapper::TextureCamSimPoseCallback, this);
+      nh.subscribe(texture_cam_sim_pose_topic, 10,
+                   &StreamingMapper::TextureCamSimPoseCallback, this);
     texture_cam_info_sub =
-      nh.subscribe(texture_cam_sim_info_topic, 10, &StreamingMapper::TextureCamSimInfoCallback, this);
+      nh.subscribe(texture_cam_sim_info_topic, 10,
+                   &StreamingMapper::TextureCamSimInfoCallback, this);
   } else {
     // Get the nav cam pose topic or the ekf state topic, or the ekf
     // pose topic, from which the other camera poses are deduced.
@@ -281,17 +264,20 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
     }
   }
 
-  sci_cam_exif_topic = "/hw/sci_cam_exif";
-  ROS_INFO_STREAM("Subscribing to sci cam exif topic: " << sci_cam_exif_topic);
-  sci_cam_exif_sub = nh.subscribe(sci_cam_exif_topic, 10, &StreamingMapper::SciCamExifCallback, this);
+  if (m_texture_cam_type == "sci_cam" && !m_sim_mode && m_sci_cam_exp_corr) {
+    sci_cam_exif_topic = "/hw/sci_cam_exif";
+    ROS_INFO_STREAM("Subscribing to sci cam exif topic: " << sci_cam_exif_topic);
+    sci_cam_exif_sub = nh.subscribe(sci_cam_exif_topic, 10,
+                                    &StreamingMapper::SciCamExifCallback, this);
+  }
 
   // Subscribe to images. Keep just 2 in the queue as they can be big.
   image_transport.reset(new image_transport::ImageTransport(nh));
 
   std::string compressed = "/compressed";
   if (texture_cam_topic.length() >= compressed.length() &&
-      texture_cam_topic.compare(texture_cam_topic.length() - compressed.length(), compressed.length(), compressed) ==
-        0) {
+      texture_cam_topic.compare(texture_cam_topic.length() - compressed.length(),
+                                compressed.length(), compressed) == 0) {
     // texture_cam_topic ends with the string /compressed
     ROS_INFO_STREAM("Subscribing to compressed image topic: " << texture_cam_topic);
     compressed_texture_image_sub =
@@ -299,7 +285,8 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
   } else {
     ROS_INFO_STREAM("Subscribing to uncompressed image topic: " << texture_cam_topic);
     uncompressed_texture_image_sub =
-      image_transport->subscribe(texture_cam_topic, 2, &StreamingMapper::UncompressedTextureCallback, this);
+      image_transport->subscribe(texture_cam_topic, 2,
+                                 &StreamingMapper::UncompressedTextureCallback, this);
   }
 
   // Load the mesh
@@ -308,10 +295,11 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
 
     std::vector<unsigned int> const& faces = mesh->get_faces();
     int num_faces = faces.size();
-    smallest_cost_per_face = std::vector<double>(num_faces, 1.0e+100);
+    m_smallest_cost_per_face = std::vector<double>(num_faces, 1.0e+100);
 
     if (use_single_texture)
-      dense_map::formModel(mesh, pixel_size, num_threads, face_projection_info, texture_atlases, texture_model);
+      dense_map::formModel(mesh, pixel_size, num_threads, face_projection_info,
+                           texture_atlases, texture_model);
   } catch (std::exception& e) {
     LOG(FATAL) << "Could not load mesh.\n" << e.what() << "\n";
   }
@@ -330,12 +318,14 @@ void StreamingMapper::ReadParams(ros::NodeHandle const& nh) {
     ROS_FATAL("Could not read the ekf_state_topic parameter.");
   if (!config_params.GetStr("texture_cam_topic", &texture_cam_topic))
     ROS_FATAL("Could not read the texture_cam_topic parameter.");
-  if (!config_params.GetStr("texture_cam_type", &texture_cam_type))
+  if (!config_params.GetStr("texture_cam_type", &m_texture_cam_type))
     ROS_FATAL("Could not read the texture_cam_type parameter.");
   if (!config_params.GetStr("mesh_file", &mesh_file)) ROS_FATAL("Could not read the mesh_file parameter.");
-  if (!config_params.GetReal("dist_between_processed_cams", &dist_between_processed_cams))
+  if (!config_params.GetReal("dist_between_processed_cams", &m_dist_between_processed_cams))
     ROS_FATAL("Could not read the dist_between_processed_cams parameter.");
-  if (!config_params.GetReal("max_iso_times_exposure", &max_iso_times_exposure))
+  if (!config_params.GetReal("angle_between_processed_cams", &m_angle_between_processed_cams))
+    ROS_FATAL("Could not read the angle_between_processed_cams parameter.");
+  if (!config_params.GetReal("max_iso_times_exposure", &m_max_iso_times_exposure))
     ROS_FATAL("Could not read the max_iso_times_exposure parameter.");
   if (!config_params.GetReal("pixel_size", &pixel_size)) ROS_FATAL("Could not read the pixel_size parameter.");
   if (!config_params.GetReal("num_exclude_boundary_pixels", &num_exclude_boundary_pixels))
@@ -345,50 +335,66 @@ void StreamingMapper::ReadParams(ros::NodeHandle const& nh) {
 
   // The sim_mode parameter is very important, it must be read early
   // on as a lot of logic depends on its value.
-  nh.getParam("sim_mode", sim_mode);
-
-  if (!config_params.GetBool("save_to_disk", &save_to_disk)) ROS_FATAL("Could not read the save_to_disk parameter.");
+  nh.getParam("sim_mode", m_sim_mode);
 
   if (!config_params.GetBool("use_single_texture", &use_single_texture))
     ROS_FATAL("Could not read the use_single_texture parameter.");
 
-  ROS_INFO_STREAM("Texture camera type = " << texture_cam_type);
+  if (!config_params.GetBool("sci_cam_exposure_correction", &m_sci_cam_exp_corr))
+    ROS_FATAL("Could not read the sci_cam_exposure_correction parameter.");
+
+  if (!config_params.GetBool("save_to_disk", &save_to_disk))
+    ROS_FATAL("Could not read the save_to_disk parameter.");
+
+  ROS_INFO_STREAM("Texture camera type = " << m_texture_cam_type);
   ROS_INFO_STREAM("Mesh = " << mesh_file);
-  if (!sim_mode) {
-    int num = (!nav_cam_pose_topic.empty()) + (!ekf_state_topic.empty()) + (!ekf_pose_topic.empty());
+  if (!m_sim_mode) {
+    int num = (!nav_cam_pose_topic.empty()) + (!ekf_state_topic.empty()) +
+      (!ekf_pose_topic.empty());
     if (num != 1)
       LOG(FATAL) << "Must specify exactly only one of nav_cam_pose_topic, "
                  << "ekf_state_topic, ekf_pose_topic.";
-
-    ROS_INFO_STREAM("dist_between_processed_cams = " << dist_between_processed_cams);
-    ROS_INFO_STREAM("max_iso_times_exposure = " << max_iso_times_exposure);
-    ROS_INFO_STREAM("use_single_texture = " << use_single_texture);
-    ROS_INFO_STREAM("pixel_size = " << pixel_size);
-    ROS_INFO_STREAM("num_threads = " << num_threads);
-    ROS_INFO_STREAM("sim_mode = " << sim_mode);
-    ROS_INFO_STREAM("save_to_disk = " << save_to_disk);
-    ROS_INFO_STREAM("num_exclude_boundary_pixels = " << num_exclude_boundary_pixels);
-    ROS_INFO_STREAM("ASTROBEE_ROBOT = " << getenv("ASTROBEE_ROBOT"));
   }
 
-  if (texture_cam_type != "nav_cam" && texture_cam_type != "sci_cam" && texture_cam_type != "haz_cam" &&
-      texture_cam_type != "heat_cam" && texture_cam_type != "acoustics_cam")
-    LOG(FATAL) << "Invalid texture cam type: " << texture_cam_type;
+  if (m_sim_mode && m_texture_cam_type == "nav_cam")
+    LOG(FATAL) << "The streaming mapper does not support nav_cam with simulated data as "
+               << "its distortion is not modeled.\n";
+
+  ROS_INFO_STREAM("Streaming mapper parameters:");
+  ROS_INFO_STREAM("dist_between_processed_cams  = " << m_dist_between_processed_cams);
+  ROS_INFO_STREAM("angle_between_processed_cams = " << m_angle_between_processed_cams);
+  ROS_INFO_STREAM("max_iso_times_exposure       = " << m_max_iso_times_exposure);
+  ROS_INFO_STREAM("use_single_texture           = " << use_single_texture);
+  ROS_INFO_STREAM("sci_cam_exposure_correction  = " << m_sci_cam_exp_corr);
+  ROS_INFO_STREAM("pixel_size                   = " << pixel_size);
+  ROS_INFO_STREAM("num_threads                  = " << num_threads);
+  ROS_INFO_STREAM("sim_mode                     = " << m_sim_mode);
+  ROS_INFO_STREAM("save_to_disk                 = " << save_to_disk);
+  ROS_INFO_STREAM("num_exclude_boundary_pixels  = " << num_exclude_boundary_pixels);
+  ROS_INFO_STREAM("ASTROBEE_ROBOT               = " << getenv("ASTROBEE_ROBOT"));
+  ROS_INFO_STREAM("ASTROBEE_WORLD               = " << getenv("ASTROBEE_WORLD"));
 
   // For a camera like sci_cam, the word "sci" better be part of texture_cam_topic.
-  std::string cam_name = texture_cam_type.substr(0, 3);
+  std::string cam_name = m_texture_cam_type.substr(0, 3);
   if (texture_cam_topic.find(cam_name) == std::string::npos)
-    LOG(FATAL) << "Texture topic " << texture_cam_topic << " is expected to contain the string " << cam_name;
+    LOG(FATAL) << "Texture topic " << texture_cam_topic << " is expected to contain the string "
+               << cam_name;
 }
 
-void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std::shared_ptr<BVHTree> bvh_tree,
-                                          double max_iso_times_exposure, double iso, double exposure,
-                                          int processed_camera_count, cv::Mat const& image, double image_timestamp,
-                                          camera::CameraModel const& cam, std::vector<double>& smallest_cost_per_face,
+void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
+                                          std::shared_ptr<BVHTree> bvh_tree,
+                                          double max_iso_times_exposure,
+                                          double iso, double exposure,
+                                          int processed_camera_count,
+                                          cv::Mat const& image, double image_timestamp,
+                                          camera::CameraModel const& cam,
+                                          std::vector<double>& smallest_cost_per_face,
                                           std::string const& out_prefix) {
-  omp_set_dynamic(0);                // Explicitly disable dynamic teams
-  omp_set_num_threads(num_threads);  // Use this many threads for all consecutive
-                                     // parallel regions
+  // Explicitly disable dynamic determination of number of threads
+  omp_set_dynamic(0);
+
+  // Use this many threads for all consecutive parallel regions
+  omp_set_num_threads(num_threads);
 
   // Colorize the image if grayscale. Careful here to avoid making a
   // copy if we don't need one.  Keep img_ptr pointing at the final
@@ -418,16 +424,14 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
     img_ptr = &scaled_image;
   }
 
-  // std::cout << "Exposure correction took " << timer1.get_elapsed()/1000.0 <<
-  // " seconds\n";
-
   // Prepare the image for publishing
   sensor_msgs::ImagePtr msg;
   std::vector<Eigen::Vector3i> face_vec;
   std::map<int, Eigen::Vector2d> uv_map;
   if (!use_single_texture) {
     // Find the UV coordinates and the faces having them
-    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, num_exclude_boundary_pixels, smallest_cost_per_face,
+    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, num_exclude_boundary_pixels,
+                              smallest_cost_per_face,
                               face_vec, uv_map);
 
     msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *img_ptr).toImageMsg();
@@ -457,22 +461,23 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
     int height = obj_len / width + 1;
     if (width * height <= obj_len) LOG(FATAL) << "Not enough room allocated for the image.";
 
-    texture_obj_msg.header.stamp = ros::Time(image_timestamp);
-    texture_obj_msg.width = width;
-    texture_obj_msg.height = height;
-    texture_obj_msg.step = width;
-    texture_obj_msg.encoding = "mono8";
-    texture_obj_msg.is_bigendian = false;
-    texture_obj_msg.data.resize(width * height);
+    m_texture_obj_msg.header.stamp = ros::Time(image_timestamp);
+    m_texture_obj_msg.width = width;
+    m_texture_obj_msg.height = height;
+    m_texture_obj_msg.step = width;
+    m_texture_obj_msg.encoding = "mono8";
+    m_texture_obj_msg.is_bigendian = false;
+    m_texture_obj_msg.data.resize(width * height);
 
     std::copy(reinterpret_cast<const char*>(&obj_str[0]),            // input beg
               reinterpret_cast<const char*>(&obj_str[0]) + obj_len,  // input end
-              texture_obj_msg.data.begin());                         // destination
+              m_texture_obj_msg.data.begin());                         // destination
     // Pad with nulls
-    for (int it = obj_len; it < width * height; it++) texture_obj_msg.data[it] = '\0';
+    for (int it = obj_len; it < width * height; it++) m_texture_obj_msg.data[it] = '\0';
 
     // When using a single texture, publish just once
-    if (!use_single_texture || processed_camera_count == 0) texture_obj_pub.publish(texture_obj_msg);
+    if (!use_single_texture || processed_camera_count == 0)
+      texture_obj_pub.publish(m_texture_obj_msg);
   }
 
   // Publish the mtl string as a mono image with one row (this hack is temporary)
@@ -480,35 +485,36 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
   if (!use_single_texture || processed_camera_count == 0 || save_to_disk) {
     formMtl(out_prefix, mtl_str);
     int mtl_len = mtl_str.size();
-    texture_mtl_msg.header.stamp = ros::Time(image_timestamp);
-    texture_mtl_msg.width = mtl_len;
-    texture_mtl_msg.height = 1;
-    texture_mtl_msg.step = mtl_len;
-    texture_mtl_msg.encoding = "mono8";
-    texture_mtl_msg.is_bigendian = false;
-    texture_mtl_msg.data.resize(mtl_len);
+    m_texture_mtl_msg.header.stamp = ros::Time(image_timestamp);
+    m_texture_mtl_msg.width = mtl_len;
+    m_texture_mtl_msg.height = 1;
+    m_texture_mtl_msg.step = mtl_len;
+    m_texture_mtl_msg.encoding = "mono8";
+    m_texture_mtl_msg.is_bigendian = false;
+    m_texture_mtl_msg.data.resize(mtl_len);
     std::copy(reinterpret_cast<const char*>(&mtl_str[0]),            // input beg
               reinterpret_cast<const char*>(&mtl_str[0]) + mtl_len,  // input end
-              texture_mtl_msg.data.begin());                         // destination
+              m_texture_mtl_msg.data.begin());                       // destination
 
-    if (!use_single_texture || processed_camera_count == 0) texture_mtl_pub.publish(texture_mtl_msg);
+    if (!use_single_texture || processed_camera_count == 0)
+      texture_mtl_pub.publish(m_texture_mtl_msg);
   }
 
   if (save_to_disk) {
     std::string obj_file = out_prefix + ".obj";
-    std::cout << "Writing: " << obj_file << std::endl;
+    std::cout << "Writing: ~/.ros/" << obj_file << std::endl;
     std::ofstream obj_handle(obj_file);
     obj_handle << obj_str;
     obj_handle.close();
 
     std::string mtl_file = out_prefix + ".mtl";
-    std::cout << "Writing: " << mtl_file << std::endl;
+    std::cout << "Writing: ~/.ros/" << mtl_file << std::endl;
     std::ofstream mtl_handle(mtl_file);
     mtl_handle << mtl_str;
     mtl_handle.close();
 
     std::string png_file = out_prefix + ".png";
-    std::cout << "Writing: " << png_file << std::endl;
+    std::cout << "Writing: ~/.ros/" << png_file << std::endl;
     if (!use_single_texture)
       cv::imwrite(png_file, *img_ptr);
     else
@@ -519,27 +525,27 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh, std:
 // Add the latest received texture cam pose to the storage. This is meant to be used
 // only for simulated data. Else use the landmark and ekf callbacks.
 void StreamingMapper::TextureCamSimPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& pose) {
-  if (!sim_mode) return;
+  if (!m_sim_mode) return;
 
   // Add the latest pose. Use a lock.
   const std::lock_guard<std::mutex> lock(texture_cam_pose_lock);
 
   // Convert the pose to Eigen::Affine3d
-  Eigen::Affine3d texture_cam_pose;
-  tf::poseMsgToEigen(pose->pose, texture_cam_pose);
-  texture_cam_poses[pose->header.stamp.toSec()] = texture_cam_pose;
+  Eigen::Affine3d texture_cam_to_world;
+  tf::poseMsgToEigen(pose->pose, texture_cam_to_world);
+  texture_cam_to_world_map[pose->header.stamp.toSec()] = texture_cam_to_world;
 
   // std::cout << "Received the sim texture cam pose at time: " << pose->header.stamp.toSec()
   // << "\n";
 
   // Wipe the oldest poses. Keep a lot of them as sometimes they can come very often.
-  while (texture_cam_poses.size() > 100) {
-    texture_cam_poses.erase(texture_cam_poses.begin());
+  while (texture_cam_to_world_map.size() > 100) {
+    texture_cam_to_world_map.erase(texture_cam_to_world_map.begin());
   }
 }
 
 void StreamingMapper::TextureCamSimInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& info) {
-  if (!sim_mode) return;
+  if (!m_sim_mode) return;
 
   // Initialize m_texture_cam_params just once. Use a lock.
   if (m_texture_cam_params.GetFocalVector() == Eigen::Vector2d(0, 0)) {
@@ -565,87 +571,91 @@ void StreamingMapper::TextureCamSimInfoCallback(const sensor_msgs::CameraInfo::C
 
     // std::cout << "Received the camera info at time: " << info->header.stamp.toSec() << "\n";
     m_texture_cam_params =
-      camera::CameraParameters(Eigen::Vector2i(image_width, image_height), Eigen::Vector2d(focal_length, focal_length),
-                               Eigen::Vector2d(optical_center_x, optical_center_y), distortion);
+      camera::CameraParameters(Eigen::Vector2i(image_width, image_height),
+                               Eigen::Vector2d(focal_length, focal_length),
+                               Eigen::Vector2d(optical_center_x, optical_center_y),
+                               distortion);
   }
 }
 
 // Compute the texture cam pose and timestamp based on the nav cam pose
 // and timestamp, and save it in the storage.
-void StreamingMapper::AddTextureCamPose(double nav_cam_timestamp, Eigen::Affine3d const& nav_cam_pose) {
-  if (nav_cam_pose.matrix() == Eigen::Matrix<double, 4, 4>::Identity()) {
+void StreamingMapper::AddTextureCamPose(double nav_cam_timestamp,
+                                          Eigen::Affine3d const& nav_cam_to_world) {
+  if (nav_cam_to_world.matrix() == Eigen::Matrix<double, 4, 4>::Identity()) {
     // Skip bad poses
     return;
   }
 
   // Must compensate for the fact that the nav cam, haz cam, and texture cam all
   // have some time delay among them
-  double texture_cam_timestamp = nav_cam_timestamp + navcam_to_texture_cam_timestamp_offset;
+  double texture_cam_timestamp = nav_cam_timestamp + m_nav_cam_to_texture_cam_timestamp_offset;
 
-  // Keep in mind that nav_cam_pose is the transform from the nav cam
+  // Keep in mind that nav_cam_to_world is the transform from the nav cam
   // to the world.  Hence the matrices are multiplied in the order as
   // below.
-  Eigen::Affine3d texture_cam_pose;
-  texture_cam_pose.matrix() = nav_cam_pose.matrix() * texture_cam_to_navcam_trans;
+  Eigen::Affine3d texture_cam_to_world;
+  texture_cam_to_world.matrix() = nav_cam_to_world.matrix() * m_texture_cam_to_nav_cam_trans;
   {
     // Add the latest pose. Use a lock.
     const std::lock_guard<std::mutex> lock(texture_cam_pose_lock);
-    texture_cam_poses[texture_cam_timestamp] = texture_cam_pose;
+    texture_cam_to_world_map[texture_cam_timestamp] = texture_cam_to_world;
 
     // Wipe the oldest poses. Keep a lot of them, as sometimes, particularly for ekf,
     // they can come very fast
-    while (texture_cam_poses.size() > 100) texture_cam_poses.erase(texture_cam_poses.begin());
+    while (texture_cam_to_world_map.size() > 100)
+      texture_cam_to_world_map.erase(texture_cam_to_world_map.begin());
   }
   // TODO(oalexan1): This will need more testing!
 }
 
 // This callback takes as input the nav_cam pose as output by localization_node.
 void StreamingMapper::LandmarkCallback(ff_msgs::VisualLandmarks::ConstPtr const& vl) {
-  if (sim_mode) return;
+  if (m_sim_mode) return;
 
   double nav_cam_timestamp = vl->header.stamp.toSec();
-  Eigen::Affine3d nav_cam_pose;
-  tf::poseMsgToEigen(vl->pose, nav_cam_pose);
+  Eigen::Affine3d nav_cam_to_world;
+  tf::poseMsgToEigen(vl->pose, nav_cam_to_world);
 
-  StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
+  StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_to_world);
 }
 
 // This callback takes as input the robot pose as output by ekf on
 // ekf_state_topic (it should be set to /gnc/ekf)
 void StreamingMapper::EkfStateCallback(ff_msgs::EkfState::ConstPtr const& ekf_state) {
-  if (sim_mode) return;
+  if (m_sim_mode) return;
 
   double nav_cam_timestamp = ekf_state->header.stamp.toSec();
   Eigen::Affine3d body_pose;
   tf::poseMsgToEigen(ekf_state->pose, body_pose);
 
   // Convert from body pose (body to world transform) to nav cam pose (nav cam to world transform)
-  // Use the equation: body_to_world = navcam_to_world * body_to_navcam, written equivalently as:
-  // navcam_to_world = body_to_world * navcam_to_body
-  Eigen::Affine3d nav_cam_pose;
-  nav_cam_pose.matrix() = body_pose.matrix() * navcam_to_body_trans;
-  StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
+  // Use the equation: body_to_world = nav_cam_to_world * body_to_nav_cam, written equivalently as:
+  // nav_cam_to_world = body_to_world * nav_cam_to_body
+  Eigen::Affine3d nav_cam_to_world;
+  nav_cam_to_world.matrix() = body_pose.matrix() * m_nav_cam_to_body_trans;
+  StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_to_world);
 }
 
 // This callback takes as input the robot pose as output by ekf on /loc/pose.
 void StreamingMapper::EkfPoseCallback(geometry_msgs::PoseStamped::ConstPtr const& ekf_pose) {
-  if (sim_mode) return;
+  if (m_sim_mode) return;
 
   double nav_cam_timestamp = ekf_pose->header.stamp.toSec();
   Eigen::Affine3d body_pose;
   tf::poseMsgToEigen(ekf_pose->pose, body_pose);
 
   // Convert from body pose (body to world transform) to nav cam pose (nav cam to world transform)
-  // Use the equation: body_to_world = navcam_to_world * body_to_navcam, written equivalently as:
-  // navcam_to_world = body_to_world * navcam_to_body
-  Eigen::Affine3d nav_cam_pose;
-  nav_cam_pose.matrix() = body_pose.matrix() * navcam_to_body_trans;
-  StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_pose);
+  // Use the equation: body_to_world = nav_cam_to_world * body_to_nav_cam, written equivalently as:
+  // nav_cam_to_world = body_to_world * nav_cam_to_body
+  Eigen::Affine3d nav_cam_to_world;
+  nav_cam_to_world.matrix() = body_pose.matrix() * m_nav_cam_to_body_trans;
+  StreamingMapper::AddTextureCamPose(nav_cam_timestamp, nav_cam_to_world);
 }
 
 // This callback takes as input the robot pose as output by ekf on /loc/pose.
 void StreamingMapper::SciCamExifCallback(std_msgs::Float64MultiArray::ConstPtr const& exif) {
-  if (sim_mode) return;
+  if (m_sim_mode || !m_sci_cam_exp_corr) return;
 
   double timestamp = exif->data[dense_map::TIMESTAMP];
 
@@ -668,20 +678,25 @@ void StreamingMapper::SciCamExifCallback(std_msgs::Float64MultiArray::ConstPtr c
 
 void StreamingMapper::WipeOldImages() {
   // Wipe the oldest images. Keep just a few.
-  size_t num_to_keep = 10;  // for sci_cam
-  if (texture_cam_type == "nav_cam") {
-    // For small images that get published often keep a bunch of them,
-    // as sometimes there is a delay for when the pose arrives,
-    // and if not enough images are kept they are wiped before
-    // they can be used.
-    // TODO(oalexan1): This is not robust enough.
+  // For small images that get published often keep a bunch of them,
+  // as sometimes there is a delay for when the pose arrives,
+  // and if not enough images are kept they are wiped before
+  // they can be used.
+  // TODO(oalexan1): This is not robust enough.
+  size_t num_to_keep = 0;
+  if (m_texture_cam_type == "nav_cam") {
     num_to_keep = 50;
-  }
-  if (texture_cam_type == "haz_cam") {
+  } else if (m_texture_cam_type == "haz_cam") {
+    // These are small
     num_to_keep = 100;
+  } else if (m_texture_cam_type == "sci_cam") {
+    num_to_keep = 10;
+  } else {
+    num_to_keep = 25;  // something in the middle
   }
 
-  while (texture_cam_images.size() > num_to_keep) texture_cam_images.erase(texture_cam_images.begin());
+  while (texture_cam_images.size() > num_to_keep)
+    texture_cam_images.erase(texture_cam_images.begin());
 
   // There is a second wiping in this code in a different place. After
   // an image is processed it will be wiped together with any images
@@ -735,12 +750,9 @@ void StreamingMapper::UncompressedTextureCallback(const sensor_msgs::ImageConstP
   WipeOldImages();
 }
 
-// Iterate over the texture images. Overlay them on the 3D model and publish
-// the result.
-// Need to consider here if they are
-// full res and compressed and color, or 1/4 res and grayscale and
-// and uncompressed
-//
+// Iterate over the texture images. Overlay them on the 3D model and
+// publish the result.  Need to consider here if they are full res and
+// compressed and color, or 1/4 res and grayscale and and uncompressed.
 void StreamingMapper::ProcessingLoop() {
   double last_attempted_texture_cam_timestamp = -1.0;
 
@@ -764,10 +776,10 @@ void StreamingMapper::ProcessingLoop() {
 
     // Safely copy the data we need (this data is small, so copying is cheap).
 
-    std::map<double, Eigen::Affine3d> local_texture_cam_poses;
+    std::map<double, Eigen::Affine3d> local_texture_cam_to_world_map;
     {
       const std::lock_guard<std::mutex> lock(texture_cam_pose_lock);
-      local_texture_cam_poses = texture_cam_poses;
+      local_texture_cam_to_world_map = texture_cam_to_world_map;
     }
 
     camera::CameraParameters local_texture_cam_params(Eigen::Vector2i(0, 0), Eigen::Vector2d(0, 0),
@@ -778,7 +790,7 @@ void StreamingMapper::ProcessingLoop() {
     }
 
     // Copy the exif data locally using a lock
-    bool need_exif = (!sim_mode && texture_cam_type == "sci_cam");
+    bool need_exif = (!m_sim_mode && m_texture_cam_type == "sci_cam" && m_sci_cam_exp_corr);
 
     std::map<double, std::vector<double> > local_sci_cam_exif;
     if (need_exif) {
@@ -804,20 +816,21 @@ void StreamingMapper::ProcessingLoop() {
           break;
         }
 
-        if (local_texture_cam_poses.empty()) {
+        if (local_texture_cam_to_world_map.empty()) {
           break;  // no poses yet
         }
 
         // Ensure that we can bracket the texture image timestamp between
         // the timestamps of the poses
-        if (texture_cam_image_timestamp > local_texture_cam_poses.rbegin()->first) {
+        if (texture_cam_image_timestamp > local_texture_cam_to_world_map.rbegin()->first) {
           continue;
         }
-        if (texture_cam_image_timestamp < local_texture_cam_poses.begin()->first) {
+        if (texture_cam_image_timestamp < local_texture_cam_to_world_map.begin()->first) {
           continue;
         }
 
-        if (need_exif && local_sci_cam_exif.find(texture_cam_image_timestamp) == local_sci_cam_exif.end()) {
+        if (need_exif &&
+            local_sci_cam_exif.find(texture_cam_image_timestamp) == local_sci_cam_exif.end()) {
           // Skip if the exif info did not arrive yet
           continue;
         }
@@ -830,7 +843,8 @@ void StreamingMapper::ProcessingLoop() {
         success = true;
 
         // Wipe this image and images older than this as we will never use them
-        while (texture_cam_images.size() > 0 && texture_cam_images.begin()->first <= texture_cam_image_timestamp)
+        while (texture_cam_images.size() > 0 &&
+               texture_cam_images.begin()->first <= texture_cam_image_timestamp)
           texture_cam_images.erase(texture_cam_images.begin());
 
         // Stop given that we have found a good image to process
@@ -842,6 +856,7 @@ void StreamingMapper::ProcessingLoop() {
       continue;
     }
 
+
     util::WallTimer timer;
 
     // All is good with this timestamp. We may still not want to process it,
@@ -850,31 +865,37 @@ void StreamingMapper::ProcessingLoop() {
     last_attempted_texture_cam_timestamp = texture_cam_image_timestamp;
 
     // Find the interpolated pose at the current image
-    Eigen::Affine3d curr_texture_cam_pose;
+    Eigen::Affine3d curr_cam_to_world;
 
-    if (!dense_map::findInterpPose(texture_cam_image_timestamp, local_texture_cam_poses, curr_texture_cam_pose))
+    if (!dense_map::findInterpPose(texture_cam_image_timestamp, local_texture_cam_to_world_map,
+                                   curr_cam_to_world))
       LOG(FATAL) << "Could not bracket the timestamp. Should have worked at this stage.";
 
-    camera::CameraModel cam(curr_texture_cam_pose.inverse(), local_texture_cam_params);
+    camera::CameraModel cam(curr_cam_to_world.inverse(), local_texture_cam_params);
 
-    Eigen::Vector3d cam_ctr = cam.GetPosition();
-    double dist_to_prev_processed = (last_processed_cam_ctr - cam_ctr).norm();
-    bool do_process = (std::isnan(dist_to_prev_processed) ||  // for the first camera to process
-                       dist_to_prev_processed > dist_between_processed_cams);
+    Eigen::Vector3d curr_cam_ctr = cam.GetPosition();
 
-    //  if (!std::isnan(dist_to_prev_processed))
-    //    ROS_INFO_STREAM("Distance from current camera to last processed camera: "
-    //                  << dist_to_prev_processed << " meters.");
+    double curr_dist_bw_cams = (m_prev_cam_ctr - curr_cam_ctr).norm();
+    Eigen::Affine3d world_pose_change
+      = curr_cam_to_world * (m_prev_cam_to_world.inverse());
+    double angle_diff = dense_map::maxRotationAngle(world_pose_change);
 
-    // Current camera is too close to previously processed camera, hence wait for the bot to move
-    if (!do_process) {
-      // ROS_INFO_STREAM("Won't process this camera image, as it is too close to previous one.");
+    // Useful for testing
+    // if (!std::isnan(m_prev_cam_ctr[0]))
+    //  std::cout << std::setprecision(4)
+    //            << "Position and orientation changes relative to prev. processed cam are "
+    //            << curr_dist_bw_cams  << " m and " << angle_diff <<" deg.\n";
+
+    bool skip_processing = (!std::isnan(m_prev_cam_ctr[0])                     &&
+                            curr_dist_bw_cams < m_dist_between_processed_cams  &&
+                            angle_diff        < m_angle_between_processed_cams);
+    if (skip_processing) {
       continue;
     }
 
     // May need to keep this comment long term
     // std::cout << "Processing the streaming camera image at time stamp "
-    //           << texture_cam_image_timestamp << std::endl;
+    //          << texture_cam_image_timestamp << std::endl;
 
     double iso = -1.0, exposure = -1.0;
     if (need_exif) {
@@ -889,16 +910,18 @@ void StreamingMapper::ProcessingLoop() {
 
     // Publish the textured mesh in obj format
     std::ostringstream oss;
-    oss << "processed_" << 1000 + processed_camera_count;  // add 1000 to list them nicely
+    oss << "processed_" << 1000 + m_processed_camera_count;  // add 1000 to list them nicely
     std::string out_prefix = oss.str();
-    publishTexturedMesh(mesh, bvh_tree, max_iso_times_exposure, iso, exposure, processed_camera_count,
-                        texture_cam_image, texture_cam_image_timestamp, cam, smallest_cost_per_face, out_prefix);
+    publishTexturedMesh(mesh, bvh_tree, m_max_iso_times_exposure, iso, exposure,
+                        m_processed_camera_count, texture_cam_image, texture_cam_image_timestamp,
+                        cam, m_smallest_cost_per_face, out_prefix);
 
     // Save this for next time
-    last_processed_cam_ctr = cam_ctr;
-    processed_camera_count++;
+    m_prev_cam_ctr = curr_cam_ctr;
+    m_prev_cam_to_world = curr_cam_to_world;
+    m_processed_camera_count++;
 
-    std::cout << "Total processing took " << timer.get_elapsed() / 1000.0 << " seconds\n";
+    std::cout << "Texture processing took " << timer.get_elapsed() / 1000.0 << " seconds\n";
   }
 }
 

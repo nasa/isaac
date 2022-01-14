@@ -46,7 +46,7 @@ override_dh_auto_configure:
         --install-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/opt/isaac \
         --devel-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/devel \
         --log-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/logs \
-		--whitelist isaac_astrobee_description isaac_util isaac_msgs inspection isaac_hw_msgs wifi isaac gs_action_helper \
+		--whitelist isaac_astrobee_description isaac_util isaac_msgs inspection cargo isaac_hw_msgs wifi isaac gs_action_helper \
 		--install \
 		--cmake-args \
 			-DCMAKE_TOOLCHAIN_FILE=$(CMAKE_TOOLCHAIN_FILE) \

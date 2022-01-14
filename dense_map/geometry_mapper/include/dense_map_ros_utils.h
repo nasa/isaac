@@ -40,6 +40,13 @@
 #include <string>
 #include <vector>
 
+// Forward declaration
+namespace pcl {
+  class PointXYZ;
+  template<class T>
+  class PointCloud;
+}
+
 namespace dense_map {
 
 // Publish a given pose
@@ -49,6 +56,13 @@ void PublishTF(const Eigen::Affine3d& publish_tf, std::string const& parent_fram
 void readBagPoses(std::string const& bag_file, std::string const& topic, StampedPoseStorage& poses);
 
 void readBagImageTimestamps(std::string const& bag_file, std::string const& topic, std::vector<double>& timestamps);
+
+// Given a bag view, for each topic in the view read the vector of
+// messages for that topic, sorted by message header timestamp. Only
+// the following sensor types are supported: sensor_msgs::Image,
+// sensor_msgs::CompressedImage, and sensor_msgs::PointCloud2.
+void indexMessages(rosbag::View& view,  // view can't be made const
+                   std::map<std::string, std::vector<rosbag::MessageInstance>>& bag_map);
 
 void readExifFromBag(std::vector<rosbag::MessageInstance> const& bag_msgs, std::map<double, std::vector<double>>& exif);
 
@@ -65,8 +79,13 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
 // repeated calls to this function we always travel forward in time,
 // and we keep track of where we are in the bag using the variable
 // bag_pos that we update as we go.
-bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs, double max_time_diff,
-                 cv::Mat& cloud, int& bag_pos, double& found_time);
+bool lookupCloud(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs,
+                 double max_time_diff, cv::Mat& cloud, int& bag_pos, double& found_time);
+
+// A wrapper around a function in pcl_ros/point_cloud.h to avoid
+// including that header all over the place as it creates an annoying
+// warning.
+void msgToPcl(sensor_msgs::PointCloud2::ConstPtr pc_msg, pcl::PointCloud<pcl::PointXYZ> & pc);
 
 // Read the list of topics in a bag while avoiding repetitions
 void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topics);
@@ -74,12 +93,13 @@ void readTopicsInBag(std::string const& bag_file, std::vector<std::string>& topi
 // A small struct in which to store an opened ROS bag and the vector of its messages
 // that we will use later to quickly navigate through it while going forward in time.
 struct RosBagHandle {
+  RosBagHandle() = delete;  // The rosbag API prevents anything else than initialization
   RosBagHandle(std::string const& bag_file, std::string const& topic) {
+    bag_msgs.clear();
     bag.open(bag_file, rosbag::bagmode::Read);
     std::vector<std::string> topics;
     topics.push_back(topic);
     view = boost::shared_ptr<rosbag::View>(new rosbag::View(bag, rosbag::TopicQuery(topics)));
-    bag_msgs.clear();
     for (rosbag::MessageInstance const m : *view) bag_msgs.push_back(m);
   }
   rosbag::Bag bag;
