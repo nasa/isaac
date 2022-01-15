@@ -44,7 +44,7 @@ jobs:
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
-                          -t isaac/astrobee:msgs-ubuntu16.04
+                          -t isaac/isaac:astrobee-msgs-ubuntu16.04
     - name: Build messages image isaac/isaac:msgs-ubuntu16.04
       run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
@@ -89,7 +89,7 @@ jobs:
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=''
-                          -t isaac/astrobee:msgs-ubuntu18.04
+                          -t isaac/isaac:astrobee-msgs-ubuntu18.04
 
     - name: Build messages image isaac/isaac:msgs-ubuntu18.04
       run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
@@ -135,7 +135,7 @@ jobs:
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
-                          -t isaac/astrobee:msgs-ubuntu20.04
+                          -t isaac/isaac:astrobee-msgs-ubuntu20.04
 
     - name: Build messages image isaac/isaac:msgs-ubuntu20.04
       run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
