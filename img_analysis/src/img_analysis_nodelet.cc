@@ -127,22 +127,25 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
 
       // Result
       isaac_msgs::ImageInspectionResult result;
+      result.anomaly_result.classifier_options.push_back("Vent free");
+      result.anomaly_result.classifier_options.push_back("Vent has obstacle");
+      result.anomaly_result.classifier_options.push_back("Unknown result, is robot looking at vent?");
 
       switch (classification) {
         case vent_analysis_.vent_free_:
-          result.result = "Vent free";
-          result.response = RESPONSE::VENT_FREE;
+          result.anomaly_result.classifier_result = "Vent free";
+          result.response = RESPONSE::SUCCESS;
           break;
         case vent_analysis_.vent_blocked_:
-          result.result = "Vent has obstacle";
-          result.response = RESPONSE::VENT_OBSTRUCTED;
+          result.anomaly_result.classifier_result = "Vent has obstacle";
+          result.response = RESPONSE::SUCCESS;
           break;
         case vent_analysis_.vent_unknown_:
-          result.result = "Unknown result, is robot looking at vent?";
-          result.response = RESPONSE::INCONCLUSIVE;
+          result.anomaly_result.classifier_result = "Unknown result, is robot looking at vent?";
+          result.response = RESPONSE::SUCCESS;
           break;
         default:
-          result.result = "Image analysis failed";
+          result.anomaly_result.classifier_result = "Image analysis failed";
           result.response = RESPONSE::FAILED;
       }
       goal_.type = isaac_msgs::ImageInspectionGoal::NONE;

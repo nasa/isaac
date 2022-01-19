@@ -556,7 +556,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // The sci cam image was received
     if (sci_cam_req_) {
       sci_cam_req_ = false;
-      result_.geometry_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
+      result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
@@ -584,7 +584,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     ROS_DEBUG_STREAM("IResultCallback()");
     // Fill in the result message with the result
     if (result != nullptr)
-      result_.vent_result.push_back(result->response);
+      result_.anomaly_result.push_back(result->anomaly_result);
     else
       ROS_ERROR_STREAM("Invalid result received Image Analysis");
     return fsm_.Update(NEXT_INSPECT);
@@ -662,8 +662,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
     // Save new goal
     goal_ = *goal;
-    result_.vent_result.clear();
-    result_.geometry_result.clear();
+    result_.anomaly_result.clear();
+    result_.inspection_result.clear();
     result_.picture_time.clear();
     goal_counter_ = 0;
     ROS_DEBUG_STREAM("RESET COUNTER");
