@@ -38,6 +38,8 @@
           name="ilp_cargo" output="$(arg output)"/>
     <node pkg="nodelet" type="nodelet" args="manager"
           name="ilp_guest_science" output="$(arg output)" />
+    <node pkg="nodelet" type="nodelet" args="manager"
+          name="ilp_framestore" output="$(arg output)" />
   </group>
 
   <!-- Launch inspection node -->
@@ -68,7 +70,7 @@
   <include file="$(find ff_util)/launch/ff_nodelet.launch">
     <arg name="class" value="mobility/FrameStore" />
     <arg name="name" value="isaac_framestore" />
-    <arg name="manager" value="mlp_mobility" />
+    <arg name="manager" value="ilp_framestore" />
     <arg name="spurn" value="$(arg spurn)" />
     <arg name="nodes" value="$(arg nodes)" />
     <arg name="extra" value="$(arg extra)" />

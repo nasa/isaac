@@ -515,7 +515,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
 
     // Allow image to stabilize
-    ros::Duration(2.0).sleep();
+    ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
     // Signal an imminent sci cam image
     sci_cam_req_ = true;
