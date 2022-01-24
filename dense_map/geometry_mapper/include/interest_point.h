@@ -21,16 +21,19 @@
 #define INTEREST_POINT_H_
 
 #include <ff_common/thread.h>
+#include <camera/camera_params.h>
 
 #include <opencv2/imgproc.hpp>
 
 #include <glog/logging.h>
+
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
 #include <string>
 #include <vector>
+#include <map>
 #include <mutex>
 #include <utility>
 
@@ -146,6 +149,7 @@ struct InterestPoint {
 };  // End class InterestPoint
 
 typedef std::pair<std::vector<InterestPoint>, std::vector<InterestPoint> > MATCH_PAIR;
+typedef std::map<std::pair<int, int>, dense_map::MATCH_PAIR> MATCH_MAP;
 
 void detectFeatures(const cv::Mat& image, bool verbose,
                     // Outputs
@@ -165,6 +169,30 @@ void writeMatchFile(std::string match_file, std::vector<InterestPoint> const& ip
 void saveImagesAndMatches(std::string const& left_prefix, std::string const& right_prefix,
                           std::pair<int, int> const& index_pair, MATCH_PAIR const& match_pair,
                           std::vector<cv::Mat> const& images);
+
+// Triangulate two rays emanating from given undistorted and centered pixels
+Eigen::Vector3d TriangulatePair(double focal_length1, double focal_length2, Eigen::Affine3d const& world_to_cam1,
+                                Eigen::Affine3d const& world_to_cam2, Eigen::Vector2d const& pix1,
+                                Eigen::Vector2d const& pix2);
+
+// Triangulate n rays emanating from given undistorted and centered pixels
+Eigen::Vector3d Triangulate(std::vector<double> const& focal_length_vec,
+                            std::vector<Eigen::Affine3d> const& world_to_cam_vec,
+                            std::vector<Eigen::Vector2d> const& pix_vec);
+
+struct cameraImage;
+
+void detectMatchFeatures(  // Inputs
+                         std::vector<dense_map::cameraImage> const& cams,
+                         std::vector<std::string> const& cam_names,
+                         std::vector<camera::CameraParameters> const& cam_params,
+                         std::vector<Eigen::Affine3d> const& world_to_cam, int num_overlaps,
+                         int initial_max_reprojection_error, int num_match_threads,
+                         bool verbose,
+                         // Outputs
+                         std::vector<std::vector<std::pair<float, float>>>& keypoint_vec,
+                         std::vector<std::map<int, int>>& pid_to_cid_fid,
+                         std::vector<std::string> & image_files);
 
 }  // namespace dense_map
 

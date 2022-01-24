@@ -148,9 +148,9 @@ class StreamingMapper {
 
   // The info for each face which allows one later to project an image onto
   // the face and compute the texture.
-  std::vector<dense_map::FaceInfo> face_projection_info;
+  std::vector<dense_map::FaceInfo> m_face_projection_info;
 
-  tex::Model texture_model;
+  IsaacObjModel texture_model;
   std::vector<dense_map::IsaacTextureAtlas::Ptr> texture_atlases;
   cv::Mat model_texture;
 
@@ -298,7 +298,7 @@ void StreamingMapper::Initialize(ros::NodeHandle& nh) {
     m_smallest_cost_per_face = std::vector<double>(num_faces, 1.0e+100);
 
     if (use_single_texture)
-      dense_map::formModel(mesh, pixel_size, num_threads, face_projection_info,
+      dense_map::formModel(mesh, pixel_size, num_threads, m_face_projection_info,
                            texture_atlases, texture_model);
   } catch (std::exception& e) {
     LOG(FATAL) << "Could not load mesh.\n" << e.what() << "\n";
@@ -436,8 +436,9 @@ void StreamingMapper::publishTexturedMesh(mve::TriangleMesh::ConstPtr mesh,
 
     msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *img_ptr).toImageMsg();
   } else {
-    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, smallest_cost_per_face, pixel_size, num_threads,
-                              face_projection_info, texture_atlases, texture_model, model_texture);
+    dense_map::projectTexture(mesh, bvh_tree, *img_ptr, cam, smallest_cost_per_face,
+                              pixel_size, num_threads, m_face_projection_info, texture_atlases,
+                              texture_model, model_texture);
     // Note that the output image has an alpha channel
     msg = cv_bridge::CvImage(std_msgs::Header(), "bgra8", model_texture).toImageMsg();
   }
@@ -713,7 +714,8 @@ void StreamingMapper::CompressedTextureCallback(const sensor_msgs::CompressedIma
     // Copy the data to local storage to ensure no strange behavior
     //  cv::Mat tmp_img = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
     //  cv::Mat tmp_img =
-    texture_cam_images[texture_cam_image_timestamp] = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
+    texture_cam_images[texture_cam_image_timestamp]
+      = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
 
     //  cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );  // Create a window for display.
     //  cv::imshow( "Display window", tmp_img);                   // Show our image inside it.
