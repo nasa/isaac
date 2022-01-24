@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.20"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ISAAC: dense_map::RefDepthError Struct Reference</title>
+<title>ISAAC: dense_map::IsaacObjModel::Face Struct Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <link rel="icon" href="favicon.png" type="image/png" />
 <script type="text/javascript" src="jquery.js"></script>
@@ -67,7 +67,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:cf05388f2679ee054f2beb29a391d25f4e673ac3&amp;dn=gpl-2.0.txt GPL-v2 */
-$(document).ready(function(){initNavTree('structdense__map_1_1RefDepthError.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('structdense__map_1_1IsaacObjModel_1_1Face.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -87,31 +87,27 @@ $(document).ready(function(){initNavTree('structdense__map_1_1RefDepthError.html
 
 <div class="header">
   <div class="summary">
-<a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="#pub-static-methods">Static Public Member Functions</a> &#124;
-<a href="structdense__map_1_1RefDepthError-members.html">List of all members</a>  </div>
+<a href="#pub-attribs">Public Attributes</a> &#124;
+<a href="structdense__map_1_1IsaacObjModel_1_1Face-members.html">List of all members</a>  </div>
   <div class="headertitle">
-<div class="title">dense_map::RefDepthError Struct Reference</div>  </div>
+<div class="title">dense_map::IsaacObjModel::Face Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
-Public Member Functions</h2></td></tr>
-<tr class="memitem:aadea501134d4100d0687c2a88622dd89"><td class="memItemLeft" align="right" valign="top"><a id="aadea501134d4100d0687c2a88622dd89"></a>
-EIGEN_MAKE_ALIGNED_OPERATOR_NEW&#160;</td><td class="memItemRight" valign="bottom"><b>RefDepthError</b> (double weight, Eigen::Vector3d const &amp;meas_depth_xyz, std::vector&lt; int &gt; const &amp;block_sizes)</td></tr>
-<tr class="separator:aadea501134d4100d0687c2a88622dd89"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a889cd5e8f0e8509957814e877d133359"><td class="memItemLeft" align="right" valign="top"><a id="a889cd5e8f0e8509957814e877d133359"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator()</b> (double const *const *parameters, double *residuals) const</td></tr>
-<tr class="separator:a889cd5e8f0e8509957814e877d133359"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
-Static Public Member Functions</h2></td></tr>
-<tr class="memitem:a009c1afc9f7890844190959323d7197b"><td class="memItemLeft" align="right" valign="top"><a id="a009c1afc9f7890844190959323d7197b"></a>
-static ceres::CostFunction *&#160;</td><td class="memItemRight" valign="bottom"><b>Create</b> (double weight, Eigen::Vector3d const &amp;meas_depth_xyz, std::vector&lt; int &gt; const &amp;block_sizes)</td></tr>
-<tr class="separator:a009c1afc9f7890844190959323d7197b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
+Public Attributes</h2></td></tr>
+<tr class="memitem:ab893349ad2b56463be51f8e20e1a2841"><td class="memItemLeft" align="right" valign="top"><a id="ab893349ad2b56463be51f8e20e1a2841"></a>
+std::size_t&#160;</td><td class="memItemRight" valign="bottom"><b>vertex_ids</b> [3]</td></tr>
+<tr class="separator:ab893349ad2b56463be51f8e20e1a2841"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abf58151c5cb8c29eaa499563d268ee5d"><td class="memItemLeft" align="right" valign="top"><a id="abf58151c5cb8c29eaa499563d268ee5d"></a>
+std::size_t&#160;</td><td class="memItemRight" valign="bottom"><b>texcoord_ids</b> [3]</td></tr>
+<tr class="separator:abf58151c5cb8c29eaa499563d268ee5d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a58f7630573a5d1508a2d2ec85ce89bd6"><td class="memItemLeft" align="right" valign="top"><a id="a58f7630573a5d1508a2d2ec85ce89bd6"></a>
+std::size_t&#160;</td><td class="memItemRight" valign="bottom"><b>normal_ids</b> [3]</td></tr>
+<tr class="separator:a58f7630573a5d1508a2d2ec85ce89bd6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this struct was generated from the following file:<ul>
-<li>dense_map/geometry_mapper/tools/camera_refiner.cc</li>
+<li>dense_map/geometry_mapper/include/<a class="el" href="texture__processing_8h_source.html">texture_processing.h</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->

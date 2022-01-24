@@ -107,14 +107,14 @@ typedef std::shared_ptr&lt; const <a class="el" href="classdense__map_1_1IsaacTe
 <tr class="memitem:a9b9c4d7b8f5fdf81044e6005450b665e"><td class="memItemLeft" align="right" valign="top"><a id="a9b9c4d7b8f5fdf81044e6005450b665e"></a>
 typedef std::vector&lt; std::size_t &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Faces</b></td></tr>
 <tr class="separator:a9b9c4d7b8f5fdf81044e6005450b665e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a11bbfb669350dfebf8bd2e7fc9dd2d7c"><td class="memItemLeft" align="right" valign="top"><a id="a11bbfb669350dfebf8bd2e7fc9dd2d7c"></a>
-typedef std::vector&lt; math::Vec2f &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Texcoords</b></td></tr>
-<tr class="separator:a11bbfb669350dfebf8bd2e7fc9dd2d7c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a28f5e9059c07a53db563300ded52c303"><td class="memItemLeft" align="right" valign="top"><a id="a28f5e9059c07a53db563300ded52c303"></a>
+typedef std::vector&lt; Eigen::Vector2d &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>Texcoords</b></td></tr>
+<tr class="separator:a28f5e9059c07a53db563300ded52c303"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ac945c055a71ed22a1ab949af6909d948"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classdense__map_1_1IsaacTexturePatch.html#ac945c055a71ed22a1ab949af6909d948">IsaacTexturePatch</a> (int64_t label, std::vector&lt; std::size_t &gt; const &amp;faces, std::vector&lt; math::Vec2f &gt; const &amp;texcoords, int64_t width, int64_t height)</td></tr>
-<tr class="separator:ac945c055a71ed22a1ab949af6909d948"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a957d54efd6124df0a1797792a6b0f825"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classdense__map_1_1IsaacTexturePatch.html#a957d54efd6124df0a1797792a6b0f825">IsaacTexturePatch</a> (int64_t label, std::vector&lt; std::size_t &gt; const &amp;faces, std::vector&lt; Eigen::Vector2d &gt; const &amp;texcoords, int64_t width, int64_t height)</td></tr>
+<tr class="separator:a957d54efd6124df0a1797792a6b0f825"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a15271bb406b85b7696529a897417396c"><td class="memItemLeft" align="right" valign="top"><a id="a15271bb406b85b7696529a897417396c"></a>
 &#160;</td><td class="memItemRight" valign="bottom"><b>IsaacTexturePatch</b> (<a class="el" href="classdense__map_1_1IsaacTexturePatch.html">IsaacTexturePatch</a> const &amp;texture_patch)</td></tr>
 <tr class="separator:a15271bb406b85b7696529a897417396c"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -127,12 +127,12 @@ std::vector&lt; std::size_t &gt; &amp;&#160;</td><td class="memItemRight" valign
 <tr class="memitem:ae253c78d7412520c7b6cdf611e847684"><td class="memItemLeft" align="right" valign="top"><a id="ae253c78d7412520c7b6cdf611e847684"></a>
 std::vector&lt; std::size_t &gt; const  &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>get_faces</b> (void) const</td></tr>
 <tr class="separator:ae253c78d7412520c7b6cdf611e847684"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5f4e12dd9e2c548830520930a28c5317"><td class="memItemLeft" align="right" valign="top"><a id="a5f4e12dd9e2c548830520930a28c5317"></a>
-std::vector&lt; math::Vec2f &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>get_texcoords</b> (void)</td></tr>
-<tr class="separator:a5f4e12dd9e2c548830520930a28c5317"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b7a73bd955b18edbcf7cf46cc05645f"><td class="memItemLeft" align="right" valign="top"><a id="a1b7a73bd955b18edbcf7cf46cc05645f"></a>
-std::vector&lt; math::Vec2f &gt; const  &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>get_texcoords</b> (void) const</td></tr>
-<tr class="separator:a1b7a73bd955b18edbcf7cf46cc05645f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6106bf889832c8c7b02db7d5c9d2c0f3"><td class="memItemLeft" align="right" valign="top"><a id="a6106bf889832c8c7b02db7d5c9d2c0f3"></a>
+std::vector&lt; Eigen::Vector2d &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>get_texcoords</b> (void)</td></tr>
+<tr class="separator:a6106bf889832c8c7b02db7d5c9d2c0f3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a67d2216cc249cebe3c833dba8838d55a"><td class="memItemLeft" align="right" valign="top"><a id="a67d2216cc249cebe3c833dba8838d55a"></a>
+std::vector&lt; Eigen::Vector2d &gt; const  &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>get_texcoords</b> (void) const</td></tr>
+<tr class="separator:a67d2216cc249cebe3c833dba8838d55a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a02f2216d3249e4dc11416c9b6924ac3e"><td class="memItemLeft" align="right" valign="top"><a id="a02f2216d3249e4dc11416c9b6924ac3e"></a>
 int64_t&#160;</td><td class="memItemRight" valign="bottom"><b>get_label</b> (void) const</td></tr>
 <tr class="separator:a02f2216d3249e4dc11416c9b6924ac3e"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -151,13 +151,13 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memitem:a90eb3cba9e3cd340d10acf0ab6520407"><td class="memItemLeft" align="right" valign="top"><a id="a90eb3cba9e3cd340d10acf0ab6520407"></a>
 static IsaacTexturePatch::Ptr&#160;</td><td class="memItemRight" valign="bottom"><b>create</b> (IsaacTexturePatch::ConstPtr texture_patch)</td></tr>
 <tr class="separator:a90eb3cba9e3cd340d10acf0ab6520407"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3c96847cfbd0f641e6c316f29f775100"><td class="memItemLeft" align="right" valign="top"><a id="a3c96847cfbd0f641e6c316f29f775100"></a>
-static IsaacTexturePatch::Ptr&#160;</td><td class="memItemRight" valign="bottom"><b>create</b> (int64_t label, std::vector&lt; std::size_t &gt; const &amp;faces, std::vector&lt; math::Vec2f &gt; const &amp;texcoords, int64_t width, int64_t height)</td></tr>
-<tr class="separator:a3c96847cfbd0f641e6c316f29f775100"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acca00c6694b40da0eb48ffe9a4b553a5"><td class="memItemLeft" align="right" valign="top"><a id="acca00c6694b40da0eb48ffe9a4b553a5"></a>
+static IsaacTexturePatch::Ptr&#160;</td><td class="memItemRight" valign="bottom"><b>create</b> (int64_t label, std::vector&lt; std::size_t &gt; const &amp;faces, std::vector&lt; Eigen::Vector2d &gt; const &amp;texcoords, int64_t width, int64_t height)</td></tr>
+<tr class="separator:acca00c6694b40da0eb48ffe9a4b553a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="ac945c055a71ed22a1ab949af6909d948"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac945c055a71ed22a1ab949af6909d948">&#9670;&nbsp;</a></span>IsaacTexturePatch()</h2>
+<a id="a957d54efd6124df0a1797792a6b0f825"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a957d54efd6124df0a1797792a6b0f825">&#9670;&nbsp;</a></span>IsaacTexturePatch()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -180,7 +180,7 @@ static IsaacTexturePatch::Ptr&#160;</td><td class="memItemRight" valign="bottom"
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">std::vector&lt; math::Vec2f &gt; const &amp;&#160;</td>
+          <td class="paramtype">std::vector&lt; Eigen::Vector2d &gt; const &amp;&#160;</td>
           <td class="paramname"><em>texcoords</em>, </td>
         </tr>
         <tr>

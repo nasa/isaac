@@ -38,16 +38,18 @@ var idm =
           [ "Image selection", "geometric_streaming_mapper.html#autotoc_md66", null ],
           [ "Map building and registration", "geometric_streaming_mapper.html#autotoc_md67", null ],
           [ "Running camera_refiner", "geometric_streaming_mapper.html#autotoc_md68", null ],
-          [ "Using the refiner with a radtan model for nav_cam", "geometric_streaming_mapper.html#autotoc_md69", null ]
+          [ "The algorithm", "geometric_streaming_mapper.html#autotoc_md69", null ],
+          [ "Camera refiner options", "geometric_streaming_mapper.html#autotoc_md70", null ],
+          [ "Using the refiner with a radtan model for nav_cam", "geometric_streaming_mapper.html#autotoc_md71", null ]
         ] ],
-        [ "Orthoprojecting images", "geometric_streaming_mapper.html#autotoc_md70", null ]
+        [ "Orthoprojecting images", "geometric_streaming_mapper.html#autotoc_md72", null ]
       ] ]
     ] ],
     [ "Volumetric Mapper", "volumetric_mapper.html", [
-      [ "Volumetric Mapper", "volumetric_mapper.html#autotoc_md71", [
-        [ "Overview", "volumetric_mapper.html#autotoc_md72", null ],
-        [ "Trace Map", "volumetric_mapper.html#autotoc_md73", null ],
-        [ "Wifi 3D Map", "volumetric_mapper.html#autotoc_md74", null ]
+      [ "Volumetric Mapper", "volumetric_mapper.html#autotoc_md73", [
+        [ "Overview", "volumetric_mapper.html#autotoc_md74", null ],
+        [ "Trace Map", "volumetric_mapper.html#autotoc_md75", null ],
+        [ "Wifi 3D Map", "volumetric_mapper.html#autotoc_md76", null ]
       ] ]
     ] ]
 ];

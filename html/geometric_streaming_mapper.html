@@ -831,6 +831,11 @@ sci_cam_pix_y: 0.1585 0.34267 0.71541 30.158 (635 residuals)
 <p>A source of errors (apart from inaccurate intrinsics, extrinsics, or insufficiently good modeling of the cameras) can be the nav_cam_to_sci_cam_timestamp_offset, which can be non-zero if the HLP and MLP/LLP processors are not synchronized (the sci_cam pictures are acquired with the HLP and nav_cam with MLP/LLP). If this value is not known well, this tool can be run with zero or more iterations and various values of: </p><pre class="fragment">--nav_cam_to_sci_cam_offset_override_value &lt;val&gt;
 </pre><p>to see which value gives the smallest residuals.</p>
 <p>If the <code>--out_texture_dir</code> option is specified, the tool will create textured meshes for each image and optimized camera at the end. Ideally those textured meshes will agree among each other.</p>
+<h3><a class="anchor" id="autotoc_md69"></a>
+The algorithm</h3>
+<p>See camera_refiner.cc for a lengthy explanation of the algorithm.</p>
+<h3><a class="anchor" id="autotoc_md70"></a>
+Camera refiner options</h3>
 <p>This program's options are: </p><pre class="fragment">--ros_bag (string, default = "")
   A ROS bag with recorded nav_cam, haz_cam intensity,
   full-resolution sci_cam, and haz_cam depth clouds.
@@ -931,6 +936,10 @@ sci_cam_pix_y: 0.1585 0.34267 0.71541 30.158 (635 residuals)
   Override the value of nav_cam_to_sci_cam_timestamp_offset from
   the robot config file with this value.
 
+--sci_cam_timestamps (string, default = "")
+  Use only these sci cam timestamps. Must be a file with one
+  timestamp per line.
+
 --depth_tri_weight (double, default = 1000.0)
   The weight to give to the constraint that depth measurements
   agree with triangulated points. Use a bigger number as depth
@@ -983,9 +992,6 @@ sci_cam_pix_y: 0.1585 0.34267 0.71541 30.158 (635 residuals)
   other relative to the triangulated points, so care is needed
   here.
 
---refiner_skip_filtering (bool, false unless specified)
-  Do not do any outlier filtering.
-
 --out_texture_dir (string, default = "")
   If non-empty and if an input mesh was provided, project the
   camera images using the optimized poses onto the mesh and write
@@ -1031,20 +1037,21 @@ sci_cam_pix_y: 0.1585 0.34267 0.71541 30.158 (635 residuals)
 --num_opt_threads (int32, default = 16)
   How many threads to use in the optimization.
 
---sci_cam_timestamps (string, default = "")
-  Use only these sci cam timestamps. Must be a file with one
-  timestamp per line.
+--num_match_threads (int32, default = 8)
+  How many threads to use in feature detection/matching.
+  A large number can use a lot of memory.
 
 --verbose (bool, false unless specified)
   Print the residuals and save the images and match files. Stereo
   Pipeline's viewer can be used for visualizing these.
-</pre><h3><a class="anchor" id="autotoc_md69"></a>
+</pre><h3><a class="anchor" id="autotoc_md71"></a>
 Using the refiner with a radtan model for nav_cam</h3>
 <p>The camera refiner supports using a radtan distortion model for nav_cam, that is a model with radial and and tangential distortion, just like for haz_cam and sci_cam, but the default nav_cam distortion model is fisheye. One can edit the robot config file and replace the fisheye model with a desired radial + tangential distortion model (4 or 5 coefficients are needed) then run the refiner.</p>
 <p>Since it is not easy to find a good initial set of such coefficients, the refiner has the option of computing such a model which best fits the given fisheye model. For that, the refiner is started with the fisheye model, this model is used to set up the problem, including triangulating the 3D points after feature detection, then the fisheye model is replaced on-the-fly with desired 4 or 5 coefficients of the radtan model via the option &ndash;nav_cam_distortion_replacement, to which one can pass, for example, "0 0 0 0". These coefficients will then be optimized while keeping the rest of the variables fixed (nav cam focal length and optical center, intrinsics of other cameras, and all the extrinsics). The new best-fit distortion model will be written to disk at the end, replacing the fisheye model, and from then on the new model can be used for further calibration experiments just as with the fisheye model.</p>
+<p>It may however be needed to rerun the refiner one more time, this time with the new distortion model read from disk, and still keep all intrinsics and extrinsics (including the sparse map and depth to image) fixed, except for the nav cam distortion, to fully tighten it.</p>
 <p>Since it is expected that fitting such a model is harder at the periphery, where the distortion is stronger, the camera refiner has the option <code>--nav_cam_num_exclude_boundary_pixels</code> can be used to restrict the nav cam view to a central region of given dimensions when such such optimization takes place (whether the new model type is fit on the fly or read from disk when already determined). If a satisfactory solution is found and it is desired to later use the geometry mapper with such a model, note its option <code>--undistorted_crop_wins</code>, and one should keep in mind that that the restricted region specified earlier may not exactly be the region to be used with the geometry mapper, since the former is specified in distorted pixels and this one in undistorted pixels.</p>
 <p>All this logic was tested and was shown to work in a satisfactory way, but no thorough attempt was made at validating that a radtan distortion model, while having more degrees of freedom, would out-perform the fisheye model. That is rather unlikely, since given sufficiently many images with good overlap, the effect of the peripheral region where the fisheye lens distortion may not perform perfectly may be small.</p>
-<h2><a class="anchor" id="autotoc_md70"></a>
+<h2><a class="anchor" id="autotoc_md72"></a>
 Orthoprojecting images</h2>
 <p>Given a camera image, its pose, and a mesh, a useful operation is to create a textured mesh with this camera. While the geometry mapper can create textured meshes as well, this tool does so from individual images rather than fusing them. It uses the logic from the streaming mapper instead of texrecon which is used by the geometry mapper.</p>
 <p>A geometry mapper run directory has all the inputs this tool needs. It can be run as follows: </p><pre class="fragment">export ASTROBEE_SOURCE_PATH=$HOME/projects/astrobee/src
