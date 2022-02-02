@@ -20,7 +20,6 @@
 # You must set the docker context to be the repository root directory
 
 ARG UBUNTU_VERSION=16.04
-
 FROM ubuntu:${UBUNTU_VERSION}
 
 ARG ROS_VERSION=kinetic
