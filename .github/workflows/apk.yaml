@@ -27,7 +27,7 @@ jobs:
                                  --build-arg UBUNTU_VERSION=16.04
                                  --build-arg ROS_VERSION=kinetic
                                  --build-arg PYTHON=''
-                                 -t isaac/astrobee:msgs-ubuntu16.04
+                                 -t isaac/isaac:astrobee-msgs-ubuntu16.04
 
     - name: Build image isaac/isaac:msgs-ubuntu16.04
       run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
@@ -47,7 +47,7 @@ jobs:
       run: |
         docker cp $(docker create --rm isaac/isaac:latest-msgs-jar-ubuntu16.04):/src/msgs/devel/share/maven/ .
         rm isaac/apks/isaac_gs_ros_bridge/app/libs/*msgs*
-        find maven -name *.jar | xargs cp -t isaac/apks/isaac_gs_ros_bridge/app/libs
+        find maven -name *.jar -print0 | xargs -0 cp -t isaac/apks/isaac_gs_ros_bridge/app/libs
 
     - name: Install APK dependencies
       run: |
