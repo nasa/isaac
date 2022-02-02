@@ -1575,6 +1575,12 @@ If the ``--out_texture_dir`` option is specified, the tool will create
 textured meshes for each image and optimized camera at the
 end. Ideally those textured meshes will agree among each other.
 
+### The algorithm
+
+See camera_refiner.cc for a lengthy explanation of the algorithm.
+
+### Camera refiner options
+
 This program's options are:
 
     --ros_bag (string, default = "")
@@ -1677,6 +1683,10 @@ This program's options are:
       Override the value of nav_cam_to_sci_cam_timestamp_offset from
       the robot config file with this value.
 
+    --sci_cam_timestamps (string, default = "")
+      Use only these sci cam timestamps. Must be a file with one
+      timestamp per line.
+
     --depth_tri_weight (double, default = 1000.0)
       The weight to give to the constraint that depth measurements
       agree with triangulated points. Use a bigger number as depth
@@ -1729,9 +1739,6 @@ This program's options are:
       other relative to the triangulated points, so care is needed
       here.
 
-    --refiner_skip_filtering (bool, false unless specified)
-      Do not do any outlier filtering.
-
     --out_texture_dir (string, default = "")
       If non-empty and if an input mesh was provided, project the
       camera images using the optimized poses onto the mesh and write
@@ -1777,9 +1784,9 @@ This program's options are:
     --num_opt_threads (int32, default = 16)
       How many threads to use in the optimization.
 
-    --sci_cam_timestamps (string, default = "")
-      Use only these sci cam timestamps. Must be a file with one
-      timestamp per line.
+    --num_match_threads (int32, default = 8)
+      How many threads to use in feature detection/matching.
+      A large number can use a lot of memory.
 
     --verbose (bool, false unless specified)
       Print the residuals and save the images and match files. Stereo
@@ -1808,6 +1815,11 @@ extrinsics). The new best-fit distortion model will be written to disk
 at the end, replacing the fisheye model, and from then on the new
 model can be used for further calibration experiments just as with the
 fisheye model.
+
+It may however be needed to rerun the refiner one more time, this time
+with the new distortion model read from disk, and still keep all
+intrinsics and extrinsics (including the sparse map and depth to
+image) fixed, except for the nav cam distortion, to fully tighten it.
 
 Since it is expected that fitting such a model is harder at the
 periphery, where the distortion is stronger, the camera refiner has

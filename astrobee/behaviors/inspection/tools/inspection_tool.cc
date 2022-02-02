@@ -172,21 +172,14 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
   case ff_util::FreeFlyerActionState::Enum::SUCCESS:
     std::cout << "[SUCCESS] ";
     if (FLAGS_anomaly) {
-      for (int i = 0; i < result->vent_result.size(); i++) {
-        switch (result->vent_result[i]) {
-        case isaac_msgs::InspectionResult::VENT_FREE:
-          std::cout << "Vent " << i <<" is free " << std::endl;                 break;
-        case isaac_msgs::InspectionResult::VENT_OBSTRUCTED:
-          std::cout << "Vent " << i <<" is obstructed " << std::endl;           break;
-        case isaac_msgs::InspectionResult::INCONCLUSIVE:
-          std::cout << "Vent " << i <<" picture was inconclusive" << std::endl; break;
-        }
+      for (int i = 0; i < result->anomaly_result.size(); i++) {
+          std::cout << "Vent " << i <<" is " << result->anomaly_result[i].classifier_result << std::endl;
       }
     }
 
     if (FLAGS_geometry) {
-      for (int i = 0; i < result->geometry_result.size(); i++) {
-        switch (result->geometry_result[i]) {
+      for (int i = 0; i < result->inspection_result.size(); i++) {
+        switch (result->inspection_result[i]) {
         case isaac_msgs::InspectionResult::PIC_ACQUIRED:
           std::cout << "Pic " << i <<" was processed " << std::endl; break;
         }

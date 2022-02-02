@@ -151,7 +151,7 @@ docker build ${astrobee_source:-${rootdir}} \
             --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
             --build-arg ROS_VERSION=${ROS_VERSION} \
             --build-arg PYTHON=${PYTHON} \
-            -t isaac/astrobee:msgs-ubuntu${UBUNTU_VERSION}
+            -t isaac/isaac:astrobee-msgs-ubuntu${UBUNTU_VERSION}
 docker build ${isaac_source:-${rootdir}} \
             -f ${isaac_source:-${rootdir}}/scripts/docker/isaac_msgs.Dockerfile \
             --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \

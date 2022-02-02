@@ -11,13 +11,21 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-    - uses: actions/checkout@v2
 
-    - name: Checkout submodule
-      run: git submodule update --init --depth 1 isaac_msgs
+    - name: Checkout Astrobee
+      uses: actions/checkout@v2
+      with:
+        repository: nasa/astrobee
+        path: astrobee/
+
+    - name: Checkout ISAAC
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        path: isaac/
 
     - name: Build code for isaac:astrobee Ubuntu 16
-      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile
+      run: docker build isaac -f isaac/scripts/docker/isaac_astrobee.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
@@ -25,24 +33,44 @@ jobs:
                           -t isaac/isaac:latest-astrobee-ubuntu16.04
 
     - name: Build code for isaac:latest Ubuntu 16
-      run: docker build . -f ./scripts/docker/isaac.Dockerfile
+      run: docker build isaac -f isaac/scripts/docker/isaac.Dockerfile
                           --build-arg UBUNTU_VERSION=16.04
                           --build-arg ROS_VERSION=kinetic
                           --build-arg PYTHON=''
                           -t isaac:latest-ubuntu16.04
 
+    - name: Build messages image isaac/astrobee:msgs-ubuntu16.04
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=16.04
+                          --build-arg ROS_VERSION=kinetic
+                          --build-arg PYTHON=''
+                          -t isaac/isaac:astrobee-msgs-ubuntu16.04
+    - name: Build messages image isaac/isaac:msgs-ubuntu16.04
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=16.04
+                          --build-arg ROS_VERSION=kinetic
+                          --build-arg PYTHON=''
+                          -t isaac/isaac:msgs-ubuntu16.04
   build-bionic:
 
     runs-on: ubuntu-18.04
 
     steps:
-    - uses: actions/checkout@v2
 
-    - name: Checkout submodule
-      run: git submodule update --init --depth 1 isaac_msgs
+    - name: Checkout Astrobee
+      uses: actions/checkout@v2
+      with:
+        repository: nasa/astrobee
+        path: astrobee/
+
+    - name: Checkout ISAAC
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        path: isaac/
 
     - name: Build code for isaac:astrobee Ubuntu 18
-      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile
+      run: docker build isaac -f isaac/scripts/docker/isaac_astrobee.Dockerfile
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=3
@@ -50,24 +78,45 @@ jobs:
                           -t isaac/isaac:latest-astrobee-ubuntu18.04
 
     - name: Build code for isaac:latest Ubuntu 18
-      run: docker build . -f ./scripts/docker/isaac.Dockerfile
+      run: docker build isaac -f isaac/scripts/docker/isaac.Dockerfile
                           --build-arg UBUNTU_VERSION=18.04
                           --build-arg ROS_VERSION=melodic
                           --build-arg PYTHON=3
                           -t isaac:latest-ubuntu18.04
 
+    - name: Build messages image isaac/astrobee:msgs-ubuntu18.04
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=18.04
+                          --build-arg ROS_VERSION=melodic
+                          --build-arg PYTHON=''
+                          -t isaac/isaac:astrobee-msgs-ubuntu18.04
+
+    - name: Build messages image isaac/isaac:msgs-ubuntu18.04
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=18.04
+                          --build-arg ROS_VERSION=melodic
+                          --build-arg PYTHON=''
+                          -t isaac/isaac:msgs-ubuntu18.04
   build-focal:
 
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v2
 
-    - name: Checkout submodule
-      run: git submodule update --init --depth 1 isaac_msgs
+    - name: Checkout Astrobee
+      uses: actions/checkout@v2
+      with:
+        repository: nasa/astrobee
+        path: astrobee/
+
+    - name: Checkout ISAAC
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        path: isaac/
 
     - name: Build code for isaac:astrobee Ubuntu 20
-      run: docker build . -f ./scripts/docker/isaac_astrobee.Dockerfile
+      run: docker build isaac -f isaac/scripts/docker/isaac_astrobee.Dockerfile
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
@@ -75,8 +124,22 @@ jobs:
                           -t isaac/isaac:latest-astrobee-ubuntu20.04
 
     - name: Build code for isaac:latest Ubuntu 20
-      run: docker build . -f ./scripts/docker/isaac.Dockerfile
+      run: docker build isaac -f isaac/scripts/docker/isaac.Dockerfile
                           --build-arg UBUNTU_VERSION=20.04
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
                           -t isaac:latest-ubuntu20.04
+
+    - name: Build messages image isaac/astrobee:msgs-ubuntu20.04
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          -t isaac/isaac:astrobee-msgs-ubuntu20.04
+
+    - name: Build messages image isaac/isaac:msgs-ubuntu20.04
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          -t isaac/isaac:msgs-ubuntu20.04

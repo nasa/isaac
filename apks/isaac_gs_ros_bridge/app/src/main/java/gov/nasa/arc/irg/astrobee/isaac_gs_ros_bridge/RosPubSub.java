@@ -155,6 +155,7 @@ public class RosPubSub implements NodeMain {
 
         if (cmd_split[0].compareTo("iir") == 0) {
             // This is an image inspection result
+            // TODO(Katie) Need to add anomaly_result once it is added to the ground node
             Log.i(mBridgeService.ISAAC_GS_ROS_BRIDGE_TAG, "Got image inspection result");
             ImageInspectionResult imageInspectionResultMsg = mImageInspectionResultPublisher.newMessage();
             imageInspectionResultMsg.setResponse(Integer.parseInt(cmd_split[1]));
@@ -170,7 +171,9 @@ public class RosPubSub implements NodeMain {
             inspectionGoalMsg.setCommand(Byte.parseByte(cmd_split[1]));
             // Need to figure out how many poses we have, subtract 2 for gs command name
             // and inspection command arg
-            int num_args = cmd_split.length - 2;
+            // TODO(Katie) This extraction needs work. The inspection poses were changed from a
+            // TODO(Katie) list of poses to a pose array.
+            /*int num_args = cmd_split.length - 2;
             int num_poses = num_args/7;
             if (num_args % 7 == 0) {
                 List<PoseStamped>  inspectPoses = inspectionGoalMsg.getInspectPoses();
@@ -192,7 +195,7 @@ public class RosPubSub implements NodeMain {
                     inspectPoses.add(poseStamped);
                 }
                 inspectionGoalMsg.setInspectPoses(inspectPoses);
-            }
+            }*/
             mInspectionGoalPublisher.publish(inspectionGoalMsg);
         } else {
             Log.e(mBridgeService.ISAAC_GS_ROS_BRIDGE_TAG, "Unknown custom guest science command.");
@@ -235,19 +238,8 @@ public class RosPubSub implements NodeMain {
     public void inspectionResultCallback(InspectionResult result) {
         Log.i(mBridgeService.ISAAC_GS_ROS_BRIDGE_TAG, "Got inspection result");
         // TODO(Katie) Extract header timestamp and frame id to be thorough
+        // TODO(Katie) Update to work with new inspection result
         String gs_data = "";
-
-        ChannelBuffer vent_result = result.getVentResult();
-        gs_data += vent_result.capacity() + "@";
-        for (int i = 0; i < vent_result.capacity(); i++) {
-            gs_data += Byte.toString(vent_result.getByte(i)) + "@";
-        }
-
-        ChannelBuffer geometry_result = result.getGeometryResult();
-        gs_data += geometry_result.capacity() + "@";
-        for (int i = 0; i < geometry_result.capacity(); i++) {
-            gs_data += Byte.toString(geometry_result.getByte(i)) + "@";
-        }
 
         gs_data += result.getResponse() + "@";
         gs_data += result.getFsmResult() + "\0";

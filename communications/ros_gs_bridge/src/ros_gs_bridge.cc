@@ -165,55 +165,13 @@ void RosGsBridge::GuestScienceDataCallback(
     // TODO(Katie)
   } else if (data->topic == "ir") {
     // Data contains the inspection result
+    // TODO(Katie) Inspection result has been changed, need to fix this code
     isaac_msgs::InspectionResult result;
-    int vent_size, geometry_size, response;
-
-    // Get vent array
-    if (delim_index == std::string::npos) {
-      ROS_ERROR_STREAM("ros gs bridge: Error parsing vent size out of " <<
-                       "inspection result. Data string is " << data_str);
-      return;
-    }
-
-    vent_size = std::stoi(data_str.substr(0, delim_index));
-    data_str.erase(0, (delim_index + 1));
-    for (int i = 0; i < vent_size; i++) {
-      delim_index = data_str.find("@");
-      if (delim_index == std::string::npos) {
-        ROS_ERROR_STREAM("ros gs bridge: Error parsing vent array out of " <<
-                         "inspection result. Data string is " << data_str);
-        return;
-      }
-      result.vent_result.push_back(std::stoi(data_str.substr(0, delim_index)));
-      data_str.erase(0, (delim_index + 1));
-    }
-
-    // Get geometry array
-    delim_index = data_str.find("@");
-    if (delim_index == std::string::npos) {
-      ROS_ERROR_STREAM("ros gs bridge: Error parsing geometry size out of " <<
-                       "inspection result. Data string is " << data_str);
-      return;
-    }
-
-    geometry_size = std::stoi(data_str.substr(0, delim_index));
-    data_str.erase(0, (delim_index + 1));
-    for (int i = 0; i < geometry_size; i++) {
-      delim_index = data_str.find("@");
-      if (delim_index == std::string::npos) {
-        ROS_ERROR_STREAM("ros gs bridge: Error parsing geometry array out of" <<
-                         " inspection result. Data string is " << data_str);
-        return;
-      }
-      result.geometry_result.push_back(std::stoi(data_str.substr(0,
-                                                                 delim_index)));
-      data_str.erase(0, (delim_index + 1));
-    }
+    int response;
 
     // Get response
-    delim_index = data_str.find("@");
     if (delim_index == std::string::npos) {
-      ROS_ERROR_STREAM("ros gs bridge: Error parsing response out of " <<
+      ROS_ERROR_STREAM("ros gs bridge: Error parsing vent size out of " <<
                        "inspection result. Data string is " << data_str);
       return;
     }
@@ -339,6 +297,7 @@ bool RosGsBridge::GrabControlService(std_srvs::Empty::Request& req,
 void RosGsBridge::ImageInspectionResultCallback(
                       ff_util::FreeFlyerActionState::Enum const& state,
                       isaac_msgs::ImageInspectionResultConstPtr const& result) {
+  // TODO(Katie) Need to add the anomaly_result
   // Time stamp in the result header is not used so we don't need to package it
   // TODO(Katie) to be thorough, it would be good to package up the timestamp
   // TODO(Katie) change string to be json

@@ -208,6 +208,10 @@ add_executable(orthoproject tools/orthoproject.cc)
 target_link_libraries(orthoproject
     geometry_mapper_lib gflags glog)
 
+add_executable(test_texture_gen tools/test_texture_gen.cc)
+target_link_libraries(test_texture_gen
+    geometry_mapper_lib gflags glog)
+
 add_executable(old_orthoproject tools/old_orthoproject.cc)
 target_link_libraries(old_orthoproject
     geometry_mapper_lib gflags glog)
