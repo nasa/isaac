@@ -180,6 +180,10 @@ add_executable(camera_refiner_old tools/camera_refiner_old.cc)
 target_link_libraries(camera_refiner_old
     geometry_mapper_lib gflags glog)
 
+add_executable(get_depth_data_from_mesh tools/get_depth_data_from_mesh.cc)
+target_link_libraries(get_depth_data_from_mesh
+    geometry_mapper_lib gflags glog)
+
 add_executable(extract_pc_from_bag tools/extract_pc_from_bag.cc)
 target_link_libraries(extract_pc_from_bag
     geometry_mapper_lib gflags glog)
