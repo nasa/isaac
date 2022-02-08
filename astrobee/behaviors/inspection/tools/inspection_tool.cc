@@ -41,6 +41,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 // C++ STL includes
+#include <boost/thread/thread.hpp>
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -87,6 +88,7 @@ DEFINE_double(deadline, -1.0, "Action deadline timeout");
 
 // Match the internal states and responses with the message definition
 using STATE = isaac_msgs::InspectionState;
+bool stopflag_ = false;
 
 bool has_only_whitespace_or_comments(const std::string & str) {
   for (std::string::const_iterator it = str.begin(); it != str.end(); it++) {
@@ -156,11 +158,11 @@ void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
 
 // Inspection action feedback
 void FeedbackCallback(isaac_msgs::InspectionFeedbackConstPtr const& feedback) {
-  std::cout << "\r                                                   "
+  std::cout << "\r                                         "
             << "\rFSM: " << feedback->state.fsm_event
             << " -> " << feedback->state.fsm_state
             << " (" << feedback->state.fsm_subevent
-            << " -> " << feedback->state.fsm_substate << ") " << std::flush;
+            << " -> " << feedback->state.fsm_substate << ")" << std::flush;
 }
 
 // Inspection action result
@@ -205,18 +207,15 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
             << " (Code " << result->response << ")" << std::endl;
 teardown:
   std::cout << std::endl;
-  // In all cases we must shutdown
-  ros::shutdown();
+  // In the case we must shutdown
+  if (result->fsm_result == "Inspection Over") {
+    stopflag_ = true;
+    ros::shutdown();
+  }
 }
 
-// Ensure all clients are connected
-void ConnectedCallback(
-  ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
-  // Check to see if connected
-  if (!client->IsConnected()) return;
-  // Print out a status message
-  std::cout << "\r                                                   "
-            << "\rState: CONNECTED" << std::flush;
+// Send the inspection goal to the server
+void SendGoal(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
   // Prepare the goal
   isaac_msgs::InspectionGoal goal;
     std::string path = std::string(ros::package::getPath("inspection"));
@@ -235,7 +234,7 @@ void ConnectedCallback(
     goal.command = isaac_msgs::InspectionGoal::ANOMALY;
 
     // Read file
-    std::cout << "Reading: " << FLAGS_anomaly_poses << std::endl;
+    // std::cout << "Reading: " << FLAGS_anomaly_poses << std::endl;
     ReadFile(path + FLAGS_anomaly_poses, goal);
 
   } else if (FLAGS_geometry) {
@@ -243,7 +242,7 @@ void ConnectedCallback(
     goal.command = isaac_msgs::InspectionGoal::GEOMETRY;
 
     // Read file
-    std::cout << "Reading: " << FLAGS_geometry_poses << std::endl;
+    // std::cout << "Reading: " << FLAGS_geometry_poses << std::endl;
     ReadFile(path + FLAGS_geometry_poses, goal);
 
   } else if (FLAGS_panorama) {
@@ -251,7 +250,7 @@ void ConnectedCallback(
     goal.command = isaac_msgs::InspectionGoal::PANORAMA;
 
     // Read file
-    std::cout << "Reading: " << FLAGS_panorama_poses << std::endl;
+    // std::cout << "Reading: " << FLAGS_panorama_poses << std::endl;
     ReadFile(path + FLAGS_panorama_poses, goal);
 
   } else if (FLAGS_volumetric) {
@@ -259,11 +258,76 @@ void ConnectedCallback(
     goal.command = isaac_msgs::InspectionGoal::VOLUMETRIC;
 
     // Read file
-    std::cout << "Reading: " << FLAGS_volumetric_poses << std::endl;
+    // std::cout << "Reading: " << FLAGS_volumetric_poses << std::endl;
     ReadFile(path + FLAGS_volumetric_poses, goal);
   }
 
   client->SendGoal(goal);
+}
+
+void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
+  while (!stopflag_ && ros::ok()) {
+    std::string line, val;
+    std::getline(std::cin, line);
+    try {
+      switch (std::stoi(line)) {
+        case 0:
+          std::cout << "Input: " << line << " - Exiting" << std::endl;
+          stopflag_ = true;
+          break;
+        case 1:
+          std::cout << "Input: " << line << " - Pausing" << std::endl;
+          FLAGS_pause = true;
+          SendGoal(client);
+          break;
+        case 2:
+          std::cout << "Input: " << line << " - Resuming" << std::endl;
+          FLAGS_pause = false;
+          FLAGS_resume = true;
+          SendGoal(client);
+          break;
+        case 3:
+          std::cout << "Input: " << line << " - Repeating" << std::endl;
+          FLAGS_pause = false;
+          FLAGS_resume = false;
+          FLAGS_repeat = true;
+          SendGoal(client);
+          break;
+        case 4:
+          std::cout << "Input: " << line << " - Skipping" << std::endl;
+          FLAGS_pause = false;
+          FLAGS_resume = false;
+          FLAGS_repeat = false;
+          FLAGS_skip = true;
+          SendGoal(client);
+          break;
+        case 5:
+          std::cout << "Input: " << line << " - Saving" << std::endl;
+          FLAGS_pause = false;
+          FLAGS_resume = false;
+          FLAGS_repeat = false;
+          FLAGS_skip = false;
+          FLAGS_save = true;
+          SendGoal(client);
+          break;
+        default:
+          std::cout << "Invalid option" << std::endl;
+      }
+    } catch (const std::invalid_argument&) {
+      continue;    }
+  }
+  return;
+}
+
+// Ensure all clients are connected
+void ConnectedCallback(
+  ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
+  // Check to see if connected
+  if (!client->IsConnected()) return;
+  // Print out a status message
+  std::cout << "\r                                                   "
+            << "\rState: CONNECTED" << std::flush;
+  SendGoal(client);
 }
 
 // Main entry point for application
@@ -320,8 +384,26 @@ int main(int argc, char *argv[]) {
       ros::shutdown();
     }
   }
+
+std::cout << "\r "
+            << "Available actions:\n"
+            << "0) Exit \n"
+            << "1) Pause \n"
+            << "2) Resume \n"
+            << "3) Repeat \n"
+            << "4) Skip \n"
+            << "5) Save \n"
+            << "Specify the number of the command to publish and hit 'enter'.\n"<< std::endl;
+
+  // Start input thread
+  boost::thread inp(GetInput, &client);
   // Synchronous mode
-  ros::spin();
+  while (!stopflag_) {
+    ros::spinOnce();
+  }
+  // Wait for thread to exit
+  inp.join();
+
   // Finish commandline flags
   google::ShutDownCommandLineFlags();
   // Make for great success
