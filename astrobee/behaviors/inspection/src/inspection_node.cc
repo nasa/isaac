@@ -609,7 +609,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Skip command
       case isaac_msgs::InspectionGoal::SKIP:
       {
-        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size()) {
+        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size() - 1) {
           // Skip the current pose
           goal_counter_++;
           result.fsm_result = "Skipped pose";

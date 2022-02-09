@@ -158,59 +158,65 @@ void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
 
 // Inspection action feedback
 void FeedbackCallback(isaac_msgs::InspectionFeedbackConstPtr const& feedback) {
-  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b              ";
-  std::cout << "\r                                         "
-            << "\rFSM: " << feedback->state.fsm_event
-            << " -> " << feedback->state.fsm_state
-            << " (" << feedback->state.fsm_subevent
-            << " -> " << feedback->state.fsm_substate << ")"
-            << "   | Input: " << std::flush;
+  std::string s;
+  s = feedback->state.fsm_event
+    + " -> " + feedback->state.fsm_state
+    + " (" + feedback->state.fsm_subevent
+    + " -> " + feedback->state.fsm_substate + ")";
+  if (s.size() < 70) s.append(70 - s.size(), ' ');
+  std::cout << "\r" << s.substr(0, 70) << "|Input: " << std::flush;
 }
 
 // Inspection action result
 void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
   isaac_msgs::InspectionResultConstPtr const& result) {
-  std::cout << std::endl << "Result: ";
+  std::string s;
+  s = "\nResult: ";
   // Print general response code
   switch (code) {
   case ff_util::FreeFlyerActionState::Enum::SUCCESS:
-    std::cout << "[SUCCESS] ";
-    // If we get there then we have some response data
-    std::cout << result->fsm_result << " (Code " << result->response << ")";
-
-    if (FLAGS_anomaly) {
-      for (int i = 0; i < result->anomaly_result.size(); i++) {
-          std::cout << "\n\tVent " << i <<" is " << result->anomaly_result[i].classifier_result;
-      }
-    }
-
-    if (FLAGS_geometry) {
-      for (int i = 0; i < result->inspection_result.size(); i++) {
-        switch (result->inspection_result[i]) {
-        case isaac_msgs::InspectionResult::PIC_ACQUIRED:
-          std::cout << "Pic " << i <<" was processed " << std::endl; break;
-        }
-      }
-    }
+    s += "[SUCCESS] ";
 
     break;
   case ff_util::FreeFlyerActionState::Enum::PREEMPTED:
-    std::cout << "[PREEMPT] ";   break;
+    s +=  "[PREEMPT] ";   break;
   case ff_util::FreeFlyerActionState::Enum::ABORTED:
-    std::cout << "[ABORTED] ";   break;
+    s +=  "[ABORTED] ";   break;
   case ff_util::FreeFlyerActionState::Enum::TIMEOUT_ON_CONNECT:
-    std::cout << "Action timed out on connect";        goto teardown;
+    std::cout << "\nResult: Action timed out on connect";        goto teardown;
   case ff_util::FreeFlyerActionState::Enum::TIMEOUT_ON_ACTIVE:
-    std::cout << "Action timed out on active";         goto teardown;
+    std::cout << "\nResult: Action timed out on active";         goto teardown;
   case ff_util::FreeFlyerActionState::Enum::TIMEOUT_ON_RESPONSE:
-    std::cout << "Action timed out on response";       goto teardown;
+    std::cout << "\nResult: Action timed out on response";       goto teardown;
   case ff_util::FreeFlyerActionState::Enum::TIMEOUT_ON_DEADLINE:
-    std::cout << "Action timed out on deadline";       goto teardown;
+    std::cout << "\nResult: Action timed out on deadline";       goto teardown;
   }
+  // Check that result var is valid
+  if (result != nullptr) {
+    // If we get there then we have some response data
+    s += result->fsm_result + " (Code " + std::to_string(result->response) + ")";
+  }
+  // Limit line to the maximum amout of characters
+  if (s.size() < 71) s.append(71 - s.size(), ' ');
   // In the case we continue
   if (result->fsm_result != "Inspection Over") {
-    std::cout << "   | Input: " << std::flush;
+    s += "|Input: ";
+    std::cout << s << std::flush;
     return;
+  }
+  std::cout << s << std::flush;
+  if (FLAGS_anomaly) {
+    for (int i = 0; i < result->anomaly_result.size(); i++) {
+        std::cout << "\n\tVent " << i <<" is " << result->anomaly_result[i].classifier_result;
+    }
+  }
+
+  if (FLAGS_geometry) {
+    for (int i = 0; i < result->inspection_result.size(); i++) {
+      if (result->inspection_result[i] == isaac_msgs::InspectionResult::PIC_ACQUIRED) {
+        std::cout << "Pic " << i <<" was processed " << std::endl; break;
+      }
+    }
   }
 
   teardown:
@@ -274,31 +280,38 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
   while (!stopflag_ && ros::ok()) {
     std::string line, val;
     std::getline(std::cin, line);
-    std::string clear_line;
-    clear_line.append(100, ' ');
+    std::string s;
     try {
       switch (std::stoi(line)) {
         case 0:
-          std::cout << "\r Exiting" << clear_line << std::endl;
+          s = "\r Input: " + line + ") Exiting";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::endl;
           stopflag_ = true;
           break;
         case 1:
           FLAGS_pause = true;
           SendGoal(client);
-          std::cout << "\r Pausing" << clear_line << std::flush;
+          s = "\r Input: " + line + ") Pausing";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::flush;
           break;
         case 2:
           FLAGS_pause = false;
           FLAGS_resume = true;
           SendGoal(client);
-          std::cout << "\r Resuming" << clear_line << std::endl;
+          s = "\r Input: " + line + ") Resuming";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::endl;
           break;
         case 3:
           FLAGS_pause = false;
           FLAGS_resume = false;
           FLAGS_repeat = true;
           SendGoal(client);
-          std::cout << "\r Pausing and repeating pose (needs resume)" << clear_line << std::flush;
+          s = "\r Input: " + line + ") Pausing and repeating pose (needs resume)";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::flush;
           break;
         case 4:
           FLAGS_pause = false;
@@ -306,7 +319,9 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           FLAGS_repeat = false;
           FLAGS_skip = true;
           SendGoal(client);
-          std::cout << "\r Pausing and skipping pose (needs resume)" << clear_line << std::flush;
+          s = "\r Input: " + line + ") Pausing and skipping pose (needs resume)";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::flush;
           break;
         case 5:
           FLAGS_pause = false;
@@ -315,13 +330,22 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           FLAGS_skip = false;
           FLAGS_save = true;
           SendGoal(client);
-          std::cout << "\r Pausing and saving (needs resume)" << clear_line << std::flush;
+          s = "\r Input: " + line + ") Pausing and saving (needs resume)";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::flush;
           break;
         default:
-          std::cout << "\r Invalid option" << clear_line << std::endl;
+          s = "\r Input: " + line + ") Invalid option";
+          if (s.size() < 80) s.append(80 - s.size(), ' ');
+          std::cout << s << std::endl;
       }
     } catch (const std::invalid_argument&) {
-      continue;    }
+      if (line != "") {
+        s = "\r Input: " + line + ") Invalid option";
+        if (s.size() < 80) s.append(80 - s.size(), ' ');
+        std::cout << s << std::endl;
+      }
+    }
   }
   return;
 }
