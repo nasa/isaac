@@ -158,11 +158,13 @@ void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
 
 // Inspection action feedback
 void FeedbackCallback(isaac_msgs::InspectionFeedbackConstPtr const& feedback) {
+  std::cout << "\b\b\b\b\b\b\b\b\b\b\b\b\b\b              ";
   std::cout << "\r                                         "
             << "\rFSM: " << feedback->state.fsm_event
             << " -> " << feedback->state.fsm_state
             << " (" << feedback->state.fsm_subevent
-            << " -> " << feedback->state.fsm_substate << ")" << std::flush;
+            << " -> " << feedback->state.fsm_substate << ")"
+            << "   | Input: " << std::flush;
 }
 
 // Inspection action result
@@ -173,9 +175,12 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
   switch (code) {
   case ff_util::FreeFlyerActionState::Enum::SUCCESS:
     std::cout << "[SUCCESS] ";
+    // If we get there then we have some response data
+    std::cout << result->fsm_result << " (Code " << result->response << ")";
+
     if (FLAGS_anomaly) {
       for (int i = 0; i < result->anomaly_result.size(); i++) {
-          std::cout << "Vent " << i <<" is " << result->anomaly_result[i].classifier_result << std::endl;
+          std::cout << "\n\tVent " << i <<" is " << result->anomaly_result[i].classifier_result;
       }
     }
 
@@ -190,7 +195,7 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
 
     break;
   case ff_util::FreeFlyerActionState::Enum::PREEMPTED:
-    std::cout << "[PREEMPT] ";               break;
+    std::cout << "[PREEMPT] ";   break;
   case ff_util::FreeFlyerActionState::Enum::ABORTED:
     std::cout << "[ABORTED] ";   break;
   case ff_util::FreeFlyerActionState::Enum::TIMEOUT_ON_CONNECT:
@@ -202,16 +207,16 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
   case ff_util::FreeFlyerActionState::Enum::TIMEOUT_ON_DEADLINE:
     std::cout << "Action timed out on deadline";       goto teardown;
   }
-  // If we get there then we have some response data
-  std::cout << result->fsm_result
-            << " (Code " << result->response << ")" << std::endl;
-teardown:
-  std::cout << std::endl;
-  // In the case we must shutdown
-  if (result->fsm_result == "Inspection Over") {
+  // In the case we continue
+  if (result->fsm_result != "Inspection Over") {
+    std::cout << "   | Input: " << std::flush;
+    return;
+  }
+
+  teardown:
+    std::cout << std::endl;
     stopflag_ = true;
     ros::shutdown();
-  }
 }
 
 // Send the inspection goal to the server
@@ -269,49 +274,51 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
   while (!stopflag_ && ros::ok()) {
     std::string line, val;
     std::getline(std::cin, line);
+    std::string clear_line;
+    clear_line.append(100, ' ');
     try {
       switch (std::stoi(line)) {
         case 0:
-          std::cout << "Input: " << line << " - Exiting" << std::endl;
+          std::cout << "\r Exiting" << clear_line << std::endl;
           stopflag_ = true;
           break;
         case 1:
-          std::cout << "Input: " << line << " - Pausing" << std::endl;
           FLAGS_pause = true;
           SendGoal(client);
+          std::cout << "\r Pausing" << clear_line << std::flush;
           break;
         case 2:
-          std::cout << "Input: " << line << " - Resuming" << std::endl;
           FLAGS_pause = false;
           FLAGS_resume = true;
           SendGoal(client);
+          std::cout << "\r Resuming" << clear_line << std::endl;
           break;
         case 3:
-          std::cout << "Input: " << line << " - Repeating" << std::endl;
           FLAGS_pause = false;
           FLAGS_resume = false;
           FLAGS_repeat = true;
           SendGoal(client);
+          std::cout << "\r Pausing and repeating pose (needs resume)" << clear_line << std::flush;
           break;
         case 4:
-          std::cout << "Input: " << line << " - Skipping" << std::endl;
           FLAGS_pause = false;
           FLAGS_resume = false;
           FLAGS_repeat = false;
           FLAGS_skip = true;
           SendGoal(client);
+          std::cout << "\r Pausing and skipping pose (needs resume)" << clear_line << std::flush;
           break;
         case 5:
-          std::cout << "Input: " << line << " - Saving" << std::endl;
           FLAGS_pause = false;
           FLAGS_resume = false;
           FLAGS_repeat = false;
           FLAGS_skip = false;
           FLAGS_save = true;
           SendGoal(client);
+          std::cout << "\r Pausing and saving (needs resume)" << clear_line << std::flush;
           break;
         default:
-          std::cout << "Invalid option" << std::endl;
+          std::cout << "\r Invalid option" << clear_line << std::endl;
       }
     } catch (const std::invalid_argument&) {
       continue;    }
