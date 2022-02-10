@@ -284,6 +284,8 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
     try {
       switch (std::stoi(line)) {
         case 0:
+          FLAGS_pause = true;
+          SendGoal(client);
           s = "\r Input: " + line + ") Exiting";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
           std::cout << s << std::endl;
