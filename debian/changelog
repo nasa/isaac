@@ -1,4 +1,12 @@
-isaac (0.2.3) UNRELEASED; urgency=medium
+isaac (0.2.4) testing; urgency=medium
+
+  * Inspection tool improvements
+  * Better CI
+  * Small bug fixes
+
+ -- Marina Moreira <mgouveia@ubuntu>  Fri, 11 Feb 2022 13:57:38 -0800
+
+isaac (0.2.3) testing; urgency=medium
 
   * Panorama picture taking mode supported
   * Cargo transport simulation support
