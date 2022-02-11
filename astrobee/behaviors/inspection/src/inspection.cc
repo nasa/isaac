@@ -562,19 +562,54 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
     if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= 2 * EPS;  // Go through all the points
 
     // Generate all the pan/tilt values
-    for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
-      for (double pan = pan_min_; pan <= pan_max_ + EPS; pan += k_pan) {
-        ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
-        panorama_rotation.setRPY(0, tilt, pan);
-        panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
-        point.orientation.x = panorama_rotation.x();
-        point.orientation.y = panorama_rotation.y();
-        point.orientation.z = panorama_rotation.z();
-        point.orientation.w = panorama_rotation.w();
-        panorama_relative.poses.push_back(point);
-        if ((tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) || (tilt < PI/2 + EPS && tilt > PI/2 - EPS))
-          break;
+    int i = 0;
+    bool top_view = false;
+    bool bottom_view = false;
+    for (double pan = pan_min_; pan <= pan_max_ + EPS; pan += k_pan) {
+      // zig zag through views
+      if (i%2 == 0) {
+        for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
+          // Avoid taking multiple pictures at top and bottom
+          if (tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) {
+            if (bottom_view) {continue;} else {bottom_view = true;}
+          }
+          if (tilt < PI/2 + EPS && tilt > PI/2 - EPS) {
+            if (top_view) {continue;} else {top_view = true;}
+          }
+
+          ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
+          panorama_rotation.setRPY(0, tilt, pan);
+          panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
+          point.orientation.x = panorama_rotation.x();
+          point.orientation.y = panorama_rotation.y();
+          point.orientation.z = panorama_rotation.z();
+          point.orientation.w = panorama_rotation.w();
+          panorama_relative.poses.push_back(point);
+        }
+      } else {
+        for (double tilt = tilt_max_; tilt >= tilt_min_ - EPS; tilt -= k_tilt) {
+          // Avoid taking multiple pictures at top and bottom
+          if (tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) {
+            if (bottom_view) {continue;} else {bottom_view = true;}
+          }
+          if (tilt < PI/2 + EPS && tilt > PI/2 - EPS) {
+            if (top_view) {continue;} else {top_view = true;}
+          }
+
+
+          ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
+          panorama_rotation.setRPY(0, tilt, pan);
+          panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
+          point.orientation.x = panorama_rotation.x();
+          point.orientation.y = panorama_rotation.y();
+          point.orientation.z = panorama_rotation.z();
+          point.orientation.w = panorama_rotation.w();
+          panorama_relative.poses.push_back(point);
+          // if ((tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) || (tilt < PI/2 + EPS && tilt > PI/2 - EPS))
+          //   break;
+        }
       }
+      i++;
     }
 
     // Go through all the panorama points
