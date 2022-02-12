@@ -11,6 +11,8 @@ validation logic, and two of the test cases are candidates for the configuration
 test during ISAAC ISS activities.
 """
 
+from __future__ import print_function
+
 import math
 
 import numpy as np
