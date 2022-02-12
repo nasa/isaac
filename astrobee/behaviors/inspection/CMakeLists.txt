@@ -61,6 +61,7 @@ include_directories(
 add_library(inspection
   src/inspection_node.cc
   src/inspection.cc
+  src/pano.cc
 )
 add_dependencies(inspection ${catkin_EXPORTED_TARGETS})
 target_link_libraries(inspection ${catkin_LIBRARIES})
