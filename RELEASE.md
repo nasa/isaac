@@ -1,5 +1,11 @@
 # Releases
 
+## Release 0.2.4
+
+  * Inspection tool improvements
+  * Better CI
+  * Small bug fixes
+
 ## Release 0.2.3
 
   * Panorama picture taking mode supported

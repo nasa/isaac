@@ -71,10 +71,12 @@
        name="ROSCONSOLE_CONFIG_FILE" value="$(find astrobee)/resources/logging.config"/>
   <arg if="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
        name="ISAAC_CONFIG_DIR" value="$(find isaac)/config" />
+  <arg unless="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
+       name="ISAAC_CONFIG_DIR" value="$(optenv ISAAC_CONFIG_DIR)" />
   <arg if="$(eval optenv('ISAAC_RESOURCE_DIR','')=='')"
        name="ISAAC_RESOURCE_DIR" value="$(find isaac)/resources" />
-
-
+  <arg unless="$(eval optenv('ISAAC_RESOURCE_DIR','')=='')"
+       name="ISAAC_RESOURCE_DIR" value="$(optenv ISAAC_RESOURCE_DIR)" />
 
   <!-- Launch the platform on its own namespace -->
   <group ns="/$(arg ns)">
