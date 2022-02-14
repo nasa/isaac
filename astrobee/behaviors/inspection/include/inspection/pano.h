@@ -23,11 +23,15 @@
 #include <cstdint>
 #include <vector>
 
+#define RAD_FROM_DEG(x) ((x) * M_PI / 180.0)
+#define DEG_FROM_RAD(x) ((x) * 180.0 / M_PI)
+
 namespace inspection {
 
 class PanoAttitude {
  public:
-  double pan, tilt;  // radians
+  double pan;  // radians, 0=forward, increases to the right
+  double tilt;  // radians, 0=forward, increases upward
   int16_t iy;  // row index, 0=bottom row
   int16_t ix;  // column index, 0=left column
 
@@ -40,9 +44,18 @@ class PanoAttitude {
 };
 
 void pano_orientations(std::vector<PanoAttitude>* orientations_out,
+                       int* nrows_out,
+                       int* ncols_out,
                        double pan_radius, double tilt_radius,
                        double h_fov, double v_fov,
                        double overlap, double attitude_tolerance);
+
+void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
+                        int* nrows_out,
+                        int* ncols_out,
+                        double pan_radius, double tilt_radius,
+                        double h_fov, double v_fov,
+                        double overlap, double attitude_tolerance);
 
 }  // namespace inspection
 

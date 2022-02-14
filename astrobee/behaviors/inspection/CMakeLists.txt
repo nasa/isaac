@@ -79,6 +79,12 @@ add_dependencies(sci_cam_tool ${catkin_EXPORTED_TARGETS})
 target_link_libraries(sci_cam_tool
   gflags ${catkin_LIBRARIES})
 
+## Declare a C++ executable: test_pano
+add_executable(test_pano tools/test_pano.cc)
+add_dependencies(test_pano ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_pano
+  inspection gflags ${catkin_LIBRARIES})
+
 #############
 ## Install ##
 #############
@@ -116,4 +122,6 @@ install(FILES nodelet_plugins.xml
 install(TARGETS inspection_tool
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(TARGETS sci_cam_tool
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(TARGETS test_pano
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

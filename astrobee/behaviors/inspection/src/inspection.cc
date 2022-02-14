@@ -550,6 +550,7 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
     float h_fov = 2 * atan(W / (2 * fx));
     float v_fov = 2 * atan(H / (2 * fy));
 
+    int nrows, ncols;
     std::vector<PanoAttitude> orientations;
     // pano_orientations() doesn't support panos with non-zero center (not needed)
     assert(pan_min_ == -pan_max_);
@@ -557,7 +558,7 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
     double attitude_tolerance = 0;  // dummy, discuss this later
 
     // generate coverage pattern pan/tilt values
-    pano_orientations(&orientations,
+    pano_orientations(&orientations, &nrows, &ncols,
                       tilt_max_, pan_max_,
                       h_fov, v_fov,
                       overlap_, attitude_tolerance);
