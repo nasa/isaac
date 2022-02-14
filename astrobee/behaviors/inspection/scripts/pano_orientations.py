@@ -288,6 +288,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    level = logging.INFO if args.verbose else logging.WARN
-    logging.basicConfig(level=level, format="%(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     do_cases(args.in_csv)
