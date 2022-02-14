@@ -33,7 +33,7 @@ At this point you need to decide where you'd like to put the ISAAC workspace and
 
 First, clone the flight software repository:
 
-    git clone --recursive ssh://git@babelfish.arc.nasa.gov:7999/isaac/isaac.git \
+    git clone --recursive https://github.com/nasa/isaac.git \
     --branch develop $ISAAC_WS/src/
 
 Checkout the submodule:
@@ -91,18 +91,18 @@ Cross-compiling isaac
 ---------
 
 
-To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions.
+To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that ASTROBEE_WS must be defined.
 
 A new catkin profile should be made to retain the configurations and easily switch between normal build.
     
     catkin profile add cross
     catkin profile set cross
-    catkin config --extend $ARMHF_CHROOT_DIR/opt/astrobee \
-                  --build-space $ARMHF_CHROOT_DIR/home/astrobee/isaac/build \
-                  --install-space $ARMHF_CHROOT_DIR/opt/isaac \
-                  --devel-space $ARMHF_CHROOT_DIR/home/astrobee/isaac/devel \
-                  --log-space $ARMHF_CHROOT_DIR/home/astrobee/isaac/logs \
-                  --whitelist isaac_astrobee_description isaac_util isaac_msgs inspection isaac_hw_msgs wifi isaac gs_action_helper \
+    catkin config --extend $ASTROBEE_WS/armhf/opt/astrobee \
+                  --build-space armhf/build \
+                  --install-space armhf/opt/isaac \
+                  --devel-space armhf/devel \
+                  --log-space armhf/logs \
+                  --whitelist isaac_astrobee_description isaac_util isaac_msgs inspection cargo isaac_hw_msgs wifi isaac gs_action_helper \
                   --install \
                   --cmake-args -DCMAKE_TOOLCHAIN_FILE=$ISAAC_WS/src/scripts/build/isaac_cross.cmake \
                     -DARMHF_CHROOT_DIR=$ARMHF_CHROOT_DIR

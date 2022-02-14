@@ -41,26 +41,24 @@ override_dh_auto_configure:
 	catkin profile add debian --force && \
 	catkin profile set debian && \
     catkin config \
-    	--extend $(ARMHF_CHROOT_DIR)/opt/astrobee \
-        --build-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/build \
-        --install-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/opt/isaac \
-        --devel-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/devel \
-        --log-space $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp/logs \
-		--whitelist isaac_astrobee_description isaac_util isaac_msgs inspection isaac_hw_msgs wifi isaac gs_action_helper \
+        --extend $(ASTROBEE_WS)/armhf/opt/astrobee \
+        --build-space debian/build \
+        --install-space src/debian/tmp/opt/isaac \
+        --devel-space debian/devel \
+        --log-space debian/logs \
+		--whitelist isaac_astrobee_description isaac_util isaac_msgs inspection cargo isaac_hw_msgs wifi isaac gs_action_helper \
 		--install \
 		--cmake-args \
 			-DCMAKE_TOOLCHAIN_FILE=$(CMAKE_TOOLCHAIN_FILE) \
 			-DARMHF_CHROOT_DIR=$(ARMHF_CHROOT_DIR) \
-			-DARMHF_TOOLCHAIN=$(ARMHF_TOOLCHAIN) && \
-	catkin clean -y --force
+			-DARMHF_TOOLCHAIN=$(ARMHF_TOOLCHAIN)
 
 override_dh_auto_build: ;
 
 # the install command is already invoked in the build
 override_dh_auto_install:
 	cd .. && \
-	catkin build && \
-	rsync --remove-source-files -azh $(ARMHF_CHROOT_DIR)/home/astrobee/isaac/tmp src/debian
+	catkin build
 
 # we don't test
 override_dh_auto_test: ;

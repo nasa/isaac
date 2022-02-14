@@ -178,7 +178,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           }
         }
         // Inspection is over, return
-        Result(RESPONSE::SUCCESS);
+        Result(RESPONSE::SUCCESS, "Inspection Over");
         return STATE::WAITING;
       });
     // [5]
@@ -192,7 +192,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           return STATE::VOL_INSPECTION;
         }
         // Inspection is over, return
-        Result(RESPONSE::SUCCESS);
+        Result(RESPONSE::SUCCESS, "Inspection Over");
         Dock("DOCK");
         return STATE::RETURN_INSPECTION;
       });
@@ -247,7 +247,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   void Initialize(ros::NodeHandle* nh) {
     nh_ = nh;
     // Set the config path to ISAAC
-    char *path = getenv("ISAAC_CONFIG_DIR");
+    char *path = getenv("CUSTOM_CONFIG_DIR");
     if (path != NULL)
       cfg_.SetPath(path);
     // Grab some configuration parameters for this node from the LUA config reader
@@ -515,7 +515,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
 
     // Allow image to stabilize
-    ros::Duration(2.0).sleep();
+    ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
     // Signal an imminent sci cam image
     sci_cam_req_ = true;
@@ -556,7 +556,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // The sci cam image was received
     if (sci_cam_req_) {
       sci_cam_req_ = false;
-      result_.geometry_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
+      result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
@@ -584,7 +584,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     ROS_DEBUG_STREAM("IResultCallback()");
     // Fill in the result message with the result
     if (result != nullptr)
-      result_.vent_result.push_back(result->response);
+      result_.anomaly_result.push_back(result->anomaly_result);
     else
       ROS_ERROR_STREAM("Invalid result received Image Analysis");
     return fsm_.Update(NEXT_INSPECT);
@@ -595,9 +595,13 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // A new arm action has been called
   void GoalCallback(isaac_msgs::InspectionGoalConstPtr const& goal) {
     if (!goal_.inspect_poses.poses.empty()) {
+      isaac_msgs::InspectionResult result;
       switch (goal->command) {
       // Pause command
       case isaac_msgs::InspectionGoal::PAUSE:
+          result.fsm_result = "Pausing";
+          result.response = RESPONSE::SUCCESS;
+          server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
         return fsm_.Update(GOAL_PAUSE);
       // Resume command
       case isaac_msgs::InspectionGoal::RESUME:
@@ -605,25 +609,24 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Skip command
       case isaac_msgs::InspectionGoal::SKIP:
       {
-        isaac_msgs::InspectionResult result;
-        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size()) {
+        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size() - 1) {
           // Skip the current pose
           goal_counter_++;
-
           result.fsm_result = "Skipped pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
+          return fsm_.Update(GOAL_PAUSE);
         } else {
           result.fsm_result = "Nothing to skip";
           result.response = RESPONSE::INVALID_COMMAND;
           server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
+          return fsm_.Update(GOAL_PAUSE);
         }
         return;
       }
       // Repeat last executed step command
       case isaac_msgs::InspectionGoal::REPEAT:
       {
-        isaac_msgs::InspectionResult result;
         if (!goal_.inspect_poses.poses.empty() && goal_counter_ > 0) {
           // Go back to the last pose
           goal_counter_--;
@@ -631,35 +634,49 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           result.fsm_result = "Will repeat last pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
+          return fsm_.Update(GOAL_PAUSE);
         } else {
           result.fsm_result = "Nothing to repeat";
           result.response = RESPONSE::INVALID_COMMAND;
           server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
+          return fsm_.Update(GOAL_PAUSE);
         }
         return;
       }
       // Save command
       case isaac_msgs::InspectionGoal::SAVE:
-        std::ofstream myfile;
-        std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
-        myfile.open(path);
-        for (int i = 0; i < goal_.inspect_poses.poses.size(); i++) {
-          myfile << goal_.inspect_poses.poses[i].position.x << " "
-                 << goal_.inspect_poses.poses[i].position.y << " "
-                 << goal_.inspect_poses.poses[i].position.z << " "
-                 << goal_.inspect_poses.poses[i].orientation.x << " "
-                 << goal_.inspect_poses.poses[i].orientation.y << " "
-                 << goal_.inspect_poses.poses[i].orientation.z << " "
-                 << goal_.inspect_poses.poses[i].orientation.w<< "\n";
+        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size()) {
+          std::ofstream myfile;
+          std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
+          myfile.open(path);
+          for (int i = goal_counter_; i < goal_.inspect_poses.poses.size(); i++) {
+            myfile << goal_.inspect_poses.poses[i].position.x << " "
+                   << goal_.inspect_poses.poses[i].position.y << " "
+                   << goal_.inspect_poses.poses[i].position.z << " "
+                   << goal_.inspect_poses.poses[i].orientation.x << " "
+                   << goal_.inspect_poses.poses[i].orientation.y << " "
+                   << goal_.inspect_poses.poses[i].orientation.z << " "
+                   << goal_.inspect_poses.poses[i].orientation.w << "\n";
+          }
+          myfile.close();
+          result.fsm_result = "Saved";
+          result.response = RESPONSE::SUCCESS;
+          server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
+          return fsm_.Update(GOAL_PAUSE);
+        } else {
+          NODELET_ERROR_STREAM("Nothing to save");
+          result.fsm_result = "Nothing to save";
+          result.response = RESPONSE::FAILED;
+          server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
+          return fsm_.Update(GOAL_PAUSE);
         }
-        myfile.close();
         return;
       }
     }
     // Save new goal
     goal_ = *goal;
-    result_.vent_result.clear();
-    result_.geometry_result.clear();
+    result_.anomaly_result.clear();
+    result_.inspection_result.clear();
     result_.picture_time.clear();
     goal_counter_ = 0;
     ROS_DEBUG_STREAM("RESET COUNTER");

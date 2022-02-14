@@ -321,7 +321,7 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
   void Initialize(ros::NodeHandle* nh) {
     nh_ = nh;
     // Set the config path to ISAAC
-    char *path = getenv("ISAAC_CONFIG_DIR");
+    char *path = getenv("CUSTOM_CONFIG_DIR");
     if (path != NULL)
       cfg_.SetPath(path);
     // Grab some configuration parameters for this node from the LUA config reader

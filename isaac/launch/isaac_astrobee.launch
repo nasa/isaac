@@ -69,11 +69,14 @@
        name="ASTROBEE_RESOURCE_DIR" value="$(find astrobee)/resources" />
   <env if="$(eval optenv('ROSCONSOLE_CONFIG_FILE','')=='')"
        name="ROSCONSOLE_CONFIG_FILE" value="$(find astrobee)/resources/logging.config"/>
-  <env if="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
+  <arg if="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
        name="ISAAC_CONFIG_DIR" value="$(find isaac)/config" />
-  <env if="$(eval optenv('ISAAC_RESOURCE_DIR','')=='')"
+  <arg unless="$(eval optenv('ISAAC_CONFIG_DIR','')=='')"
+       name="ISAAC_CONFIG_DIR" value="$(optenv ISAAC_CONFIG_DIR)" />
+  <arg if="$(eval optenv('ISAAC_RESOURCE_DIR','')=='')"
        name="ISAAC_RESOURCE_DIR" value="$(find isaac)/resources" />
-
+  <arg unless="$(eval optenv('ISAAC_RESOURCE_DIR','')=='')"
+       name="ISAAC_RESOURCE_DIR" value="$(optenv ISAAC_RESOURCE_DIR)" />
 
   <!-- Launch the platform on its own namespace -->
   <group ns="/$(arg ns)">
@@ -177,6 +180,9 @@
       <!-- node pkg="astrobee" type="check_env.sh" name="mlp_check_env" output="screen" -->
 
     </group>
+
+    <env name="CUSTOM_CONFIG_DIR" value="$(arg ISAAC_CONFIG_DIR)" />
+    <env name="CUSTOM_RESOURCE_DIR" value="$(arg ISAAC_RESOURCE_DIR)" />
 
     <!-- ILP --> 
     <group unless="$(eval arg('ilp')=='disabled')">

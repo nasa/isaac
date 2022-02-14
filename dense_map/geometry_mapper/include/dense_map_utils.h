@@ -41,15 +41,25 @@
 
 namespace dense_map {
 
-const int NUM_SCALAR_PARAMS = 1;
-const int NUM_OPT_CTR_PARAMS = 2;  // optical center in x and y
-const int NUM_RESIDUALS = 2;       // Same as pixel size
-const int NUM_XYZ_PARAMS = 3;
-const int NUM_RIGID_PARAMS = 7;  // (quaternion (4) + translation (3))
+const int NUM_SCALAR_PARAMS  = 1;  // Used to float single-value params // NOLINT
+const int NUM_OPT_CTR_PARAMS = 2;  // optical center in x and y         // NOLINT
+const int NUM_PIX_PARAMS     = 2;                                       // NOLINT
+const int NUM_XYZ_PARAMS     = 3;                                       // NOLINT
+const int NUM_RIGID_PARAMS   = 7;  // quaternion (4) + translation (3)  // NOLINT
+const int NUM_AFFINE_PARAMS  = 12; // 3x3 matrix (9) + translation (3)  // NOLINT
 
 // A  function to split a string like 'optical_center focal_length' into
 // its two constituents.
-void parse_intrinsics_to_float(std::string const& intrinsics_to_float, std::set<std::string>& intrinsics_to_float_set);
+void parse_intrinsics_to_float(std::string const& intrinsics_to_float,
+                                 std::set<std::string>& intrinsics_to_float_set);
+
+// A  function to split a string like 'haz_cam sci_cam' into
+// its two constituents and validate against the list of known cameras.
+void parse_extrinsics_to_float(std::vector<std::string> const& cam_names,
+                               std::string const& ref_cam_name,
+                               std::string const& depth_to_image_name,
+                               std::string const& extrinsics_to_float,
+                               std::set<std::string>& extrinsics_to_float_set);
 
 // Extract a rigid transform to an array of length NUM_RIGID_PARAMS
 void rigid_transform_to_array(Eigen::Affine3d const& aff, double* arr);
@@ -57,6 +67,12 @@ void rigid_transform_to_array(Eigen::Affine3d const& aff, double* arr);
 // Convert an array of length NUM_RIGID_PARAMS to a rigid
 // transform. Normalize the quaternion to make it into a rotation.
 void array_to_rigid_transform(Eigen::Affine3d& aff, const double* arr);
+
+void affine_transform_to_array(Eigen::Affine3d const& aff, double* arr);
+void array_to_affine_transform(Eigen::Affine3d& aff, const double* arr);
+
+// Convert a string of values separated by spaces to a vector of doubles.
+std::vector<double> string_to_vector(std::string const& str);
 
 // Read a 4x4 pose matrix of doubles from disk
 void readPoseMatrix(cv::Mat& pose, std::string const& filename);
@@ -74,26 +90,45 @@ std::string matType(cv::Mat const& mat);
 
 // Read the transform from depth to given camera
 void readCameraTransform(config_reader::ConfigReader& config, std::string const transform_str,
-                         Eigen::MatrixXd& transform);
+                         Eigen::Affine3d& transform);
 
-// Read a bunch of transforms from the robot calibration file
-void readConfigFile(std::string const& navcam_to_hazcam_timestamp_offset_str,
-                    std::string const& scicam_to_hazcam_timestamp_offset_str,
-                    std::string const& hazcam_to_navcam_transform_str,
-                    std::string const& scicam_to_hazcam_transform_str, std::string const& navcam_to_body_transform_str,
-                    std::string const& hazcam_depth_to_image_transform_str, double& navcam_to_hazcam_timestamp_offset,
-                    double& scicam_to_hazcam_timestamp_offset, Eigen::MatrixXd& hazcam_to_navcam_trans,
-                    Eigen::MatrixXd& scicam_to_hazcam_trans, Eigen::MatrixXd& navcam_to_body_trans,
-                    Eigen::Affine3d& hazcam_depth_to_image_transform, camera::CameraParameters& nav_cam_params,
-                    camera::CameraParameters& haz_cam_params, camera::CameraParameters& sci_cam_params);
+// Read some transforms from the robot calibration file
+void readConfigFile                                                     // NOLINT
+(// Inputs                                                              // NOLINT
+ std::vector<std::string> const& cam_names,                             // NOLINT
+ std::string const& nav_cam_to_body_trans_str,                          // NOLINT
+ std::string const& haz_cam_depth_to_image_trans_str,                   // NOLINT
+ // Outputs                                                             // NOLINT
+ std::vector<camera::CameraParameters> & cam_params,                    // NOLINT
+ std::vector<Eigen::Affine3d>          & nav_to_cam_trans,              // NOLINT
+ std::vector<double>                   & nav_to_cam_timestamp_offset,   // NOLINT
+ Eigen::Affine3d                       & nav_cam_to_body_trans,         // NOLINT
+ Eigen::Affine3d                       & haz_cam_depth_to_image_trans); // NOLINT
+
+// Save some transforms from the robot calibration file. This has some very fragile
+// logic and cannot handle comments in the config file.
+void updateConfigFile                                                           // NOLINT
+(std::vector<std::string>              const& cam_names,                        // NOLINT
+ std::string                           const& haz_cam_depth_to_image_trans_str, // NOLINT
+ std::vector<camera::CameraParameters> const& cam_params,                       // NOLINT
+ std::vector<Eigen::Affine3d>          const& nav_to_cam_trans,                 // NOLINT
+ std::vector<double>                   const& nav_to_cam_timestamp_offset,      // NOLINT
+ Eigen::Affine3d                       const& haz_cam_depth_to_image_trans);    // NOLINT
 
 // Given two poses aff0 and aff1, and 0 <= alpha <= 1, do linear interpolation.
-Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0, Eigen::Affine3d const& aff1);
+Eigen::Affine3d linearInterp(double alpha, Eigen::Affine3d const& aff0,
+                               Eigen::Affine3d const& aff1);
 
 // Given a set of poses indexed by timestamp in an std::map, find the
 // interpolated pose at desired timestamp. This is efficient
 // only for very small maps. Else use the StampedPoseStorage class.
-bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses, Eigen::Affine3d& interp_pose);
+bool findInterpPose(double desired_time, std::map<double, Eigen::Affine3d> const& poses,
+                    Eigen::Affine3d& interp_pose);
+
+// Implement some heuristic to find the maximum rotation angle that can result
+// from applying the given transform. It is assumed that the transform is not
+// too different from the identity.
+double maxRotationAngle(Eigen::Affine3d const& T);
 
 // A class to store timestamped poses, implementing O(log(n)) linear
 // interpolation at a desired timestamp. For fast access, keep the
@@ -138,15 +173,6 @@ double fileNameToTimestamp(std::string const& file_name);
 // Create a directory unless it exists already
 void createDir(std::string const& dir);
 
-// Modify in-place the robot config file
-void update_config_file(bool update_cam1, std::string const& cam1_name,
-                        boost::shared_ptr<camera::CameraParameters> cam1_params, bool update_cam2,
-                        std::string const& cam2_name, boost::shared_ptr<camera::CameraParameters> cam2_params,
-                        bool update_depth_to_image_transform, Eigen::Affine3d const& depth_to_image_transform,
-                        bool update_extrinsics, Eigen::Affine3d const& cam2_to_cam1_transform,
-                        bool update_timestamp_offset, std::string const& cam1_to_cam2_timestamp_offset_str,
-                        double cam1_to_cam2_timestamp_offset);
-
 // A little holding structure for nav, sci, and haz poses
 struct CameraPoses {
   std::map<double, double> haz_depth_to_image_timestamps;
@@ -189,16 +215,6 @@ void pickTimestampsInBounds(std::vector<double> const& timestamps, double left_b
 
 // Must always have NUM_EXIF the last.
 enum ExifData { TIMESTAMP = 0, EXPOSURE_TIME, ISO, APERTURE, FOCAL_LENGTH, NUM_EXIF };
-
-// Triangulate two rays emanating from given undistorted and centered pixels
-Eigen::Vector3d TriangulatePair(double focal_length1, double focal_length2, Eigen::Affine3d const& world_to_cam1,
-                                Eigen::Affine3d const& world_to_cam2, Eigen::Vector2d const& pix1,
-                                Eigen::Vector2d const& pix2);
-
-// Triangulate n rays emanating from given undistorted and centered pixels
-Eigen::Vector3d Triangulate(std::vector<double> const& focal_length_vec,
-                            std::vector<Eigen::Affine3d> const& world_to_cam_vec,
-                            std::vector<Eigen::Vector2d> const& pix_vec);
 
 // A utility for saving a camera in a format ASP understands.
 // TODO(oalexan1): Expose the sci cam intrinsics rather than having

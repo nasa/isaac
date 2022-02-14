@@ -120,7 +120,8 @@ int main(int argc, char** argv) {
     // Maybe resize
     cv::Mat resized_image;
     if (FLAGS_scale < 1.0) {
-      cv::resize(*image_ptr, resized_image, cv::Size(), FLAGS_scale, FLAGS_scale, cv::INTER_AREA);
+      cv::resize(*image_ptr, resized_image, cv::Size(), FLAGS_scale, FLAGS_scale,
+                 cv::INTER_AREA);
       image_ptr = &resized_image;
     }
 

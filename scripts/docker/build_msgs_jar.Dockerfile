@@ -1,5 +1,3 @@
-#!/bin/bash
-#
 # Copyright (c) 2021, United States Government, as represented by the
 # Administrator of the National Aeronautics and Space Administration.
 #
@@ -18,20 +16,24 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# This will set up an Astrobee docker container using the non-NASA install instructions.
+# You must set the docker context to be the repository root directory
 
-if [ -n "$(git status --porcelain)" ]; then 
-  echo "You should not build Debians for a dirty source tree!"
-  echo "Make sure all your changes are committed AND pushed to the server..."
-  exit -1
-fi
+ARG REMOTE=isaac
+FROM ${REMOTE}/isaac:msgs-ubuntu16.04
 
-EXTRA_FLAGS="-b -a armhf"
-if [[ $* == *--config* ]]; then
-  EXTRA_FLAGS="-A"
-fi
+RUN apt-get update && apt-get install -y \
+  unzip \
+  libc6-dev-i386 \
+  lib32z1 \
+  python-wstool \
+  openjdk-8-jdk \
+  ros-kinetic-rosjava \
+  && rm -rf /var/lib/apt/lists/*
 
-pushd $DIR/../..
-export CMAKE_TOOLCHAIN_FILE=${DIR}/isaac_cross.cmake
-DEB_BUILD_OPTIONS="parallel=8" debuild -e ASTROBEE_WS -e ARMHF_CHROOT_DIR -e ARMHF_TOOLCHAIN -e CMAKE_TOOLCHAIN_FILE -e CMAKE_PREFIX_PATH -us -uc $EXTRA_FLAGS
-popd > /dev/null
+# Compile msg jar files, genjava_message_artifacts only works with bash
+RUN ["/bin/bash", "-c", "cd /src/msgs \
+  && catkin config \
+  && catkin build \
+  && . devel/setup.bash \
+  && genjava_message_artifacts --verbose -p ff_msgs ff_hw_msgs isaac_msgs isaac_hw_msgs"]

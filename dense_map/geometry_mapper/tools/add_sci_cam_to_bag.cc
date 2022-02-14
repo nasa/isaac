@@ -117,9 +117,32 @@ int main(int argc, char** argv) {
     std::string topic = m.getTopic();
     if (topic == FLAGS_sci_cam_topic) continue;
 
-    double timestamp = m.getTime().toSec();
-    if (beg_time < 0) beg_time = timestamp;
-    end_time = timestamp;
+    // If the current message is an image or a point cloud, get its
+    // header timestamp. That is a more reliable time than
+    // m.getTime(), which is the time the message got recorded, not
+    // when it got made.
+    double timestamp = -1.0;
+    sensor_msgs::Image::ConstPtr image_msg = m.instantiate<sensor_msgs::Image>();
+    if (image_msg) {
+      timestamp = image_msg->header.stamp.toSec();
+    } else {
+      sensor_msgs::CompressedImage::ConstPtr comp_image_msg =
+        m.instantiate<sensor_msgs::CompressedImage>();
+      if (comp_image_msg) {
+        timestamp = comp_image_msg->header.stamp.toSec();
+      } else {
+        sensor_msgs::PointCloud2::ConstPtr pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
+        if (pc_msg) {
+          timestamp = pc_msg->header.stamp.toSec();
+        }
+      }
+    }
+
+    if (timestamp > 0.0) {
+      // Record beg and end time from the headers
+      if (beg_time < 0) beg_time = timestamp;
+      end_time = timestamp;
+    }
 
     output_bag.write(m.getTopic(), m.getTime(), m);
   }

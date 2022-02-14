@@ -76,7 +76,7 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
  protected:
   void Initialize(ros::NodeHandle* nh) {
     // Set the config path to ISAAC
-    char *path = getenv("ISAAC_CONFIG_DIR");
+    char *path = getenv("CUSTOM_CONFIG_DIR");
     if (path != NULL)
       cfg_.SetPath(path);
     // Grab some configuration parameters for this node from the LUA config reader
@@ -127,22 +127,25 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
 
       // Result
       isaac_msgs::ImageInspectionResult result;
+      result.anomaly_result.classifier_options.push_back("Vent free");
+      result.anomaly_result.classifier_options.push_back("Vent has obstacle");
+      result.anomaly_result.classifier_options.push_back("Unknown result, is robot looking at vent?");
 
       switch (classification) {
         case vent_analysis_.vent_free_:
-          result.result = "Vent free";
-          result.response = RESPONSE::VENT_FREE;
+          result.anomaly_result.classifier_result = "Vent free";
+          result.response = RESPONSE::SUCCESS;
           break;
         case vent_analysis_.vent_blocked_:
-          result.result = "Vent has obstacle";
-          result.response = RESPONSE::VENT_OBSTRUCTED;
+          result.anomaly_result.classifier_result = "Vent has obstacle";
+          result.response = RESPONSE::SUCCESS;
           break;
         case vent_analysis_.vent_unknown_:
-          result.result = "Unknown result, is robot looking at vent?";
-          result.response = RESPONSE::INCONCLUSIVE;
+          result.anomaly_result.classifier_result = "Unknown result, is robot looking at vent?";
+          result.response = RESPONSE::SUCCESS;
           break;
         default:
-          result.result = "Image analysis failed";
+          result.anomaly_result.classifier_result = "Image analysis failed";
           result.response = RESPONSE::FAILED;
       }
       goal_.type = isaac_msgs::ImageInspectionGoal::NONE;

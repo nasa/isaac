@@ -133,7 +133,7 @@ class Inspection {
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   ros::Publisher pub_;
-  tf2::Quaternion vent_to_scicam_rot_;
+  tf2::Quaternion target_to_scicam_rot_;
 
   geometry_msgs::PoseArray points_;    // Vector containing inspection poses
 
