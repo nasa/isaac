@@ -29,7 +29,7 @@
  <tr style="height: 70px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">ISAAC
-   &#160;<span id="projectnumber">0.2.3</span>
+   &#160;<span id="projectnumber">0.2.4</span>
    </div>
    <div id="projectbrief">Flight software for the ISAAC project, adding functionality to the Astrobee robot, operating inside the International Space Station.</div>
   </td>
@@ -128,14 +128,14 @@ source devel/setup.bash
 </pre><p>If you are working in simulation only, then you're all done! The next steps are only for running ISAAC onboard Astrobee.</p>
 <h1><a class="anchor" id="autotoc_md11"></a>
 Cross-compiling isaac</h1>
-<p>To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions.</p>
+<p>To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that ASTROBEE_WS must be defined.</p>
 <p>A new catkin profile should be made to retain the configurations and easily switch between normal build. </p><pre class="fragment">catkin profile add cross
 catkin profile set cross
-catkin config --extend $ARMHF_CHROOT_DIR/opt/astrobee \
-              --build-space $ARMHF_CHROOT_DIR/home/astrobee/isaac/build \
-              --install-space $ARMHF_CHROOT_DIR/opt/isaac \
-              --devel-space $ARMHF_CHROOT_DIR/home/astrobee/isaac/devel \
-              --log-space $ARMHF_CHROOT_DIR/home/astrobee/isaac/logs \
+catkin config --extend $ASTROBEE_WS/armhf/opt/astrobee \
+              --build-space armhf/build \
+              --install-space armhf/opt/isaac \
+              --devel-space armhf/devel \
+              --log-space armhf/logs \
               --whitelist isaac_astrobee_description isaac_util isaac_msgs inspection cargo isaac_hw_msgs wifi isaac gs_action_helper \
               --install \
               --cmake-args -DCMAKE_TOOLCHAIN_FILE=$ISAAC_WS/src/scripts/build/isaac_cross.cmake \
