@@ -42,18 +42,17 @@ services:
   # --------------------------------------------------------------------------------------------------
   # Essential IDI Services
   # --------------------------------------------------------------------------------------------------
-  idi_frontend:
+  iui_frontend:
     # This service serves the static content that represents
     # the frontend ISAAC data interface.
     #
-    image: isaac_data_interface_frontend
-    build: "${IDI_PATH:-.}/frontend"
-    hostname: idi_frontend
-    container_name: idi_frontend
+    image: ${REMOTE}isaac_user_interface_frontend
+    hostname: iui_frontend
+    container_name: iui_frontend
     ports:
       - "8080:8080"
     depends_on:
-      - idi_backend
+      - iui_backend
       - rosbridge
     networks:
       - isaac
@@ -62,35 +61,34 @@ services:
     # volumes:
     #   - "./frontend:/app:ro"
 
-  idi_backend:
+  iui_backend:
     # This service serves the front-end by providing it with
     # historical telemetry that it retrieves from ROS bridge.
     #
-    image: isaac_data_interface_backend
-    build: "${IDI_PATH:-.}/backend"
-    hostname: idi_backend
-    container_name: idi_backend
+    image: ${REMOTE}isaac_user_interface_backend
+    hostname: iui_backend
+    container_name: iui_backend
     command: python /main.py
     volumes:
-      - "${IDI_PATH:-.}/config.json:/config.json:ro"
+      - "${IUI_PATH:-.}/config.json:/config.json:ro"
     depends_on:
       - rosmaster
       - rosbridge
-      - idi_arangodb
+      - iui_arangodb
     ports:
       - "9091:9091"
     networks:
       - isaac
     links:
-      - idi_arangodb
+      - iui_arangodb
 
-  idi_arangodb:
+  iui_arangodb:
     # This service provides a database for the backend. The
     # backend uses this database to store ROS messages in JSON format.
     #
     image: arangodb:latest
-    hostname: idi_arangodb
-    container_name: idi_arangodb
+    hostname: iui_arangodb
+    container_name: iui_arangodb
     environment:
       ARANGO_ROOT_PASSWORD: isaac
     ports:
@@ -108,13 +106,7 @@ services:
     # For more info, see:
     # http://wiki.ros.org/rosbridge_suite
     #
-    image: isaac_data_interface_rosbridge
-    build:
-      context: "${IDI_PATH:-.}/rosbridge"
-      args:
-        UBUNTU_VERSION: '${UBUNTU_VERSION}'
-        ROS_VERSION: '${ROS_VERSION}'
-        PYTHON: '${PYTHON}'
+    image: ${REMOTE}isaac_user_interface_rosbridge
     hostname: rosbridge
     container_name: rosbridge
     entrypoint: "/ros_entrypoint.sh"
@@ -130,87 +122,6 @@ services:
       isaac:
         ipv4_address: 172.19.0.8
 
-  rosvideo:
-    # This service runs a web video server that will efficiently
-    # publish a stream of images from a ROS topic that is set to
-    # publish ROS messages of the type sensor_msgs/Image
-    #
-    # For more info, see:
-    # http://wiki.ros.org/web_video_server
-    #
-    image: isaac_data_interface_rosvideo
-    build:
-      context: "${IDI_PATH:-.}/rosvideo"
-      args:
-        UBUNTU_VERSION: '${UBUNTU_VERSION}'
-        ROS_VERSION: '${ROS_VERSION}'
-        PYTHON: '${PYTHON}'
-    hostname: rosvideo
-    container_name: rosvideo
-    entrypoint: "/ros_entrypoint.sh"
-    command: "rosrun web_video_server web_video_server"
-    expose:
-      - 8080
-    depends_on:
-      - rosmaster
-      - rosbridge
-    environment:
-      - ROS_MASTER_URI=http://rosmaster:11311
-      - ROS_IP=172.19.0.9
-    networks:
-      isaac:
-        ipv4_address: 172.19.0.9
-
-  idi_transformers:
-    # This service is the master of meshes: it subscribes to these
-    # three ROS topics:
-    # 1. /ism/sci_cam/img
-    # 2. /ism/sci_cam/obj
-    # 3. /ism/sci_cam/mtl
-    # When it recieves a complete mesh from all three topics, it
-    # assembles them and creates a GLTF file. Then it publishes on
-    # the following ROS topic to let the IDI frontend know that
-    # a new mesh is available.
-    # 1. /mapper_gltf
-    #
-    image: isaac_data_interface_transformers
-    build: 
-      context: "${IDI_PATH:-.}/transformers"
-      args:
-        UBUNTU_VERSION: '${UBUNTU_VERSION}'
-        ROS_VERSION: '${ROS_VERSION}'
-        PYTHON: '${PYTHON}'
-    hostname: idi_transformers
-    container_name: idi_transformers
-    command: /transformers/run.sh
-    depends_on:
-      - rosmaster
-    environment:
-      - ROS_MASTER_URI=http://rosmaster:11311
-      - ROS_IP=172.19.0.7
-    networks:
-      isaac:
-        ipv4_address: 172.19.0.7
-
-  idi_notebook:
-    # Launches analyst notebook
-    #
-    image: isaac_data_interface_notebook
-    build: "${IDI_PATH:-.}/notebook"
-    hostname: idi_notebook
-    container_name: idi_notebook
-    ports:
-      - "8888:8888"
-    environment:
-      - JUPYTER_TOKEN=isaac
-      - ROS_MASTER_URI=http://rosmaster:11311
-    depends_on:
-      - rosmaster
-    volumes:
-      - ${IDI_PATH:-.}/notebook/workspace:/home/jovyan/workspace/
-    networks:
-      - isaac
-    command: "start-notebook.sh"
 
 # ----------------------------------------------------------------------------------------------------
 # Docker Compose Volumes

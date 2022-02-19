@@ -47,3 +47,7 @@ tags
 # Folders
 doc/html
 doc/latex
+analyst/workspace/.ipython
+analyst/workspace/.jupyter
+analyst/workspace/.local
+analyst/workspace/.ipynb_checkpoints

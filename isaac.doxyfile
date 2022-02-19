@@ -836,7 +836,7 @@ WARN_LOGFILE           =
 
 INPUT                  = README.md \
                          INSTALL.md \
-                         DEMO_INSTALL.md \
+                         scripts \
                          isaac \
                          astrobee \
                          dense_map \

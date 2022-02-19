@@ -1,0 +1,20 @@
+version: "2.1"
+services:
+
+
+  analyst_notebook:
+    # Launches analyst notebook
+    #
+    image: jupyter/scipy-notebook
+    hostname: isaac_notebook
+    container_name: isaac_notebook
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_TOKEN=isaac
+      - ROS_MASTER_URI=http://rosmaster:11311
+    depends_on:
+      - iui_arangodb
+    volumes:
+      - ${ISAAC_PATH:-.}/analyst/workspace:/home/jovyan/
+    command: "start-notebook.sh"
