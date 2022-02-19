@@ -33,7 +33,9 @@ class TestCase {
   std::string label;
   double pan_radius_degrees, tilt_radius_degrees;
   double h_fov_degrees, v_fov_degrees;
-  double overlap, attitude_tolerance_degrees;
+  double overlap;
+  double plan_attitude_tolerance_degrees;
+  double test_attitude_tolerance_degrees;
 };
 
 std::string read_string(std::istream* in) {
@@ -56,7 +58,8 @@ TestCase read_test_case(std::istream* in) {
   result.h_fov_degrees = read_double(in);
   result.v_fov_degrees = read_double(in);
   result.overlap = read_double(in);
-  result.attitude_tolerance_degrees = read_double(in);
+  result.plan_attitude_tolerance_degrees = read_double(in);
+  result.test_attitude_tolerance_degrees = read_double(in);
   return result;
 }
 
@@ -86,20 +89,13 @@ void print_pano(const std::string& label,
   printf("%lu images, %d rows x %d cols, frame# [pan tilt]:\n", orientations.size(), nrows, ncols);
 
   // build lookup
-  typedef std::pair<int, int> LookupKey;
-  typedef std::pair<int, inspection::PanoAttitude> LookupValue;
-  std::unordered_map<LookupKey, LookupValue, boost::hash<LookupKey> > orient_lookup;
-  int frame = 0;
-  for (const auto& orient : orientations) {
-    orient_lookup.insert(std::make_pair(LookupKey(orient.iy, orient.ix),
-                                        LookupValue(frame, orient)));
-    frame++;
-  }
+  inspection::OrientLookupMap orient_lookup;
+  inspection::get_orient_lookup(&orient_lookup, orientations);
 
   // print table format
   for (int iy = 0; iy < nrows; iy++) {
     for (int ix = 0; ix < ncols; ix++) {
-      const auto& it = orient_lookup.find(LookupKey(iy, ix));
+      const auto& it = orient_lookup.find(inspection::OrientLookupKey(iy, ix));
       if (it == orient_lookup.end()) {
         printf("                  ");
       } else {
@@ -127,7 +123,7 @@ void do_test_case(orientations_func_t orientations_func, const TestCase& test_ca
                     RAD_FROM_DEG(test_case.h_fov_degrees),
                     RAD_FROM_DEG(test_case.v_fov_degrees),
                     test_case.overlap,
-                    RAD_FROM_DEG(test_case.attitude_tolerance_degrees));
+                    RAD_FROM_DEG(test_case.plan_attitude_tolerance_degrees));
 
   write_pano_csv(test_case.label, orientations);
   print_pano(test_case.label, orientations, nrows, ncols);
@@ -159,7 +155,23 @@ void do_test_cases(const std::string& label, orientations_func_t orientations_fu
 }
 
 int main(int argc, char* argv[]) {
-  do_test_cases("=== pano_orientations === ", &inspection::pano_orientations);
-  do_test_cases("=== pano_orientations2 === ", &inspection::pano_orientations2);
+  int which_algo = 2;
+  if (argc >= 2) {
+    std::string arg = argv[1];
+    if (arg == "1") {
+      which_algo = 1;
+    } else if (arg == "2") {
+      which_algo = 2;
+    } else {
+      std::cerr << "usage: test_pano [1|2]" << std::endl;
+      std::cerr << "couldn't parse argument" << std::endl;
+    }
+  }
+
+  if (which_algo == 1) {
+    do_test_cases("=== pano_orientations === ", &inspection::pano_orientations);
+  } else {
+    do_test_cases("=== pano_orientations2 === ", &inspection::pano_orientations2);
+  }
   return 0;
 }
