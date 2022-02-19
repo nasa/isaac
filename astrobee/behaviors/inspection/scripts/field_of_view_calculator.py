@@ -14,8 +14,8 @@ import scipy.optimize
 
 def tsai_distort(ru, kappa):
     # http://www.vision.caltech.edu/bouguetj/calib_doc/papers/Tsai.pdf eq 6 - Tsai model
-    ru2 = ru ** 2
-    coeff = 1 + kappa[0] * ru2 + kappa[1] * ru2 ** 2
+    ru2 = ru**2
+    coeff = 1 + kappa[0] * ru2 + kappa[1] * ru2**2
     # normally it would be ru = rd * coeff, but see camera_params.cc - the sense is inverted
     rd = ru * coeff
     return rd
