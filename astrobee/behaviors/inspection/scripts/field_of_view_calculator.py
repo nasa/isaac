@@ -7,8 +7,9 @@ other cameras.
 """
 
 import math
+from math import atan, tan
+
 import scipy.optimize
-from math import tan, atan
 
 
 def tsai_distort(ru, kappa):
@@ -24,6 +25,7 @@ def tsai_undistort(rd, kappa):
     # solve for ru in: rd = tsai_distort(ru, kappa)
     def func(ru):
         return tsai_distort(ru, kappa) - rd
+
     ru0 = rd  # initial guess: no distortion
     ru = scipy.optimize.fsolve(func, ru0)
     return ru
