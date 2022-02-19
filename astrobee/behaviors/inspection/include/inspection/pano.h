@@ -21,6 +21,8 @@
 #define INSPECTION_PANO_H_
 
 #include <cstdint>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #define RAD_FROM_DEG(x) ((x) * M_PI / 180.0)
@@ -32,7 +34,7 @@ class PanoAttitude {
  public:
   double pan;  // radians, 0=forward, increases to the right
   double tilt;  // radians, 0=forward, increases upward
-  int16_t iy;  // row index, 0=bottom row
+  int16_t iy;  // row index, 0=top row
   int16_t ix;  // column index, 0=left column
 
   inline PanoAttitude(double _pan, double _tilt, int16_t _iy, int16_t _ix) :
@@ -49,6 +51,13 @@ void pano_orientations(std::vector<PanoAttitude>* orientations_out,
                        double pan_radius, double tilt_radius,
                        double h_fov, double v_fov,
                        double overlap, double attitude_tolerance);
+
+typedef std::pair<int, int> OrientLookupKey;
+typedef std::pair<int, inspection::PanoAttitude> OrientLookupValue;
+typedef std::unordered_map<OrientLookupKey, OrientLookupValue, boost::hash<OrientLookupKey> > OrientLookupMap;
+
+void get_orient_lookup(OrientLookupMap* orient_lookup_out,
+                       const std::vector<PanoAttitude>& orientations);
 
 void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
                         int* nrows_out,

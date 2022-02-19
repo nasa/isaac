@@ -17,10 +17,12 @@
  * under the License.
  */
 
+#include <boost/functional/hash.hpp>
 #include <cmath>
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
 #include "inspection/pano.h"
 
 #define EPS 1e-5
@@ -120,9 +122,7 @@ void assert_gte(double a, double b, double eps, const std::string& label) {
 
 /* Returns the effective HFOV for an image with tilt centered at @tilt.
  * At large tilt values ("high latitude"), effective HFOV is larger
- * because the parallels are shorter near the pole. We conservatively
- * take the effective HFOV from either the middle, top, or bottom edge
- * of the image, whichever is smallest.
+ * because the parallels are shorter near the pole.
  *
  * :param float h_fov: Horizontal field of view of each image (radians).
  * :param float v_fov: Vertical field of view of each image (radians).
@@ -130,10 +130,22 @@ void assert_gte(double a, double b, double eps, const std::string& label) {
  * :return: The effective HFOV (radians).
  */
 double get_h_fov_effective(double h_fov, double v_fov, double tilt) {
-  double v_radius = 0.5 * v_fov;
-  double min_abs_theta = fabs(tilt - v_radius);
-  min_abs_theta = std::min(min_abs_theta, fabs(tilt));
-  min_abs_theta = std::min(min_abs_theta, fabs(tilt + v_radius));
+  double min_abs_theta = fabs(tilt);
+  /* We could take the worst-case HFOV from either the middle, top, or
+   * bottom edge of the image, whichever is smallest. This can be
+   * important to avoid holes with wide-FOV images near the poles and
+   * minimal overlap, but tends to be overly conservative in other
+   * cases. That would be delta = 0.5.
+   *
+   * In this latest version, we'll take an intermediate approach of
+   * checking values halfway between the midpoint and the top/bottom,
+   * delta = 0.25. Empirically, this seems ok in our coverage validator
+   * test cases. */
+  double delta = 0.25;
+
+  min_abs_theta = std::min(min_abs_theta, fabs(tilt - delta * v_fov));
+  min_abs_theta = std::min(min_abs_theta, fabs(tilt + delta * v_fov));
+
   return h_fov / cos(min_abs_theta);
 }
 
@@ -250,7 +262,7 @@ LinSpace pano_1d_complete_pan(double fov, double overlap, double attitude_tolera
  * :param h_fov: Horizontal field of view of each image (radians).
  * :param v_fov: Vertical field of view of each image (radians).
  * :param overlap: Minimum required overlap between consecutive images, as a proportion of the image field of view (0 .. 1).
- * :param attitude_tolerance: Ensure overlap criterion is met even if relative attitude between a pair of adjacent images is off by at most this much (radians).
+ * :param attitude_tolerance: Ensure complete coverage and sufficient overlap even if relative attitude between a pair of adjacent images, or between an image and the desired pano boundary, is off by at most this much (radians).
  * :param tilt: The tilt of the image center (radians).
  * :return: A sequence of pan orientations of image centers (radians).
  */
@@ -266,13 +278,33 @@ LinSpace pano_1d_pan(double pan_radius,
   }
 }
 
+void get_orient_lookup(OrientLookupMap* orient_lookup_out,
+                       const std::vector<PanoAttitude>& orientations) {
+  orient_lookup_out->clear();
+  int frame = 0;
+  for (const auto& orient : orientations) {
+    orient_lookup_out->insert(std::make_pair(OrientLookupKey(orient.iy, orient.ix),
+                                             OrientLookupValue(frame, orient)));
+    frame++;
+  }
+}
+
 /* Given panorama parameters specifying desired coverage, write a vector
  * of pan/tilt orientations that will achieve the coverage. Note that
  * this coverage planner always puts the center of the panorama at pan,
  * tilt = 0, 0. But normally these pan/tilt values are interpreted
  * relative to a 6-DOF reference pose, so you can use the reference pose
  * attitude to point the center of the panorama in whatever direction
- * you want.
+ * you want. Note that this algorithm can not guarantee it will satisfy
+ * the complete coverage and overlap requirements due to the fact that
+ * image coverage areas are warped into non-rectangles in a way that's
+ * difficult to handle in general. Therefore, you should validate that
+ * the pano covers the area you want by adding your parameters to
+ * pano_test_cases.csv, then running test_pano and plot_pano.py. If
+ * necessary, encourage the planner to add more images by adding some
+ * extra "warp margin" into plan_attitude_tolerance_degrees while
+ * leaving alone test_attitude_tolerance_degrees, until the problem is
+ * resolved.
  *
  * orientations_out: Write output PanoAttitude sequence here.
  * nrows_out: Write number of rows in panorama here.
@@ -282,7 +314,7 @@ LinSpace pano_1d_pan(double pan_radius,
  * h_fov: Horizontal FOV of the imager (radians).
  * v_fov: Vertical FOV of the imager (radians).
  * overlap: Required proportion of overlap between consecutive image, 0 .. 1 (unitless).
- * attitude_tolerance: Ensure overlap criterion is met even if relative attitude between a pair of adjacent images, or between an image and the desired pano boundary, is off by at most this much (radians).
+ * attitude_tolerance: Try to ensure complete coverage and sufficient overlap even if relative attitude between a pair of adjacent images, or between an image and the desired pano boundary, is off by at most this much (radians).
  */
 void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
                         int* nrows_out,
@@ -295,6 +327,7 @@ void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
   LinSpace tilt_seq = pano_1d(tilt_radius, v_fov, overlap, attitude_tolerance);
   std::vector<double> tilt_vals;
   tilt_seq.write_vector(&tilt_vals);
+  int nrows = tilt_vals.size();
   std::reverse(tilt_vals.begin(), tilt_vals.end());  // order top-to-bottom
   std::vector<double> pan_vals;
   double min_abs_tilt = fabs(tilt_vals[0]);
@@ -317,6 +350,55 @@ void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
   unsigned int ncols = col_centers.num_pts;
   for (auto& orient : image_centers) {
     orient.ix = col_centers.find_closest(orient.pan);
+  }
+
+  // Do simple greedy column reassignments as needed. This empirically
+  // reduces large attitude changes. The principle is to look in the
+  // adjacent row that is nearer to the equator (if there is one), find
+  // the frame with the closest pan value, and choose the same column it
+  // did.
+  OrientLookupMap orient_lookup;
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    get_orient_lookup(&orient_lookup, image_centers);
+
+    for (auto& orient : image_centers) {
+      int ny;
+      if (orient.tilt < 0) {
+        ny = orient.iy - 1;
+      } else {
+        ny = orient.iy + 1;
+      }
+      if (!(0 <= ny && ny < nrows)) {
+        continue;
+      }
+
+      double min_abs_pan_diff = 999;
+      int min_ix = -1;
+
+      for (int nx = orient.ix - 1; nx < orient.ix + 2; nx++) {
+        int nx_mod = (nx + ncols) % ncols;
+        const auto& nit = orient_lookup.find(OrientLookupKey(ny, nx_mod));
+        if (nit != orient_lookup.end()) {
+          const inspection::PanoAttitude& n_orient = nit->second.second;
+          if (fabs(n_orient.tilt) > fabs(orient.tilt)) {
+            // only do reassignment if neighbor row is actually closer to equator
+            break;
+          }
+          double abs_diff0 = fabs(orient.pan - n_orient.pan);
+          double abs_diff = std::min(abs_diff0, 360 - abs_diff0);
+          if (abs_diff < min_abs_pan_diff) {
+            min_abs_pan_diff = abs_diff;
+            min_ix = n_orient.ix;
+          }
+        }
+      }
+      if (min_ix != -1 && min_ix != orient.ix) {
+        orient.ix = min_ix;
+        changed = true;
+      }
+    }
   }
 
   // order images in column-major order; alternate direction top-to-bottom or bottom-to-top
