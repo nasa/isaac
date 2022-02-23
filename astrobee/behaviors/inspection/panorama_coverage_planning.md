@@ -41,7 +41,10 @@ large attitude changes that are challenging for Astrobee localization.
 A further consideration is that, when viewing a plot of the coverage
 using a typical equirectangular projection, the rectangular area of each
 image becomes increasingly warped as the tilt value approaches the poles
-(+/-90 degrees).
+at +/-90 degrees (Fig. 1).
+
+![Image warping](plot_3_one_column_borders.png "Image warping")
+Figure 1: Image warping
 
 The primary effect of the warping is to make the effective image
 coverage wider nearer the poles. We take advantage of this effect by
@@ -52,7 +55,14 @@ the column-major raster sequencing is only approximate.
 A secondary effect of the warping is that it complicates determining how
 to position the warped rectangles of individual image coverage so that
 together they cover the boundaries of the rectangular desired imaging
-area.
+area. As a result, although the panorama planner tries to meet the
+coverage and overlap requirements, it can *not* guarantee they are
+satisfied in general. Instead, you are encouraged to use the `test_pano`
+tool and `plot_pano.py` script together to check correctness, and if
+there is a problem, inflate the `plan_attitude_tolerance_degrees`
+parameter (used by the `test_pano` tool at planning time) while leaving
+unchanged the `test_attitude_tolerance_degrees` parameter (used by the
+`plot_pano.py` tool at testing time), until the problem is corrected.
 
 # ISAAC panorama surveys
 
@@ -88,8 +98,11 @@ criteria were:
    strictest/driving requirement.]
 
 As of this writing (2022/02), using the experimental
-pano_orientations2() planner, the resulting panorama plan has 56 images
-in 7 rows, with at most 10 images in a row.
+`pano_orientations2()` planner, the resulting panorama plan has 56
+images in 7 rows, with at most 10 images in a row (Fig. 2).
+
+![5_mapper_and_hugin sequence](plot_5_mapper_and_hugin_seq.png "5_mapper_and_hugin sequence")
+Figure 2: 5_mapper_and_hugin sequence
 
 ## `4_mapper`
 
