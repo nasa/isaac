@@ -45,25 +45,26 @@ at +/-90 degrees (Fig. 1).
 
 | ![Image warping](plot_3_one_column_borders.png "Image warping") |
 |:--:|
-| Figure 1: Image warping |
+| Figure 1: Image warping. Note that the red image FOV farther from tilt=0 is more warped than the green image FOV. |
 
 The primary effect of the warping is to make the effective image
 coverage wider nearer the poles. We take advantage of this effect by
 reducing the number of images in grid rows nearer the poles. A downside
 of reducing the image count is that the images no longer form a grid, so
-the column-major raster sequencing is only approximate.
+the column-major raster sequencing is only approximate (Fig. 2).
 
 A secondary effect of the warping is that it complicates determining how
 to position the warped rectangles of individual image coverage so that
 together they cover the boundaries of the rectangular desired imaging
-area. As a result, although the panorama planner tries to meet the
-coverage and overlap requirements, it can *not* guarantee they are
-satisfied in general. Instead, you are encouraged to use the `test_pano`
-tool and `plot_pano.py` script together to check correctness, and if
-there is a problem, inflate the `plan_attitude_tolerance_degrees`
-parameter (used by the `test_pano` tool at planning time) while leaving
-unchanged the `test_attitude_tolerance_degrees` parameter (used by the
-`plot_pano.py` tool at testing time), until the problem is corrected.
+area. As a result, although the panorama planner's simple heuristic
+image spacing algorithm tries to meet the coverage and overlap
+requirements, it can *not* guarantee they are satisfied in
+general. Instead, you are encouraged to use the `test_pano` tool and
+`plot_pano.py` script together to check correctness, and if there is a
+problem, inflate the `plan_attitude_tolerance_degrees` parameter (used
+by the `test_pano` tool at planning time) while leaving unchanged the
+`test_attitude_tolerance_degrees` parameter (used by the `plot_pano.py`
+tool at testing time), until the problem is corrected.
 
 # ISAAC panorama survey parameters
 
@@ -178,3 +179,45 @@ As of this writing, all test cases in `pano_test_cases.csv` pass with the
 During the validation process, `plot_pano.py` also writes several plots
 for each test case that can be used to visualize the resulting panorama
 plan.
+
+# Camera field of view estimation
+
+Modeling the field of view of a camera is complicated. The Astrobee
+cameras of interest for panorama planning each have a rectangular sensor
+and a lens with radial distortion. As a result, when the shape of the
+camera FOV is displayed in a standard equirectangular projection, even
+at tilt = 0, the FOV shape is not actually a rectangle, but instead has
+a curved shape with "spikes at the corners". For the purposes of
+panorama planning, the radial distortion effect is very significant for
+the NavCam, somewhat significant for the HazCam, and almost negligible
+for the SciCam.
+
+The true camera FOV shape is both complicated to calculate and difficult
+to use for panorama planning purposes. As a result, our tools model the
+FOV as a simplified rectangle. In particular, the rectangle dimensions
+we use, as output by `field_of_view_calculator.py`, are an estimate of
+the inscribed rectangle, i.e., the largest (axis-aligned) rectangle that
+fits completely within the true FOV shape. This rectangular approximate
+FOV is currently used both during panorama planning and validation. This
+is a conservative approach in that it will underestimate the true
+coverage and overlap in the panorama.
+
+Note that when camera FOV is reported elsewhere, such as in manufacturer
+technical specifications, it may not agree with our dimensions in part
+because they may use a different definition, such as the dimensions of
+the circumscribing rectangle.
+
+Our FOV estimates are based on the calibrated camera intrinsics for
+Bumble, as documented within the script.  We expect that the FOV
+variation between robots is not large enough to affect panorama
+planning.
+
+Future improvements in this area could be:
+
+- Reimplement `field_of_view_calculator.py` in C++ using exactly the
+  same computer vision libraries used by Astrobee FSW, instead of the
+  current approach based on reimplementing some of the mathematical
+  formulas in simplified form. This would reduce the likelihood of
+  errors in the FOV estimation.
+- Make the `plot_pano.py` script display the true camera FOV shape and
+  use that for validation.
