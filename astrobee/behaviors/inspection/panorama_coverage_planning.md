@@ -43,8 +43,9 @@ using a typical equirectangular projection, the rectangular area of each
 image becomes increasingly warped as the tilt value approaches the poles
 at +/-90 degrees (Fig. 1).
 
-![Image warping](plot_3_one_column_borders.png "Image warping")
-Figure 1: Image warping
+| ![Image warping](plot_3_one_column_borders.png "Image warping") |
+|:--:|
+| Figure 1: Image warping |
 
 The primary effect of the warping is to make the effective image
 coverage wider nearer the poles. We take advantage of this effect by
@@ -64,7 +65,7 @@ parameter (used by the `test_pano` tool at planning time) while leaving
 unchanged the `test_attitude_tolerance_degrees` parameter (used by the
 `plot_pano.py` tool at testing time), until the problem is corrected.
 
-# ISAAC panorama surveys
+# ISAAC panorama survey parameters
 
 There are different styles of panorama that could be useful for
 different applications.
@@ -101,8 +102,9 @@ As of this writing (2022/02), using the experimental
 `pano_orientations2()` planner, the resulting panorama plan has 56
 images in 7 rows, with at most 10 images in a row (Fig. 2).
 
-![5_mapper_and_hugin sequence](plot_5_mapper_and_hugin_seq.png "5_mapper_and_hugin sequence")
-Figure 2: 5_mapper_and_hugin sequence
+| ![5_mapper_and_hugin sequence](plot_5_mapper_and_hugin_seq.png "5_mapper_and_hugin sequence") |
+|:--:|
+| Figure 2: `5_mapper_and_hugin` sequence |
 
 ## `4_mapper`
 
@@ -136,3 +138,43 @@ with Hugin auto-stitch.
 
 The resulting panorama plan has only 15 images. This type of panorama
 could occasionally be suitable for a fast low-resolution survey.
+
+# Validation
+
+The following shell commands can be used to validate the panorama planner
+on the test cases:
+
+```console
+ISAAC_DIR="$HOME/isaac"
+cd "$ISAAC_DIR/src/astrobee/behaviors/inspection/scripts"
+$ISAAC_DIR/devel/lib/inspection/test_pano 2  # pano_orientations2() planner
+./plot_pano.py -v
+```
+Panorama plans must pass the following checks:
+
+- Complete coverage. A grid of test points are sampled from the full
+  spherical coverage (currently at 5 degree spacing). Each sampled test
+  point must be within the FOV of at least one image in the panorama.
+  (This testing approach is likely to catch coverage gaps, but can't
+  provide a guarantee for gaps sized smaller than the grid spacing.)
+
+- Sufficient overlap. Each image must have the required overlap
+  proportion with its immediate neighbors in the image grid, in all four
+  cardinal directions. Because columns don't necessarily align, there
+  may be two bracketing "immediate neighbors" in each of the north/south
+  directions, and the requirement is that the *total* overlap over both
+  neighbors must meet the specified overlap proportion. The overlap
+  proportion is estimated by sampling a test grid within the first image
+  and checking how many of the points fall within the neighbor image.
+
+- Attitude tolerance. An attitude tolerance requirement of *a* is
+  factored into the checks by (1) shrinking each image FOV by *a*/2 on
+  all sides, and (2) also padding the required coverage area by *a*/2 on
+  all sides.
+
+As of this writing, all test cases in `pano_test_cases.csv` pass with the
+`pano_orientations2()` planner.
+
+During the validation process, `plot_pano.py` also writes several plots
+for each test case that can be used to visualize the resulting panorama
+plan.
