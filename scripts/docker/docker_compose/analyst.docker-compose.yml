@@ -24,4 +24,4 @@ services:
       - ${ISAAC_PATH:-.}/analyst/workspace:/home/analyst/
       - ${DATA_PATH}:/home/analyst/data
       - ${BAGS_PATH}:/home/analyst/data/bags
-    # command: "/ros_entrypoint.sh"
+    command: "/ros_entrypoint.sh"
