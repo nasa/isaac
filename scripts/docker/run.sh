@@ -112,6 +112,10 @@ export ISAAC_PATH=${isaac_source}
 export IUI_PATH=${iui_source}
 export MAST_PATH=${mast_source}
 
+# Define data locations for analyst notebook
+export DATA_PATH=${HOME}/data
+export BAGS_PATH=$(readlink -f ${HOME}/data/bags)
+
 echo "ISAAC UI path: "${iui_source}
 echo "Build MAST?:" $mast " MAST path: "${mast_source}
 
@@ -131,7 +135,7 @@ elif [ "$os" = "focal" ]; then
 fi
 
 if [ $remote -eq 1 ]; then
-  export REMOTE=ghcr.io/nasa/
+  export REMOTE=ghcr.io/nasa
 fi
 
 # Launch the rosmaster container + isaac network + IDI

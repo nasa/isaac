@@ -11,6 +11,8 @@ services:
     build: 
       context: '..'
       dockerfile: 'analyst.Dockerfile'
+      args:
+        REMOTE: ${REMOTE:-isaac}
     ports:
       - "8888:8888"
     networks:
@@ -19,5 +21,7 @@ services:
       - JUPYTER_TOKEN=isaac
       - ROS_MASTER_URI=http://rosmaster:11311
     volumes:
-      - ${ISAAC_PATH:-.}/analyst/workspace:/home/jovyan/
-    command: "start-notebook.sh"
+      - ${ISAAC_PATH:-.}/analyst/workspace:/home/analyst/
+      - ${DATA_PATH}:/home/analyst/data
+      - ${BAGS_PATH}:/home/analyst/data/bags
+    # command: "/ros_entrypoint.sh"
