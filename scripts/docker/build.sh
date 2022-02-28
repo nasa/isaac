@@ -21,33 +21,35 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-# short help
-usage_string="$scriptname [-h]  [-x <use ubuntu 16.04 image>]\
- [-b <use ubuntu 18.04 image>] [-f <use ubuntu 20.04 image>]\
- [-a <astrobee source path>] [-d <idi source path>]\
- [-m <mast source path>] [-n <don't use mast>] [-v <building on a VM>]"
-#[-t make_target]
+# Print the help message (list all the options)
+print_help()
+{
+  echo -e "Builds docker images for the ISAAC stack"
+  echo -e "The build script will automatically detect the current Ubuntu OS version and"
+  echo -e "define the docker files variables UBUNTU_VERSION, ROS_VERSION, and PYTHON accordingly."
+  echo -e "Options:"
+  echo -e "\t-x | --xenial\t\t\tBuild images for Ubuntu 16.04"
+  echo -e "\t-b | --bionic\t\t\tBuild images for Ubuntu 18.04"
+  echo -e "\t-f | --focal\t\t\tBuild images for Ubuntu 20.04"
+  echo -e "\t-a | --astrobee-source-path\tSpecify the astrobee source directory to use"
+  echo -e "\t\t\t\tdefault=isaac_source/../../astrobee"
+  echo -e "\t-i | --iui-source-dir\t\tSpecify the idi source directory to use"
+  echo -e "\t\t\t\tdefault=isaac_source/../../isaac_data_interface"
+  echo -e "\t-m | --mast-source-dir\t\tSpecify the mast source directory to use"
+  echo -e "\t\t\t\tdefault=isaac_source/../../mast/src"
+  echo -e "\t-n | --no-mast\t\t\tBuild without MAST"
+  echo -e "\t-v | --vm\t\t\tBuild images compatible with virtual machine only"
+  echo
+}
 
 # Print the script usage
 print_usage()
 {
-    echo $usage_string
+    echo -e "Invalid option!\n\n"
+    print_help
 }
 
-# Print the help message (list all the options)
-print_help()
-{
-    echo "scriptname usage:"
-    echo $usage_string
-    echo -e "\t-a astrobee_source_path   specify the astrobee source directory to use"
-    echo -e "\t   default=isaac_source/../../astrobee"
-    echo -e "\t-d idi_source_path   specify the idi source directory to use"
-    echo -e "\t   default=isaac_source/../../isaac_data_interface"
-    echo -e "\t-m mast_source_path   specify the mast source directory to use"
-    echo -e "\t   default=isaac_source/../../mast/src"
-    echo -e "\t-n build without MAST"
-    echo
-}
+# Initialize variables
 os=`cat /etc/os-release | grep -oP "(?<=VERSION_CODENAME=).*"`
 mast=1
 vm=0
@@ -60,16 +62,16 @@ while [ "$1" != "" ]; do
                                       ;;
         -f | --focal )                os="focal"
                                       ;;
-        -a | --astrobee_source_dir )  shift
+        -a | --astrobee-source-path ) shift
                                       astrobee_source=$1
                                       ;;
-        -d | --idi_source_dir )       shift
+        -i | --iui-source-dir )       shift
                                       idi_source=$1
                                       ;;
-        -m | --mast_source_dir )      shift
+        -m | --mast-source-dir )      shift
                                       mast_source=$1
                                       ;;
-        -n | --no_mast )              mast=0
+        -n | --no-mast )              mast=0
                                       ;;
         -v | --vm )                   vm=1
                                       ;;

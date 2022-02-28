@@ -1,7 +1,7 @@
 Native Install
 =====
 
-Usage instructions for non-NASA and NASA users
+Machine setup
 ---------
 
 Install the 64-bit version of [Ubuntu 16.04, 18.04 or 20.04](http://releases.ubuntu.com/)
@@ -18,10 +18,8 @@ any other operating system or Ubuntu versions.*
 *Note: Please ensure you install the 64-bit version of Ubuntu. We do not
 support running ISAAC Software on 32-bit systems.*
 
-Machine setup
----------
+**The `isaac` repo depends on some `astrobee` packages, therefore, `astrobee` needs to be installed beforehand.**
 
-The `isaac` repo depends on some `astrobee` packages, therefore, `astrobee` needs to be installed beforehand.
 
 Checkout the project source code
 ---------
