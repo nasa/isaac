@@ -91,31 +91,29 @@ $(document).ready(function(){initNavTree('md_INSTALL.html',''); initResizable();
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><h1><a class="anchor" id="autotoc_md5"></a>
-Usage instructions for non-NASA and NASA users</h1>
+Machine setup</h1>
 <p>Install the 64-bit version of <a href="http://releases.ubuntu.com/">Ubuntu 16.04, 18.04 or 20.04</a> on a host machine, and make sure that you can checkout and build code. </p><pre class="fragment">sudo apt-get install build-essential git
 </pre><p><em>Note: You will need 4 GBs of RAM to compile the software. If you don't have that much RAM available, please use swap space.</em></p>
 <p><em>Note: Please ensure you install Ubuntu 16.04, 18.04 or 20.04. At this time we do not support any other operating system or Ubuntu versions.</em></p>
 <p><em>Note: Please ensure you install the 64-bit version of Ubuntu. We do not support running ISAAC Software on 32-bit systems.</em></p>
+<p><b>The <code>isaac</code> repo depends on some <code>astrobee</code> packages, therefore, <code>astrobee</code> needs to be installed beforehand.</b></p>
 <h1><a class="anchor" id="autotoc_md6"></a>
-Machine setup</h1>
-<p>The <code>isaac</code> repo depends on some <code>astrobee</code> packages, therefore, <code>astrobee</code> needs to be installed beforehand.</p>
-<h1><a class="anchor" id="autotoc_md7"></a>
 Checkout the project source code</h1>
 <p>At this point you need to decide where you'd like to put the ISAAC workspace and code (<code>ISAAC_WS</code>) on your machine (add this to your .bashrc for persistency): </p><pre class="fragment">export ISAAC_WS=$HOME/isaac
 </pre><p>First, clone the flight software repository: </p><pre class="fragment">git clone --recursive https://github.com/nasa/isaac.git \
 --branch develop $ISAAC_WS/src/
 </pre><p>Checkout the submodule: </p><pre class="fragment">git submodule update --init --recursive
-</pre><h1><a class="anchor" id="autotoc_md8"></a>
+</pre><h1><a class="anchor" id="autotoc_md7"></a>
 Dependencies</h1>
 <p>Next, install all required dependencies: <em>Note: <code>root</code> access is necessary to install the packages below</em> <em>Note: Before running this please ensure that your system is completely updated by running 'sudo apt-get update' and then 'sudo apt-get upgrade'</em></p>
 <p>pushd $ISAAC_WS/src cd scripts/setup ./install_desktop_packages.sh ./build_install_dependencies.sh sudo rosdep init rosdep update popd</p>
-<h1><a class="anchor" id="autotoc_md9"></a>
+<h1><a class="anchor" id="autotoc_md8"></a>
 Configuring the build</h1>
 <p>By default, the catkin uses the following paths:</p><ul>
 <li>devel build path: <code>$ISAAC_WS/devel</code></li>
 <li>install build path: <code>$ISAAC_WS/install</code></li>
 </ul>
-<h1><a class="anchor" id="autotoc_md10"></a>
+<h1><a class="anchor" id="autotoc_md9"></a>
 Building the code</h1>
 <p>Source your astrobee build environment, for example as: </p><pre class="fragment">source $ASTROBEE_WS/devel/setup.bash
 </pre><p>Build with catkin build. </p><pre class="fragment">cd $ISAAC_WS
@@ -126,7 +124,7 @@ source devel/setup.bash
 catkin build
 source devel/setup.bash
 </pre><p>If you are working in simulation only, then you're all done! The next steps are only for running ISAAC onboard Astrobee.</p>
-<h1><a class="anchor" id="autotoc_md11"></a>
+<h1><a class="anchor" id="autotoc_md10"></a>
 Cross-compiling isaac</h1>
 <p>To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that ASTROBEE_WS must be defined.</p>
 <p>A new catkin profile should be made to retain the configurations and easily switch between normal build. </p><pre class="fragment">catkin profile add cross
@@ -140,7 +138,7 @@ catkin config --extend $ASTROBEE_WS/armhf/opt/astrobee \
               --install \
               --cmake-args -DCMAKE_TOOLCHAIN_FILE=$ISAAC_WS/src/scripts/build/isaac_cross.cmake \
                 -DARMHF_CHROOT_DIR=$ARMHF_CHROOT_DIR
-</pre><h1><a class="anchor" id="autotoc_md12"></a>
+</pre><h1><a class="anchor" id="autotoc_md11"></a>
 Build ISAAC debian</h1>
 <p>To build a debian you must first confirm that cross-compiling is functional. Once it is: </p><pre class="fragment">./src/scripts/build/build_debian.sh
 </pre> </div></div><!-- contents -->

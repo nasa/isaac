@@ -90,7 +90,7 @@ $(document).ready(function(){initNavTree('repo_structure.html',''); initResizabl
 <div class="title">Repository Structure </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h2><a class="anchor" id="autotoc_md17"></a>
+<div class="textblock"><h2><a class="anchor" id="autotoc_md19"></a>
 Folder description</h2>
 <p>The <code>isaac</code> folder is the primary entry point into flight software. For example, if you run <code>roslaunch isaac &lt;launch_file&gt;</code> you are instructing ROS to examine the 'launch' directory in this folder for a XML file called <code>&lt;launch_file&gt;</code>, which describes how to start a specific experiment.</p>
 <ol type="1">
@@ -100,13 +100,13 @@ Folder description</h2>
 <li><code>resources</code> - A directory containing all non-LUA resources used by nodes in the system. Additional files might be needed depending on the context.</li>
 <li><code>scripts</code> - A simple bash script to print out the environment variables, which can be used to check the context at any point in the launch sequence.</li>
 </ol>
-<h2><a class="anchor" id="autotoc_md18"></a>
+<h2><a class="anchor" id="autotoc_md20"></a>
 Environment variables</h2>
 <ul>
 <li><code>ISAAC_RESOURCE_DIR</code>: An absolute path to all non-LUA system resources that are used by the nodes in the system. For example, this includes sparse maps, zone files, clutter maps, etc.</li>
 <li><code>ISAAC_CONFIG_DIR</code>: An absolute path to all LUA config files that store input parameters for the nodes in the system.</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md19"></a>
+<h2><a class="anchor" id="autotoc_md21"></a>
 Context determination</h2>
 <p>When launched, nodes must know the context in which they are being launched in order to operate correctly. By context, we mean (a) the robot class being run, (b) the world in which the robot is being run, and (c) paths to both a LUA config and a resource directory. You have flexibility in how this is specified, but note that we enforce the following strict precedence: </p><pre class="fragment">/etc &gt; environment variable &gt; roslaunch arguments &gt; default roslaunch values
 </pre><p>For example, consider this launch process run on your local desktop (in this case there will be no <code>/etc/robotname</code> file set by default) </p><pre class="fragment">export ASTROBEE_ROBOT=p4d
@@ -121,14 +121,14 @@ roslaunch isaac sim.launch
         -&gt; [astrobee]
             -&gt; ...                         [*]
 </pre><p>At the package level, ilp nodes inherit from ff_nodelet, and are launched using a pattern defined by ff_nodelet.launch. This pattern respects our context determination hierarchy. glp nodes do not inherit from ff_nodelet, and are meant for general robot functionality.</p>
-<h2><a class="anchor" id="autotoc_md20"></a>
+<h2><a class="anchor" id="autotoc_md22"></a>
 Default contexts</h2>
 <p>Assuming no environment variables are set or <code>/etc</code> files are created, the default contexts defined by the launch files are the following:</p>
 <ul>
 <li><code>isaac_astrobee.launch</code>: robot = {argument}, world = iss, drivers = true</li>
 <li><code>sim.launch</code>: robot = sim, world = granite, drivers = false</li>
 </ul>
-<h2><a class="anchor" id="autotoc_md21"></a>
+<h2><a class="anchor" id="autotoc_md23"></a>
 Remotely launching nodes</h2>
 <p>It is possible to launch the GLP, ILP, MLP, LLP and simulator on remote devices. The corresponding arguments are <code>glp:=&lt;ip&gt;</code>, <code>ilp:=&lt;ip&gt;</code>, <code>mlp:=&lt;ip&gt;</code>, <code>llp:=&lt;ip&gt;</code> and <code>sim:=&lt;ip&gt;</code>. There are two special values for <code>&lt;ip&gt;</code>:</p>
 <ul>
@@ -136,12 +136,12 @@ Remotely launching nodes</h2>
 <li>ip = <code>disabled</code> : disable this machine completely.</li>
 </ul>
 <p>The {llp,mlp,sim} arguments with {IP,local,disabled} options is very powerful and supports any configuration of robot with simulated nodes or hardware in the loop.</p>
-<h2><a class="anchor" id="autotoc_md22"></a>
+<h2><a class="anchor" id="autotoc_md24"></a>
 Launching only specific nodes</h2>
 <p>It is possible to specify on the command line the set of nodes to be launched using the <code>nodes:=&lt;comma_separated_list_of_nodes&gt;</code> argument.</p>
 <p>In this case, only the provided nodes will be launched on their destination processors (llp or mlp). In addition, it is possible to avoid roslaunch to perform any connection to a particular processor with the declaration <code>{llp,mlp}:=disabled</code>. This is particularly useful if you need to test some nodes on one processor and do not have access to the other processor.</p>
 <p>For example, to test only the picoflexx cameras on the MLP, not attempting connection to the LLP (in case it is absent from the test rig): </p><pre class="fragment">roslaunch isaac isaac_astrobee.launch llp:=disabled nodes:=pico_driver,framestore
-</pre><h2><a class="anchor" id="autotoc_md23"></a>
+</pre><h2><a class="anchor" id="autotoc_md25"></a>
 Launch file examples</h2>
 <ol type="1">
 <li><p class="startli">Start a local iss simulation with one p4d robot on namespace '/'</p>
