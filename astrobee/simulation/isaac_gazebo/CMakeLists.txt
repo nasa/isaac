@@ -34,6 +34,8 @@ find_package(catkin REQUIRED COMPONENTS
     isaac_hw_msgs
     isaac_msgs
     cv_bridge
+    camera
+    jsonloader
 )
 
 find_package(gazebo REQUIRED)
@@ -45,6 +47,7 @@ catkin_package(
     gazebo_sensor_plugin_wifi_receiver
     gazebo_sensor_plugin_wifi_transmitter
     gazebo_sensor_plugin_heat_cam
+    gazebo_sensor_plugin_sci_cam
     gazebo_model_plugin_cargo
   CATKIN_DEPENDS
     gazebo_plugins
@@ -58,6 +61,8 @@ catkin_package(
     isaac_util
     isaac_msgs
     isaac_hw_msgs
+    camera
+    jsonloader
 )
 
 ###########
@@ -154,6 +159,17 @@ add_dependencies(
     ${catkin_EXPORTED_TARGETS})
 list(APPEND targets_to_install gazebo_sensor_plugin_air_quality)
 
+# Create a sensor plugin for the sci cam
+add_library(
+  gazebo_sensor_plugin_sci_cam
+  SHARED src/gazebo_sensor_plugin_sci_cam/gazebo_sensor_plugin_sci_cam.cc)
+target_link_libraries(
+  gazebo_sensor_plugin_sci_cam
+  ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
+add_dependencies(
+  gazebo_sensor_plugin_sci_cam
+  ${catkin_EXPORTED_TARGETS})
+list(APPEND targets_to_install gazebo_sensor_plugin_sci_cam)
 
 # Create a model plugin for the cargo system
 add_library(
