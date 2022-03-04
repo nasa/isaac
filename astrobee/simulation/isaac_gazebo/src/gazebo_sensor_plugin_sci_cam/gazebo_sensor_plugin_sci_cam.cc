@@ -23,7 +23,7 @@
 #include <config_reader/config_reader.h>
 
 // JSON includes
-#include <json/json.h>
+#include <jsoncpp/json/json.h>
 #include <jsoncpp/json/value.h>
 #include <jsonloader/planio.h>
 
