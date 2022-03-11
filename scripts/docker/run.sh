@@ -38,7 +38,7 @@ print_help()
   echo -e "\t-vm\t\t\t\tRun the simulation locally - compatible with VM setup"
   echo -e "\t-remote\t\t\t\tRun the remote images (bypass building docker images locally)"
   echo -e "\t-analyst\t\t\tRun analyst notebook"
-  echo -e "\t--no-simvm\t\t\tDon't run the simulation"
+  echo -e "\t--no-sim\t\t\tDon't run the simulation"
   echo -e "\t-g | --ground-only\t\tRun only the isaac ground software (hardware in the loop only)"
   echo -e "\t-robot\t\t\t\tSpecify robot name (hardware in the loop only)"
   echo

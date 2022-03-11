@@ -160,6 +160,13 @@ docker build ${isaac_source:-${rootdir}} \
             --build-arg ROS_VERSION=${ROS_VERSION} \
             --build-arg PYTHON=${PYTHON} \
             -t isaac/isaac:msgs-ubuntu${UBUNTU_VERSION}
+# Build analyst
+docker build ${isaac_source:-${rootdir}} \
+            -f ${isaac_source:-${rootdir}}/scripts/docker/analyst.Dockerfile \
+            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
+            --build-arg ROS_VERSION=${ROS_VERSION} \
+            --build-arg PYTHON=${PYTHON} \
+            -t isaac/isaac_analyst_notebook:latest
 
 # Build IDI and MAST
 export IDI_PATH=${idi_source}
