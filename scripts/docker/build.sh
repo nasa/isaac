@@ -53,6 +53,7 @@ print_usage()
 os=`cat /etc/os-release | grep -oP "(?<=VERSION_CODENAME=).*"`
 mast=1
 vm=0
+REMOTE=isaac
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -73,6 +74,8 @@ while [ "$1" != "" ]; do
                                       ;;
         -n | --no-mast )              mast=0
                                       ;;
+        -r | --remote )               REMOTE=ghcr.io/nasa
+                                      ;;
         -v | --vm )                   vm=1
                                       ;;
         -h | --help )                 print_help
@@ -91,7 +94,7 @@ rootdir=$(realpath ${thisdir}/../..)
 # Define root dir of different repos
 astrobee_source=$(realpath ${astrobee_source:-${rootdir}/../../astrobee/src})
 isaac_source=${rootdir}
-idi_source=$(realpath ${idi_source:-${rootdir}/../../isaac_data_interface})
+idi_source=$(realpath ${idi_source:-${rootdir}/../../isaac_user_interface})
 if $mast; then
 	mast_source=$(realpath ${mast_source:-${rootdir}/../../mast/src})
 fi
@@ -174,9 +177,12 @@ export MAST_PATH=${mast_source}
 export UBUNTU_VERSION=${UBUNTU_VERSION}
 export ROS_VERSION=${ROS_VERSION}
 export PYTHON=${PYTHON}
+export REMOTE=${REMOTE}
 
+cd ${IDI_PATH}
+pwd
 if [ $mast == 1 ]; then
-	docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${IDI_PATH}/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml build
+	docker-compose -f docker-compose.yml -f plugins/ros.docker-compose.yml -f plugins/isaac.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml build
 else
-	docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${IDI_PATH}/idi.docker-compose.yml build
+	docker-compose -f docker-compose.yml -f plugins/ros.docker-compose.yml -f plugins/isaac.docker-compose.yml build
 fi
