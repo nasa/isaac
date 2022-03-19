@@ -1,86 +1,126 @@
 #!/usr/bin/env python
+#
+# Copyright (c) 2021, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
 
 """
 This is a reference implementation for how to generate panorama orientations given a
 configuration that includes the desired pan and tilt ranges, camera field of view,
-desired overlap between consecutive images, and a pre-tilt parameter that helps
-with efficiently capturing directional panoramas near tilt = +/- 90.
+desired overlap between consecutive images, and attitude tolerance to account
+for the possibility of pointing error.
 
 The main function of interest is panoOrientations(). There is also some
-validation logic, and two of the test cases are candidates for the configurations to
-test during the SoundSee-Data-3 ISS activity.
+validation logic, and some of the test cases are candidates for the configurations to
+test during ISAAC ISS activities.
 """
 
+from __future__ import print_function
+
+import argparse
+import csv
+import logging
 import math
 
 import numpy as np
-from scipy.spatial.transform import Rotation
 
 EPS = 1e-5
-ROLL, PITCH, YAW = 0, 1, 2
 
 
-def fromRPY(roll, pitch, yaw):
-    return Rotation.from_euler("XYZ", (roll, pitch, yaw), degrees=True)
+def get_h_fov_effective(h_fov, v_fov, tilt):
+    """
+    Returns the effective HFOV for an image with tilt centered at @tilt.
+    At large tilt values ("high latitude"), effective HFOV is larger
+    because the parallels are shorter near the pole. We conservatively
+    take the effective HFOV from either the middle, top, or bottom edge
+    of the image, whichever is smallest.
+
+    :param float h_fov: Horizontal field of view of each image (degrees).
+    :param float v_fov: Vertical field of view of each image (degrees).
+    :param float tilt: The tilt of the image center (degrees).
+    :return: The effective HFOV (degrees).
+    """
+    v_radius = 0.5 * v_fov
+    min_abs_theta = min(abs(tilt - v_radius), abs(tilt), abs(tilt + v_radius))
+    return h_fov / math.cos(min_abs_theta * math.pi / 180)
 
 
-def toRPY(rot):
-    return rot.as_euler("XYZ", degrees=True)
-
-
-def pano1D(rangeMin, rangeMax, fov, overlap):
+def pano_1d(range_radius, fov, overlap, attitude_tolerance):
     """
     Returns image center coordinates such that images cover the range
-    @rangeMin .. @rangeMax with at least the specified @overlap. If one
-    image suffices, it will be centered between @rangeMin and @rangeMax (and
-    the edges of the image will beyond the range if it is smaller than @fov).
-    If more than one image is needed to cover the range, the boundary images
-    will cover exactly to the edges of the specified range and the images
-    will be evenly spaced.
+    -@range_radius .. +@range_radius with at least the specified
+    @overlap. If one image suffices, it will be centered at 0 (and the
+    edges of the image will extend beyond the range if it is smaller
+    than @fov).  If more than one image is needed to cover the range,
+    the boundary images will cover exactly to the edges of the specified
+    range (modulo @attitude_tolerance) and the images will be evenly spaced.
 
-    :param float rangeMin: Minimum angle of minimum image (degrees).
-    :param float rangeMax: Maximum angle of maximum image (degrees).
+    :param float range_radius: Images must cover -range_radius .. +range_radius (degrees).
     :param float fov: Field of view of each image (degrees).
     :param float overlap: Minimum required overlap between consecutive images, as a proportion of the image field of view (0 .. 1).
+    :param float attitude_tolerance: Ensure overlap criterion is met even if relative attitude between a pair of adjacent images, or between an image and the desired pano boundary, is off by at most this much (degrees).
     :return: A vector of orientations of image centers.
     """
-    assertLte(rangeMin, rangeMax, EPS)
-    W = rangeMax - rangeMin
+    W = range_radius * 2
 
-    if W < fov:
+    if (W + 2 * attitude_tolerance - fov) < 0:
         # Special case: Only one image needed. Center it.
-        return np.array([0.5 * (rangeMin + rangeMax)])
+        return np.array([0])
 
-    # sufficient overlap criterion: stride <= fov * (1 - overlap)
-    # (k - 1) * stride + fov = W
-    # stride = (W - fov) / (k - 1)
-    # (W - fov) / (k - 1) <= fov * (1 - overlap)
-    # k - 1 >= (W - fov) / (fov * (1 - overlap))
-    # k >= (W - fov) / (fov * (1 - overlap)) + 1
+    # sufficient overlap criterion: stride <= fov * (1 - overlap) - attitude_tolerance
+    # (k - 1) * stride + fov = W + 2 * attitude_tolerance
+    # stride = (W + 2 * attitude_tolerance - fov) / (k - 1)
+    # (W + 2 * attitude_tolerance - fov) / (k - 1) <= fov * (1 - overlap) - attitude_tolerance
+    # k - 1 >= (W + 2 * attitude_tolerance - fov) / (fov * (1 - overlap) - attitude_tolerance)
+    # k >= (W + 2 * attitude_tolerance - fov) / (fov * (1 - overlap) - attitude_tolerance) + 1
 
-    k = math.ceil((W - fov) / (fov * (1 - overlap))) + 1
+    k = (
+        math.ceil(
+            (W + 2 * attitude_tolerance - fov)
+            / (fov * (1 - overlap) - attitude_tolerance)
+        )
+        + 1
+    )
 
     if 1:
         # optional sanity checks
 
-        stride = (W - fov) / (k - 1)
-        assertLte(stride, fov * (1 - overlap), EPS)  # sufficient overlap
+        stride = (W + 2 * attitude_tolerance - fov) / (k - 1)
+        assert_lte(
+            stride, fov * (1 - overlap) - attitude_tolerance, EPS
+        )  # sufficient overlap
 
         # check if we have more images than necessary
         if k == 1:
             pass  # obviously need at least one image
         elif k == 2:
-            assertLte(fov, W, EPS)  # k = 1 is not enough
+            assert_lte(fov, W + 2 * attitude_tolerance, EPS)  # k = 1 is not enough
         else:
-            stride1 = (W - fov) / (k - 2)
-            assertGte(stride1, fov * (1 - overlap), EPS)  # k is minimized
+            stride1 = (W + 2 * attitude_tolerance - fov) / (k - 2)
+            assert_gte(
+                stride1, fov * (1 - overlap) - attitude_tolerance, EPS
+            )  # k is minimized
 
-    minCenter = rangeMin + fov / 2
-    maxCenter = rangeMax - fov / 2
-    return np.linspace(minCenter, maxCenter, num=k)
+    min_center = -(range_radius + attitude_tolerance) + fov / 2
+    max_center = -min_center
+    return np.linspace(min_center, max_center, num=k)
 
 
-def pano1DCompletePan(fov, overlap):
+def pano_1d_complete_pan(fov, overlap, attitude_tolerance):
     """
     Returns image center coordinates such that the images cover the full pan
     range -180 .. 180 with at least the specified @overlap between all consecutive images,
@@ -88,65 +128,134 @@ def pano1DCompletePan(fov, overlap):
 
     :param float fov: Field of view of each image (degrees).
     :param float overlap: Minimum required overlap between consecutive images, as a proportion of the image field of view (0 .. 1).
-    :return: A vector of orientations of image centers.
+    :param float attitude_tolerance: Ensure overlap criterion is met even if relative attitude between a pair of adjacent images, or between an image and the desired pano boundary, is off by at most this much (degrees).
+    :return: A vector of orientations of image centers (degrees).
     """
-    k = math.ceil(360 / (fov * (1 - overlap)))
+    k = math.ceil(360 / (fov * (1 - overlap) - attitude_tolerance))
     centers = np.linspace(-180, 180, num=k, endpoint=False)
     # ensure pano is centered at pan = 0
-    midPoint = np.mean((centers[0], centers[-1]))
-    return centers - midPoint
+    mid_point = np.mean((centers[0], centers[-1]))
+    return centers - mid_point
 
 
-def panoOrientations(panMin, panMax, tiltMin, tiltMax, hFov, vFov, overlap, preTilt):
+def pano_1d_pan(pan_radius, h_fov, v_fov, overlap, attitude_tolerance, tilt):
+    """
+    Returns image center coordinates for a row of images at tilt value
+    @tilt that cover the range -@pan_radius .. +@pan_radius with at least
+    the specified @overlap. Special complete wrap-around behavior is
+    triggered when @pan_radius is exactly 180.
+
+    :param float pan_radius: Cover pan angle of -pan_radius to +pan_radius (degrees).
+    :param float h_fov: Horizontal field of view of each image (degrees).
+    :param float v_fov: Vertical field of view of each image (degrees).
+    :param float overlap: Minimum required overlap between consecutive images, as a proportion of the image field of view (0 .. 1).
+    :param float attitude_tolerance: Ensure overlap criterion is met even if relative attitude between a pair of adjacent images is off by at most this much (degrees).
+    :param float tilt: The tilt of the image center (degrees).
+    :return: A vector of pan orientations of image centers (degrees).
+    """
+    h_fov_effective = get_h_fov_effective(h_fov, v_fov, tilt)
+    # print("tilt=%s h_fov_effective=%s" % (tilt, h_fov_effective))
+    if pan_radius == 180:
+        return pano_1d_complete_pan(h_fov_effective, overlap, attitude_tolerance)
+    else:
+        return pano_1d(pan_radius, h_fov_effective, overlap, attitude_tolerance)
+
+
+def pano_orientations(
+    pan_radius, tilt_radius, h_fov, v_fov, overlap, attitude_tolerance
+):
     """
     Return image center coordinates that cover the specified pan and tilt ranges,
     with the specified @overlap. Special complete wrap-around behavior is triggered when
-    the pan range is exactly -180 .. 180. The @preTilt parameter can be used to re-center
-    the panorama, enabling efficient directional panoramas near tilt = +/- 90.
+    the pan_radius is exactly 180.
 
-    :param float panMin: Pan angle of left edge of leftmost column (degrees).
-    :param float panMax: Pan angle of right edge of rightmost column (degrees).
-    :param float tiltMin: Tilt angle of bottom edge of bottom row (degrees).
-    :param float tiltMax: Tilt angle of top edge of top row (degrees).
-    :param float hFov: Horizontal field of view of each image (degrees).
-    :param float vFov: Vertical field of view of each image (degrees).
+    :param float pan_radius: Cover pan angle of -pan_radius to +pan_radius (degrees).
+    :param float tilt_radius: Cover tilt angle of -tilt_radius to +tilt_radius (degrees).
+    :param float h_fov: Horizontal field of view of each image (degrees).
+    :param float v_fov: Vertical field of view of each image (degrees).
     :param float overlap: Minimum required overlap between consecutive images, as a proportion of the image field of view (0 .. 1).
-    :param float preTilt: Offsets the (pan, tilt) = (0, 0) center in tilt (degrees) so as to efficiently capture panoramas centered near tilt = +/- 90. Example: When preTilt = -90, tilt = 0 is offset to point straight down.
-    :return: (imageCenters, ncols, nrows). A list of orientations of image centers, the number of columns in the panorama, and the number of rows.
+    :param float attitude_tolerance: Ensure overlap criterion is met even if relative attitude between a pair of adjacent images is off by at most this much (degrees).
+    :return: (image_centers, nrows, ncols). A list of orientations of image centers, the number of rows in the panorama, and the number of columns.
     """
-    if panMin == -180 and panMax == 180:
-        panVals = pano1DCompletePan(hFov, overlap)
-    else:
-        panVals = pano1D(panMin, panMax, hFov, overlap)
-    tiltVals = pano1D(tiltMin, tiltMax, vFov, overlap)
 
-    # Images are in column-major order. When capturing a long panorama with
-    # people present, this makes it easier for them to move out of the field of
-    # view as needed. Order columns left to right, and within each column, tilt
-    # top to bottom. That is just more intuitive for people's expectations.
-    imageCenters = []
-    preRot = fromRPY(0, preTilt, 0)
-    for pan in panVals:
-        for tilt in reversed(tiltVals):
-            rot = fromRPY(0, tilt, pan)
-            imageCenters.append(rot * preRot)
-    return (imageCenters, len(panVals), len(tiltVals))
+    # calculate all image centers
+    image_centers = []
+    tilt_vals = pano_1d(tilt_radius, v_fov, overlap, attitude_tolerance)
+    for iy, tilt in enumerate(reversed(tilt_vals)):
+        pan_vals = pano_1d_pan(
+            pan_radius, h_fov, v_fov, overlap, attitude_tolerance, tilt
+        )
+        for pan in pan_vals:
+            image_centers.append((pan, tilt, iy, -1))
+    # image_centers = np.array(image_centers)
+    # print(image_centers.shape)
+    image_centers = np.array(
+        image_centers,
+        dtype=[
+            ("pan", np.double),
+            ("tilt", np.double),
+            ("iy", np.int16),
+            ("ix", np.int16),
+        ],
+    )
+
+    # assign image centers to columns
+    min_tilt = np.min(np.abs(tilt_vals))
+    column_centers = pano_1d_pan(
+        pan_radius, h_fov, v_fov, overlap, attitude_tolerance, min_tilt
+    )
+    image_pans = image_centers["pan"]
+    image_centers["ix"] = np.array(
+        [np.argmin(np.abs(column_centers - p)) for p in image_pans]
+    )
+
+    # order images in column-major order; alternate direction top-to-bottom or bottom-to-top
+    images_ordered = []
+    for ix, pan in enumerate(column_centers):
+        images_in_col_ind = image_centers["ix"] == ix
+        images_in_col = image_centers[images_in_col_ind]
+
+        # sort on tilt bottom-to-top
+        images_in_col = images_in_col[np.argsort(images_in_col["tilt"])]
+
+        # on even-numbered columns, reverse tilt order, top-to-bottom
+        if ix % 2 == 0:
+            images_in_col = images_in_col[::-1]
+
+        images_ordered += list(images_in_col)
+    images_ordered = np.array(images_ordered)
+
+    nrows = len(tilt_vals)
+    ncols = len(column_centers)
+
+    return images_ordered, nrows, ncols
 
 
-def printPano(pano):
-    imageCenters, ncols, nrows = pano
-    print("%s cols x %s rows [roll pitch yaw]" % (ncols, nrows))
-    for i in range(nrows):
+def print_pano(pano):
+    image_centers, nrows, ncols = pano
+    num_images = image_centers.shape[0]
+    print(
+        "%s images, %s rows x %s cols, frame# [pan tilt]:" % (num_images, nrows, ncols)
+    )
+    if 0:
+        print(image_centers)
+        return
+    image_lookup = {
+        (iy, ix): (i, pan, tilt) for i, (pan, tilt, iy, ix) in enumerate(image_centers)
+    }
+    for iy in range(nrows):
         print("  ", end="")
-        for j in range(ncols):
-            # print(i, j, j * nrows + i)
-            imageCenter = imageCenters[j * nrows + i]
-            # print(np.around(getEuler(imageCenter, preTilt=-30)), end=" ")
-            print(np.around(toRPY(imageCenter)), end=" ")
+        for ix in range(ncols):
+            image_info = image_lookup.get((iy, ix))
+            if image_info is None:
+                print("              ", end="   ")
+            else:
+                i, pan, tilt = image_info
+                print("%2d [%4d %4d]" % (i, round(pan), round(tilt)), end="   ")
         print()
 
 
-def assertEqual(a, b, eps):
+def assert_equal(a, b, eps):
     assert abs(a - b) < eps, "FAIL: %s should equal %s, within tolerance %s" % (
         a,
         b,
@@ -154,233 +263,48 @@ def assertEqual(a, b, eps):
     )
 
 
-def assertLte(a, b, eps):
+def assert_lte(a, b, eps):
     assert a <= b + eps, "FAIL: %s should be <= %s, within tolerance %s" % (a, b, eps)
 
 
-def assertGte(a, b, eps):
-    assert a >= b + eps, "FAIL: %s should be >= %s, within tolerance %s" % (a, b, eps)
+def assert_gte(a, b, eps):
+    assert a >= b - eps, "FAIL: %s should be >= %s, within tolerance %s" % (a, b, eps)
 
 
-def getEuler(rot, preTilt):
-    invPreRot = fromRPY(0, -preTilt, 0)
-    return toRPY(rot * invPreRot)
-
-
-def checkPano(pano, panMin, panMax, tiltMin, tiltMax, hFov, vFov, overlap, preTilt):
-    imageCenters, ncols, nrows = pano
-
-    topLeft = getEuler(imageCenters[0], preTilt)
-
-    if ncols == 1:
-        assertLte(panMax - panMin, hFov, EPS)  # one column is enough
-    else:
-        nextPan = getEuler(imageCenters[nrows], preTilt)
-        panStride = nextPan[YAW] - topLeft[YAW]
-        assertLte(panStride, hFov * (1 - overlap), EPS)  # pan overlaps enough
-
-    if nrows == 1:
-        assertLte(tiltMax - tiltMin, vFov, EPS)  # one row is enough
-    else:
-        nextTilt = getEuler(imageCenters[1], preTilt)
-        tiltStride = -(nextTilt[PITCH] - topLeft[PITCH])
-        assertLte(tiltStride, vFov * (1 - overlap), EPS)  # tilt overlaps enough
-
-    # we shouldn't be able to remove a column
-    if ncols == 1:
-        pass  # obviously can't remove single column
-    elif ncols == 2:
-        if panMin == -180 and panMax == 180:
-            assertLte(hFov * (1 - overlap), 360)  # one column is not enough
-        else:
-            assertLte(hFov, panMax - panMin, EPS)  # one column is not enough
-    else:
-        if panMin == -180 and panMax == 180:
-            panStride1 = 360 / (ncols - 1)
-        else:
-            panStride1 = ((panMax - panMin) - hFov) / (ncols - 2)
-        assertGte(panStride1, hFov * (1 - overlap), EPS)  # ncols is minimized
-
-    # we shouldn't be able to remove a row
-    if nrows == 1:
-        pass  # obviously can't remove single row
-    elif nrows == 2:
-        assertLte(vFov, tiltMax - tiltMin, EPS)  # one row is not enough
-    else:
-        tiltStride1 = ((tiltMax - tiltMin) - vFov) / (nrows - 2)
-        assertGte(tiltStride1, vFov * (1 - overlap), EPS)  # nrows is minimized
-
-    bottomRight = getEuler(imageCenters[-1], preTilt)
-
-    panCenterMin = topLeft[YAW]
-    panCenterMax = bottomRight[YAW]
-    if panMin == -180 and panMax == 180:
-        assertEqual(panStride * ncols, 360, EPS)  # evenly spaced
-        midPan = np.mean((panCenterMin, panCenterMax))
-        assertEqual(midPan, 0, EPS)  # centered
-    else:
-        if ncols == 1:
-            assertEqual(
-                panCenterMin, 0.5 * (panMin + panMax), EPS
-            )  # single column is centered
-        else:
-            assertEqual(panCenterMin - hFov / 2, panMin, EPS)  # covers to panMin
-            assertEqual(panCenterMax + hFov / 2, panMax, EPS)  # covers to panMax
-
-    tiltCenterMax = topLeft[PITCH]
-    tiltCenterMin = bottomRight[PITCH]
-
-    if nrows == 1:
-        assertEqual(
-            tiltCenterMin, 0.5 * (tiltMin + tiltMax), EPS
-        )  # single row is centered
-    else:
-        assertEqual(tiltCenterMin - vFov / 2, tiltMin, EPS)  # covers to tiltMin
-        assertEqual(tiltCenterMax + vFov / 2, tiltMax, EPS)  # covers to tiltMax
-
-
-def testCase(label, config):
+def test_case(config):
+    label = config["label"]
     print(label, end=": ")
-    pano = panoOrientations(**config)
-    printPano(pano)
-    checkPano(pano, **config)
+    pano = pano_orientations(
+        float(config["pan_radius_degrees"]),
+        float(config["tilt_radius_degrees"]),
+        float(config["h_fov_degrees"]),
+        float(config["v_fov_degrees"]),
+        float(config["overlap"]),
+        float(config["attitude_tolerance_degrees"]),
+    )
+    print_pano(pano)
+    print()
 
 
-# Based on field_of_view_calculator.py, consulting with Oleg, we have:
-SCI_CAM_FOV = [60.8, 47.5]  # degrees
-HAZ_CAM_FOV = [54.8, 43.2]  # degrees
+def do_cases(csv_path):
+    with open(csv_path, "r") as csv_stream:
+        rows = csv.DictReader(csv_stream)
+        for row in rows:
+            test_case(row)
 
-# For panorama configuration, to ensure all sensors have enough overlap, we
-# need to use the combination of (sensor FOV, overlap) that translates to the
-# tightest image spacing.
 
-# The justification for requiring overlap is partly in order to use features in
-# overlapping areas to guide registration, and partly in order to tolerate
-# attitude control errors while collecting the panorama (with more overlap, we
-# are less likely to have accidental gaps in coverage due to pointing errors).
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "in_csv",
+        nargs="?",
+        help="input file of test cases",
+        default="pano_test_cases.csv",
+    )
 
-# Overlapping for registration is not really relevant for the HazCam, given
-# that the geometry mapper currently exclusively relies on NavCam for
-# registration, but it is relevant for registering SciCam images using
-# stitching tools like Hugin. Currently, we don't really know what level of
-# pointing error to expect.
-
-# In the test cases below, we are conservatively using the smaller HazCam FOV
-# with the 30% overlap required by the SciCam. Note that if we were to switch
-# to basing it on the larger SciCam FOV, it would only reduce the image count
-# for a full-sphere pano by ~10-15%, so this seems like an acceptable level
-# of overhead in order to be appropriately conservative.
-
-# == TEST CASE 1 ==
-# Full spherical panorama. Note a small amount of padding has been added to the
-# tilt range to ensure the poles are actually captured. It doesn't change the
-# number of rows required.
-
-# These might be the right parameters for a full-coverage SciCam test pano
-# during SoundSee-Data-3.
-testCase(
-    "Full spherical panorama",
-    {
-        "panMin": -180,
-        "panMax": 180,
-        "tiltMin": -95,
-        "tiltMax": 95,
-        "hFov": HAZ_CAM_FOV[0],
-        "vFov": HAZ_CAM_FOV[1],
-        "overlap": 0.3,
-        "preTilt": 0,
-    },
-)
-
-# == TEST CASE 2 ==
-testCase(
-    "Directional panorama",
-    {
-        "panMin": -60,
-        "panMax": 60,
-        "tiltMin": -30,
-        "tiltMax": 30,
-        "hFov": HAZ_CAM_FOV[0],
-        "vFov": HAZ_CAM_FOV[1],
-        "overlap": 0.3,
-        "preTilt": 0,
-    },
-)
-
-# == TEST CASE 3 ==
-# This test case with a small amount of pre-tilt is useful for sanity checking.
-# We expect preTilt to have a straightforward first-order effect on the pitch
-# values but also a second-order effect on the roll and yaw.
-testCase(
-    "Directional panorama with small pre-tilt",
-    {
-        "panMin": -60,
-        "panMax": 60,
-        "tiltMin": -30,
-        "tiltMax": 30,
-        "hFov": HAZ_CAM_FOV[0],
-        "vFov": HAZ_CAM_FOV[1],
-        "overlap": 0.3,
-        "preTilt": -10,
-    },
-)
-
-# == TEST CASE 4 ==
-# The results look much stranger with pre-tilt set to -90. For example, in the
-# center column of the pano, we expect both the roll and yaw values to flip
-# from 0 (upper part of pano) to +/- 180 (lower part of pano) as the pano
-# crosses the pole. Note: If you see a warning about gimbal lock right at the
-# pole, it should be harmless in this context.  It just indicates that there
-# are multiple valid RPY values that would give the same desired rotation, so
-# it is arbitrarily picking one.
-
-# These might be the right parameters for a SoundSee test pano during
-# SoundSee-Data-3. (The FOV parameters are a bit arbitrary for this type of
-# "virtual imaging" sensor, can double-check with SoundSee folks.)
-testCase(
-    "Directional panorama centered straight down",
-    {
-        "panMin": -60,
-        "panMax": 60,
-        "tiltMin": -60,
-        "tiltMax": 60,
-        "hFov": 60,
-        "vFov": 60,
-        "overlap": 0.3,
-        "preTilt": -90,
-    },
-)
-
-# == TEST CASE 5 ==
-# Test special-case logic for 1-row panorama.
-
-testCase(
-    "1-row panorama",
-    {
-        "panMin": -60,
-        "panMax": 60,
-        "tiltMin": 10,
-        "tiltMax": 20,
-        "hFov": 60,
-        "vFov": 60,
-        "overlap": 0.3,
-        "preTilt": 0,
-    },
-)
-
-# == TEST CASE 6 ==
-# Test special-case logic for 1-column panorama.
-
-testCase(
-    "1-column panorama",
-    {
-        "panMin": 0,
-        "panMax": 0,
-        "tiltMin": -60,
-        "tiltMax": 60,
-        "hFov": 60,
-        "vFov": 60,
-        "overlap": 0.3,
-        "preTilt": 0,
-    },
-)
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    do_cases(args.in_csv)

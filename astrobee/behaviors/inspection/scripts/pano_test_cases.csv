@@ -1,0 +1,8 @@
+"label","pan_radius_degrees","tilt_radius_degrees","h_fov_degrees","v_fov_degrees","overlap","plan_attitude_tolerance_degrees","test_attitude_tolerance_degrees"
+"0_spherical",180,90,59.0,44.8,0.3,5,5
+"1_directional",60,30,59.0,44.8,0.3,7,5
+"2_one_row",60,5,60,60,0.3,7,5
+"3_one_column",0,60,60,60,0.3,7,5
+"4_mapper",180,91.45,59.0,47.7,0.0,5,5
+"5_mapper_and_hugin",180,90,61.2,47.7,0.3,5,5
+"6_nav_hugin",180,90,115.9,85.4,0.3,5,5
