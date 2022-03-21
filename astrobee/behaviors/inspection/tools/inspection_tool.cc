@@ -229,7 +229,7 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
 void SendGoal(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
   // Prepare the goal
   isaac_msgs::InspectionGoal goal;
-    std::string path = std::string(ros::package::getPath("inspection"));
+  std::string path = std::string(ros::package::getPath("inspection"));
   if (FLAGS_pause) {
     goal.command = isaac_msgs::InspectionGoal::PAUSE;
   } else if (FLAGS_resume) {

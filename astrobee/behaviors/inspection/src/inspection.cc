@@ -92,6 +92,7 @@ namespace inspection {
                           tf_target_to_sci_cam.transform.rotation.w);
     } catch (tf2::TransformException &ex) {
       ROS_ERROR("ERROR getting target to sci_cam transform: %s", ex.what());
+      target_to_scicam_rot_ = tf2::Quaternion(0, 0, 0, 1);
     }
 
     // Parameters Panorama survey
@@ -338,6 +339,8 @@ namespace inspection {
                           tf_sci_cam_to_body.transform.rotation.w));
     } catch (tf2::TransformException &ex) {
       ROS_ERROR("ERROR getting sci_cam transform: %s", ex.what());
+      sci_cam_to_body.setOrigin(tf2::Vector3(0, 0, 0));
+      sci_cam_to_body.setRotation(tf2::Quaternion(0, 0, 0, 1));
     }
 
     tf2::Transform target_to_sci_cam;
