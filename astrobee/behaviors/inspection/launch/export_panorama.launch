@@ -17,7 +17,7 @@
 <!-- permissions and limitations under the License.                          -->
 
 <launch>
-  <arg name="name" default="inspection" />
+  <arg name="name" default="export_panorama" />
   <arg name="manager" default="" />
 
   <!-- Context options (NB: THESE ARE OVERRIDDEN BY ENVIRONMENT VARIABLES)       -->
