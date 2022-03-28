@@ -124,19 +124,34 @@ std::shared_ptr<BVHTree> LoadMeshTree(const std::string& mesh_file) {
   return bvh_tree;
 }
 
-void GetDepthData(const std::vector<lc::Time>& timestamps, const std::vector<Eigen::Vector3d>& sensor_t_rays,
-                  const lc::PoseInterpolater& groundtruth_pose_interpolater, const BVHTree& bvh_tree) {
+std::vector<boost::optional<double>> GetDepthData(const std::vector<lc::Time>& timestamps,
+                                                  const std::vector<Eigen::Vector3d>& sensor_t_rays,
+                                                  const lc::PoseInterpolater& groundtruth_pose_interpolater,
+                                                  const BVHTree& bvh_tree) {
+  std::vector<boost::optional<double>> depths;
   for (const auto& timestamp : timestamps) {
     const auto world_T_sensor = groundtruth_pose_interpolater.Interpolate(timestamp);
     if (!world_T_sensor) {
       LOG(ERROR) << "Failed to get groundtruth pose at timstamp " << timestamp;
+      depths.emplace_back(boost::none);
       continue;
     }
     for (const auto& sensor_t_ray : sensor_t_rays) {
-      const auto depth = Depth(sensor_t_ray, *world_T_sensor, bvh_tree);
-      // TODO(Rsoussan): save depth somewhere!!
+      depths.emplace_back(Depth(sensor_t_ray, *world_T_sensor, bvh_tree));
     }
   }
+}
+
+void SaveDepthData(const std::vector<lc::Time>& timestamps, const std::vector<Eigen::Vector3d>& sensor_t_rays,
+                   const std::vector<boost::optional<double>>& depths, const std::string& output_filename) {
+  std::ofstream output_file;
+  output_file.open(output_filename);
+  for (int i = 0; i < timestamps.size(); ++i) {
+    if (!depths[i]) continue;
+    output_file << timestamps[i] << " " << *(depths[i]) << " " << sensor_t_rays[i].z() << " " << sensor_t_rays[i].x()
+                << std::endl;
+  }
+  output_file.close();
 }
 
 int main(int argc, char** argv) {
@@ -225,5 +240,8 @@ int main(int argc, char** argv) {
   const auto groundtruth_pose_interpolater = MakePoseInterpolater(groundtruth_directory, groundtruth_sensor_frame,
                                                                   groundtruth_sensor_T_sensor, timestamp_offset);
   const auto mesh_tree = LoadMeshTree(mesh_file);
-  GetDepthData(query_timestamps, sensor_t_rays, groundtruth_pose_interpolater, *mesh_tree);
+  const auto depths = GetDepthData(query_timestamps, sensor_t_rays, groundtruth_pose_interpolater, *mesh_tree);
+  // TODO(rsoussan): add loading of output filename!
+  const std::string output_filename = "";
+  SaveDepthData(query_timestamps, sensor_t_rays, depths, output_filename);
 }
