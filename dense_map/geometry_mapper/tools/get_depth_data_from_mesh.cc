@@ -16,48 +16,106 @@
  * under the License.
  */
 
-#include <dense_map/depth_data_generator.h>
+// #include <dense_map/depth_data_generator.h>
 #include <ff_common/init.h>
 // TODO(rsoussan): Move set configs fcn to ff_common??
 #include <localization_common/utilities.h>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 #include <glog/logging.h>
 
+#include <experimental/filesystem>
+
+namespace dm = dense_map;
+namespace fs = std::experimental::filesystem;
 namespace po = boost::program_options;
 namespace lc = localization_common;
+
+boost::optional<double> Depth(const Eigen::Vector3d& sensor_t_ray,
+            const Eigen::Isometry3d& world_T_sensor,
+                        const mve::TriangleMesh::Ptr& mesh,
+                        const std::shared_ptr<BVHTree>& bvh_tree,
+                        double min_depth = 1e-3, double max_depth = 1e2) {
+  const Eigen::Vector3d world_F_sensor_t_ray = world_T_sensor.linear() * sensor_t_ray;
+  // Create ray centered at world_t_sensor
+  BVHTree::Ray bvh_ray;
+  bvh_ray.origin = dm::eigen_to_vec3f(world_T_sensor.translation());
+  bvh_ray.dir = dm::eigen_to_vec3f(world_F_sensor_t_ray);
+  bvh_ray.dir.normalize();
+  bvh_ray.tmin = min_depth;
+  bvh_ray.tmax = max_depth;
+
+  // Get intersection if it exists
+  BVHTree::Hit hit;
+  if (bvh_tree->intersect(bvh_ray, &hit)) return hit.t;
+  return boost::none;
+}
+
+lc::Time LoadTimestamp(const std::string& filename, const double timestamp_offset = 0.0) {
+  return dm::filenameToTimestamp(filename) + timestamp_offset;
+}
+
+void LoadTimestampsAndPoses(const std::string& directory, const std::string& sensor_name,
+                            const Eigen::Isometry3d& body_T_sensor, std::vector<lc::Time>& timestamps,
+                            std::vector<Eigen::Isometry3d>& poses, const double timestamp_offset = 0.0) {
+  for (const auto& file : fs::recursive_directory_iterator(directory)) {
+    const std::string filename = file.path().filename();
+    if (boost::algorithm::ends_with(filename, "world.txt") &&
+        std::string::find(filename, sensor_name) != std::string::npos) {
+      timestamps.emplace_back(LoadTimestamp(filename, timestamp_offset));
+      Eigen::Affine3d affine_pose;
+      dm::readAffine(affine_pose, filename);
+      poses.emplace_back(Eigen::Isometry3d(affine_pose.matrix()));
+    }
+  }
+  return timestamps;
+}
+
+std::vector<Eigen::Isometry3d> LoadGroundtruthPoses(const std::string& groundtruth_poses_file) {
+  std::vector<Eigen::Isometry3d> groundtruth_poses;
+  std::string pose;
+  std::ifstream groundtruth_poses_filestream(groundtruth_poses_file);
+  while (groundtruth_poses_filestream >> pose) Eigen::Affine3d affine_pose;
+  dm::readAffine(affine_pose, pose);
+  groundtruth_poses.push_back(Eigen::Isometry3d(affine_pose.matrix()));
+  groundtruth_poses_filestream.close();
+  return groundtruth_poses;
+}
+
+std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_file) {
+  std::vector < Eigen::Vector3d sensor_t_rays;
+  return sensor_t_rays;
+}
 
 int main(int argc, char** argv) {
   std::string robot_config_file;
   std::string world;
+  std::string sensor_frame;
   po::options_description desc(
     "Adds depth data to desired points at provided timestamps.  Uses a provided mesh and sequence of groundtruth poses "
     "to obtain the depth data.");
-  desc.add_options()("help,h", "produce help message")
-("timestamps-file", po::value<std::string>()->required(),
-    "File containing a set of timestamps to generate depth data for. Each timestamped should be on a newline.")
-("image-points-file", po::value<std::string>()->required(),
-    "File containing a set of image points to generate depth data for. Each image point should be on a newline.")
-("sensor-frame", po::value<std::string>()->required(),
-    "Sensor frame to generate depth data in.")
-(
-    "gt-poses-file", po::value<std::string>()->required(),
-    "File containing sequence of groundtruth poses.")
-("gt-pose-frame", po::value<std::string>()->required(),
-    "Frame that the groundtruth poses are in.")
-("mesh", po::value<std::string>()->required(),
-    "Mesh used to provide depth data.")
+  desc.add_options()("help,h", "produce help message")(
+    "timestamps-file", po::value<std::string>()->required(),
+    "File containing a set of timestamps to generate depth data for. Each timestamped should be on a newline.")(
+    "sensor-rays-file", po::value<std::string>()->required(),
+    "File containing a set of rays from the sensor frame to generate depth data for. Each set of ray parameters should "
+    "be on a newline.")("groundtruth-directory", po::value<std::string>()->required(),
+                        "Directory containing groundtruth poses and timestamps.")(
+    "mesh", po::value<std::string>()->required(), "Mesh used to provide depth data.")(
     "config-path,c", po::value<std::string>()->required(), "Path to astrobee config directory.")(
     "robot-config-file,r", po::value<std::string>(&robot_config_file)->default_value("config/robots/bumble.config"),
-    "Robot config file")("world,w", po::value<std::string>(&world)->default_value("iss"), "World name");
+    "Robot config file")("world,w", po::value<std::string>(&world)->default_value("iss"), "World name")
+    // TODO(rsoussan): Add soundsee sensor trafo to astrobee configs!
+    ("sensor-frame", po::value<std::string>(&sensor_frame)->default_value("soundsee"),
+     "Sensor frame to generate depth data in.");
   po::positional_options_description p;
   p.add("timestamps-file", 1);
-  p.add("image-points-file", 1);
+  p.add("sensor-rays-file", 1);
   p.add("sensor-frame", 1);
-  p.add("gt-poses-file", 1);
-  p.add("gt-pose-frame", 1);
+  p.add("groundtruth-directory", 1);
   p.add("mesh", 1);
   p.add("config-path", 1);
   po::variables_map vm;
@@ -74,10 +132,9 @@ int main(int argc, char** argv) {
   }
 
   const std::string timestamps_file = vm["timestamps-file"].as<std::string>();
-  const std::string image_points_file = vm["image-points-file"].as<std::string>();
+  const std::string sensor_rays_file = vm["sensor-rays-file"].as<std::string>();
   const std::string sensor_frame = vm["sensor-frame"].as<std::string>();
-  const std::string gt_poses_file = vm["gt-poses-file"].as<std::string>();
-  const std::string gt_pose_frame = vm["gt-pose-frame"].as<std::string>();
+  const std::string groundtruth_directory = vm["groundtruth-directory"].as<std::string>();
   const std::string mesh = vm["mesh"].as<std::string>();
   const std::string config_path = vm["config-path"].as<std::string>();
 
@@ -86,16 +143,16 @@ int main(int argc, char** argv) {
   int ff_argc = 1;
   ff_common::InitFreeFlyerApplication(&ff_argc, &argv);
 
-  if (!boost::filesystem::exists(timestamps_file)) {
+  if (!fs::exists(timestamps_file)) {
     LOG(FATAL)("Timestamps file " << timestamps_file << " not found.");
   }
-  if (!boost::filesystem::exists(image_points_file)) {
-    LOG(FATAL)("Image points file " << image_points_file << " not found.");
+  if (!fs::exists(sensor_rays_file)) {
+    LOG(FATAL)("Image points file " << sensor_rays_file << " not found.");
   }
-  if (!boost::filesystem::exists(gt_poses_file)) {
-    LOG(FATAL)("Groundtruth poses file " << gt_poses_file << " not found.");
+  if (!fs::exists(groundtruth_directory)) {
+    LOG(FATAL)("Groundtruth directory " << groundtruth_directory << " not found.");
   }
-  if (!boost::filesystem::exists(mesh_file)) {
+  if (!fs::exists(mesh_file)) {
     LOG(FATAL)("Mesh " << mesh_file << " not found.");
   }
 
@@ -106,11 +163,19 @@ int main(int argc, char** argv) {
     LOG(FATAL)("Failed to read config files.");
   }
 
-  // TODO(rsoussan): get vec of timestamps, make struct for image points?, get vec of gt poses, get mesh, get
-  // gt_sensor_T_sensor! Load timestamps like in calibration package! load from csv! how is this done there? same for
-  // image poiints! Use oleg's tools to load gt poses, mesh, and sensor frame Is soundsee sensor frame provided
-  // somewhere? add option to pass in command line using a file?
-
-  dense_map::DepthDataGenerator depth_data_generator(timestamps, image_points, gt_poses, mesh, gt_sensor_T_sensor);
-  depth_data_generator.GetDepthData();
+  const auto timestamps = LoadTimestamps(timestamps_file);
+  const auto sensor_t_rays = LoadSensorRays(sensor_rays_file);
+  const auto body_T_sensor = lc::LoadTransform(config, sensor_frame);
+  // TODO(rsoussan): load this for nav, sci, haz! (AA)
+  // const auto body_T_groundtruth_sensor = lc::LoadTransform(config, groundtruth_frame);
+  // const Eigen::Isometry3d groundtruth_sensor_T_sensor = body_T_groundtruth_sensor.inverse() * body_T_sensor;
+  const auto groundtruth_pose_interpolater = MakePoseInterpolater(groundtruth_directory);
+  // Load the mesh
+  mve::TriangleMesh::Ptr mesh;
+  std::shared_ptr<mve::MeshInfo> mesh_info;
+  std::shared_ptr<tex::Graph> graph;
+  std::shared_ptr<BVHTree> bvh_tree;
+  dm::loadMeshBuildTree(mesh_file, mesh, mesh_info, graph, bvh_tree);
+  // dm::DepthDataGenerator depth_data_generator(timestamps, sensor_rays, groundtruth_pose_interpolator, mesh, bvh_tree,
+  // groundtruth_sensor_T_sensor); depth_data_generator.GetDepthData();
 }

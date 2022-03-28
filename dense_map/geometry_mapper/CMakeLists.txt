@@ -39,6 +39,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   config_reader
+  localization_common
 )
 
 # The quantity CMAKE_PREFIX_PATH can be set as an environmental
@@ -117,7 +118,7 @@ set(TEXRECON_INCLUDE_DIRS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES geometry_mapper
-  CATKIN_DEPENDS roscpp std_msgs nodelet camera interest_point sparse_mapping ff_util isaac_hw_msgs eigen_conversions rosbag cv_bridge image_transport config_reader
+  CATKIN_DEPENDS roscpp std_msgs nodelet camera interest_point sparse_mapping ff_util isaac_hw_msgs eigen_conversions rosbag cv_bridge image_transport config_reader localization_common
 # DEPENDS system_lib
 )
 
