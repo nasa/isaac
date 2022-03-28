@@ -76,9 +76,17 @@ void LoadTimestampsAndPoses(const std::string& directory, const std::string& sen
   }
 }
 
-std::vector<lc::Time> LoadTimestamps(const std::string& timestamps_file) {
+// Assumes each timestamp is on a newline of the file
+std::vector<lc::Time> LoadTimestamps(const std::string& timestamps_filename) {
   std::vector<lc::Time> timestamps;
-  // TODO(rsoussan): Implement this!
+  std::ifstream timestamps_file(timestamps_filename);
+  std::string file_line;
+  lc::Time timestamp;
+  while (std::getline(timestamps_file, file_line)) {
+    std::istringstream line_ss(file_line);
+    line_ss >> timestamp;
+    timestamps.emplace_back(timestamp);
+  }
   return timestamps;
 }
 
@@ -91,8 +99,19 @@ lc::PoseInterpolater MakePoseInterpolater(
   return lc::PoseInterpolater(timestamps, poses);
 }
 
-std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_file) {
+std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filename) {
   std::vector<Eigen::Vector3d> sensor_t_rays;
+  std::ifstream sensor_rays_file(sensor_rays_filename);
+  std::string file_line;
+  double x, y;
+  while (std::getline(sensor_rays_file, file_line)) {
+    std::istringstream line_ss(file_line);
+    line_ss >> x;
+    line_ss >> y;
+    // Assumes each point is sampled from an y,z grid with an x offset of 1.0
+    const Eigen::Vector3d sensor_t_ray(y, 1.0, x);
+    sensor_t_rays.emplace_back(sensor_t_ray);
+  }
   return sensor_t_rays;
 }
 
