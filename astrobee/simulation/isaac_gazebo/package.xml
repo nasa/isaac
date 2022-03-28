@@ -26,6 +26,8 @@
   <build_depend>isaac_util</build_depend>
   <build_depend>isaac_hw_msgs</build_depend>
   <build_depend>isaac_msgs</build_depend>
+  <build_depend>camera</build_depend>
+  <build_depend>jsonloader</build_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>gazebo_ros</run_depend>
   <run_depend>gazebo_plugins</run_depend>
@@ -37,6 +39,8 @@
   <run_depend>isaac_util</run_depend>
   <run_depend>isaac_hw_msgs</run_depend>
   <run_depend>isaac_msgs</run_depend>
+  <run_depend>camera</run_depend>
+  <run_depend>jsonloader</run_depend>
   <export>
     <gazebo_ros plugin_path="${prefix}/lib"/>
     <gazebo_ros gazebo_model_path="${prefix}/../../description/media"/>

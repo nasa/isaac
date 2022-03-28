@@ -143,3 +143,7 @@ jobs:
                           --build-arg ROS_VERSION=noetic
                           --build-arg PYTHON=3
                           -t isaac/isaac:msgs-ubuntu20.04
+
+    - name: Build analyst image isaac/isaac:msgs-ubuntu20.04
+      run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
+                          -t isaac/isaac_analyst_notebook:latest

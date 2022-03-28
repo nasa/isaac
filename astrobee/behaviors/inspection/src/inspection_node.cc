@@ -178,7 +178,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           }
         }
         // Inspection is over, return
-        Result(RESPONSE::SUCCESS);
+        Result(RESPONSE::SUCCESS, "Inspection Over");
         return STATE::WAITING;
       });
     // [5]
@@ -192,7 +192,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           return STATE::VOL_INSPECTION;
         }
         // Inspection is over, return
-        Result(RESPONSE::SUCCESS);
+        Result(RESPONSE::SUCCESS, "Inspection Over");
         Dock("DOCK");
         return STATE::RETURN_INSPECTION;
       });
@@ -595,9 +595,13 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // A new arm action has been called
   void GoalCallback(isaac_msgs::InspectionGoalConstPtr const& goal) {
     if (!goal_.inspect_poses.poses.empty()) {
+      isaac_msgs::InspectionResult result;
       switch (goal->command) {
       // Pause command
       case isaac_msgs::InspectionGoal::PAUSE:
+          result.fsm_result = "Pausing";
+          result.response = RESPONSE::SUCCESS;
+          server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
         return fsm_.Update(GOAL_PAUSE);
       // Resume command
       case isaac_msgs::InspectionGoal::RESUME:
@@ -605,25 +609,24 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Skip command
       case isaac_msgs::InspectionGoal::SKIP:
       {
-        isaac_msgs::InspectionResult result;
-        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size()) {
+        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size() - 1) {
           // Skip the current pose
           goal_counter_++;
-
           result.fsm_result = "Skipped pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
+          return fsm_.Update(GOAL_PAUSE);
         } else {
           result.fsm_result = "Nothing to skip";
           result.response = RESPONSE::INVALID_COMMAND;
           server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
+          return fsm_.Update(GOAL_PAUSE);
         }
         return;
       }
       // Repeat last executed step command
       case isaac_msgs::InspectionGoal::REPEAT:
       {
-        isaac_msgs::InspectionResult result;
         if (!goal_.inspect_poses.poses.empty() && goal_counter_ > 0) {
           // Go back to the last pose
           goal_counter_--;
@@ -631,10 +634,12 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           result.fsm_result = "Will repeat last pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
+          return fsm_.Update(GOAL_PAUSE);
         } else {
           result.fsm_result = "Nothing to repeat";
           result.response = RESPONSE::INVALID_COMMAND;
           server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
+          return fsm_.Update(GOAL_PAUSE);
         }
         return;
       }
@@ -654,8 +659,16 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
                    << goal_.inspect_poses.poses[i].orientation.w << "\n";
           }
           myfile.close();
+          result.fsm_result = "Saved";
+          result.response = RESPONSE::SUCCESS;
+          server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
+          return fsm_.Update(GOAL_PAUSE);
         } else {
           NODELET_ERROR_STREAM("Nothing to save");
+          result.fsm_result = "Nothing to save";
+          result.response = RESPONSE::FAILED;
+          server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
+          return fsm_.Update(GOAL_PAUSE);
         }
         return;
       }

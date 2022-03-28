@@ -19,10 +19,12 @@
 # under the License.
 
 thisdir=$(dirname "$(readlink -f "$0")")
-rootdir=${thisdir}/../../..
-export IDI_PATH=${IDI_PATH:-${rootdir}/../isaac_data_interface}
-export MAST_PATH=${MAST_PATH:-${rootdir}/../mast}
-docker stop isaac
-docker rm isaac
-docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml down \
+
+# stop isaac container if it exists
+docker stop isaac 2>/dev/null
+docker rm isaac 2>/dev/null
+
+# stop all docker-compose combinations
+docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml -f ${thisdir}/docker_compose/analyst.docker-compose.yml down \
+||docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml down \
 || docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml down
