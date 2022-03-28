@@ -16,10 +16,16 @@
  * under the License.
  */
 
-// #include <dense_map/depth_data_generator.h>
+#include <dense_map_utils.h>
 #include <ff_common/init.h>
+#include <localization_common/pose_interpolater.h>
 // TODO(rsoussan): Move set configs fcn to ff_common??
 #include <localization_common/utilities.h>
+#include <msg_conversions/msg_conversions.h>
+#include <texture_processing.h>
+
+#include <acc/bvh_tree.h>
+#include <mve/mesh.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -27,12 +33,11 @@
 
 #include <glog/logging.h>
 
-#include <experimental/filesystem>
-
 namespace dm = dense_map;
-namespace fs = std::experimental::filesystem;
+namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 namespace lc = localization_common;
+namespace mc = msg_conversions;
 
 boost::optional<double> Depth(const Eigen::Vector3d& sensor_t_ray, const Eigen::Isometry3d& world_T_sensor,
                               const mve::TriangleMesh::Ptr& mesh, const std::shared_ptr<BVHTree>& bvh_tree,
@@ -53,7 +58,7 @@ boost::optional<double> Depth(const Eigen::Vector3d& sensor_t_ray, const Eigen::
 }
 
 lc::Time LoadTimestamp(const std::string& filename, const double timestamp_offset = 0.0) {
-  return dm::filenameToTimestamp(filename) + timestamp_offset;
+  return dm::fileNameToTimestamp(filename) + timestamp_offset;
 }
 
 void LoadTimestampsAndPoses(const std::string& directory, const std::string& sensor_name,
@@ -61,9 +66,8 @@ void LoadTimestampsAndPoses(const std::string& directory, const std::string& sen
                             const Eigen::Isometry3d& poses_sensor_T_sensor = Eigen::Isometry3d::Identity(),
                             const double timestamp_offset = 0.0) {
   for (const auto& file : fs::recursive_directory_iterator(directory)) {
-    const std::string filename = file.path().filename();
-    if (boost::algorithm::ends_with(filename, "world.txt") &&
-        std::string::find(filename, sensor_name) != std::string::npos) {
+    const std::string filename = file.path().filename().string();
+    if (boost::algorithm::ends_with(filename, "world.txt") && filename.find(sensor_name) != std::string::npos) {
       timestamps.emplace_back(LoadTimestamp(filename, timestamp_offset));
       Eigen::Affine3d affine_pose;
       dm::readAffine(affine_pose, filename);
@@ -71,20 +75,19 @@ void LoadTimestampsAndPoses(const std::string& directory, const std::string& sen
       poses.push_back(world_T_poses_sensor * poses_sensor_T_sensor);
     }
   }
-  return timestamps;
 }
 
-lc::PoseInterpolator MakePoseInerpolator(const std::string& directory, const std::string& sensor_name,
+lc::PoseInterpolater MakePoseInerpolater(const std::string& directory, const std::string& sensor_name,
                                          const Eigen::Isometry3d& poses_sensor_T_sensor = Eigen::Isometry3d::Identity(),
                                          const double timestamp_offset = 0.0) {
   std::vector<lc::Time> timestamps;
   std::vector<Eigen::Isometry3d> poses;
   LoadTimestampsAndPoses(directory, sensor_name, timestamps, poses, poses_sensor_T_sensor, timestamp_offset);
-  return lc::PoseInterpolator(timestamps, poses);
+  return lc::PoseInterpolater(timestamps, poses);
 }
 
 std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_file) {
-  std::vector < Eigen::Vector3d sensor_t_rays;
+  std::vector<Eigen::Vector3d> sensor_t_rays;
   return sensor_t_rays;
 }
 
@@ -131,7 +134,7 @@ int main(int argc, char** argv) {
 
   const std::string sensor_rays_file = vm["sensor-rays-file"].as<std::string>();
   const std::string groundtruth_directory = vm["groundtruth-directory"].as<std::string>();
-  const std::string mesh = vm["mesh"].as<std::string>();
+  const std::string mesh_file = vm["mesh"].as<std::string>();
   const std::string config_path = vm["config-path"].as<std::string>();
 
   // Only pass program name to free flyer so that boost command line options
@@ -140,34 +143,36 @@ int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&ff_argc, &argv);
 
   if (!fs::exists(sensor_rays_file)) {
-    LOG(FATAL)("Sensor rays file " << sensor_rays_file << " not found.");
+    LOG(FATAL) << "Sensor rays file " << sensor_rays_file << " not found.";
   }
   if (!fs::exists(groundtruth_directory)) {
-    LOG(FATAL)("Groundtruth directory " << groundtruth_directory << " not found.");
+    LOG(FATAL) << "Groundtruth directory " << groundtruth_directory << " not found.";
   }
   if (!fs::exists(mesh_file)) {
-    LOG(FATAL)("Mesh " << mesh_file << " not found.");
+    LOG(FATAL) << "Mesh " << mesh_file << " not found.";
   }
 
   lc::SetEnvironmentConfigs(config_path, world, robot_config_file);
   config_reader::ConfigReader config;
   config.AddFile("geometry.config");
   if (!config.ReadFiles()) {
-    LOG(FATAL)("Failed to read config files.");
+    LOG(FATAL) << "Failed to read config files.";
   }
 
   const auto sensor_t_rays = LoadSensorRays(sensor_rays_file);
-  const auto body_T_sensor = lc::LoadTransform(config, sensor_frame);
-  const auto body_T_groundtruth_sensor = lc::LoadTransform(config, groundtruth_sensor_frame);
+  const auto body_T_sensor = mc::LoadEigenTransform(config, sensor_frame);
+  const auto body_T_groundtruth_sensor = mc::LoadEigenTransform(config, groundtruth_sensor_frame);
   const Eigen::Isometry3d groundtruth_sensor_T_sensor = body_T_groundtruth_sensor.inverse() * body_T_sensor;
-  const auto groundtruth_pose_interpolator =
-    MakePoseInerpolator(groundtruth_directory, groundtruth_sensor_name, groundtruth_sensor_T_sensor, timestamp_offset);
+  // TODO(rsoussan): Load this!!
+  const double timestamp_offset = 0;
+  const auto groundtruth_pose_interpolater =
+    MakePoseInerpolater(groundtruth_directory, groundtruth_sensor_frame, groundtruth_sensor_T_sensor, timestamp_offset);
   // Load the mesh
   mve::TriangleMesh::Ptr mesh;
   std::shared_ptr<mve::MeshInfo> mesh_info;
   std::shared_ptr<tex::Graph> graph;
   std::shared_ptr<BVHTree> bvh_tree;
   dm::loadMeshBuildTree(mesh_file, mesh, mesh_info, graph, bvh_tree);
-  // dm::DepthDataGenerator depth_data_generator(timestamps, sensor_rays, groundtruth_pose_interpolator, mesh, bvh_tree,
+  // dm::DepthDataGenerator depth_data_generator(timestamps, sensor_rays, groundtruth_pose_interpolater, mesh, bvh_tree,
   // groundtruth_sensor_T_sensor); depth_data_generator.GetDepthData();
 }
