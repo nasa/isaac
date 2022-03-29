@@ -159,6 +159,7 @@ int main(int argc, char** argv) {
   std::string world;
   std::string sensor_frame;
   std::string groundtruth_sensor_frame;
+  std::string output_file;
   double timestamp_offset;
   po::options_description desc(
     "Adds depth data to desired points at provided timestamps.  Uses a provided mesh and sequence of groundtruth poses "
@@ -173,7 +174,10 @@ int main(int argc, char** argv) {
     "mesh", po::value<std::string>()->required(), "Mesh used to provide depth data.")(
     "config-path,c", po::value<std::string>()->required(), "Path to astrobee config directory.")(
     "robot-config-file,r", po::value<std::string>(&robot_config_file)->default_value("config/robots/bumble.config"),
-    "Robot config file")("world,w", po::value<std::string>(&world)->default_value("iss"), "World name")
+    "Robot config file")("world,w", po::value<std::string>(&world)->default_value("iss"), "World name")(
+    "output-file", po::value<std::string>(&output_file)->default_value("depths.csv"),
+    "Output file containing timestamp, depth, x, y values on each line. Timestamps for which depth data was not "
+    "successfully loaded are not included in the output.")
     // TODO(rsoussan): Add soundsee sensor trafo to astrobee configs!
     ("sensor-frame,s", po::value<std::string>(&sensor_frame)->default_value("soundsee"),
      "Sensor frame to generate depth data in.")(
@@ -241,7 +245,5 @@ int main(int argc, char** argv) {
                                                                   groundtruth_sensor_T_sensor, timestamp_offset);
   const auto mesh_tree = LoadMeshTree(mesh_file);
   const auto depths = GetDepthData(query_timestamps, sensor_t_rays, groundtruth_pose_interpolater, *mesh_tree);
-  // TODO(rsoussan): add loading of output filename!
-  const std::string output_filename = "";
-  SaveDepthData(query_timestamps, sensor_t_rays, depths, output_filename);
+  SaveDepthData(query_timestamps, sensor_t_rays, depths, output_file);
 }
