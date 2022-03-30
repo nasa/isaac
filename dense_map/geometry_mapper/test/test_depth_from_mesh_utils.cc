@@ -18,13 +18,15 @@
  */
 
 #include <depth_from_mesh_utils.h>
+#include <localization_common/utilities.h>
 #include <texture_processing.h>
 
 #include <gtest/gtest.h>
 
 namespace dm = dense_map;
+namespace lc = localization_common;
 
-TEST(DepthFromMeshTester, NoRotationDepths) {
+TEST(DepthFromMeshTester, Depth) {
   std::vector<unsigned int> ids{0, 1, 2};
   std::vector<math::Vec3f> vertices;
   // Build a mesh with a single triangule along the yz plane, offset from the x axis by 1
@@ -71,6 +73,18 @@ TEST(DepthFromMeshTester, NoRotationDepths) {
     const Eigen::Vector3d sensor_t_ray(0, 0, 1);
     const auto depth = dm::Depth(sensor_t_ray, world_T_sensor, *bvh_tree);
     EXPECT_TRUE(depth == boost::none);
+  }
+  // Poses with ray facing mesh at an angle
+  {
+    auto world_T_sensor = Eigen::Isometry3d::Identity();
+    const double yaw_degrees = 45.0;
+    world_T_sensor.linear() = lc::RotationFromEulerAngles(yaw_degrees, 0, 0);
+    // Create a ray facing along the x axis
+    const Eigen::Vector3d sensor_t_ray(1, 0, 0);
+    const auto depth = dm::Depth(sensor_t_ray, world_T_sensor, *bvh_tree);
+    const double expected_depth = 1.0 / std::cos(yaw_degrees * M_PI / 180.0);
+    ASSERT_TRUE(depth != boost::none);
+    EXPECT_NEAR(*depth, expected_depth, 1e-6);
   }
 }
 
