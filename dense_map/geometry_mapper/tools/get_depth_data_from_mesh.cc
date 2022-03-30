@@ -51,7 +51,10 @@ boost::optional<double> Depth(const Eigen::Vector3d& sensor_t_ray, const Eigen::
 
   // Get intersection if it exists
   BVHTree::Hit hit;
-  if (bvh_tree.intersect(bvh_ray, &hit)) return hit.t;
+  if (bvh_tree.intersect(bvh_ray, &hit))
+    return hit.t;
+  else
+    LOG(DEBUG) << "Failed to get mesh intersection.";
   return boost::none;
 }
 
@@ -70,7 +73,9 @@ void LoadTimestampsAndPoses(const std::string& directory, const std::string& sen
     if (boost::algorithm::ends_with(filename, "world.txt") && filename.find(sensor_name) != std::string::npos) {
       timestamps.emplace_back(LoadTimestamp(filename, timestamp_offset));
       Eigen::Affine3d affine_pose;
-      dm::readAffine(affine_pose, filename);
+      if (!dm::readAffine(affine_pose, file.path().string())) {
+        LOG(FATAL) << "Failed to read pose for filename " << filename;
+      }
       const Eigen::Isometry3d world_T_poses_sensor(affine_pose.matrix());
       poses.push_back(world_T_poses_sensor * poses_sensor_T_sensor);
     }
@@ -241,7 +246,7 @@ int main(int argc, char** argv) {
   }
 
   const auto sensor_t_rays = LoadSensorRays(sensor_rays_file);
-  const auto query_timestamps = LoadTimestamps("");
+  const auto query_timestamps = LoadTimestamps(timestamps_file);
   const auto body_T_sensor = mc::LoadEigenTransform(config, sensor_frame + "_transform");
   const auto body_T_groundtruth_sensor = mc::LoadEigenTransform(config, groundtruth_sensor_frame + "_transform");
   const Eigen::Isometry3d groundtruth_sensor_T_sensor = body_T_groundtruth_sensor.inverse() * body_T_sensor;
