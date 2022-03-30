@@ -226,6 +226,18 @@ add_executable(streaming_mapper tools/streaming_mapper.cc)
 target_link_libraries(streaming_mapper
     geometry_mapper_lib gflags glog)
 
+if(CATKIN_ENABLE_TESTING)
+ find_package(rostest REQUIRED)
+  add_rostest_gtest(test_depth_from_mesh_utils
+    test/test_depth_from_mesh_utils.test
+    test/test_depth_from_mesh_utils.cc
+  )
+  target_link_libraries(test_depth_from_mesh_utils
+    ${PROJECT_NAME}_lib ${catkin_LIBRARIES} 
+  )
+
+endif()
+ 
 #############
 ## Install ##
 #############
