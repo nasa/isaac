@@ -142,6 +142,7 @@ std::vector<boost::optional<double>> GetDepthData(const std::vector<lc::Time>& t
       depths.emplace_back(Depth(sensor_t_ray, *world_T_sensor, bvh_tree));
     }
   }
+  return depths;
 }
 
 void SaveDepthData(const std::vector<lc::Time>& timestamps, const std::vector<Eigen::Vector3d>& sensor_t_rays,
