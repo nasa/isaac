@@ -142,6 +142,7 @@ add_definitions(${PCL_DEFINITIONS})
 
 # Declare a C++ library
 add_library(geometry_mapper_lib
+    src/depth_from_mesh_utils.cc
     src/dense_map_utils.cc
     src/dense_map_ros_utils.cc
     src/TinyEXIF.cc
