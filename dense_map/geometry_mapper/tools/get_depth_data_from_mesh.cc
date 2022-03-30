@@ -54,7 +54,7 @@ boost::optional<double> Depth(const Eigen::Vector3d& sensor_t_ray, const Eigen::
   if (bvh_tree.intersect(bvh_ray, &hit))
     return hit.t;
   else
-    LOG(DEBUG) << "Failed to get mesh intersection.";
+    VLOG(2) << "Failed to get mesh intersection.";
   return boost::none;
 }
 
@@ -117,7 +117,7 @@ std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filen
     line_ss >> y;
     // Assumes each point is sampled from a y, z grid with an x offset of 1.0
     const Eigen::Vector3d sensor_t_ray(1.0, y, z);
-    sensor_t_rays.emplace_back(sensor_t_ray);
+    sensor_t_rays.emplace_back(sensor_t_ray.normalized());
   }
   return sensor_t_rays;
 }
@@ -156,8 +156,8 @@ void SaveDepthData(const std::vector<lc::Time>& timestamps, const std::vector<Ei
   output_file.open(output_filename);
   for (int i = 0; i < timestamps.size(); ++i) {
     if (!depths[i]) continue;
-    output_file << timestamps[i] << " " << *(depths[i]) << " " << sensor_t_rays[i].z() << " " << sensor_t_rays[i].x()
-                << std::endl;
+    output_file << std::setprecision(20) << timestamps[i] << " " << *(depths[i]) << " " << sensor_t_rays[i].z() << " "
+                << sensor_t_rays[i].x() << std::endl;
   }
   output_file.close();
 }
@@ -254,5 +254,10 @@ int main(int argc, char** argv) {
                                                                   groundtruth_sensor_T_sensor, timestamp_offset);
   const auto mesh_tree = LoadMeshTree(mesh_file);
   const auto depths = GetDepthData(query_timestamps, sensor_t_rays, groundtruth_pose_interpolater, *mesh_tree);
+  int depth_count = 0;
+  for (const auto& depth : depths) {
+    if (depth) ++depth_count;
+  }
+  LOG(INFO) << "Got " << depth_count << " of " << query_timestamps.size() << " depths successfully.";
   SaveDepthData(query_timestamps, sensor_t_rays, depths, output_file);
 }
