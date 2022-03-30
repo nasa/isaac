@@ -88,6 +88,19 @@ TEST(DepthFromMeshTester, Depth) {
   }
 }
 
+TEST(DepthFromMeshTester, LoadTimestamp) {
+  {
+    const std::string filename("123.456_world.txt");
+    const auto timestamp = dm::LoadTimestamp(filename);
+    EXPECT_NEAR(timestamp, 123.456, 1e-6);
+  }
+  {
+    const std::string filename("123.456_world.txt");
+    const auto timestamp = dm::LoadTimestamp(filename, 10);
+    EXPECT_NEAR(timestamp, 133.456, 1e-6);
+  }
+}
+
 // Run all the tests that were declared with TEST()
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
