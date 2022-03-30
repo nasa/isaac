@@ -108,10 +108,8 @@ std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filen
   double y, z;
   while (std::getline(sensor_rays_file, file_line)) {
     std::istringstream line_ss(file_line);
-    // TODO(rsoussan): Correct order?
-    line_ss >> z;
     line_ss >> y;
-    // Assumes each point is sampled from a y, z grid with an x offset of 1.0
+    line_ss >> z;
     const Eigen::Vector3d sensor_t_ray(1.0, y, z);
     sensor_t_rays.emplace_back(sensor_t_ray.normalized());
   }

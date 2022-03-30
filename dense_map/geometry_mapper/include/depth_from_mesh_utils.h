@@ -19,7 +19,6 @@
 #ifndef DEPTH_FROM_MESH_UTILS_H_
 #define DEPTH_FROM_MESH_UTILS_H_
 
-
 #include <localization_common/pose_interpolater.h>
 #include <localization_common/time.h>
 
@@ -54,6 +53,8 @@ localization_common::PoseInterpolater MakePoseInterpolater(
   const std::string& directory, const std::string& sensor_name,
   const Eigen::Isometry3d& poses_sensor_T_sensor = Eigen::Isometry3d::Identity(), const double timestamp_offset = 0.0);
 
+// Assumes each point is sampled from an y, z grid with an x offset of 1.0
+// Points are entered as "y z" values with new points on a newline in the file
 std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filename);
 
 std::shared_ptr<BVHTree> LoadMeshTree(const std::string& mesh_file);

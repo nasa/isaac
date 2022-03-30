@@ -19,6 +19,7 @@
 
 #include <depth_from_mesh_utils.h>
 #include <localization_common/utilities.h>
+#include <localization_common/test_utilities.h>
 #include <texture_processing.h>
 
 #include <glog/logging.h>
@@ -106,8 +107,14 @@ TEST(DepthFromMeshTester, LoadTimestamp) {
   }
 }
 
+TEST(DepthFromMeshTester, LoadSensorRays) {
+  const std::string filename(DATA_DIR + "/sensor_rays.csv");
+  const auto sensor_rays = dm::LoadSensorRays(filename);
+  EXPECT_MATRIX_NEAR(sensor_rays[0], Eigen::Vector3d(1, 1.23, 4.56).normalized(), 1e-6);
+  EXPECT_MATRIX_NEAR(sensor_rays[1], Eigen::Vector3d(1, 7.888999, 99999.111222).normalized(), 1e-6);
+}
+
 TEST(DepthFromMeshTester, LoadTimestamps) {
-  LOG(INFO) << "Data dir: " << DATA_DIR;
   const std::string filename(DATA_DIR + "/timestamps.csv");
   const auto timestamps = dm::LoadTimestamps(filename);
   EXPECT_NEAR(timestamps[0], 1.11, 1e-6);
