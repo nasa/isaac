@@ -19,7 +19,6 @@
 #include <dense_map_utils.h>
 #include <ff_common/init.h>
 #include <localization_common/pose_interpolater.h>
-// TODO(rsoussan): Move set configs fcn to ff_common??
 #include <localization_common/utilities.h>
 #include <msg_conversions/msg_conversions.h>
 #include <texture_processing.h>
@@ -103,13 +102,14 @@ std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filen
   std::vector<Eigen::Vector3d> sensor_t_rays;
   std::ifstream sensor_rays_file(sensor_rays_filename);
   std::string file_line;
-  double x, y;
+  double y, z;
   while (std::getline(sensor_rays_file, file_line)) {
     std::istringstream line_ss(file_line);
-    line_ss >> x;
+    // TODO(rsoussan): Correct order?
+    line_ss >> z;
     line_ss >> y;
-    // Assumes each point is sampled from an y,z grid with an x offset of 1.0
-    const Eigen::Vector3d sensor_t_ray(y, 1.0, x);
+    // Assumes each point is sampled from a y, z grid with an x offset of 1.0
+    const Eigen::Vector3d sensor_t_ray(1.0, y, z);
     sensor_t_rays.emplace_back(sensor_t_ray);
   }
   return sensor_t_rays;
@@ -166,11 +166,12 @@ int main(int argc, char** argv) {
     "to obtain the depth data.");
   desc.add_options()("help,h", "produce help message")(
     "timestamps-file", po::value<std::string>()->required(),
-    "File containing a set of timestamps to generate depth data for. Each timestamped should be on a newline.")(
+    "File containing a set of timestamps to generate depth data for. Each timestamp should be on a newline.")(
     "sensor-rays-file", po::value<std::string>()->required(),
-    "File containing a set of rays from the sensor frame to generate depth data for. Each set of ray parameters should "
-    "be on a newline.")("groundtruth-directory", po::value<std::string>()->required(),
-                        "Directory containing groundtruth poses and timestamps files.")(
+    "File containing a set of rays from the sensor frame to generate depth data for. Each point has an assumed x "
+    "offset of 1 meter from the sensor, so only y z pairs are required.  Each point pair should be on a newline.")(
+    "groundtruth-directory", po::value<std::string>()->required(),
+    "Directory containing groundtruth poses with timestamps as filenames.")(
     "mesh", po::value<std::string>()->required(), "Mesh used to provide depth data.")(
     "config-path,c", po::value<std::string>()->required(), "Path to astrobee config directory.")(
     "robot-config-file,r", po::value<std::string>(&robot_config_file)->default_value("config/robots/bumble.config"),
@@ -181,7 +182,7 @@ int main(int argc, char** argv) {
     // TODO(rsoussan): Add soundsee sensor trafo to astrobee configs!
     ("sensor-frame,s", po::value<std::string>(&sensor_frame)->default_value("soundsee"),
      "Sensor frame to generate depth data in.")(
-      "groundtruth-sensor-frame", po::value<std::string>(&groundtruth_sensor_frame)->default_value("nav_cam"),
+      "groundtruth-sensor-frame,g", po::value<std::string>(&groundtruth_sensor_frame)->default_value("nav_cam"),
       "Sensor frame of groundtruth poses.")("timestamp-offset,o",
                                             po::value<double>(&timestamp_offset)->default_value(0.0),
                                             "Timestamp offset for the sensor used to generate groundtruth poses.");
@@ -238,8 +239,8 @@ int main(int argc, char** argv) {
 
   const auto sensor_t_rays = LoadSensorRays(sensor_rays_file);
   const auto query_timestamps = LoadTimestamps("");
-  const auto body_T_sensor = mc::LoadEigenTransform(config, sensor_frame);
-  const auto body_T_groundtruth_sensor = mc::LoadEigenTransform(config, groundtruth_sensor_frame);
+  const auto body_T_sensor = mc::LoadEigenTransform(config, sensor_frame + "_transform");
+  const auto body_T_groundtruth_sensor = mc::LoadEigenTransform(config, groundtruth_sensor_frame + "_transform");
   const Eigen::Isometry3d groundtruth_sensor_T_sensor = body_T_groundtruth_sensor.inverse() * body_T_sensor;
   const auto groundtruth_pose_interpolater = MakePoseInterpolater(groundtruth_directory, groundtruth_sensor_frame,
                                                                   groundtruth_sensor_T_sensor, timestamp_offset);
