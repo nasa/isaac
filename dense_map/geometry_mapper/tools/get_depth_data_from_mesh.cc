@@ -56,7 +56,9 @@ boost::optional<double> Depth(const Eigen::Vector3d& sensor_t_ray, const Eigen::
 }
 
 lc::Time LoadTimestamp(const std::string& filename, const double timestamp_offset = 0.0) {
-  return dm::fileNameToTimestamp(filename) + timestamp_offset;
+  const std::string timestamp_string = filename.substr(0, filename.find("_"));
+  if (timestamp_string.empty()) LOG(FATAL) << "Failed to load timestamp from filename.";
+  return std::stod(timestamp_string) + timestamp_offset;
 }
 
 void LoadTimestampsAndPoses(const std::string& directory, const std::string& sensor_name,
