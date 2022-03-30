@@ -17,5 +17,6 @@
 <!-- permissions and limitations under the License.                          -->
 
 <launch>
+  <env name="DATA_DIR" value="$(find geometry_mapper)/test/data/" />
   <test pkg="dense_map" type="test_depth_from_mesh_utils" test-name="test_depth_from_mesh_utils" />
 </launch>

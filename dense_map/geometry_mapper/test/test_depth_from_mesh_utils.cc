@@ -21,10 +21,15 @@
 #include <localization_common/utilities.h>
 #include <texture_processing.h>
 
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 
 namespace dm = dense_map;
 namespace lc = localization_common;
+
+// TODO(rsoussan): put this back!!
+const std::string DATA_DIR =
+  "/home/rsoussan/isaac/src/dense_map/geometry_mapper/test/data";  // std::string(std::getenv("DATA_DIR"));
 
 TEST(DepthFromMeshTester, Depth) {
   std::vector<unsigned int> ids{0, 1, 2};
@@ -99,6 +104,15 @@ TEST(DepthFromMeshTester, LoadTimestamp) {
     const auto timestamp = dm::LoadTimestamp(filename, 10);
     EXPECT_NEAR(timestamp, 133.456, 1e-6);
   }
+}
+
+TEST(DepthFromMeshTester, LoadTimestamps) {
+  LOG(INFO) << "Data dir: " << DATA_DIR;
+  const std::string filename(DATA_DIR + "/timestamps.csv");
+  const auto timestamps = dm::LoadTimestamps(filename);
+  EXPECT_NEAR(timestamps[0], 1.11, 1e-6);
+  EXPECT_NEAR(timestamps[1], 2.222, 1e-6);
+  EXPECT_NEAR(timestamps[2], 333.3333, 1e-6);
 }
 
 // Run all the tests that were declared with TEST()

@@ -233,7 +233,7 @@ if(CATKIN_ENABLE_TESTING)
     test/test_depth_from_mesh_utils.cc
   )
   target_link_libraries(test_depth_from_mesh_utils
-    ${PROJECT_NAME}_lib ${catkin_LIBRARIES} 
+    ${PROJECT_NAME}_lib glog ${catkin_LIBRARIES} 
   )
 
 endif()
