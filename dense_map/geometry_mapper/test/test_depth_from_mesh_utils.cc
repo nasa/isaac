@@ -117,9 +117,32 @@ TEST(DepthFromMeshTester, LoadSensorRays) {
 TEST(DepthFromMeshTester, LoadTimestamps) {
   const std::string filename(DATA_DIR + "/timestamps.csv");
   const auto timestamps = dm::LoadTimestamps(filename);
+  ASSERT_EQ(timestamps.size(), 3);
   EXPECT_NEAR(timestamps[0], 1.11, 1e-6);
   EXPECT_NEAR(timestamps[1], 2.222, 1e-6);
   EXPECT_NEAR(timestamps[2], 333.3333, 1e-6);
+}
+
+TEST(DepthFromMeshTester, LoadTimestampsAndPoses) {
+  const std::string directory_name(DATA_DIR);
+  std::vector<lc::Time> timestamps;
+  std::vector<Eigen::Isometry3d> poses;
+  dm::LoadTimestampsAndPoses(directory_name, "nav_cam", timestamps, poses);
+  ASSERT_EQ(timestamps.size(), 3);
+  ASSERT_EQ(poses.size(), 3);
+  {
+    EXPECT_NEAR(timestamps[0], 1234.22, 1e-6);
+    EXPECT_MATRIX_NEAR(poses[0], Eigen::Isometry3d::Identity(), 1e-6);
+  }
+  {
+    EXPECT_NEAR(timestamps[1], 313131.99, 1e-6);
+    EXPECT_MATRIX_NEAR(
+      poses[1], lc::Isometry3d(Eigen::Vector3d(-1.1, -0.22, 300.3), lc::RotationFromEulerAngles(45, 45, 45)), 1e-6);
+  }
+  {
+    EXPECT_NEAR(timestamps[2], 22222.1119, 1e-6);
+    EXPECT_MATRIX_NEAR(poses[2], lc::Isometry3d(Eigen::Vector3d(1, 2.22, -3.33), Eigen::Matrix3d::Identity()), 1e-6);
+  }
 }
 
 // Run all the tests that were declared with TEST()
