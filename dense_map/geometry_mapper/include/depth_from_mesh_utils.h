@@ -50,8 +50,9 @@ void LoadTimestampsAndPoses(const std::string& directory, const std::string& sen
 std::vector<localization_common::Time> LoadTimestamps(const std::string& timestamps_filename);
 
 localization_common::PoseInterpolater MakePoseInterpolater(
-  const std::string& directory, const std::string& sensor_name,
-  const Eigen::Isometry3d& poses_sensor_T_sensor = Eigen::Isometry3d::Identity(), const double timestamp_offset = 0.0);
+  const std::string& directory, const Eigen::Isometry3d& body_T_sensor,
+  const std::vector<std::string>& groundtruth_sensor_names,
+  const std::vector<Eigen::Isometry3d>& body_T_groundtruth_sensor_vec, const std::vector<double>& timestamp_offsets);
 
 // Assumes each point is sampled from an y, z grid with an x offset of 1.0
 // Points are entered as "y z" values with new points on a newline in the file

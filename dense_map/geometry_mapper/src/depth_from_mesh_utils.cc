@@ -62,8 +62,7 @@ lc::Time LoadTimestamp(const std::string& filename, const double timestamp_offse
 
 void LoadTimestampsAndPoses(const std::string& directory, const std::string& sensor_name,
                             std::vector<lc::Time>& timestamps, std::vector<Eigen::Isometry3d>& poses,
-                            const Eigen::Isometry3d& poses_sensor_T_sensor,
-                            const double timestamp_offset) {
+                            const Eigen::Isometry3d& poses_sensor_T_sensor, const double timestamp_offset) {
   for (const auto& file : fs::recursive_directory_iterator(directory)) {
     const std::string filename = file.path().filename().string();
     if (boost::algorithm::ends_with(filename, "world.txt") && filename.find(sensor_name) != std::string::npos) {
@@ -92,12 +91,16 @@ std::vector<lc::Time> LoadTimestamps(const std::string& timestamps_filename) {
   return timestamps;
 }
 
-lc::PoseInterpolater MakePoseInterpolater(
-  const std::string& directory, const std::string& sensor_name,
-  const Eigen::Isometry3d& poses_sensor_T_sensor, const double timestamp_offset) {
+lc::PoseInterpolater MakePoseInterpolater(const std::string& directory, const Eigen::Isometry3d& body_T_sensor,
+                                          const std::vector<std::string>& groundtruth_sensor_names,
+                                          const std::vector<Eigen::Isometry3d>& body_T_groundtruth_sensor_vec,
+                                          const std::vector<double>& timestamp_offsets) {
   std::vector<lc::Time> timestamps;
   std::vector<Eigen::Isometry3d> poses;
-  LoadTimestampsAndPoses(directory, sensor_name, timestamps, poses, poses_sensor_T_sensor, timestamp_offset);
+  for (int i = 0; i < groundtruth_sensor_names.size(); ++i) {
+    LoadTimestampsAndPoses(directory, groundtruth_sensor_names[i], timestamps, poses,
+                           (body_T_groundtruth_sensor_vec[i]).inverse() * body_T_sensor, timestamp_offsets[i]);
+  }
   return lc::PoseInterpolater(timestamps, poses);
 }
 

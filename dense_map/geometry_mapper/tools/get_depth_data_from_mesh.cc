@@ -38,9 +38,7 @@ int main(int argc, char** argv) {
   std::string robot_config_file;
   std::string world;
   std::string sensor_frame;
-  std::string groundtruth_sensor_frame;
   std::string output_file;
-  double timestamp_offset;
   po::options_description desc(
     "Adds depth data to desired points at provided timestamps.  Uses a provided mesh and sequence of groundtruth poses "
     "to obtain the depth data.");
@@ -61,11 +59,7 @@ int main(int argc, char** argv) {
     "successfully loaded are not included in the output.")
     // TODO(rsoussan): Add soundsee sensor trafo to astrobee configs!
     ("sensor-frame,s", po::value<std::string>(&sensor_frame)->default_value("soundsee"),
-     "Sensor frame to generate depth data in.")(
-      "groundtruth-sensor-frame,g", po::value<std::string>(&groundtruth_sensor_frame)->default_value("nav_cam"),
-      "Sensor frame of groundtruth poses.")("timestamp-offset,o",
-                                            po::value<double>(&timestamp_offset)->default_value(0.0),
-                                            "Timestamp offset for the sensor used to generate groundtruth poses.");
+     "Sensor frame to generate depth data in.");
 
   po::positional_options_description p;
   p.add("timestamps-file", 1);
@@ -120,10 +114,15 @@ int main(int argc, char** argv) {
   const auto sensor_t_rays = dm::LoadSensorRays(sensor_rays_file);
   const auto query_timestamps = dm::LoadTimestamps(timestamps_file);
   const auto body_T_sensor = mc::LoadEigenTransform(config, sensor_frame + "_transform");
-  const auto body_T_groundtruth_sensor = mc::LoadEigenTransform(config, groundtruth_sensor_frame + "_transform");
-  const Eigen::Isometry3d groundtruth_sensor_T_sensor = body_T_groundtruth_sensor.inverse() * body_T_sensor;
-  const auto groundtruth_pose_interpolater = dm::MakePoseInterpolater(groundtruth_directory, groundtruth_sensor_frame,
-                                                                  groundtruth_sensor_T_sensor, timestamp_offset);
+  std::vector<std::string> groundtruth_sensor_frames{"nav_cam", "sci_cam", "haz_cam"};
+  // TODO(rsoussan): Add option to pass these as args?
+  std::vector<double> timestamp_offsets{0, 0, 0};
+  std::vector<Eigen::Isometry3d> body_T_groundtruth_sensor_vec;
+  for (const auto& sensor_frame : groundtruth_sensor_frames) {
+    body_T_groundtruth_sensor_vec.emplace_back(mc::LoadEigenTransform(config, sensor_frame + "_transform"));
+  }
+  const auto groundtruth_pose_interpolater = dm::MakePoseInterpolater(
+    groundtruth_directory, body_T_sensor, groundtruth_sensor_frames, body_T_groundtruth_sensor_vec, timestamp_offsets);
   const auto mesh_tree = dm::LoadMeshTree(mesh_file);
   const auto depths = dm::GetDepthData(query_timestamps, sensor_t_rays, groundtruth_pose_interpolater, *mesh_tree);
   int depth_count = 0;
