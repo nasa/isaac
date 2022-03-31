@@ -145,6 +145,56 @@ TEST(DepthFromMeshTester, LoadTimestampsAndPoses) {
   }
 }
 
+TEST(DepthFromMeshTester, LoadTimestampsAndPosesWithOffset) {
+  const std::string directory_name(DATA_DIR);
+  std::vector<lc::Time> timestamps;
+  std::vector<Eigen::Isometry3d> poses;
+  const double offset = -0.113;
+  dm::LoadTimestampsAndPoses(directory_name, "nav_cam", timestamps, poses, Eigen::Isometry3d::Identity(), offset);
+  ASSERT_EQ(timestamps.size(), 3);
+  ASSERT_EQ(poses.size(), 3);
+  {
+    EXPECT_NEAR(timestamps[0], 1234.22 + offset, 1e-6);
+    EXPECT_MATRIX_NEAR(poses[0], Eigen::Isometry3d::Identity(), 1e-6);
+  }
+  {
+    EXPECT_NEAR(timestamps[1], 313131.99 + offset, 1e-6);
+    EXPECT_MATRIX_NEAR(
+      poses[1], lc::Isometry3d(Eigen::Vector3d(-1.1, -0.22, 300.3), lc::RotationFromEulerAngles(45, 45, 45)), 1e-6);
+  }
+  {
+    EXPECT_NEAR(timestamps[2], 22222.1119 + offset, 1e-6);
+    EXPECT_MATRIX_NEAR(poses[2], lc::Isometry3d(Eigen::Vector3d(1, 2.22, -3.33), Eigen::Matrix3d::Identity()), 1e-6);
+  }
+}
+
+TEST(DepthFromMeshTester, LoadTimestampsAndPosesWithSensorOffset) {
+  const std::string directory_name(DATA_DIR);
+  std::vector<lc::Time> timestamps;
+  std::vector<Eigen::Isometry3d> poses;
+  const auto poses_sensor_T_sensor = lc::RandomIsometry3d();
+  dm::LoadTimestampsAndPoses(directory_name, "nav_cam", timestamps, poses, poses_sensor_T_sensor);
+  ASSERT_EQ(timestamps.size(), 3);
+  ASSERT_EQ(poses.size(), 3);
+  {
+    EXPECT_NEAR(timestamps[0], 1234.22, 1e-6);
+    EXPECT_MATRIX_NEAR(poses[0], Eigen::Isometry3d::Identity() * poses_sensor_T_sensor, 1e-6);
+  }
+  {
+    EXPECT_NEAR(timestamps[1], 313131.99, 1e-6);
+    EXPECT_MATRIX_NEAR(poses[1],
+                       lc::Isometry3d(Eigen::Vector3d(-1.1, -0.22, 300.3), lc::RotationFromEulerAngles(45, 45, 45)) *
+                         poses_sensor_T_sensor,
+                       1e-6);
+  }
+  {
+    EXPECT_NEAR(timestamps[2], 22222.1119, 1e-6);
+    EXPECT_MATRIX_NEAR(
+      poses[2], lc::Isometry3d(Eigen::Vector3d(1, 2.22, -3.33), Eigen::Matrix3d::Identity()) * poses_sensor_T_sensor,
+      1e-6);
+  }
+}
+
 // Run all the tests that were declared with TEST()
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
