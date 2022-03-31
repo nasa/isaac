@@ -74,7 +74,9 @@ class LoadBagDatabase:
             # Upload to database
             aql = (
                 "INSERT "
+                + "{'message':"
                 + str(msg)
+                + "}"
                 + " INTO "
                 + subtopic
                 + " LET newDoc = NEW RETURN newDoc"
