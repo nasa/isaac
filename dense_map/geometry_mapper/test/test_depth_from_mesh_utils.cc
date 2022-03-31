@@ -28,9 +28,7 @@
 namespace dm = dense_map;
 namespace lc = localization_common;
 
-// TODO(rsoussan): put this back!!
-const std::string DATA_DIR =
-  "/home/rsoussan/isaac/src/dense_map/geometry_mapper/test/data";  // std::string(std::getenv("DATA_DIR"));
+const std::string DATA_DIR = std::string(std::getenv("DATA_DIR"));
 
 TEST(DepthFromMeshTester, Depth) {
   std::vector<unsigned int> ids{0, 1, 2};
