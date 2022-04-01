@@ -131,6 +131,6 @@ int main(int argc, char** argv) {
   for (const auto& depth : depths) {
     if (depth) ++depth_count;
   }
-  LOG(INFO) << "Got " << depth_count << " of " << query_timestamps.size() << " depths successfully.";
+  LOG(INFO) << "Got " << depth_count << " of " << depths.size() << " depths successfully.";
   dm::SaveDepthData(query_timestamps, sensor_t_rays, depths, output_file, mesh_rows);
 }
