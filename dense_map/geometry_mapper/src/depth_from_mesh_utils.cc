@@ -154,13 +154,27 @@ std::vector<boost::optional<double>> GetDepthData(const std::vector<lc::Time>& t
 }
 
 void SaveDepthData(const std::vector<lc::Time>& timestamps, const std::vector<Eigen::Vector3d>& sensor_t_rays,
-                   const std::vector<boost::optional<double>>& depths, const std::string& output_filename) {
+                   const std::vector<boost::optional<double>>& depths, const std::string& output_filename,
+                   const int rows) {
   std::ofstream output_file;
   output_file.open(output_filename);
-  for (int i = 0; i < timestamps.size(); ++i) {
-    if (!depths[i]) continue;
-    output_file << std::setprecision(20) << timestamps[i] << " " << *(depths[i]) << " " << sensor_t_rays[i].z() << " "
-                << sensor_t_rays[i].x() << std::endl;
+  for (const auto timestamp : timestamps) {
+    output_file << std::setprecision(20) << timestamp << " ";
+  }
+  output_file << std::endl;
+  const int cols = depths.size() / (timestamps.size() * rows);
+  int col = 0;
+  for (const auto& depth : depths) {
+    if (!depth) {
+      output_file << -1 << " ";
+    } else {
+      output_file << *depth << " ";
+    }
+    ++col;
+    if (col >= cols) {
+      std::cout << std::endl;
+      col = 0;
+    }
   }
   output_file.close();
 }

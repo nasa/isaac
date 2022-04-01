@@ -66,7 +66,8 @@ std::vector<boost::optional<double>> GetDepthData(
 
 void SaveDepthData(const std::vector<localization_common::Time>& timestamps,
                    const std::vector<Eigen::Vector3d>& sensor_t_rays,
-                   const std::vector<boost::optional<double>>& depths, const std::string& output_filename);
+                   const std::vector<boost::optional<double>>& depths, const std::string& output_filename,
+                   const int rows);
 }  // namespace dense_map
 
 #endif  // DEPTH_FROM_MESH_UTILS_H_
