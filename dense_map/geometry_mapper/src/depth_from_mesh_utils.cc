@@ -163,17 +163,19 @@ void SaveDepthData(const std::vector<lc::Time>& timestamps, const std::vector<Ei
   }
   output_file << std::endl;
   const int cols = depths.size() / (timestamps.size() * rows);
-  int col = 0;
+  output_file << cols << std::endl;
+  const int depths_per_row = depths.size() / timestamps.size();
+  int index = 0;
   for (const auto& depth : depths) {
     if (!depth) {
       output_file << -1 << " ";
     } else {
       output_file << *depth << " ";
     }
-    ++col;
-    if (col >= cols) {
-      std::cout << std::endl;
-      col = 0;
+    ++index;
+    if (index >= depths_per_row) {
+      output_file << std::endl;
+      index = 0;
     }
   }
   output_file.close();
