@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
     "config-path,c", po::value<std::string>()->required(), "Path to astrobee config directory.")(
     "robot-config-file,r", po::value<std::string>(&robot_config_file)->default_value("config/robots/bumble.config"),
     "Robot config file")("world,w", po::value<std::string>(&world)->default_value("iss"), "World name")(
-    "output-file", po::value<std::string>(&output_file)->default_value("depths.csv"),
+    "output-file,o", po::value<std::string>(&output_file)->default_value("depths.csv"),
     "Output file containing timestamp, depth, x, y values on each line. Timestamps for which depth data was not "
     "successfully loaded are not included in the output.")
     // TODO(rsoussan): Add soundsee sensor trafo to astrobee configs!
