@@ -142,7 +142,7 @@ std::vector<boost::optional<double>> GetDepthData(const std::vector<lc::Time>& t
   for (const auto& timestamp : timestamps) {
     const auto world_T_sensor = groundtruth_pose_interpolater.Interpolate(timestamp);
     if (!world_T_sensor) {
-      LOG(ERROR) << "Failed to get groundtruth pose at timstamp " << timestamp;
+      LOG(ERROR) << "Failed to get groundtruth pose at timstamp " << std::setprecision(20) << timestamp;
       depths.emplace_back(boost::none);
       continue;
     }
