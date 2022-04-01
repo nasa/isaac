@@ -56,7 +56,7 @@ localization_common::PoseInterpolater MakePoseInterpolater(
 
 // Assumes each point is sampled from an y, z grid with an x offset of 1.0
 // Points are entered as "y z" values with new points on a newline in the file
-std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filename);
+std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filename, int& rows);
 
 std::shared_ptr<BVHTree> LoadMeshTree(const std::string& mesh_file);
 

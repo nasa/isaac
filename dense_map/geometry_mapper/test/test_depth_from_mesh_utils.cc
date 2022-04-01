@@ -28,7 +28,8 @@
 namespace dm = dense_map;
 namespace lc = localization_common;
 
-const std::string DATA_DIR = std::string(std::getenv("DATA_DIR"));
+const std::string DATA_DIR =
+  "/home/rsoussan/isaac/src/dense_map/geometry_mapper/test/data";  // std::string(std::getenv("DATA_DIR"));
 
 TEST(DepthFromMeshTester, Depth) {
   std::vector<unsigned int> ids{0, 1, 2};
@@ -107,7 +108,9 @@ TEST(DepthFromMeshTester, LoadTimestamp) {
 
 TEST(DepthFromMeshTester, LoadSensorRays) {
   const std::string filename(DATA_DIR + "/sensor_rays.csv");
-  const auto sensor_rays = dm::LoadSensorRays(filename);
+  int rows;
+  const auto sensor_rays = dm::LoadSensorRays(filename, rows);
+  EXPECT_EQ(rows, 2);
   EXPECT_MATRIX_NEAR(sensor_rays[0], Eigen::Vector3d(1, 1.23, 4.56).normalized(), 1e-6);
   EXPECT_MATRIX_NEAR(sensor_rays[1], Eigen::Vector3d(1, 7.888999, 99999.111222).normalized(), 1e-6);
 }

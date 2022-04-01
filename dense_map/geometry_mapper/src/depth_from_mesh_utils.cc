@@ -104,17 +104,23 @@ lc::PoseInterpolater MakePoseInterpolater(const std::string& directory, const Ei
   return lc::PoseInterpolater(timestamps, poses);
 }
 
-std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filename) {
+std::vector<Eigen::Vector3d> LoadSensorRays(const std::string& sensor_rays_filename, int& rows) {
   std::vector<Eigen::Vector3d> sensor_t_rays;
   std::ifstream sensor_rays_file(sensor_rays_filename);
   std::string file_line;
   double y, z;
+  int line_index = 0;
   while (std::getline(sensor_rays_file, file_line)) {
     std::istringstream line_ss(file_line);
-    line_ss >> y;
-    line_ss >> z;
-    const Eigen::Vector3d sensor_t_ray(1.0, y, z);
-    sensor_t_rays.emplace_back(sensor_t_ray.normalized());
+    if (line_index == 0) {
+      line_ss >> rows;
+    } else {
+      line_ss >> y;
+      line_ss >> z;
+      const Eigen::Vector3d sensor_t_ray(1.0, y, z);
+      sensor_t_rays.emplace_back(sensor_t_ray.normalized());
+    }
+    ++line_index;
   }
   return sensor_t_rays;
 }

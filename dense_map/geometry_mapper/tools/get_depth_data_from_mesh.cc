@@ -111,7 +111,9 @@ int main(int argc, char** argv) {
     LOG(FATAL) << "Failed to read config files.";
   }
 
-  const auto sensor_t_rays = dm::LoadSensorRays(sensor_rays_file);
+  // Needed later to write results in correct format
+  int mesh_rows;
+  const auto sensor_t_rays = dm::LoadSensorRays(sensor_rays_file, mesh_rows);
   const auto query_timestamps = dm::LoadTimestamps(timestamps_file);
   const auto body_T_sensor = mc::LoadEigenTransform(config, sensor_frame + "_transform");
   std::vector<std::string> groundtruth_sensor_frames{"nav_cam", "sci_cam", "haz_cam"};
