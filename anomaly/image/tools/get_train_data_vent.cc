@@ -258,7 +258,7 @@ int ReadFile() {
 
     // Test
     ChangePoses(vent_transform);
-    PublishSciCamCommand("takeSinglePicture");
+    PublishSciCamCommand("takePicture");
     ros::spinOnce();
   }
   return 0;

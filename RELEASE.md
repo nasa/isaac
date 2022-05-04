@@ -1,5 +1,11 @@
 # Releases
 
+## Release 0.2.5
+
+  * Add sci cam plugin to isaac repo
+  * Soundsee depth tool
+  * Output standalone panorama survey
+
 ## Release 0.2.4
 
   * Inspection tool improvements

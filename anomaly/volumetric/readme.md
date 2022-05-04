@@ -1,0 +1,3 @@
+\page volumetric_anomaly Volumetric
+
+Volumetric anomaly detection documentation

@@ -159,7 +159,7 @@ inline IsaacTexturePatch::IsaacTexturePatch(int64_t label, std::vector<std::size
                                             int64_t width, int64_t height)
     : label(label), faces(faces), texcoords(texcoords), width(width), height(height) {}
 
-IsaacTexturePatch::IsaacTexturePatch(IsaacTexturePatch const& texture_patch) {
+inline IsaacTexturePatch::IsaacTexturePatch(IsaacTexturePatch const& texture_patch) {
   label = texture_patch.label;
   faces = std::vector<std::size_t>(texture_patch.faces);
   texcoords = std::vector<Eigen::Vector2d>(texture_patch.texcoords);

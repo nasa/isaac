@@ -78,6 +78,12 @@ add_dependencies(sci_cam_tool ${catkin_EXPORTED_TARGETS})
 target_link_libraries(sci_cam_tool
   gflags ${catkin_LIBRARIES})
 
+## Declare a C++ executable: export_panorama
+add_executable(export_panorama tools/export_panorama.cc)
+add_dependencies(export_panorama ${catkin_EXPORTED_TARGETS})
+target_link_libraries(export_panorama
+  inspection gflags ${catkin_LIBRARIES})
+
 #############
 ## Install ##
 #############

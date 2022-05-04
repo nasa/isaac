@@ -1,0 +1,27 @@
+version: "2.1"
+services:
+
+
+  analyst_notebook:
+    # Launches analyst notebook
+    #
+    image: isaac_analyst_notebook
+    hostname: isaac_notebook
+    container_name: isaac_notebook
+    build: 
+      context: '..'
+      dockerfile: 'analyst.Dockerfile'
+      args:
+        REMOTE: ${REMOTE:-isaac}
+    ports:
+      - "8888:8888"
+    networks:
+      - isaac
+    environment:
+      - JUPYTER_TOKEN=isaac
+      - ROS_MASTER_URI=http://rosmaster:11311
+    volumes:
+      - ${ISAAC_PATH:-.}/analyst/workspace:/home/analyst/
+      - ${DATA_PATH}:/home/analyst/data
+      - ${BAGS_PATH}:/home/analyst/data/bags
+    command: "/ros_entrypoint.sh"

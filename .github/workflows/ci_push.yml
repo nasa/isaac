@@ -173,6 +173,12 @@ jobs:
                           --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04
 
+    - name: Build analyst image isaac/isaac:msgs-ubuntu20.04
+      run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
+                          --build-arg REMOTE=ghcr.io/nasa
+                          -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
+
+
     - name: Log in to registry
       run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
 
@@ -182,3 +188,4 @@ jobs:
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu20.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu20.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04; fi;
+        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest; fi;

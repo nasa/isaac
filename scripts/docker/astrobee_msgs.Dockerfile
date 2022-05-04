@@ -54,7 +54,7 @@ RUN apt-get update \
   python${PYTHON}-catkin-tools \
   && rm -rf /var/lib/apt/lists/*
 
-#Add the entrypoint for docker
+# Add the entrypoint for docker
 RUN echo "#!/bin/bash\nset -e\n\nsource \"/opt/ros/${ROS_VERSION}/setup.bash\"\nexec \"\$@\"" > /ros_entrypoint.sh && \
   chmod +x /ros_entrypoint.sh && \
   rosdep init && \

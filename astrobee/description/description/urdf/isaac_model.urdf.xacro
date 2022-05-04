@@ -134,7 +134,7 @@
   <xacro:include filename="$(find description)/urdf/sensor_dock_cam.urdf.xacro" />
   <xacro:include filename="$(find description)/urdf/sensor_haz_cam.urdf.xacro" />
   <xacro:include filename="$(find description)/urdf/sensor_perch_cam.urdf.xacro" />
-  <xacro:include filename="$(find description)/urdf/sensor_sci_cam.urdf.xacro" />
+  <xacro:include filename="$(find isaac_astrobee_description)/urdf/sensor_sci_cam.urdf.xacro" />
   <xacro:include filename="$(find isaac_astrobee_description)/urdf/sensor_heat_cam.urdf.xacro" />
   <xacro:include filename="$(find isaac_astrobee_description)/urdf/sensor_wifi_receiver.urdf.xacro" />
   <xacro:include filename="$(find isaac_astrobee_description)/urdf/sensor_RFID_receiver.urdf.xacro" />
