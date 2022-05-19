@@ -3,6 +3,8 @@ name: Build, test and push packages CI
 on:
   push:
     branches: [ 'master' ]
+  workflow_dispatch:
+    branches: [ 'master' ]
 
 jobs:
 
