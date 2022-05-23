@@ -44,6 +44,7 @@ var NAVTREE =
     [ "Docker Install", "docker.html", null ],
     [ "Subsystems", "subsystems.html", "subsystems" ],
     [ "Tutorials", "md_isaac_Tutorials.html", "md_isaac_Tutorials" ],
+    [ "Ros To Guest Science Bridge", "ros_gs_bridge.html", null ],
     [ "Class Index", "classes.html", null ]
   ] ]
 ];
