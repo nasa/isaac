@@ -31,9 +31,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install pyArango \
-    && pip3 install torch==1.10.2+cpu torchvision==0.11.3+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html \
-    && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 \
-    && pip3 install matplotlib opencv-python
+    && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
+    && pip3 install matplotlib opencv-python \
+    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
 EXPOSE 8888
 

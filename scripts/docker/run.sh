@@ -170,8 +170,14 @@ elif [  $vm -eq 1 ]; then
   export ROS_MASTER_URI=http://172.19.0.5:11311
   roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait
 
-elif  [ $no_sim -eq 0 ]; then
+elif  [ $no_sim -eq 1 ]; then
   echo "NO SIM"
+  # Start native astrobee simulation and connect to socket network
+  export ROS_IP=`ip -4 addr show docker0 | grep -oP "(?<=inet ).*(?=/)"`
+  export ROS_MASTER_URI=http://172.19.0.5:11311
+  roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen robot:=${robot} rviz:=true --wait
+
+else
   XSOCK=/tmp/.X11-unix
   XAUTH=/tmp/.docker.xauth
   touch $XAUTH
