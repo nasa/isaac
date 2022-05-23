@@ -838,11 +838,12 @@ INPUT                  = README.md \
                          INSTALL.md \
                          scripts \
                          isaac \
+                         analyst \
+                         anomaly \
                          astrobee \
+                         communications \
                          dense_map \
                          description \
-                         img_analysis \
-                         hardware \
                          isaac_msgs \
                          shared \
                          simulation

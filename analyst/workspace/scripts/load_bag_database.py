@@ -37,51 +37,52 @@ logging.basicConfig()
 
 
 class LoadBagDatabase:
-    def __init__(self, database, path, topics):
+    def __init__(self, database, path, topics=[]):
         self.db = database
-        # TODO Marina: Recursively look into bag directory
         # Check the folder contents
         bagfiles = [f for f in listdir(path) if f.endswith(".bag")]
-        print("bagfiles" + str(bagfiles) + "\ntopics" + str(topics))
         for bag in bagfiles:
             self.read_bag(path + bag, topics)
 
-    # TODO Marina: automatically joint bags split into different parts
     def read_bag(self, bag_file, topics_list):
         # access bag
-        print("Reading bag file")
+        print("Reading bag file ", bag_file)
         bag = rosbag.Bag(bag_file)
-        bag_contents = bag.read_messages()
-        bagName = bag.filename
+        topic_count = {}
+        messages_total = bag.get_message_count(topics_list)
+        message_count = 0
+        # Go through all the messages in a topic
+        for subtopic, msg, t in bag.read_messages(topics_list):
+            # Print loading status
+            message_count = message_count + 1
+            print("Reading ", message_count, "/", messages_total, " ", end="\r")
 
-        # get list of topics from the bag
-        bag_topics = []
-        for topic, msg, t in bag_contents:
-            if topic in topics_list:
-                bag_topics.append(topic)
-        print("List of topics " + str(bag_topics))
+            # Fix topic name
+            subtopic = subtopic[1:].replace("/", "_")
 
-        # create a new collection with the bag name
-        # collection name needs to start with a letter
-        bagFile = "bag_" + bagFile[:-4]
-        print("Creating collection " + bagFile)
-        if not self.db.hasCollection("yo"):
-            self.db.createCollection(name="yo")
-        # ensure index
-        self.db["yo"].ensureSkiplistIndex(["header.stamp.secs"])
+            # Save topic count for later output
+            if subtopic in topic_count.keys():
+                topic_count[subtopic] = topic_count.get(subtopic) + 1
+            else:
+                topic_count[subtopic] = 1
 
-        # open
-        for topic_name in bag_topics:
-            # Go through all the messages in a topic
-            for subtopic, msg, t in bag.read_messages(topic_name):
-                msg = yaml.safe_load(str(msg))
+            # Create topic collection if it doesn't exist already
+            if not self.db.hasCollection(subtopic):
+                self.db.createCollection(name=subtopic)
+            # Convert message to yaml
+            msg = yaml.safe_load(str(msg))
+            # Upload to database
+            aql = (
+                "INSERT "
+                + "{'message':"
+                + str(msg)
+                + "}"
+                + " INTO "
+                + subtopic
+                + " LET newDoc = NEW RETURN newDoc"
+            )
+            queryResult = self.db.AQLQuery(aql)
 
-                aql = (
-                    "INSERT "
-                    + str(msg)
-                    + " INTO "
-                    + "yo"
-                    + " LET newDoc = NEW RETURN newDoc"
-                )
-                queryResult = self.db.AQLQuery(aql)
+        print("\nTopics found:")
+        print(topic_count)
         bag.close()

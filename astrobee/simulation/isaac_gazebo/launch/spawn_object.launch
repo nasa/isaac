@@ -19,7 +19,7 @@
 <launch>
   <arg name="ns"       default="object"/>       <!-- Robot namespace         -->
   <arg name="spawn"    default=""/>             <!-- Object to spawn         -->
-  <arg name="name"     default="objectx"/>      <!-- Name of object          -->
+  <arg name="name"     default="object"/>      <!-- Name of object          -->
   <arg name="pose"     default="0 0 0 0 0 0 1"/>
 
   <!-- <arg if="$(eval arg('position')=='vent')"

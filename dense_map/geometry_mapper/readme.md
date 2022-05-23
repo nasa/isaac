@@ -663,7 +663,7 @@ To extract the sci cam data, if necessary, do:
     $ASTROBEE_WS/devel/lib/localization_node/extract_image_bag \
      mydata.bag -image_topic /hw/cam_sci/compressed            \
      -output_directory sci_data -use_timestamp_as_image_name
-
+ca
 To extract the depth clouds, which may be useful for debugging purposes,
 do:
 

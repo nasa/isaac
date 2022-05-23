@@ -24,12 +24,16 @@ ARG REMOTE=isaac
 FROM ${REMOTE}/isaac:msgs-ubuntu20.04
 
 RUN apt-get update \
-  && apt-get install -y python3-pip \
+  && apt-get install -y \
+        python3-pip \
+        ffmpeg libsm6 libxext6 \
+        ros-noetic-cv-bridge \
   && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install pyArango \
-    && pip3 install torch==1.10.2+cpu torchvision==0.11.3+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html \
-    && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1
+    && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
+    && pip3 install matplotlib opencv-python \
+    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
 EXPOSE 8888
 

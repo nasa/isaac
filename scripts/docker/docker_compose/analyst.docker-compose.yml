@@ -6,6 +6,7 @@ services:
     # Launches analyst notebook
     #
     image: isaac_analyst_notebook
+    command: "/ros_entrypoint.sh"
     hostname: isaac_notebook
     container_name: isaac_notebook
     build: 
@@ -15,13 +16,14 @@ services:
         REMOTE: ${REMOTE:-isaac}
     ports:
       - "8888:8888"
-    networks:
-      - isaac
     environment:
       - JUPYTER_TOKEN=isaac
       - ROS_MASTER_URI=http://rosmaster:11311
+      - ROS_IP=172.19.0.12
+    networks:
+      isaac:
+        ipv4_address: 172.19.0.12
     volumes:
       - ${ISAAC_PATH:-.}/analyst/workspace:/home/analyst/
       - ${DATA_PATH}:/home/analyst/data
       - ${BAGS_PATH}:/home/analyst/data/bags
-    command: "/ros_entrypoint.sh"
