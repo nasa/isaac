@@ -39,6 +39,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   config_reader
+  localization_common
 )
 
 # The quantity CMAKE_PREFIX_PATH can be set as an environmental
@@ -117,7 +118,7 @@ set(TEXRECON_INCLUDE_DIRS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES geometry_mapper
-  CATKIN_DEPENDS roscpp std_msgs nodelet camera interest_point sparse_mapping ff_util isaac_hw_msgs eigen_conversions rosbag cv_bridge image_transport config_reader
+  CATKIN_DEPENDS roscpp std_msgs nodelet camera interest_point sparse_mapping ff_util isaac_hw_msgs eigen_conversions rosbag cv_bridge image_transport config_reader localization_common
 # DEPENDS system_lib
 )
 
@@ -141,6 +142,7 @@ add_definitions(${PCL_DEFINITIONS})
 
 # Declare a C++ library
 add_library(geometry_mapper_lib
+    src/depth_from_mesh_utils.cc
     src/dense_map_utils.cc
     src/dense_map_ros_utils.cc
     src/TinyEXIF.cc
@@ -178,6 +180,10 @@ target_link_libraries(camera_refiner
 
 add_executable(camera_refiner_old tools/camera_refiner_old.cc)
 target_link_libraries(camera_refiner_old
+    geometry_mapper_lib gflags glog)
+
+add_executable(get_depth_data_from_mesh tools/get_depth_data_from_mesh.cc)
+target_link_libraries(get_depth_data_from_mesh
     geometry_mapper_lib gflags glog)
 
 add_executable(extract_pc_from_bag tools/extract_pc_from_bag.cc)
@@ -220,6 +226,18 @@ add_executable(streaming_mapper tools/streaming_mapper.cc)
 target_link_libraries(streaming_mapper
     geometry_mapper_lib gflags glog)
 
+if(CATKIN_ENABLE_TESTING)
+ find_package(rostest REQUIRED)
+  add_rostest_gtest(test_depth_from_mesh_utils
+    test/test_depth_from_mesh_utils.test
+    test/test_depth_from_mesh_utils.cc
+  )
+  target_link_libraries(test_depth_from_mesh_utils
+    ${PROJECT_NAME}_lib glog ${catkin_LIBRARIES} 
+  )
+
+endif()
+ 
 #############
 ## Install ##
 #############
