@@ -57,7 +57,7 @@
   <!-- Launch cargo node -->
   <include file="$(find ff_util)/launch/ff_nodelet.launch">
     <arg name="class" value="cargo/CargoNode" />
-    <arg name="name" value="Cargo" />
+    <arg name="name" value="cargo" />
     <arg name="manager" value="ilp_cargo" />
     <arg name="spurn" value="$(arg spurn)" />
     <arg name="nodes" value="$(arg nodes)" />
