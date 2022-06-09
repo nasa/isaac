@@ -25,6 +25,6 @@ docker stop isaac 2>/dev/null
 docker rm isaac 2>/dev/null
 
 # stop all docker-compose combinations
-docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml -f ${thisdir}/docker_compose/analyst.docker-compose.yml down \
-||docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml down \
-|| docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml down
+docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/iui.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml -f ${thisdir}/docker_compose/analyst.docker-compose.yml down \
+||docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/iui.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml down \
+|| docker-compose -f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/iui.docker-compose.yml down
