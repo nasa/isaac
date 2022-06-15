@@ -8,7 +8,7 @@ services:
     image: isaac_analyst_notebook
     command: "/ros_entrypoint.sh"
     hostname: isaac_notebook
-    container_name: isaac_notebook
+    container_name: ${REMOTE}isaac_notebook
     build: 
       context: '..'
       dockerfile: 'analyst.Dockerfile'

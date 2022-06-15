@@ -57,7 +57,7 @@ mast=1          # MAST is ON by default
 vm=0            # We are not running in a virtual machine by default
 remote=0
 ground=0
-analyst=
+analyst=0
 robot=bumble
 no_sim=0
 
@@ -135,11 +135,11 @@ elif [ "$os" = "focal" ]; then
 fi
 
 if [ $remote -eq 1 ]; then
-  export REMOTE=ghcr.io/nasa
+  export REMOTE=ghcr.io/nasa/
 fi
 
 # Launch the rosmaster container + isaac network + IDI
-files="-f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/idi.docker-compose.yml"
+files="-f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/iui.docker-compose.yml"
 echo -e "The ISAAC UI is hosted in: http://localhost:8080"
 echo -e "The ArangoDB database is hosted in: http://localhost:8529"
 
