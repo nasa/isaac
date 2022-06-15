@@ -44,10 +44,14 @@ in_traj=$1
 out_traj="${in_traj%.*}_out.txt"
 
 while read -r line;
-
 do
-stringarray=($line)
-echo "$( echo "${stringarray[0]}+$2" | bc ) $( echo "${stringarray[1]}+$3" | bc ) $( echo "${stringarray[2]}+$4" | bc ) ${stringarray[3]} ${stringarray[4]} ${stringarray[5]} ${stringarray[6]}" >> $out_traj;
+    stringarray=($line)
+    if [ ${stringarray[0]} == "#" ]; then
+        echo $line >> $out_traj;
+        continue
+    fi
+
+     echo "$( echo ${stringarray[0]} $2 | awk '{print $1 + $2}' ) $( echo ${stringarray[1]} $3 | awk '{print $1 + $2}' ) $( echo ${stringarray[2]} $4 | awk '{print $1 + $2}' ) ${stringarray[3]} ${stringarray[4]} ${stringarray[5]} ${stringarray[6]}" >> $out_traj;
 
 
 done < $1
