@@ -58,26 +58,6 @@ def run_cmd(cmd, logfile=""):
     return (return_code, stdout, stderr)
 
 
-def list_images_in_map(mapfile):
-
-    cmd = ["rosrun", "sparse_mapping", "build_map", "-info", "-output_map", mapfile]
-
-    (returncode, stdout, stderr) = run_cmd(cmd)
-
-    if returncode != 0:
-        print(("Failed to run: " + " ".join(cmd)))
-
-    images = []
-    for line in (stdout + "\n" + stderr).split("\n"):
-
-        # Print warning messages to stdout
-        m = re.match("^.*?\s([^\s]*?jpg)", line)
-        if m:
-            images.append(m.group(1))
-
-    return images
-
-
 def parse_args():
 
     parser = argparse.ArgumentParser(description="Generates/updates hugin files.")
