@@ -150,9 +150,7 @@ def main():
     variable_groups = StandardImageVariableGroups(p)
     lenses = variable_groups.getLenses()
     for i in range(0, p.getNrOfImages()):
-        # img = p.getImage(i)
         lenses.switchParts(i, lenses.getPartNumber(0))
-        # p.setSrcImage(i, img);
 
     # Write hugin file
     # make a c++ std::ofstream to write to
