@@ -125,78 +125,78 @@ def main():
     else:
         output_hugin = args.output_hugin
 
-    # # Read bagfile
-    # bag = rosbag.Bag(args.bag_name)
-    # get_pose = False
-    # srcImage = SrcPanoImage()
-    # srcImage.setVar("v", 62)
-    # for topic, msg, t in bag.read_messages():
-    #     if topic == "/hw/cam_sci/compressed":
+    # Read bagfile
+    bag = rosbag.Bag(args.bag_name)
+    get_pose = False
+    srcImage = SrcPanoImage()
+    srcImage.setVar("v", 62)
+    for topic, msg, t in bag.read_messages():
+        if topic == "/hw/cam_sci/compressed":
 
-    #         img = (
-    #             args.work_dir
-    #             + str(msg.header.stamp.secs)
-    #             + "."
-    #             + "%03d" % (msg.header.stamp.nsecs * 0.000001)
-    #             + ".jpg"
-    #         )
-    #         print(img)
-    #         # Make sure image exists
-    #         if os.path.exists(img) is False:
-    #             print("Could not find panorama image!!!")
-    #         else:
-    #             # Insert image into hugin
-    #             srcImage.setFilename(img)
-    #             get_pose = True
+            img = (
+                args.work_dir
+                + str(msg.header.stamp.secs)
+                + "."
+                + "%03d" % (msg.header.stamp.nsecs * 0.000001)
+                + ".jpg"
+            )
+            print(img)
+            # Make sure image exists
+            if os.path.exists(img) is False:
+                print("Could not find panorama image!!!")
+            else:
+                # Insert image into hugin
+                srcImage.setFilename(img)
+                get_pose = True
 
-    #     if get_pose and topic == "/loc/pose":
-    #         # Configure hugin parameters
-    #         orientation_list = [
-    #             msg.pose.orientation.x,
-    #             msg.pose.orientation.y,
-    #             msg.pose.orientation.z,
-    #             msg.pose.orientation.w,
-    #         ]
-    #         (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
-    #         srcImage.setVar("r", roll * RAD2DEG)
-    #         srcImage.setVar("p", pitch * RAD2DEG)
-    #         srcImage.setVar("y", yaw * RAD2DEG)
-    #         p.addImage(srcImage)
-    #         get_pose = False
+        if get_pose and topic == "/loc/pose":
+            # Configure hugin parameters
+            orientation_list = [
+                msg.pose.orientation.x,
+                msg.pose.orientation.y,
+                msg.pose.orientation.z,
+                msg.pose.orientation.w,
+            ]
+            (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
+            srcImage.setVar("r", roll * RAD2DEG)
+            srcImage.setVar("p", pitch * RAD2DEG)
+            srcImage.setVar("y", yaw * RAD2DEG)
+            p.addImage(srcImage)
+            get_pose = False
 
-    # bag.close()
+    bag.close()
 
-    # # Link lenses
-    # variable_groups = StandardImageVariableGroups(p)
-    # lenses = variable_groups.getLenses()
-    # for i in range(0, p.getNrOfImages()):
-    #     # img = p.getImage(i)
-    #     lenses.switchParts(i, lenses.getPartNumber(0))
-    #     # p.setSrcImage(i, img);
+    # Link lenses
+    variable_groups = StandardImageVariableGroups(p)
+    lenses = variable_groups.getLenses()
+    for i in range(0, p.getNrOfImages()):
+        # img = p.getImage(i)
+        lenses.switchParts(i, lenses.getPartNumber(0))
+        # p.setSrcImage(i, img);
 
-    # # Write hugin file
-    # # make a c++ std::ofstream to write to
-    # ofs = ofstream(output_hugin)
-    # # write the modified panorama to that stream
-    # p.writeData(ofs)
-    # # done with it
-    # del ofs
+    # Write hugin file
+    # make a c++ std::ofstream to write to
+    ofs = ofstream(output_hugin)
+    # write the modified panorama to that stream
+    p.writeData(ofs)
+    # done with it
+    del ofs
 
-    # # Generate control points
-    # cmd = ["cpfind", "--multirow", "-o", output_hugin, output_hugin]
-    # (returncode, stdout, stderr) = run_cmd(cmd)
-    # print(stdout)
+    # Generate control points
+    cmd = ["cpfind", "--multirow", "-o", output_hugin, output_hugin]
+    (returncode, stdout, stderr) = run_cmd(cmd)
+    print(stdout)
 
-    # # Throw away control points are prob invalid
-    # cmd = ["cpclean", "-o", output_hugin, output_hugin]
-    # (returncode, stdout, stderr) = run_cmd(cmd)
-    # print(stdout)
+    # Throw away control points are prob invalid
+    cmd = ["cpclean", "-o", output_hugin, output_hugin]
+    (returncode, stdout, stderr) = run_cmd(cmd)
+    print(stdout)
 
-    # # Optimize attitude + b
-    # cmd = ["pto_var", "--opt", "y,p,r,b", "-o", output_hugin, output_hugin]
-    # (returncode, stdout, stderr) = run_cmd(cmd)
-    # cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-    # (returncode, stdout, stderr) = run_cmd(cmd)
+    # Optimize attitude + b
+    cmd = ["pto_var", "--opt", "y,p,r,b", "-o", output_hugin, output_hugin]
+    (returncode, stdout, stderr) = run_cmd(cmd)
+    cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+    (returncode, stdout, stderr) = run_cmd(cmd)
 
     # Optimize position iteratively not to diverge
     ifs = ifstream(output_hugin)  # create a C++ std::ifstream
@@ -241,7 +241,7 @@ def main():
         cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
 
-    # PhotometricOptimizer
+    # Photometric Optimizer
     cmd = ["autooptimiser", "-m", "-o", output_hugin, output_hugin]
     (returncode, stdout, stderr) = run_cmd(cmd)
 
