@@ -189,6 +189,7 @@ def main():
     for optim_nr in optim_nr_list:
 
         # Optimizer cycles
+        # We do this iteratively otherwise it will diverge
         for x in range(0, pano_size, stride):
             print(x)
             ifs = ifstream(output_hugin)  # create a C++ std::ifstream
@@ -213,11 +214,37 @@ def main():
             cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
             (returncode, stdout, stderr) = run_cmd(cmd)
 
-        # Optimize attitude + b
+        # Optimize attitude + b + v
         cmd = ["pto_var", "--opt", "y,p,r,b,v", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
         cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
+
+    # Optimize attitude + position
+    cmd = [
+        "pto_var",
+        "--opt",
+        "y,p,r,Tpp,Tpy,TrX,TrY,TrZ",
+        "-o",
+        output_hugin,
+        output_hugin,
+    ]
+    (returncode, stdout, stderr) = run_cmd(cmd)
+    cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+    (returncode, stdout, stderr) = run_cmd(cmd)
+
+    # Optimize ALL
+    cmd = [
+        "pto_var",
+        "--opt",
+        "y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v",
+        "-o",
+        output_hugin,
+        output_hugin,
+    ]
+    (returncode, stdout, stderr) = run_cmd(cmd)
+    cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+    (returncode, stdout, stderr) = run_cmd(cmd)
 
     # Photometric Optimizer
     cmd = ["autooptimiser", "-m", "-o", output_hugin, output_hugin]
