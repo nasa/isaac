@@ -88,7 +88,7 @@ def parse_args():
 
     parser.add_argument(
         "--no-stitching",
-        dest="disable_stitching",
+        dest="no_stitching",
         action="store_true",
         help="Generate hugin and optimize only.",
     )
