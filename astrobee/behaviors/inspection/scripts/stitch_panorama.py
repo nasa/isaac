@@ -248,7 +248,7 @@ def main():
         cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
 
-        # Optimize ALL x2
+        # Optimize ALL x3
         cmd = [
             "pto_var",
             "--opt",
@@ -260,6 +260,27 @@ def main():
         (returncode, stdout, stderr) = run_cmd(cmd)
         cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = [
+            "pto_var",
+            "--opt",
+            "y,p,r,TrX,TrY,TrZ,b,v",
+            "-o",
+            output_hugin,
+            output_hugin,
+        ]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = [
+            "pto_var",
+            "--opt",
+            "y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v",
+            "-o",
+            output_hugin,
+            output_hugin,
+        ]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
 
         # Photometric Optimizer
