@@ -83,10 +83,22 @@ def parse_args():
         "-work_dir",
         type=str,
         required=False,
-        help="Store all results in this directory.",
+        help="Where all the sci cam images are.",
     )
 
-    parser.add_argument("image_lists", nargs="*")
+    parser.add_argument(
+        "--no-stitching",
+        dest="disable_stitching",
+        action="store_true",
+        help="Generate hugin and optimize only.",
+    )
+
+    parser.add_argument(
+        "--stitching-only",
+        dest="only_stitching",
+        action="store_true",
+        help="Stitch hugin file only",
+    )
 
     args = parser.parse_args()
 
@@ -105,167 +117,177 @@ def main():
     else:
         output_hugin = args.output_hugin
 
-    # Read bagfile
-    bag = rosbag.Bag(args.bag_name)
-    get_pose = False
-    srcImage = SrcPanoImage()
-    srcImage.setVar("v", 62)
-    for topic, msg, t in bag.read_messages():
-        if topic == "/hw/cam_sci/compressed":
+    if not args.only_stitching:
+        # Read bagfile
+        bag = rosbag.Bag(args.bag_name)
+        get_pose = False
+        srcImage = SrcPanoImage()
+        srcImage.setVar("v", 62)
+        for topic, msg, t in bag.read_messages():
+            if topic == "/hw/cam_sci/compressed":
 
-            img = (
-                args.work_dir
-                + str(msg.header.stamp.secs)
-                + "."
-                + "%03d" % (msg.header.stamp.nsecs * 0.000001)
-                + ".jpg"
-            )
-            print(img)
-            # Make sure image exists
-            if os.path.exists(img) is False:
-                print("Could not find panorama image!!!")
-            else:
-                # Insert image into hugin
-                srcImage.setFilename(img)
-                get_pose = True
-
-        if get_pose and topic == "/loc/pose":
-            # Configure hugin parameters
-            orientation_list = [
-                msg.pose.orientation.x,
-                msg.pose.orientation.y,
-                msg.pose.orientation.z,
-                msg.pose.orientation.w,
-            ]
-            (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
-            srcImage.setVar("r", roll * RAD2DEG)
-            srcImage.setVar("p", pitch * RAD2DEG)
-            srcImage.setVar("y", yaw * RAD2DEG)
-            p.addImage(srcImage)
-            get_pose = False
-
-    bag.close()
-
-    # Link lenses
-    variable_groups = StandardImageVariableGroups(p)
-    lenses = variable_groups.getLenses()
-    for i in range(0, p.getNrOfImages()):
-        lenses.switchParts(i, lenses.getPartNumber(0))
-
-    # Write hugin file
-    # make a c++ std::ofstream to write to
-    ofs = ofstream(output_hugin)
-    # write the modified panorama to that stream
-    p.writeData(ofs)
-    # done with it
-    del ofs
-
-    # Generate control points
-    cmd = ["cpfind", "--multirow", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
-    print(stdout)
-
-    # Throw away control points are prob invalid
-    cmd = ["cpclean", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
-    print(stdout)
-
-    # Optimize attitude + b
-    cmd = ["pto_var", "--opt", "y,p,r,b", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
-    cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
-
-    # Optimize position iteratively not to diverge
-    ifs = ifstream(output_hugin)  # create a C++ std::ifstream
-    p.readData(ifs)  # read the pto file into the Panorama object
-
-    orig_tuple = p.getOptimizeVector()
-
-    pano_size = len(orig_tuple)
-    stride = 5
-    optim_nr_list = [10, 15]
-
-    for optim_nr in optim_nr_list:
-
-        # Optimizer cycles
-        # We do this iteratively otherwise it will diverge
-        for x in range(0, pano_size, stride):
-            print(x)
-            ifs = ifstream(output_hugin)  # create a C++ std::ifstream
-            p.readData(ifs)  # read the pto file into the Panorama object
-            optvec = []
-            for i in range(pano_size):
-                if (x + optim_nr) > pano_size:
-                    start = x + optim_nr - pano_size
+                img = (
+                    args.work_dir
+                    + str(msg.header.stamp.secs)
+                    + "."
+                    + "%03d" % (msg.header.stamp.nsecs * 0.000001)
+                    + ".jpg"
+                )
+                print(img)
+                # Make sure image exists
+                if os.path.exists(img) is False:
+                    print("Could not find panorama image!!!")
                 else:
-                    start = 0
-                if i >= x and i < x + optim_nr or i < start:
-                    optvec.append(["y", "p", "r", "Tpp", "Tpy", "TrX", "TrY", "TrZ"])
-                else:
-                    optvec.append([])
+                    # Insert image into hugin
+                    srcImage.setFilename(img)
+                    get_pose = True
 
-            print(optvec)
-            p.setOptimizeVector(optvec)
-            ofs = ofstream(output_hugin)
-            p.writeData(ofs)
-            del ofs
+            if get_pose and topic == "/loc/pose":
+                # Configure hugin parameters
+                orientation_list = [
+                    msg.pose.orientation.x,
+                    msg.pose.orientation.y,
+                    msg.pose.orientation.z,
+                    msg.pose.orientation.w,
+                ]
+                (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
+                srcImage.setVar("r", roll * RAD2DEG)
+                srcImage.setVar("p", pitch * RAD2DEG)
+                srcImage.setVar("y", yaw * RAD2DEG)
+                p.addImage(srcImage)
+                get_pose = False
 
-            cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-            (returncode, stdout, stderr) = run_cmd(cmd)
+        bag.close()
 
-        # Optimize attitude + b + v
-        cmd = ["pto_var", "--opt", "y,p,r,b,v", "-o", output_hugin, output_hugin]
+        # Link lenses
+        variable_groups = StandardImageVariableGroups(p)
+        lenses = variable_groups.getLenses()
+        for i in range(0, p.getNrOfImages()):
+            lenses.switchParts(i, lenses.getPartNumber(0))
+
+        # Write hugin file
+        # make a c++ std::ofstream to write to
+        ofs = ofstream(output_hugin)
+        # write the modified panorama to that stream
+        p.writeData(ofs)
+        # done with it
+        del ofs
+
+        # Generate control points
+        cmd = ["cpfind", "--multirow", "-o", output_hugin, output_hugin]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        print(stdout)
+
+        # Throw away control points are prob invalid
+        cmd = ["cpclean", "-o", output_hugin, output_hugin]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        print(stdout)
+
+        # Optimize attitude + b
+        cmd = ["pto_var", "--opt", "y,p,r,b", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
         cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
         (returncode, stdout, stderr) = run_cmd(cmd)
 
-    # Optimize attitude + position
-    cmd = [
-        "pto_var",
-        "--opt",
-        "y,p,r,Tpp,Tpy,TrX,TrY,TrZ",
-        "-o",
-        output_hugin,
-        output_hugin,
-    ]
-    (returncode, stdout, stderr) = run_cmd(cmd)
-    cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
+        # Optimize position iteratively not to diverge
+        ifs = ifstream(output_hugin)  # create a C++ std::ifstream
+        p.readData(ifs)  # read the pto file into the Panorama object
 
-    # Optimize ALL
-    cmd = [
-        "pto_var",
-        "--opt",
-        "y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v",
-        "-o",
-        output_hugin,
-        output_hugin,
-    ]
-    (returncode, stdout, stderr) = run_cmd(cmd)
-    cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
+        orig_tuple = p.getOptimizeVector()
 
-    # Photometric Optimizer
-    cmd = ["autooptimiser", "-m", "-o", output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
+        pano_size = len(orig_tuple)
+        stride = 5
+        optim_nr_list = [10, 15]
 
-    # Configure image output
-    cmd = [
-        "pano_modify",
-        "-o",
-        output_hugin,
-        "--center",
-        "--canvas=AUTO",
-        "--projection=2",
-        "--fov=360x180",
-        output_hugin,
-    ]
-    (returncode, stdout, stderr) = run_cmd(cmd)
+        for optim_nr in optim_nr_list:
 
-    # Generate panorama
-    cmd = ["hugin_executor", "--stitching", "--prefix=" + output_hugin, output_hugin]
-    (returncode, stdout, stderr) = run_cmd(cmd)
+            # Optimizer cycles
+            # We do this iteratively otherwise it will diverge
+            for x in range(0, pano_size, stride):
+                print(x)
+                ifs = ifstream(output_hugin)  # create a C++ std::ifstream
+                p.readData(ifs)  # read the pto file into the Panorama object
+                optvec = []
+                for i in range(pano_size):
+                    if (x + optim_nr) > pano_size:
+                        start = x + optim_nr - pano_size
+                    else:
+                        start = 0
+                    if i >= x and i < x + optim_nr or i < start:
+                        optvec.append(
+                            ["y", "p", "r", "Tpp", "Tpy", "TrX", "TrY", "TrZ"]
+                        )
+                    else:
+                        optvec.append([])
+
+                print(optvec)
+                p.setOptimizeVector(optvec)
+                ofs = ofstream(output_hugin)
+                p.writeData(ofs)
+                del ofs
+
+                cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+                (returncode, stdout, stderr) = run_cmd(cmd)
+
+            # Optimize attitude + b + v
+            cmd = ["pto_var", "--opt", "y,p,r,b,v", "-o", output_hugin, output_hugin]
+            (returncode, stdout, stderr) = run_cmd(cmd)
+            cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+            (returncode, stdout, stderr) = run_cmd(cmd)
+
+        # Optimize attitude + position
+        cmd = [
+            "pto_var",
+            "--opt",
+            "y,p,r,Tpp,Tpy,TrX,TrY,TrZ",
+            "-o",
+            output_hugin,
+            output_hugin,
+        ]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+
+        # Optimize ALL x2
+        cmd = [
+            "pto_var",
+            "--opt",
+            "y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v",
+            "-o",
+            output_hugin,
+            output_hugin,
+        ]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+        (returncode, stdout, stderr) = run_cmd(cmd)
+
+        # Photometric Optimizer
+        cmd = ["autooptimiser", "-m", "-o", output_hugin, output_hugin]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+
+        # Configure image output
+        cmd = [
+            "pano_modify",
+            "-o",
+            output_hugin,
+            "--center",
+            "--canvas=AUTO",
+            "--projection=2",
+            "--fov=360x180",
+            output_hugin,
+        ]
+        (returncode, stdout, stderr) = run_cmd(cmd)
+
+    if not args.no_stitching:
+        # Generate panorama
+        cmd = [
+            "hugin_executor",
+            "--stitching",
+            "--prefix=" + output_hugin,
+            output_hugin,
+        ]
+        (returncode, stdout, stderr) = run_cmd(cmd)
 
 
 if __name__ == "__main__":
