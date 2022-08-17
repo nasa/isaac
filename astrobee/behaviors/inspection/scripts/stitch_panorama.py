@@ -296,6 +296,7 @@ def main():
             "--canvas=AUTO",
             "--projection=2",
             "--fov=360x180",
+            "--output-type=NORMAL,REMAP",
             output_hugin,
         ]
         (returncode, stdout, stderr) = run_cmd(cmd)
