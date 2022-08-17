@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
   std::map<double, double> haz_depth_to_image_timestamps, haz_image_to_depth_timestamps;
   std::vector<double> all_nav_cam_timestamps, all_haz_cam_timestamps, all_sci_cam_timestamps;
 
-  // TODO(mgouveia): Add config file for these
+  // Declare detector
   const vc::LKOpticalFlowFeatureDetectorAndMatcherParams params = LoadParams();
   vc::LKOpticalFlowFeatureDetectorAndMatcher detector_and_matcher(params);
   cv::Feature2D& detector = *(detector_and_matcher.detector());
@@ -244,7 +244,8 @@ int main(int argc, char** argv) {
   std::vector<double> sci_cam_timestamps_plus_extra = all_sci_cam_timestamps;
   std::vector<rosbag::MessageInstance> const& nav_cam_msgs = nav_cam_handle.bag_msgs;
   size_t it = 0;
-  vc::FeatureImage *current_image;
+  sensor_msgs::Image::ConstPtr image_msg_init = nav_cam_msgs[0].instantiate<sensor_msgs::Image>();
+  vc::FeatureImage current_image = LoadImage(image_msg_init, detector);
 
 
 
@@ -257,24 +258,19 @@ int main(int argc, char** argv) {
       if (image_msg) {
         double nav_cam_time = image_msg->header.stamp.toSec();
 
-
-        std::cout << "0 " << std::endl << std::flush;
         // Convert to Feature Image
-        std::cout << "1 " << std::endl << std::flush;
         vc::FeatureImage compare_image = LoadImage(image_msg, detector);
-        std::cout << "2 " << std::endl << std::flush;
         if (replace_first && nav_cam_time > beg) {
-          *current_image = compare_image;
+          current_image = compare_image;
           replace_first = false;
-          continue;
-        }
-
-        if (nav_cam_time > beg && nav_cam_time < end &&
-            LowMovementImageSequence(*current_image, compare_image, FLAGS_max_dist_between_images,
+        } else if (nav_cam_time > beg && nav_cam_time < end &&
+            LowMovementImageSequence(current_image, compare_image, FLAGS_max_dist_between_images,
                                      detector_and_matcher)) {
           sci_cam_timestamps_plus_extra.push_back(nav_cam_time);
-          *current_image = compare_image;
+          current_image = compare_image;
           std::cout << "Added nav cam image with timestamp " << nav_cam_time << std::endl;
+        } else if (nav_cam_time > end) {
+          break;
         }
       }
     }
