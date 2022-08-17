@@ -39,17 +39,25 @@
 #include <Eigen/Geometry>
 #include <Eigen/Core>
 
+#include <ff_common/init.h>
 #include <ff_common/utils.h>
 #include <ff_common/thread.h>
 #include <config_reader/config_reader.h>
 #include <msg_conversions/msg_conversions.h>
+#include <localization_common/averager.h>
+#include <localization_common/logger.h>
+#include <vision_common/lk_optical_flow_feature_detector_and_matcher.h>
 
 #include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
 #include <string>
 #include <map>
 #include <iostream>
 #include <fstream>
+
+namespace lc = localization_common;
+namespace vc = vision_common;
 
 // Pick images from which to build a map so that they bracket given
 // sci cam images. Then pick extra images if needed.
@@ -62,15 +70,14 @@ DEFINE_string(output_nav_cam_dir, "",
 
 DEFINE_string(nav_cam_topic, "/mgt/img_sampler/nav_cam/image_record",
               "The nav cam topic in the bag file.");
-
 DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points",
               "The depth point cloud topic in the bag file.");
 DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
               "The depth camera intensity topic in the bag file.");
 DEFINE_string(sci_cam_topic, "/hw/cam_sci/compressed", "The sci cam topic in the bag file.");
 
-DEFINE_double(max_time_between_images, 1.0e+10,
-              "Select additional nav cam images to make the timestamps between any two "
+DEFINE_double(max_dist_between_images, 0.15,
+              "Select additional nav cam images to make the distance between any two "
               "consecutive such images be no more than this.");
 
 DEFINE_double(bracket_len, 0.6,
@@ -83,6 +90,84 @@ DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
               "Override the value of nav_cam_to_sci_cam_timestamp_offset from the robot config "
               "file with this value.");
 
+
+// Load detector parameters
+vc::LKOpticalFlowFeatureDetectorAndMatcherParams LoadParams() {
+  vc::LKOpticalFlowFeatureDetectorAndMatcherParams params;
+  // TODO(rsoussan): Add config file for these
+  params.max_iterations = 10;
+  params.termination_epsilon = 0.03;
+  params.window_length = 31;
+  params.max_level = 3;
+  params.min_eigen_threshold = 0.001;
+  params.max_flow_distance = 180;
+  params.max_backward_match_distance = 0.5;
+  params.good_features_to_track.max_corners = 100;
+  params.good_features_to_track.quality_level = 0.01;
+  params.good_features_to_track.min_distance = 40;
+  params.good_features_to_track.block_size = 3;
+  params.good_features_to_track.use_harris_detector = false;
+  params.good_features_to_track.k = 0.04;
+  return params;
+}
+
+// Read the cam timestamps
+void getMessageTimestamps(std::string name, dense_map::RosBagHandle& cam_handle,
+                          std::vector<double>& all_cam_timestamps) {
+  // Read messages
+  std::vector<rosbag::MessageInstance> const& cam_msgs = cam_handle.bag_msgs;
+  // Go through all the messages
+  for (size_t it = 0; it < cam_msgs.size(); it++) {
+    sensor_msgs::Image::ConstPtr image_msg = cam_msgs[it].instantiate<sensor_msgs::Image>();
+    if (image_msg) {
+      double cam_time = image_msg->header.stamp.toSec();
+      all_cam_timestamps.push_back(cam_time);
+    }
+     // Can be compressed too
+    sensor_msgs::CompressedImage::ConstPtr comp_image_msg = cam_msgs[it].instantiate<sensor_msgs::CompressedImage>();
+    if (comp_image_msg) {
+      double cam_time = comp_image_msg->header.stamp.toSec();
+      all_cam_timestamps.push_back(cam_time);
+    }
+  }
+
+  std::cout.precision(17);
+  if (all_cam_timestamps.empty())
+    std::cout << "Warning: No " << name << " cam images are present." << std::endl;
+  else
+    std::cout << "Number of " << name << " cam images " << all_cam_timestamps.size() << std::endl;
+}
+
+vc::FeatureImage LoadImage(const sensor_msgs::Image::ConstPtr image_msg, cv::Feature2D& detector) {
+  cv::Mat image = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::MONO8)->image;
+  cv::resize(image, image, cv::Size(), 0.5, 0.5);
+
+  if (image.empty()) LogFatal("Failed to load image ");
+  cv::resize(image, image, cv::Size(), 0.5, 0.5);
+  return vc::FeatureImage(image, detector);
+}
+
+bool LowMovementImageSequence(const vc::FeatureImage& current_image, const vc::FeatureImage& next_image,
+                              const double max_low_movement_mean_distance,
+                              vc::LKOpticalFlowFeatureDetectorAndMatcher& detector_and_matcher) {
+  const auto& matches = detector_and_matcher.Match(current_image, next_image);
+  if (matches.size() < 5) {
+    LogDebug("Too few matches: " << matches.size() << ", current image keypoints: " << current_image.keypoints().size()
+                                 << ", next image keypoints: " << next_image.keypoints().size());
+    return true;
+  }
+  LogDebug("Found matches: " << matches.size() << ", current image keypoints: " << current_image.keypoints().size()
+                             << ", next image keypoints: " << next_image.keypoints().size());
+  lc::Averager distance_averager;
+  for (const auto& match : matches) {
+    distance_averager.Update(match.distance);
+  }
+  LogDebug("Mean distance: " << distance_averager.average());
+  if (distance_averager.average() <= max_low_movement_mean_distance) return false;
+  return true;
+}
+
+
 int main(int argc, char** argv) {
   ff_common::InitFreeFlyerApplication(&argc, &argv);
   if (FLAGS_ros_bag.empty()) LOG(FATAL) << "The bag file was not specified.";
@@ -91,7 +176,7 @@ int main(int argc, char** argv) {
 
   if (FLAGS_bracket_len <= 0.0) LOG(FATAL) << "Must have a positive bracket length.";
 
-  if (FLAGS_max_time_between_images <= 0.0) LOG(FATAL) << "Must use a positive value for --max_time_between_images.\n";
+  if (FLAGS_max_dist_between_images <= 0.0) LOG(FATAL) << "Must use a positive value for --max_dist_between_images.\n";
 
   if (!boost::filesystem::exists(FLAGS_output_nav_cam_dir))
     if (!boost::filesystem::create_directories(FLAGS_output_nav_cam_dir) ||
@@ -117,108 +202,99 @@ int main(int argc, char** argv) {
     cam_params, nav_to_cam_trans, nav_to_cam_timestamp_offset, nav_cam_to_body_trans,
     haz_cam_depth_to_image_transform);
 
-  if (!std::isnan(FLAGS_nav_cam_to_sci_cam_offset_override_value)) {
-    for (size_t it = 0; it < cam_types.size(); it++) {
-      if (cam_types[it] == "sci_cam") {
-        double new_val = FLAGS_nav_cam_to_sci_cam_offset_override_value;
-        std::cout << "Overriding the value " << nav_to_cam_timestamp_offset[it]
-                  << " of nav_cam_to_sci_cam_timestamp_offset with: " << new_val << std::endl;
-        nav_to_cam_timestamp_offset[it] = new_val;
-      }
-    }
-  }
-
-  // This will be used for output
-  std::map<double, double> haz_depth_to_image_timestamps, haz_image_to_depth_timestamps;
-
-  std::vector<double> all_nav_cam_timestamps, all_haz_cam_timestamps, all_sci_cam_timestamps;
-
   // Here we count on the order of cam_types above
   double nav_cam_to_haz_cam_timestamp_offset = nav_to_cam_timestamp_offset[1];
   double nav_cam_to_sci_cam_timestamp_offset = nav_to_cam_timestamp_offset[2];
 
-  std::cout << "nav_cam_to_haz_cam_timestamp_offset = " << nav_cam_to_haz_cam_timestamp_offset
-            << "\n";
-  std::cout << "nav_cam_to_sci_cam_timestamp_offset = " << nav_cam_to_sci_cam_timestamp_offset
-            << "\n";
-
-  // TODO(oalexan1): Make the logic below into functions
-
-  // Read the haz cam data we will need
-  double haz_cam_start_time = -1.0;
-  std::vector<rosbag::MessageInstance> const& haz_cam_intensity_msgs
-    = haz_cam_intensity_handle.bag_msgs;
-  for (size_t it = 0; it < haz_cam_intensity_msgs.size(); it++) {
-    sensor_msgs::Image::ConstPtr image_msg
-      = haz_cam_intensity_msgs[it].instantiate<sensor_msgs::Image>();
-    if (image_msg) {
-      double haz_cam_time = image_msg->header.stamp.toSec();
-      all_haz_cam_timestamps.push_back(haz_cam_time);
-
-      if (haz_cam_start_time < 0) haz_cam_start_time = haz_cam_time;
-    }
+  // Overwrite sci cam offset
+  if (!std::isnan(FLAGS_nav_cam_to_sci_cam_offset_override_value)) {
+    std::cout << "Overriding the value " << nav_cam_to_sci_cam_timestamp_offset
+              << " of nav_cam_to_sci_cam_timestamp_offset with: "
+              << FLAGS_nav_cam_to_sci_cam_offset_override_value << std::endl;
+    nav_cam_to_sci_cam_timestamp_offset = FLAGS_nav_cam_to_sci_cam_offset_override_value;
   }
 
-  std::cout.precision(17);
+  std::cout << "nav_cam_to_haz_cam_timestamp_offset = " << nav_cam_to_haz_cam_timestamp_offset << "\n";
+  std::cout << "nav_cam_to_sci_cam_timestamp_offset = " << nav_cam_to_sci_cam_timestamp_offset << "\n";
 
-  if (all_haz_cam_timestamps.empty())
-    std::cout << "Warning: No haz cam images are present." << std::endl;
-  else
-    std::cout << "Number of haz cam images " << all_haz_cam_timestamps.size() << std::endl;
+  // This will be used for output
+  std::map<double, double> haz_depth_to_image_timestamps, haz_image_to_depth_timestamps;
+  std::vector<double> all_nav_cam_timestamps, all_haz_cam_timestamps, all_sci_cam_timestamps;
 
-  // Read the sci cam data we will need (images and clouds)
-  std::vector<rosbag::MessageInstance> const& sci_cam_msgs = sci_cam_handle.bag_msgs;
-  std::cout << "Number of sci cam images " << sci_cam_msgs.size() << std::endl;
+  // TODO(mgouveia): Add config file for these
+  const vc::LKOpticalFlowFeatureDetectorAndMatcherParams params = LoadParams();
+  vc::LKOpticalFlowFeatureDetectorAndMatcher detector_and_matcher(params);
+  cv::Feature2D& detector = *(detector_and_matcher.detector());
+
+  // Read the haz cam timestamps
+  // TODO(oalexan1): This is never used
+  getMessageTimestamps("haz", haz_cam_intensity_handle, all_haz_cam_timestamps);
+
+
+  // Read the sci cam timestamps
+  getMessageTimestamps("sci", sci_cam_handle, all_sci_cam_timestamps);
   std::set<double> sci_cam_set;
-  for (size_t it = 0; it < sci_cam_msgs.size(); it++) {
-    sensor_msgs::Image::ConstPtr image_msg = sci_cam_msgs[it].instantiate<sensor_msgs::Image>();
-    if (image_msg) {
-      double sci_cam_time = image_msg->header.stamp.toSec();
-      all_sci_cam_timestamps.push_back(sci_cam_time);
-    }
-    // Can be compressed too
-    sensor_msgs::CompressedImage::ConstPtr comp_image_msg =
-      sci_cam_msgs[it].instantiate<sensor_msgs::CompressedImage>();
-    if (comp_image_msg) {
-      double sci_cam_time = comp_image_msg->header.stamp.toSec();
-      all_sci_cam_timestamps.push_back(sci_cam_time);
-      sci_cam_set.insert(sci_cam_time);
-    }
+  for (double t : all_sci_cam_timestamps) {
+      sci_cam_set.insert(t);
   }
-  if (all_sci_cam_timestamps.empty()) LOG(FATAL) << "No sci cam timestamps.";
+  std::cout << "end reading sci cam " << std::endl;
 
-  // See if to insert extra timestamps so we get good overlap when building
-  // a sparse map. We'll also pick haz cam images in between any such pair
-  // of bracketing images even if there's no sci cam there.
-  std::vector<double> extra_sci_cam_timestamps;
-  for (size_t sci_it = 0; sci_it + 1 < all_sci_cam_timestamps.size(); sci_it++) {
-    double beg = all_sci_cam_timestamps[sci_it];
-    double end = all_sci_cam_timestamps[sci_it + 1];
-    if (end - beg > FLAGS_max_time_between_images) {
-      int num = ceil((end - beg) / FLAGS_max_time_between_images);
-      for (int extra_it = 1; extra_it < num; extra_it++) {
-        extra_sci_cam_timestamps.push_back(beg + extra_it * (end - beg) / num);
+
+  // Add filler nav cam images based on movement
+  std::vector<double> sci_cam_timestamps_plus_extra = all_sci_cam_timestamps;
+  std::vector<rosbag::MessageInstance> const& nav_cam_msgs = nav_cam_handle.bag_msgs;
+  size_t it = 0;
+  vc::FeatureImage *current_image;
+
+
+
+  bool replace_first = true;
+  for (std::set<double>::iterator it_sci = sci_cam_set.begin(); std::next(it_sci) != sci_cam_set.end(); it_sci++) {
+    double beg = *it_sci;
+    double end = *std::next(it_sci);
+    for (; it < nav_cam_msgs.size(); it++) {
+      sensor_msgs::Image::ConstPtr image_msg = nav_cam_msgs[it].instantiate<sensor_msgs::Image>();
+      if (image_msg) {
+        double nav_cam_time = image_msg->header.stamp.toSec();
+
+
+        std::cout << "0 " << std::endl << std::flush;
+        // Convert to Feature Image
+        std::cout << "1 " << std::endl << std::flush;
+        vc::FeatureImage compare_image = LoadImage(image_msg, detector);
+        std::cout << "2 " << std::endl << std::flush;
+        if (replace_first && nav_cam_time > beg) {
+          *current_image = compare_image;
+          replace_first = false;
+          continue;
+        }
+
+        if (nav_cam_time > beg && nav_cam_time < end &&
+            LowMovementImageSequence(*current_image, compare_image, FLAGS_max_dist_between_images,
+                                     detector_and_matcher)) {
+          sci_cam_timestamps_plus_extra.push_back(nav_cam_time);
+          *current_image = compare_image;
+          std::cout << "Added nav cam image with timestamp " << nav_cam_time << std::endl;
+        }
       }
     }
+    // Find first nav after sci cam stamp
+    replace_first = true;
   }
 
-  std::vector<double> sci_cam_timestamps_plus_extra = all_sci_cam_timestamps;
-  for (size_t extra_it = 0; extra_it < extra_sci_cam_timestamps.size(); extra_it++) {
-    sci_cam_timestamps_plus_extra.push_back(extra_sci_cam_timestamps[extra_it]);
-  }
+
+
+  // for (size_t extra_it = 0; extra_it < extra_sci_cam_timestamps.size(); extra_it++) {
+  //   sci_cam_timestamps_plus_extra.push_back(extra_sci_cam_timestamps[extra_it]);
+  // }
   std::sort(sci_cam_timestamps_plus_extra.begin(), sci_cam_timestamps_plus_extra.end());
 
-  // Read the nav cam data we will need
-  std::vector<rosbag::MessageInstance> const& nav_cam_msgs = nav_cam_handle.bag_msgs;
-  std::cout << "Number of nav cam images " << nav_cam_msgs.size() << std::endl;
-  for (size_t it = 0; it < nav_cam_msgs.size(); it++) {
-    sensor_msgs::Image::ConstPtr image_msg = nav_cam_msgs[it].instantiate<sensor_msgs::Image>();
-    if (image_msg) {
-      double nav_cam_time = image_msg->header.stamp.toSec();
-      all_nav_cam_timestamps.push_back(nav_cam_time);
-    }
-  }
-  if (all_nav_cam_timestamps.empty()) LOG(FATAL) << "No nav cam timestamps. Check the nav cam topic.";
+
+  std::cout << "end adding extra sci cam " << std::endl;
+
+
+  getMessageTimestamps("nav", nav_cam_handle, all_nav_cam_timestamps);
+
 
   std::vector<double> nav_cam_timestamps;
 
