@@ -76,7 +76,7 @@ DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
               "The depth camera intensity topic in the bag file.");
 DEFINE_string(sci_cam_topic, "/hw/cam_sci/compressed", "The sci cam topic in the bag file.");
 
-DEFINE_double(max_dist_between_images, 0.15,
+DEFINE_double(max_dist_between_images, -1,
               "Select additional nav cam images to make the distance between any two "
               "consecutive such images be no more than this.");
 
@@ -95,16 +95,16 @@ DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
 vc::LKOpticalFlowFeatureDetectorAndMatcherParams LoadParams() {
   vc::LKOpticalFlowFeatureDetectorAndMatcherParams params;
   // TODO(rsoussan): Add config file for these
-  params.max_iterations = 10;
+  params.max_iterations = 40;
   params.termination_epsilon = 0.03;
   params.window_length = 31;
-  params.max_level = 3;
+  params.max_level = 4;
   params.min_eigen_threshold = 0.001;
   params.max_flow_distance = 180;
   params.max_backward_match_distance = 0.5;
   params.good_features_to_track.max_corners = 100;
   params.good_features_to_track.quality_level = 0.01;
-  params.good_features_to_track.min_distance = 40;
+  params.good_features_to_track.min_distance = 20;
   params.good_features_to_track.block_size = 3;
   params.good_features_to_track.use_harris_detector = false;
   params.good_features_to_track.k = 0.04;
@@ -151,7 +151,7 @@ bool LowMovementImageSequence(const vc::FeatureImage& current_image, const vc::F
                               const double max_low_movement_mean_distance,
                               vc::LKOpticalFlowFeatureDetectorAndMatcher& detector_and_matcher) {
   const auto& matches = detector_and_matcher.Match(current_image, next_image);
-  if (matches.size() < 5) {
+  if (matches.size() < 4) {
     LogDebug("Too few matches: " << matches.size() << ", current image keypoints: " << current_image.keypoints().size()
                                  << ", next image keypoints: " << next_image.keypoints().size());
     return true;
@@ -237,56 +237,48 @@ int main(int argc, char** argv) {
   for (double t : all_sci_cam_timestamps) {
       sci_cam_set.insert(t);
   }
-  std::cout << "end reading sci cam " << std::endl;
-
 
   // Add filler nav cam images based on movement
   std::vector<double> sci_cam_timestamps_plus_extra = all_sci_cam_timestamps;
-  std::vector<rosbag::MessageInstance> const& nav_cam_msgs = nav_cam_handle.bag_msgs;
-  size_t it = 0;
-  sensor_msgs::Image::ConstPtr image_msg_init = nav_cam_msgs[0].instantiate<sensor_msgs::Image>();
-  vc::FeatureImage current_image = LoadImage(image_msg_init, detector);
+  if (FLAGS_max_dist_between_images > 0) {
+    std::vector<rosbag::MessageInstance> const& nav_cam_msgs = nav_cam_handle.bag_msgs;
+    size_t it = 0;
+    sensor_msgs::Image::ConstPtr image_msg_init = nav_cam_msgs[0].instantiate<sensor_msgs::Image>();
+    vc::FeatureImage current_image = LoadImage(image_msg_init, detector);
 
 
 
-  bool replace_first = true;
-  for (std::set<double>::iterator it_sci = sci_cam_set.begin(); std::next(it_sci) != sci_cam_set.end(); it_sci++) {
-    double beg = *it_sci;
-    double end = *std::next(it_sci);
-    for (; it < nav_cam_msgs.size(); it++) {
-      sensor_msgs::Image::ConstPtr image_msg = nav_cam_msgs[it].instantiate<sensor_msgs::Image>();
-      if (image_msg) {
-        double nav_cam_time = image_msg->header.stamp.toSec();
+    bool replace_first = true;
+    for (std::set<double>::iterator it_sci = sci_cam_set.begin(); std::next(it_sci) != sci_cam_set.end(); it_sci++) {
+      double beg = *it_sci;
+      double end = *std::next(it_sci);
+      for (; it < nav_cam_msgs.size(); it++) {
+        sensor_msgs::Image::ConstPtr image_msg = nav_cam_msgs[it].instantiate<sensor_msgs::Image>();
+        if (image_msg) {
+          double nav_cam_time = image_msg->header.stamp.toSec();
 
-        // Convert to Feature Image
-        vc::FeatureImage compare_image = LoadImage(image_msg, detector);
-        if (replace_first && nav_cam_time > beg) {
-          current_image = compare_image;
-          replace_first = false;
-        } else if (nav_cam_time > beg && nav_cam_time < end &&
-            LowMovementImageSequence(current_image, compare_image, FLAGS_max_dist_between_images,
-                                     detector_and_matcher)) {
-          sci_cam_timestamps_plus_extra.push_back(nav_cam_time);
-          current_image = compare_image;
-          std::cout << "Added nav cam image with timestamp " << nav_cam_time << std::endl;
-        } else if (nav_cam_time > end) {
-          break;
+          // Convert to Feature Image
+          vc::FeatureImage compare_image = LoadImage(image_msg, detector);
+          if (replace_first && nav_cam_time > beg) {
+            current_image = compare_image;
+            replace_first = false;
+          } else if (nav_cam_time > beg && nav_cam_time < end &&
+              LowMovementImageSequence(current_image, compare_image, FLAGS_max_dist_between_images,
+                                       detector_and_matcher)) {
+            sci_cam_timestamps_plus_extra.push_back(nav_cam_time);
+            current_image = compare_image;
+            std::cout << "Added nav cam image with timestamp " << nav_cam_time << std::endl;
+          } else if (nav_cam_time > end) {
+            break;
+          }
         }
       }
+      // Find first nav after sci cam stamp
+      replace_first = true;
     }
-    // Find first nav after sci cam stamp
-    replace_first = true;
   }
 
-
-
-  // for (size_t extra_it = 0; extra_it < extra_sci_cam_timestamps.size(); extra_it++) {
-  //   sci_cam_timestamps_plus_extra.push_back(extra_sci_cam_timestamps[extra_it]);
-  // }
   std::sort(sci_cam_timestamps_plus_extra.begin(), sci_cam_timestamps_plus_extra.end());
-
-
-  std::cout << "end adding extra sci cam " << std::endl;
 
 
   getMessageTimestamps("nav", nav_cam_handle, all_nav_cam_timestamps);
