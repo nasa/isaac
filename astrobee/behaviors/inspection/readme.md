@@ -58,3 +58,48 @@ The pictures will be published on the topic
 They will also show up in the sci cam window in RVIZ.
 
 If requests to take a single picture come at a high rate, some of them will be dropped.
+
+Using export panorama tool
+---------
+
+This tool was created to allow for panorama surveys to be created and exported. This is useful to make panorama plans beforehand to ensure reproduceability.
+
+To export the panorama file:
+
+	rosrun inspection export_panorama -panorama_poses $PANORAMA_POSES -panorama_out $OUTPUL_PLAN
+
+where $PANORAMA_POSES is a text file container the poses of the panorama centers, and $OUTPUT_PLAN is the output path of the panorama w.r.t. the package folder.
+Other options that can be specified are:
+
+    -camera (Camera to use) type: string default: "sci_cam"
+    -ns (Robot namespace) type: string default: ""
+    -overlap (Panorama: overlap between images) type: double default: 0.5
+    -pan_max (Panorama: maximum pan) type: double default: 180
+    -pan_min (Panorama: minimum pan) type: double default: -180
+    -panorama_out (Panorama poses output) type: string
+      default: "/resources/pano_out.txt"
+    -panorama_poses (Panorama poses list to map) type: string
+      default: "/resources/scicam_panorama.txt"
+    -tilt_max (Panorama: maximum tilt) type: double default: 90
+    -tilt_min (Panorama: minimum tilt) type: double default: -90
+
+
+Using the stitch panorama script
+---------
+
+This script firstly creates the hugin panorama stitcher file for a specific panorama, initializes it with the localization data, runs multiple optimizations and finally produces the final stitched result
+
+To run the tool:
+
+	rosrun inspection stitch_panorama.py -bag_name $BAG_NAME -work_dir $SCI_CAM_DIR
+
+where $BAG_NAME is the bagfile which the script uses to identify which sci_cam images to use and initializes the attitude in the hugin file accordig to localization data. The $SCI_CAM_DIR is he folder location to the sci_cam images copied from the HLP.
+
+Other optional arguments are:
+
+    -input_hugin     (Input Hugin pto file.) type: string
+    -output_hugin    (Output Hugin pto file.) type: string
+    --no-stitching   (Generate hugin and optimize only.)
+    --stitching-only (Stitch hugin file only)
+
+The --no-stitching option followed by the --stitch-only option is useful if manual checks/changes are desired to the hugin file before stitching the panorama (which takes a long time), it particularly useful if the localization data is not sufficient for the panorama output to be properly centered around the (0,0,0) ISS reference frame.  
