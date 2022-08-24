@@ -90,6 +90,8 @@ DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
               "Override the value of nav_cam_to_sci_cam_timestamp_offset from the robot config "
               "file with this value.");
 
+DEFINE_bool(left_bracket_only, false,
+              "Output only the left bracket.");
 
 // Load detector parameters
 vc::LKOpticalFlowFeatureDetectorAndMatcherParams LoadParams() {
@@ -322,7 +324,7 @@ int main(int argc, char** argv) {
           bool is_good2 = (s < t2 && t2 <= s + d/2.0);
           if (is_good2) {
             nav_cam_timestamps.push_back(all_nav_cam_timestamps[nav_it1]);
-            nav_cam_timestamps.push_back(all_nav_cam_timestamps[nav_it2]);
+            if (!FLAGS_left_bracket_only) nav_cam_timestamps.push_back(all_nav_cam_timestamps[nav_it2]);
             std::cout << std::setprecision(17) << std::fixed << "For ";
             if (sci_cam_set.find(sci_cam_timestamps_plus_extra[sci_it]) != sci_cam_set.end())
               std::cout << "sci_cam ";
