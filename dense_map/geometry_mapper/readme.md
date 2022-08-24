@@ -739,7 +739,7 @@ Ensure that the bot name is correct below. Set ``ASTROBEE_SOURCE_PATH``,
       --camera_topics "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int"\
       --undistorted_crop_wins "sci_cam,1250,1000 nav_cam,1100,776 haz_cam,250,200" \
       --haz_cam_points_topic /hw/depth_haz/points                           \
-      --start 0                                                             \
+      --start_step 0                                                        \
       --duration 1e+10                                                      \
       --sampling_spacing_seconds 5                                          \
       --dist_between_processed_cams 0.1                                     \

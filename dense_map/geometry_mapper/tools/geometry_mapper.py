@@ -262,7 +262,7 @@ def process_args(args):
     parser.add_argument(
         "--merge_maps",
         dest="merge_maps",
-        default="",
+        nargs="*",
         help="Given several output geometry mapper directories, specified "
         + "as a list in quotes, create a merged textured mesh. The input "
         + "bag and sparse map will not be used. Each input geometry mapper run "
@@ -790,6 +790,7 @@ def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
 # Find the ratio of a sci cam image's width and the width from the camera config file.
 def find_sci_cam_scale(image_file):
     # width from the imag file
+    print(image_file)
     img = cv2.imread(image_file)
     image_width = img.shape[1]
 
@@ -807,7 +808,7 @@ def find_sci_cam_scale(image_file):
     return float(image_width) / float(config_width)
 
 
-def texture_mesh(src_path, exec_path, cam_type, crop_win_map, mesh, args):
+def undistort_and_texrecon(src_path, cam_type, crop_win_map, args):
     if args.simulated_data and cam_type == "nav_cam":
         print("Texturing nav_cam is not supported with simulated data.")
         return "None"
@@ -843,13 +844,34 @@ def texture_mesh(src_path, exec_path, cam_type, crop_win_map, mesh, args):
         )
         create_texrecon_cameras(args, src_path, undist_dir, cam_type)
 
+    else:
+        # Simulated images don't have distortion
+        create_texrecon_cameras(args, src_path, dist_dir, cam_type)
+
+
+def texture_mesh(src_path, exec_path, cam_type, mesh, args):
+    if args.simulated_data and cam_type == "nav_cam":
+        print("Texturing nav_cam is not supported with simulated data.")
+        return "None"
+
+    dist_image_list = os.path.join(args.output_dir, cam_type + "_index.txt")
+    with open(dist_image_list) as f:
+        image_files = f.readlines()
+        if len(image_files) == 0:
+            # That there are no images for a given camera is not necessarily fatal,
+            # but do tell the user.
+            print("Found no images for: " + cam_type)
+            return ""
+
+    dist_dir = os.path.join(args.output_dir, "distorted_" + cam_type)
+    undist_dir = os.path.join(args.output_dir, "undistorted_" + cam_type)
+
+    if not args.simulated_data:
         if args.texture_individual_images:
             texture_individual_images(args, exec_path, mesh, dist_image_list, cam_type)
 
         textured_mesh = run_texrecon(args, src_path, mesh, undist_dir, cam_type)
     else:
-        # Simulated images don't have distortion
-        create_texrecon_cameras(args, src_path, dist_dir, cam_type)
         textured_mesh = run_texrecon(args, src_path, mesh, dist_dir, cam_type)
 
     return textured_mesh
@@ -869,10 +891,6 @@ def merge_poses_and_clouds(args):
     """
     Merge individual reconstructions from previous invocations of this tool.
     """
-    input_dirs = args.merge_maps.split()
-
-    if len(input_dirs) == 0:
-        raise Exception("No input maps to merge were specified")
 
     # The out dir was created by now
     output_dir = args.output_dir
@@ -880,7 +898,7 @@ def merge_poses_and_clouds(args):
     # Copy all the data from the input dirs except log files
     # and sub-subdirectories
     print("Copying the data, this will take time.")
-    for input_dir in input_dirs:
+    for input_dir in args.merge_maps:
         items = os.listdir(input_dir)
         for item in items:
 
@@ -917,7 +935,7 @@ def merge_poses_and_clouds(args):
         # Merge the index files by concatenating them
         output_index = os.path.join(output_dir, index_file)
         f_out = open(output_index, "w")
-        for input_dir in input_dirs:
+        for input_dir in args.merge_maps:
             input_index = os.path.join(input_dir, index_file)
             if not os.path.isfile(input_index):
                 continue
@@ -941,10 +959,13 @@ if __name__ == "__main__":
     setup_outputs(args)
 
     start_step = int(args.start_step)
+    print("Starting in step " + str(start_step))
 
     if start_step <= 0:
-        if args.merge_maps == "":
+        if args.merge_maps == []:
             compute_poses_and_clouds(geometry_mapper_path, args)
+            for camera_type in args.camera_types.split():
+                undistort_and_texrecon(src_path, camera_type, crop_win_map, args)
         else:
             merge_poses_and_clouds(args)
 
@@ -1004,7 +1025,7 @@ if __name__ == "__main__":
     if start_step <= 9:
         for camera_type in args.camera_types.split():
             textured_mesh = texture_mesh(
-                src_path, exec_path, camera_type, crop_win_map, simplified_mesh, args
+                src_path, exec_path, camera_type, simplified_mesh, args
             )
             textured_meshes += [textured_mesh]
 
