@@ -962,7 +962,7 @@ if __name__ == "__main__":
     print("Starting in step " + str(start_step))
 
     if start_step <= 0:
-        if args.merge_maps == []:
+        if args.merge_maps is None:
             compute_poses_and_clouds(geometry_mapper_path, args)
             for camera_type in args.camera_types.split():
                 undistort_and_texrecon(src_path, camera_type, crop_win_map, args)
