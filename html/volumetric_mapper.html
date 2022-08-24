@@ -90,16 +90,16 @@ $(document).ready(function(){initNavTree('volumetric_mapper.html',''); initResiz
 <div class="title">Volumetric Mapper </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h1><a class="anchor" id="autotoc_md91"></a>
+<div class="textblock"><h1><a class="anchor" id="autotoc_md93"></a>
 Volumetric Mapper</h1>
-<h2><a class="anchor" id="autotoc_md92"></a>
+<h2><a class="anchor" id="autotoc_md94"></a>
 Overview</h2>
 <p>The wifi mapper subscribes to all the wifi signal strength messages and prcesses them for 3D visualization. Customization os the produced maps is defined in isaac/config/dense_map/wifi_mapper.config</p>
-<h2><a class="anchor" id="autotoc_md93"></a>
+<h2><a class="anchor" id="autotoc_md95"></a>
 Trace Map</h2>
 <p>The trace map is drawn at a certain resolution, within this resolution, every signal received is averaged. The result is depicted using MarkerArray's where the cube size is the map resolution.</p>
 <p>Parameters: plot_trace - enable or disable the trace map calculation resolution - resolution of the trace map where whithin it, the measurements will be averaged</p>
-<h2><a class="anchor" id="autotoc_md94"></a>
+<h2><a class="anchor" id="autotoc_md96"></a>
 Wifi 3D Map</h2>
 <p>The Wifi Mapper uses Gaussian Process Regression to mapp the ISS regarding the wifi signal strength. It makes use of the libgp library. When a new measure is obtained, the value is recorded in the GP object. When the timer responsible for calculating the wifi interpolation is enables, all the recorded data is processed.</p>
 <p>Parameters: plot_map - enable or disable the 3D map interpolation calculation </p>
