@@ -93,6 +93,9 @@ DEFINE_double(nav_cam_to_sci_cam_offset_override_value,
 DEFINE_bool(left_bracket_only, false,
               "Output only the left bracket.");
 
+DEFINE_string(logfile, "",
+              "Log the output images.");
+
 // Load detector parameters
 vc::LKOpticalFlowFeatureDetectorAndMatcherParams LoadParams() {
   vc::LKOpticalFlowFeatureDetectorAndMatcherParams params;
@@ -377,6 +380,17 @@ int main(int argc, char** argv) {
              nav_cam_timestamps[nav_it]);
     std::cout << "Writing: " << filename_buffer << std::endl;
     cv::imwrite(filename_buffer, image);
+  }
+  // If logfile wanted
+  if (FLAGS_logfile != "") {
+    FILE *logfile;
+    logfile = fopen(FLAGS_logfile.c_str(), "w");
+    for (size_t nav_it = 0; nav_it < nav_cam_timestamps.size(); nav_it++) {
+      fprintf(logfile, "%s/%10.7f.jpg ",
+               FLAGS_output_nav_cam_dir.c_str(),
+               nav_cam_timestamps[nav_it]);
+    }
+    fclose(logfile);
   }
   return 0;
 }
