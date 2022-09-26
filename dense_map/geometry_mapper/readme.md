@@ -1378,7 +1378,7 @@ have about 4/5 overlap with images from other pairs.
 If necessary, add more intermediate images by re-running this tool
 with:
 
-    --max_time_between_images <val>
+    --max_dist_between_images <val>
 
 It is good to not allow too many images or excessive overlap, but, if
 removing excessive images, ensure that each sci cam image is still
@@ -1387,12 +1387,21 @@ the images in pairs of very similar ones. That is good even if there's
 no sci cam images between some pairs, as it is likely haz cam images
 are found later in that bracket.
 
-One could start by running this tool with a smaller value of the
---max_time_between_images option, wiping many redundant images while
+One could start by running this tool with the
+--max_dist_between_images option, wiping many redundant images while
 ensuring there is good overlap among them and keeping pairs of similar
-images, then running this tool one more time with a very large value
-of this option to ensure the bracketing images for each sci cam image
+images, then running this tool one more time without this option
+to ensure the bracketing images for each sci cam image
 are added back.
+
+The option --left_bracket_only will generate the left brackets only,
+this might be useful if you want to minimize images in the map-making
+process, but be sure to merge the remaining images in a later stage.
+
+To save a log file with with a specific name containing the generated
+pictures path use:
+
+    --logfile <str>
 
 ### Map building and registration
 
