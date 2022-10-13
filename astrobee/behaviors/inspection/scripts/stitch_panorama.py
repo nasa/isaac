@@ -16,88 +16,119 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+"""
+Generate/update Hugin PTO files and stitch a panorama.
+
+Example:
+  export ASTROBEE_RESOURCE_DIR=$SOURCE_PATH/astrobee/resources
+  export ASTROBEE_CONFIG_DIR=$SOURCE_PATH/astrobee/config
+  export ASTROBEE_WORLD=granite
+  export ASTROBEE_ROBOT=bsharp
+  rosrun inspection scripts/stitch_panorama.py in.bag --images-dir=isaac_sci_cam_delayed
+"""
+
 import argparse
+import math
 import os
-import re
+import shutil
 import subprocess
-import sys
 
+import cv2
+import hsi
 import rosbag
-from hsi import *  # load hugin
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import euler_from_quaternion
 
-RAD2DEG = 180 / 3.1415
+RAD2DEG = 180 / math.pi
+IMAGE_TOPIC = "/hw/cam_sci/compressed"
+POSE_TOPIC = "/loc/pose"
+UNDISTORT_ENV_VARS = [
+    "ASTROBEE_RESOURCE_DIR",
+    "ASTROBEE_CONFIG_DIR",
+    "ASTROBEE_WORLD",
+    "ASTROBEE_ROBOT",
+]
+# List of Hugin variables that relate to camera intrinsics. There are many
+# more, but these are the only ones we optimize.
+LENS_PARAMS = ["v", "b"]
 
 
-def run_cmd(cmd, logfile=""):
+def quote_if_needed(arg):
+    if " " in arg:
+        return '"' + arg + '"'
+    else:
+        return arg
 
-    print((" ".join(cmd)))
 
-    if logfile != "":
-        f = open(logfile, "w")
+def run_cmd(cmd, path_prefix=None):
+    print("run_cmd: " + " ".join([quote_if_needed(arg) for arg in cmd]))
 
-    stdout = ""
-    stderr = ""
-    popen = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True
-    )
-    for stdout_line in iter(popen.stdout.readline, ""):
-        if logfile != "":
-            f.write(stdout_line)
-
-        stdout += stdout_line
-
-    popen.stdout.close()
+    if path_prefix:
+        env = os.environ.copy()
+        env["PATH"] = path_prefix + ":" + env["PATH"]
+        popen = subprocess.Popen(cmd, env=env)
+    else:
+        popen = subprocess.Popen(cmd)
     return_code = popen.wait()
     if return_code:
         raise subprocess.CalledProcessError(return_code, cmd)
 
-    if return_code != 0:
-        print(("Failed to run command.\nOutput: ", stdout, "\nError: ", stderr))
+    return return_code
 
-    return (return_code, stdout, stderr)
+
+class CustomFormatter(
+    argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter
+):
+    pass
 
 
 def parse_args():
-
-    parser = argparse.ArgumentParser(description="Generates/updates hugin files.")
-    parser.add_argument(
-        "-bag_name",
-        type=str,
-        required=True,
-        help="Input bagfile..",
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=CustomFormatter
     )
     parser.add_argument(
-        "-input_hugin",
+        "inbag",
         type=str,
-        required=False,
-        help="Input Hugin pto file.",
+        help="Input bagfile containing SciCam images and pose messages.",
     )
     parser.add_argument(
-        "-output_hugin",
+        "--output-dir",
         type=str,
         required=False,
-        help="Output Hugin pto file.",
+        default="stitch_{inbag}",
+        help="Directory to write stitched pano and intermediate files",
     )
     parser.add_argument(
-        "-work_dir",
+        "--images-dir",
         type=str,
         required=False,
-        help="Where all the sci cam images are.",
+        default=".",
+        help="Directory to read SciCam images from.",
     )
-
     parser.add_argument(
         "--no-stitching",
         dest="no_stitching",
         action="store_true",
+        default=False,
         help="Generate hugin and optimize only.",
     )
-
     parser.add_argument(
         "--stitching-only",
         dest="only_stitching",
         action="store_true",
+        default=False,
         help="Stitch hugin file only",
+    )
+    parser.add_argument(
+        "--no-undistort",
+        action="store_true",
+        default=False,
+        help="Don't undistort input images before stitching",
+    )
+    parser.add_argument(
+        "--no-lens-params",
+        action="store_true",
+        default=False,
+        help="Disable optimization of lens parameters",
     )
 
     args = parser.parse_args()
@@ -105,44 +136,34 @@ def parse_args():
     return args
 
 
-def main():
-
-    args = parse_args()
-
-    # Make a new Panorama object
-    p = Panorama()
-
-    if args.output_hugin is None:
-        output_hugin = args.bag_name.replace(".bag", ".pto")
-    else:
-        output_hugin = args.output_hugin
-
-    if not args.only_stitching:
-        # Read bagfile
-        bag = rosbag.Bag(args.bag_name)
-        get_pose = False
-        srcImage = SrcPanoImage()
-        srcImage.setVar("v", 62)
-        for topic, msg, t in bag.read_messages():
-            if topic == "/hw/cam_sci/compressed":
-
-                img = (
-                    args.work_dir
-                    + str(msg.header.stamp.secs)
+def get_image_meta(inbag_path, images_dir):
+    src_images = []
+    with rosbag.Bag(inbag_path) as bag:
+        need_pose = False
+        print("Detecting images:")
+        for topic, msg, t in bag.read_messages([IMAGE_TOPIC, POSE_TOPIC]):
+            if topic == IMAGE_TOPIC:
+                img_path = os.path.join(
+                    images_dir,
+                    str(msg.header.stamp.secs)
                     + "."
                     + "%03d" % (msg.header.stamp.nsecs * 0.000001)
-                    + ".jpg"
+                    + ".jpg",
                 )
-                print(img)
+                print("  " + img_path)
                 # Make sure image exists
-                if os.path.exists(img) is False:
-                    print("Could not find panorama image!!!")
-                else:
-                    # Insert image into hugin
-                    srcImage.setFilename(img)
-                    get_pose = True
+                if not os.path.exists(img_path):
+                    raise RuntimeError("Could not find %s" % img_path)
 
-            if get_pose and topic == "/loc/pose":
+                # Gather image metadata
+                src_image = hsi.SrcPanoImage()
+                src_image.setVar("v", 62)  # about right, may override later
+                src_image.setFilename(os.path.realpath(img_path))
+                src_images.append(src_image)
+
+                need_pose = True
+
+            if need_pose and topic == POSE_TOPIC:
                 # Configure hugin parameters
                 orientation_list = [
                     msg.pose.orientation.x,
@@ -151,47 +172,229 @@ def main():
                     msg.pose.orientation.w,
                 ]
                 (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
-                srcImage.setVar("r", roll * RAD2DEG)
-                srcImage.setVar("p", pitch * RAD2DEG)
-                srcImage.setVar("y", yaw * RAD2DEG)
-                p.addImage(srcImage)
-                get_pose = False
+                src_image.setVar("r", roll * RAD2DEG)
+                src_image.setVar("p", pitch * RAD2DEG)
+                src_image.setVar("y", yaw * RAD2DEG)
+                need_pose = False
+    return src_images
 
-        bag.close()
+
+def get_undistorted_path(fname, undistort_dir, ext):
+    with_ext = os.path.splitext(os.path.basename(fname))[0] + ext
+    return os.path.realpath(os.path.join(undistort_dir, with_ext))
+
+
+def undistort_images(src_images, output_dir):
+    undistort_dir = os.path.join(output_dir, "build", "undistort")
+    intrinsics_path = os.path.join(undistort_dir, "undistorted_intrinsics.txt")
+
+    call_undistort(src_images, undistort_dir, intrinsics_path)
+
+    # point pto file at the undistorted images
+    for img in src_images:
+        img.setFilename(get_undistorted_path(img.getFilename(), undistort_dir, ".png"))
+
+    undistorted_intrinsics = read_undistorted_intrinsics(intrinsics_path)
+    set_h_fov(src_images, undistorted_intrinsics)
+
+
+def call_undistort(src_images, undistort_dir, intrinsics_path):
+    if os.path.exists(intrinsics_path):
+        print(
+            "Undistort output %s already exists, not reprocessing images"
+            % intrinsics_path
+        )
+        return
+
+    # create file listing input images for undistort_image
+    if not os.path.exists(undistort_dir):
+        os.makedirs(undistort_dir)
+
+    input_images_path = os.path.join(undistort_dir, "input_images.txt")
+    with open(input_images_path, "w") as input_list:
+        for img in src_images:
+            input_list.write(img.getFilename() + "\n")
+
+    # check necessary environment variables are defined
+    for var in UNDISTORT_ENV_VARS:
+        if os.getenv(var) is None:
+            raise RuntimeError(
+                "Environment variable %s must be defined in order for undistort_image to read the correct camera parameters"
+                % var
+            )
+
+    run_cmd(
+        [
+            "rosrun",
+            "camera",
+            "undistort_image",
+            "-image_list",
+            input_images_path,
+            "-robot_camera",
+            "sci_cam",
+            # default output size is much larger than needed, enable autocrop
+            "-undistorted_crop_win",
+            "loose",
+            "-alpha",
+            "-cubic",
+            "-output_directory",
+            undistort_dir,
+            "-undistorted_intrinsics",
+            intrinsics_path,
+        ]
+    )
+
+
+def read_undistorted_intrinsics(intrinsics_path):
+    with open(intrinsics_path, "r") as intrinsics_stream:
+        lines = intrinsics_stream.read().splitlines()
+        vals = lines[1].split()
+        # all values have units of pixels
+        intrinsics = {
+            "width": float(vals[0]),
+            "height": float(vals[1]),
+            "focal_length": float(vals[2]),
+            "center_x": float(vals[3]),
+            "center_y": float(vals[4]),
+        }
+    return intrinsics
+
+
+def get_h_fov(undistorted_intrinsics):
+    # see https://wiki.panotools.org/Field_of_View "Conversion from focal length"
+    width = undistorted_intrinsics["width"]
+    f = undistorted_intrinsics["focal_length"]
+    h_fov_degrees = RAD2DEG * 2 * math.atan(width / (2 * f))
+    return h_fov_degrees
+
+
+def set_h_fov(src_images, undistorted_intrinsics):
+    h_fov_degrees = get_h_fov(undistorted_intrinsics)
+    for img in src_images:
+        img.setVar("v", h_fov_degrees)
+
+
+def concat_if(prefix, suffix, cond):
+    if cond:
+        return prefix + suffix
+    else:
+        return prefix
+
+
+def filter_lens_params(params, do_filter):
+    """
+    If @do_filter is True, filter lens parameters out of
+    the parameter list.
+    """
+    if do_filter:
+        return ",".join([p for p in params.split(",") if p not in LENS_PARAMS])
+    else:
+        return params
+
+
+class PathSequence(object):
+    """
+    Generates a sequence of filenames based on a "base" filename
+    by inserting a number "_NNN" before the extension.
+    """
+
+    def __init__(self, base_path, insert_n):
+        self.base_path = base_path
+        self.insert_n = insert_n
+        self.n = 0
+
+    def insert_suffix(self, suffix):
+        prefix, ext = os.path.splitext(self.base_path)
+        return prefix + suffix + ext
+
+    def get_path(self):
+        if self.insert_n:
+            return self.insert_suffix("_%03d" % self.n)
+        else:
+            return self.base_path
+
+    def next(self):
+        self.n += 1
+        return self.get_path()
+
+
+def read_pto(pano, pto_path):
+    print("\nread_pto: %s" % pto_path)
+    ifs = hsi.ifstream(pto_path)
+    pano.readData(ifs)
+
+
+def write_pto(pano, pto_path):
+    print("\nwrite_pto: %s" % pto_path)
+    ofs = hsi.ofstream(pto_path)
+    pano.writeData(ofs)
+
+
+def main():
+    args = parse_args()
+
+    inbag_base = os.path.splitext(os.path.basename(args.inbag))[0]
+    output_dir = args.output_dir.format(inbag=inbag_base)
+    pto_base = os.path.join(output_dir, "build", "stitch.pto")
+    pto = PathSequence(pto_base, True)
+    pto_final = pto.insert_suffix("_final")
+
+    if not args.only_stitching:
+        src_images = get_image_meta(args.inbag, args.images_dir)
+        if not args.no_undistort:
+            undistort_images(src_images, output_dir)
+
+        # Make a new Panorama object
+        p = hsi.Panorama()
+        for img in src_images:
+            p.addImage(img)
 
         # Link lenses
-        variable_groups = StandardImageVariableGroups(p)
+        variable_groups = hsi.StandardImageVariableGroups(p)
         lenses = variable_groups.getLenses()
         for i in range(0, p.getNrOfImages()):
             lenses.switchParts(i, lenses.getPartNumber(0))
 
-        # Write hugin file
-        # make a c++ std::ofstream to write to
-        ofs = ofstream(output_hugin)
-        # write the modified panorama to that stream
-        p.writeData(ofs)
-        # done with it
-        del ofs
+        write_pto(p, pto.get_path())
 
         # Generate control points
-        cmd = ["cpfind", "--multirow", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        print(stdout)
+        cmd = [
+            "cpfind",
+            "--multirow",
+            # Request more control points 2 -> 5 in case it helps optimization.
+            "--sieve2size",
+            "5",
+            # Per cpfind man page, rpy is "the preferred mode if a calibrated
+            # lens is used"
+            "--ransacmode",
+            "rpy",
+            pto.get_path(),
+            "-o",
+            pto.next(),
+        ]
+        run_cmd(cmd)
 
         # Throw away control points are prob invalid
-        cmd = ["cpclean", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        print(stdout)
+        cmd = ["cpclean", pto.get_path(), "-o", pto.next()]
+        run_cmd(cmd)
 
         # Optimize attitude + b
-        cmd = ["pto_var", "--opt", "y,p,r,b", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        cmd = [
+            "pto_var",
+            "--opt",
+            filter_lens_params("y,p,r,b", args.no_lens_params),
+            pto.get_path(),
+            "-o",
+            pto.next(),
+        ]
+        run_cmd(cmd)
+
+        current = pto.get_path()
+        cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+        run_cmd(cmd)
 
         # Optimize position iteratively not to diverge
-        ifs = ifstream(output_hugin)  # create a C++ std::ifstream
-        p.readData(ifs)  # read the pto file into the Panorama object
+        read_pto(p, pto.get_path())
 
         orig_tuple = p.getOptimizeVector()
 
@@ -205,15 +408,14 @@ def main():
             # We do this iteratively otherwise it will diverge
             for x in range(0, pano_size, stride):
                 print(x)
-                ifs = ifstream(output_hugin)  # create a C++ std::ifstream
-                p.readData(ifs)  # read the pto file into the Panorama object
+                read_pto(p, pto.get_path())
                 optvec = []
                 for i in range(pano_size):
                     if (x + optim_nr) > pano_size:
                         start = x + optim_nr - pano_size
                     else:
                         start = 0
-                    if i >= x and i < x + optim_nr or i < start:
+                    if x <= i < x + optim_nr or i < start:
                         optvec.append(
                             ["y", "p", "r", "Tpp", "Tpy", "TrX", "TrY", "TrZ"]
                         )
@@ -222,96 +424,153 @@ def main():
 
                 print(optvec)
                 p.setOptimizeVector(optvec)
-                ofs = ofstream(output_hugin)
-                p.writeData(ofs)
-                del ofs
+                write_pto(p, pto.next())
 
-                cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-                (returncode, stdout, stderr) = run_cmd(cmd)
+                current = pto.get_path()
+                cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+                run_cmd(cmd)
 
             # Optimize attitude + b + v
-            cmd = ["pto_var", "--opt", "y,p,r,b,v", "-o", output_hugin, output_hugin]
-            (returncode, stdout, stderr) = run_cmd(cmd)
-            cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-            (returncode, stdout, stderr) = run_cmd(cmd)
+            cmd = [
+                "pto_var",
+                "--opt",
+                filter_lens_params("y,p,r,b,v", args.no_lens_params),
+                pto.get_path(),
+                "-o",
+                pto.next(),
+            ]
+            run_cmd(cmd)
+
+            current = pto.get_path()
+            cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+            run_cmd(cmd)
 
         # Optimize attitude + position
         cmd = [
             "pto_var",
             "--opt",
             "y,p,r,Tpp,Tpy,TrX,TrY,TrZ",
+            pto.get_path(),
             "-o",
-            output_hugin,
-            output_hugin,
+            pto.next(),
         ]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        run_cmd(cmd)
+
+        current = pto.get_path()
+        cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+        run_cmd(cmd)
 
         # Optimize ALL x3
         cmd = [
             "pto_var",
             "--opt",
-            "y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v",
+            filter_lens_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v", args.no_lens_params),
+            pto.get_path(),
             "-o",
-            output_hugin,
-            output_hugin,
+            pto.next(),
         ]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        run_cmd(cmd)
+
+        current = pto.get_path()
+        cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+        run_cmd(cmd)
+
         cmd = [
             "pto_var",
             "--opt",
-            "y,p,r,TrX,TrY,TrZ,b,v",
+            filter_lens_params("y,p,r,TrX,TrY,TrZ,b,v", args.no_lens_params),
+            pto.get_path(),
             "-o",
-            output_hugin,
-            output_hugin,
+            pto.next(),
         ]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        run_cmd(cmd)
+
+        current = pto.get_path()
+        cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+        run_cmd(cmd)
+
         cmd = [
             "pto_var",
             "--opt",
-            "y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v",
+            filter_lens_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v", args.no_lens_params),
+            pto.get_path(),
             "-o",
-            output_hugin,
-            output_hugin,
+            pto.next(),
         ]
-        (returncode, stdout, stderr) = run_cmd(cmd)
-        cmd = ["autooptimiser", "-n", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        run_cmd(cmd)
+
+        current = pto.get_path()
+        cmd = ["autooptimiser", "-n", "-o", pto.next(), current]
+        run_cmd(cmd)
 
         # Photometric Optimizer
-        cmd = ["autooptimiser", "-m", "-o", output_hugin, output_hugin]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        current = pto.get_path()
+        cmd = ["autooptimiser", "-m", "-o", pto.next(), current]
+        run_cmd(cmd)
 
         # Configure image output
         cmd = [
             "pano_modify",
-            "-o",
-            output_hugin,
             "--center",
             "--canvas=AUTO",
             "--projection=2",
             "--fov=360x180",
             "--output-type=NORMAL,REMAP",
-            output_hugin,
+            # Use lossless TIFF 'deflate' compression in output
+            # images. Empirically, this makes them smaller but not as small as
+            # PNG, so we'll do one more conversion at the end.
+            "--ldr-compression=DEFLATE",
+            pto.get_path(),
+            "-o",
+            pto.next(),
         ]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+        run_cmd(cmd)
+
+        # Set enblend options for stitching
+        read_pto(p, pto.get_path())
+
+        # Black dropout areas workaround #1: Switch primary seam generator to
+        # less advanced but possibly more robust older version. This is probably
+        # the better way to handle it (increases speed as well). Some places
+        # online recommend trying this.
+        p.getOptions().enblendOptions += " --primary-seam-generator=nft"
+
+        # Black dropout areas workaround #2: Turn off seam optimization. This
+        # seems to help in some cases but not as often? May not be needed if
+        # workaround #1 is used.
+        # p.getOptions().enblendOptions += " --no-optimize --fine-mask"
+
+        print("Set enblend options: %s" % p.getOptions().enblendOptions)
+        write_pto(p, pto.next())
+
+        # Need to copy last pto in sequence to be "final", so it will be used
+        # on any subsequent --stitching-only runs.
+        shutil.copyfile(pto.get_path(), pto_final)
 
     if not args.no_stitching:
         # Generate panorama
+        pano_path = os.path.join(output_dir, "build", "pano")
         cmd = [
             "hugin_executor",
             "--stitching",
-            "--prefix=" + output_hugin,
-            output_hugin,
+            "--prefix=" + pano_path,
+            pto_final,
         ]
-        (returncode, stdout, stderr) = run_cmd(cmd)
+
+        print("\n=== Stitching first in dry run mode for debugging ===")
+        dry_run_cmd = list(cmd)
+        dry_run_cmd[-1:-1] = ["--dry-run"]
+        run_cmd(dry_run_cmd)
+
+        print("\n=== Now stitching for real ===")
+        run_cmd(cmd)
+
+        tif_path = pano_path + ".tif"
+        final_png_path = os.path.join(output_dir, os.path.basename(pano_path)) + ".png"
+        print("opencv_convert %s %s" % (tif_path, final_png_path))
+        pano_img = cv2.imread(tif_path)
+        cv2.imwrite(final_png_path, pano_img)
 
 
 if __name__ == "__main__":
-
     main()
