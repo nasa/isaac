@@ -28,10 +28,12 @@ Example:
 """
 
 import argparse
+import datetime
 import math
 import os
 import shutil
 import subprocess
+import sys
 
 import cv2
 import hsi
@@ -49,7 +51,8 @@ UNDISTORT_ENV_VARS = [
 ]
 # List of Hugin variables that relate to camera intrinsics. There are many
 # more, but these are the only ones we optimize.
-LENS_PARAMS = ["v", "b"]
+LENS_PARAMS = ("v", "b")
+TRANSLATION_PARAMS = ("TrX", "TrY", "TrZ", "Tpy", "Tpp")
 
 
 def quote_if_needed(arg):
@@ -125,10 +128,29 @@ def parse_args():
         help="Don't undistort input images before stitching",
     )
     parser.add_argument(
-        "--no-lens-params",
+        "--no-lens",
         action="store_true",
         default=False,
         help="Disable optimization of lens parameters",
+    )
+    parser.add_argument(
+        "--no-translation",
+        action="store_true",
+        default=False,
+        help="Disable optimization of translation parameters",
+    )
+    parser.add_argument(
+        "--no-log",
+        action="store_true",
+        default=False,
+        help="Disable duplicating console output to log file",
+    )
+    parser.add_argument(
+        "--skip-images",
+        type=str,
+        required=False,
+        default=None,
+        help="Skip specified images. Comma-separated list of substrings to match image file against (you can just specify the timestamps of the images you want to skip).",
     )
 
     args = parser.parse_args()
@@ -136,8 +158,12 @@ def parse_args():
     return args
 
 
-def get_image_meta(inbag_path, images_dir):
+def get_image_meta(inbag_path, images_dir, skip_images_str):
     src_images = []
+    if skip_images_str is None:
+        skip_images = []
+    else:
+        skip_images = skip_images_str.split(",")
     with rosbag.Bag(inbag_path) as bag:
         need_pose = False
         print("Detecting images:")
@@ -151,6 +177,16 @@ def get_image_meta(inbag_path, images_dir):
                     + ".jpg",
                 )
                 print("  " + img_path)
+
+                img_base = os.path.basename(img_path)
+                skip_matches = [s for s in skip_images if s in img_base]
+                if skip_matches:
+                    print(
+                        "    Matches one of --skip-images (%s), skipping"
+                        % skip_matches[0]
+                    )
+                    continue
+
                 # Make sure image exists
                 if not os.path.exists(img_path):
                     raise RuntimeError("Could not find %s" % img_path)
@@ -175,7 +211,20 @@ def get_image_meta(inbag_path, images_dir):
                 src_image.setVar("r", roll * RAD2DEG)
                 src_image.setVar("p", pitch * RAD2DEG)
                 src_image.setVar("y", yaw * RAD2DEG)
+
+                # If y/p are very far from Tpy/Tpp (difference approaching 90
+                # degrees or greater), the remapping math gets weird and nona
+                # can produce nonsensical output.  And not sure how to
+                # interpret Tpy/Tpp. Like either or both could have opposite
+                # sign from y/p. It's clear there's a real problem here, but
+                # this change to try and help if anything made it worse so far.
+                # https://hugin.sourceforge.io/docs/manual/Stitching_a_photo-mosaic.html
+                # https://wiki.panotools.org/Hugin_FAQ - search "translation"
+                # src_image.setVar("Tpy", yaw * RAD2DEG)
+                # src_image.setVar("Tpp", pitch * RAD2DEG)
+
                 need_pose = False
+
     return src_images
 
 
@@ -281,15 +330,17 @@ def concat_if(prefix, suffix, cond):
         return prefix
 
 
-def filter_lens_params(params, do_filter):
-    """
-    If @do_filter is True, filter lens parameters out of
-    the parameter list.
-    """
+def filter_params1(params, reject_params, do_filter):
     if do_filter:
-        return ",".join([p for p in params.split(",") if p not in LENS_PARAMS])
+        return ",".join([p for p in params.split(",") if p not in reject_params])
     else:
         return params
+
+
+def filter_params(params, args):
+    params = filter_params1(params, LENS_PARAMS, args.no_lens)
+    params = filter_params1(params, TRANSLATION_PARAMS, args.no_translation)
+    return params
 
 
 class PathSequence(object):
@@ -330,17 +381,49 @@ def write_pto(pano, pto_path):
     pano.writeData(ofs)
 
 
+def get_timestamp():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def duplicate_console_to_log(log_path):
+    """
+    Duplicate console output to specified log file. Both stdout
+    and stderr of this process and all children should be included.
+    """
+    print("Duplicating console log to %s" % log_path)
+    log_path = os.path.realpath(log_path)
+    log_dir = os.path.dirname(log_path)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    # Unbuffer stdout (ensures stdout and stderr interleave properly). As of
+    # Python 3.3+ this might not work and no longer be needed.
+    sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
+
+    tee = subprocess.Popen(["tee", "--append", log_path], stdin=subprocess.PIPE)
+    os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
+    os.dup2(tee.stdin.fileno(), sys.stderr.fileno())
+
+
 def main():
     args = parse_args()
 
     inbag_base = os.path.splitext(os.path.basename(args.inbag))[0]
     output_dir = args.output_dir.format(inbag=inbag_base)
+
+    if not args.no_log:
+        log_path = os.path.join(output_dir, "build", "console.log")
+        duplicate_console_to_log(log_path)
+
+    print("%s Started run" % get_timestamp())
+    print("Command-line arguments: %s" % sys.argv)
+
     pto_base = os.path.join(output_dir, "build", "stitch.pto")
     pto = PathSequence(pto_base, True)
     pto_final = pto.insert_suffix("_final")
 
     if not args.only_stitching:
-        src_images = get_image_meta(args.inbag, args.images_dir)
+        src_images = get_image_meta(args.inbag, args.images_dir, args.skip_images)
         if not args.no_undistort:
             undistort_images(src_images, output_dir)
 
@@ -382,7 +465,7 @@ def main():
         cmd = [
             "pto_var",
             "--opt",
-            filter_lens_params("y,p,r,b", args.no_lens_params),
+            filter_params("y,p,r,b", args),
             pto.get_path(),
             "-o",
             pto.next(),
@@ -417,7 +500,7 @@ def main():
                         start = 0
                     if x <= i < x + optim_nr or i < start:
                         optvec.append(
-                            ["y", "p", "r", "Tpp", "Tpy", "TrX", "TrY", "TrZ"]
+                            filter_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ", args).split(",")
                         )
                     else:
                         optvec.append([])
@@ -434,7 +517,7 @@ def main():
             cmd = [
                 "pto_var",
                 "--opt",
-                filter_lens_params("y,p,r,b,v", args.no_lens_params),
+                filter_params("y,p,r,b,v", args),
                 pto.get_path(),
                 "-o",
                 pto.next(),
@@ -449,7 +532,7 @@ def main():
         cmd = [
             "pto_var",
             "--opt",
-            "y,p,r,Tpp,Tpy,TrX,TrY,TrZ",
+            filter_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ", args),
             pto.get_path(),
             "-o",
             pto.next(),
@@ -464,7 +547,7 @@ def main():
         cmd = [
             "pto_var",
             "--opt",
-            filter_lens_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v", args.no_lens_params),
+            filter_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v", args),
             pto.get_path(),
             "-o",
             pto.next(),
@@ -478,7 +561,7 @@ def main():
         cmd = [
             "pto_var",
             "--opt",
-            filter_lens_params("y,p,r,TrX,TrY,TrZ,b,v", args.no_lens_params),
+            filter_params("y,p,r,TrX,TrY,TrZ,b,v", args),
             pto.get_path(),
             "-o",
             pto.next(),
@@ -492,7 +575,7 @@ def main():
         cmd = [
             "pto_var",
             "--opt",
-            filter_lens_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v", args.no_lens_params),
+            filter_params("y,p,r,Tpp,Tpy,TrX,TrY,TrZ,b,v", args),
             pto.get_path(),
             "-o",
             pto.next(),
@@ -548,6 +631,7 @@ def main():
         shutil.copyfile(pto.get_path(), pto_final)
 
     if not args.no_stitching:
+        print("%s Starting stitching" % get_timestamp())
         # Generate panorama
         pano_path = os.path.join(output_dir, "build", "pano")
         cmd = [
@@ -570,6 +654,11 @@ def main():
         print("opencv_convert %s %s" % (tif_path, final_png_path))
         pano_img = cv2.imread(tif_path)
         cv2.imwrite(final_png_path, pano_img)
+        print("\n=== Final stitched pano in %s ===\n" % final_png_path)
+
+    print("%s Finished run" % get_timestamp())
+    if not args.no_log:
+        print("Complete console output in %s" % log_path)
 
 
 if __name__ == "__main__":
