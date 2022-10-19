@@ -848,6 +848,8 @@ Parameters:
       with missing parts. The default is 10.
     --edge_keep_ratio: Simply the mesh keeping only this fraction of
       the original edges. The default is 0.2.
+    --max_texture_size: The maximum size (in pixels) of each texture
+      file created for the produced textured mesh. The default is 2048.
     --output_dir: The directory where to write the processed data.
     --simulated_data: If specified, use data recorded in simulation. 
       Then haz and sci camera poses and intrinsics should be recorded in the 
