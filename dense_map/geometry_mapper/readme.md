@@ -193,14 +193,28 @@ This should end up creating the program:
 
 ### Compiling CGAL
 
-Compile the CGAL tools following the instructions at:
+Compile the CGAL tools using the commands:
 
-    https://github.com/oleg-alexandrov/cgal_tools
+    mkdir -p $HOME/projects
+    cd $HOME/projects
+    git clone https://github.com/oleg-alexandrov/cgal_tools
+    cd cgal_tools
+    git checkout d3467a9 
+    wget https://github.com/CGAL/cgal/releases/download/v5.3/CGAL-5.3.tar.xz
+    tar xfv CGAL-5.3.tar.xz
+    cmake . -DCMAKE_BUILD_TYPE=Release \
+      -DCGAL_DIR:PATH=CGAL-5.3
+    make -j 10
 
-This should create some programs in:
+CGAL will fail to build with cmake version 3.10 installed with Ubuntu
+18. It is suggested to fetch cmake version 3.15 or later.
+
+The outcome will be that some programs will be installed in:
 
     $HOME/projects/cgal_tools
  
+which will be later looked up by the geometry mapper.
+
 ### CGAL license    
 
 CGAL is released under the GPL. Care must be taken to not include it
