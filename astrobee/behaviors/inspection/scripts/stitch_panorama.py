@@ -78,6 +78,26 @@ def run_cmd(cmd, path_prefix=None):
     return return_code
 
 
+def catkin_find(pkg, subpath):
+    return (
+        subprocess.check_output(["catkin_find", "--first-only", pkg, subpath])
+        .decode("utf-8")
+        .strip()
+    )
+
+
+def fill_if_missing(var, value):
+    if os.environ.get(var) is None:
+        if callable(value):
+            value = value()
+        os.environ[var] = value
+        print(
+            "Environment variable was not specified, setting auto-detected / default value:"
+        )
+        print("  Variable: %s" % var)
+        print("  Value: %s" % value)
+
+
 class CustomFormatter(
     argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter
 ):
@@ -152,8 +172,28 @@ def parse_args():
         default=None,
         help="Skip specified images. Comma-separated list of substrings to match image file against (you can just specify the timestamps of the images you want to skip).",
     )
+    parser.add_argument(
+        "--world",
+        type=str,
+        required=False,
+        default=None,
+        help="Override ASTROBEE_WORLD environment variable",
+    )
+    parser.add_argument(
+        "--robot",
+        type=str,
+        required=False,
+        default=None,
+        help="Override ASTROBEE_ROBOT environment variable",
+    )
 
     args = parser.parse_args()
+
+    # override environment variables if user specified command-line args
+    if args.world is not None:
+        os.environ["ASTROBEE_WORLD"] = args.world
+    if args.robot is not None:
+        os.environ["ASTROBEE_ROBOT"] = args.robot
 
     return args
 
@@ -263,6 +303,14 @@ def call_undistort(src_images, undistort_dir, intrinsics_path):
     with open(input_images_path, "w") as input_list:
         for img in src_images:
             input_list.write(img.getFilename() + "\n")
+
+    # auto-detect if environment variables weren't specified
+    fill_if_missing(
+        "ASTROBEE_RESOURCE_DIR", lambda: catkin_find("astrobee", "resources")
+    )
+    fill_if_missing("ASTROBEE_CONFIG_DIR", lambda: catkin_find("astrobee", "config"))
+    fill_if_missing("ASTROBEE_WORLD", "iss")
+    # Note: No default value for robot. The user really needs to specify!
 
     # check necessary environment variables are defined
     for var in UNDISTORT_ENV_VARS:
