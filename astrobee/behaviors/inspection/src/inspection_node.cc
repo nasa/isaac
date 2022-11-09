@@ -324,6 +324,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Read maximum number of retryals for a motion action
     max_motion_retry_number_= cfg_.Get<int>("max_motion_retry_number");
 
+
+    // Timer for the sci cam camera
+    sci_cam_timeout_ = nh_->createTimer(ros::Duration(cfg_.Get<int>("sci_cam_timeout")), &InspectionNode::SciCamTimeout,
+                                        this, false, false);
+
     // Initiate inspection library
     inspection_ = new Inspection(nh, &cfg_);
   }
@@ -518,7 +523,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
     // Signal an imminent sci cam image
-    sci_cam_req_ = true;
+    sci_cam_req_ = sci_cam_req_ + 1;
 
     // Take picture
     ff_msgs::CommandArg arg;
@@ -548,14 +553,17 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
 
     // Timer for the sci cam camera
-    ros::Timer sci_cam_timeout_ = nh_->createTimer(ros::Duration(5), &InspectionNode::SciCamTimeout, this, true, false);
+    sci_cam_timeout_.start();
+
     return 0;
   }
 
   void SciCamCallback(const sensor_msgs::CompressedImage::ConstPtr& msg) {
     // The sci cam image was received
-    if (sci_cam_req_) {
-      sci_cam_req_ = false;
+    if (sci_cam_req_ != 0) {
+      // Clear local variables
+      sci_cam_timeout_.stop();
+      sci_cam_req_ = 0;
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
 
@@ -569,8 +577,15 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     return;
   }
   void SciCamTimeout(const ros::TimerEvent& event) {
+    sci_cam_timeout_.stop();
     // The sci cam image was not received
-    return fsm_.Update(INSPECT_FAILED);
+    if (sci_cam_req_ < 2) {
+      ROS_WARN_STREAM("sci cam didn't repond, resending it again");
+      ImageInspect();
+      return;
+    } else {
+      return fsm_.Update(INSPECT_FAILED);
+    }
   }
 
   // Feedback of an action
@@ -844,6 +859,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   ros::Publisher pub_guest_sci_;
   ros::Subscriber sub_sci_cam_;
   ros::ServiceServer server_set_state_;
+  ros::Timer sci_cam_timeout_;
   isaac_msgs::InspectionGoal goal_;
   int goal_counter_= 0;
   std::string m_fsm_subevent_, m_fsm_substate_;
@@ -853,7 +869,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   int motion_retry_number_= 0;
   int max_motion_retry_number_ = 0;
   // Flag to wait for sci camera
-  bool sci_cam_req_ = false;
+  int sci_cam_req_ = 0;
   bool ground_active_ = false;
   bool sim_mode_ = false;
 
