@@ -34,6 +34,9 @@
 
 #define SUBSYSTEM_BEHAVIORS                         "beh"
 
+#define NODE_SCI_CAM                                "sci_cam"
+#define ACTION_BEHAVIORS_SCI_CAM                    "beh/sci_cam"
+
 #define NODE_INSPECTION                             "inspection"
 #define TOPIC_BEHAVIORS_INSPECTION_STATE            "beh/inspection/state"
 #define SERVICE_BEHAVIORS_INSPECTION_SET_STATE      "beh/inspection/set_state"
@@ -90,7 +93,6 @@
 #define SUBSYSTEM_HARDWARE                          "hw"
 
 #define NODE_WIFI                                   "wifi"
-
 #define TOPIC_HARDWARE_WIFI                         "hw/wifi"
 #define TOPIC_WIFI_TRANSMITTER_MAP                  "hw/wifi/transmitter_map"
 

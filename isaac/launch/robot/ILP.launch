@@ -54,6 +54,18 @@
     <arg name="default" value="true" />
   </include>
 
+  <!-- Launch sci cam node -->
+  <include file="$(find ff_util)/launch/ff_nodelet.launch">
+    <arg name="class" value="sci_cam/SciCamNode" />
+    <arg name="name" value="sci_cam" />
+    <arg name="manager" value="ilp_inspection" />
+    <arg name="spurn" value="$(arg spurn)" />
+    <arg name="nodes" value="$(arg nodes)" />
+    <arg name="extra" value="$(arg extra)" />
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="default" value="true" />
+  </include>
+
   <!-- Launch cargo node -->
   <include file="$(find ff_util)/launch/ff_nodelet.launch">
     <arg name="class" value="cargo/CargoNode" />

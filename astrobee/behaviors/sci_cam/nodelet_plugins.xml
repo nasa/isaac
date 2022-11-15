@@ -1,0 +1,5 @@
+<library path="lib/libsci_cam">
+  <class name="sci_cam/SciCamNode" type="sci_cam::SciCamNode" base_class_type="nodelet::Nodelet">
+    <description>Nodelet for SciCam picture taking</description>
+  </class>
+</library>

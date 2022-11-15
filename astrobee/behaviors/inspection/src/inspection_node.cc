@@ -51,8 +51,9 @@
 // Actions
 #include <ff_msgs/MotionAction.h>
 #include <ff_msgs/DockAction.h>
-#include <isaac_msgs/InspectionAction.h>
+#include <isaac_msgs/SciCamAction.h>
 #include <isaac_msgs/ImageInspectionAction.h>
+#include <isaac_msgs/InspectionAction.h>
 
 // Eigen for math
 #include <Eigen/Dense>
@@ -151,7 +152,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // [3]
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       MOTION_SUCCESS, [this](FSM::Event const& event) -> FSM::State {
-        ImageInspect();
+        // Activate image anomaly detector if there are gound communications
+        if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
+          ImageInspect();
+        }
+        SciCam("SINGLE_PIC");
         return STATE::VISUAL_INSPECTION;
       });
     // [4]
@@ -261,14 +266,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     pub_state_ = nh->advertise<isaac_msgs::InspectionState>(
       TOPIC_BEHAVIORS_INSPECTION_STATE, 1, true);
 
-    // Publish the guest science command fr the sci cam
-    pub_guest_sci_ = nh->advertise<ff_msgs::CommandStamped>(
-      TOPIC_COMMAND, 1, true);
-
-    // Subscribe to the sci camera topic to make sure a picture was taken
-    sub_sci_cam_ = nh->subscribe(TOPIC_HARDWARE_SCI_CAM + std::string("/compressed"), 1,
-                      &InspectionNode::SciCamCallback, this);
-
     // Allow the state to be manually set
     server_set_state_ = nh->advertiseService(SERVICE_BEHAVIORS_INSPECTION_SET_STATE,
       &InspectionNode::SetStateCallback, this);
@@ -297,6 +294,18 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       &InspectionNode::ConnectedCallback, this));
     client_d_.Create(nh, ACTION_BEHAVIORS_DOCK);
 
+    // Setup sci_cam client action
+    client_s_.SetConnectedTimeout(cfg_.Get<double>("timeout_sci_cam_connected"));
+    client_s_.SetActiveTimeout(cfg_.Get<double>("timeout_sci_cam_active"));
+    client_s_.SetResponseTimeout(cfg_.Get<double>("timeout_sci_cam_response"));
+    client_s_.SetFeedbackCallback(std::bind(&InspectionNode::SFeedbackCallback,
+      this, std::placeholders::_1));
+    client_s_.SetResultCallback(std::bind(&InspectionNode::SResultCallback,
+      this, std::placeholders::_1, std::placeholders::_2));
+    client_s_.SetConnectedCallback(std::bind(
+      &InspectionNode::ConnectedCallback, this));
+    client_s_.Create(nh, ACTION_BEHAVIORS_SCI_CAM);
+
     // Get parameter whether we running this in simulation or the robot
     ros::param::get("sim_mode", sim_mode_);
 
@@ -312,7 +321,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       &InspectionNode::GroundConnectedCallback, this));
     client_i_.Create(nh, ACTION_ANOMALY_IMG_ANALYSIS);
 
-    // Setup the execute action
+    // Setup the inspection action
     server_.SetGoalCallback(std::bind(
       &InspectionNode::GoalCallback, this, std::placeholders::_1));
     server_.SetPreemptCallback(std::bind(
@@ -324,11 +333,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Read maximum number of retryals for a motion action
     max_motion_retry_number_= cfg_.Get<int>("max_motion_retry_number");
 
-
-    // Timer for the sci cam camera
-    sci_cam_timeout_ = nh_->createTimer(ros::Duration(cfg_.Get<int>("sci_cam_timeout")), &InspectionNode::SciCamTimeout,
-                                        this, false, false);
-
     // Initiate inspection library
     inspection_ = new Inspection(nh, &cfg_);
   }
@@ -338,6 +342,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     NODELET_DEBUG_STREAM("ConnectedCallback()");
     if (!client_m_.IsConnected()) return;       // Move action
     if (!client_d_.IsConnected()) return;       // Dock action
+    if (!client_s_.IsConnected()) return;       // Scicam action
     fsm_.Update(READY);                         // Ready!
   }
 
@@ -355,7 +360,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     UpdateCallback(fsm_.GetState(), MANUAL_STATE_SET);
     return true;
   }
-
 
   // Send a move command
   bool MoveInspect(std::string const& mode, geometry_msgs::Pose pose) {
@@ -506,66 +510,38 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
   }
 
-  // IMG ANALYSIS
+  // SciCam ACTION CLIENT
 
-  // Send a move command
-  bool ImageInspect() {
-    // Activate image anomaly detector if there are gound communications
-    if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
-      // Send goal
-      isaac_msgs::ImageInspectionGoal goal;
-      goal.type = isaac_msgs::ImageInspectionGoal::VENT;
-      client_i_.SendGoal(goal);
-      ROS_ERROR_STREAM("sent image inspection goal");
+  // Send a dock or undock command
+  bool SciCam(std::string const& mode) {
+    // Create a new motion goal
+    isaac_msgs::SciCamGoal goal;
+    if (mode == "SINGLE_PIC") {
+      goal.command = isaac_msgs::SciCamGoal::SINGLE_PIC;
+    } else if (mode == "CONT_PIC") {
+      goal.command = isaac_msgs::SciCamGoal::CONT_PIC;
     }
 
-    // Allow image to stabilize
-    ros::Duration(cfg_.Get<double>("station_time")).sleep();
-
-    // Signal an imminent sci cam image
-    sci_cam_req_ = sci_cam_req_ + 1;
-
-    // Take picture
-    ff_msgs::CommandArg arg;
-    std::vector<ff_msgs::CommandArg> cmd_args;
-
-    // The command sends two strings. The first has the app name,
-    // and the second the command value, encoded as json.
-
-    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-    arg.s = "gov.nasa.arc.irg.astrobee.sci_cam_image";
-    cmd_args.push_back(arg);
-
-    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-    arg.s = "{\"name\": \"takePicture\"}";
-    cmd_args.push_back(arg);
-
-    ff_msgs::CommandStamped cmd;
-    cmd.header.stamp = ros::Time::now();
-    cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_CUSTOM_GUEST_SCIENCE;
-    cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
-    cmd.cmd_src = "guest science";
-    cmd.cmd_origin = "guest science";
-    cmd.args = cmd_args;
-
-
-    pub_guest_sci_.publish(cmd);
-
-
-    // Timer for the sci cam camera
-    sci_cam_timeout_.start();
-
-    return 0;
+    // Send the goal to the dock behavior
+    return client_s_.SendGoal(goal);
   }
 
-  void SciCamCallback(const sensor_msgs::CompressedImage::ConstPtr& msg) {
-    // The sci cam image was received
-    if (sci_cam_req_ != 0) {
-      // Clear local variables
-      sci_cam_timeout_.stop();
-      sci_cam_req_ = 0;
+  // Ignore the sci cam feedback, for now
+  void SFeedbackCallback(isaac_msgs::SciCamFeedbackConstPtr const& feedback) {
+  }
+
+  // Result of a move action
+  void SResultCallback(ff_util::FreeFlyerActionState::Enum result_code,
+  isaac_msgs::SciCamResultConstPtr const& result) {
+    // Fill in the result message with the result
+    if (result != nullptr) {
+      ROS_ERROR_STREAM("Invalid result received SciCam");
+      return;
+    }
+    switch (result_code) {
+    case ff_util::FreeFlyerActionState::SUCCESS:
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
-      result_.picture_time.push_back(msg->header.stamp);
+      result_.picture_time.insert(result_.picture_time.end(), result->picture_time.begin(), result->picture_time.end());
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
         ROS_ERROR_STREAM("wait for result()");
@@ -573,19 +549,24 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       }
       ROS_DEBUG_STREAM("Scicam picture acquired " << ros::Time::now());
       return fsm_.Update(NEXT_INSPECT);
-    }
-    return;
-  }
-  void SciCamTimeout(const ros::TimerEvent& event) {
-    sci_cam_timeout_.stop();
-    // The sci cam image was not received
-    if (sci_cam_req_ < 2) {
-      ROS_WARN_STREAM("sci cam didn't repond, resending it again");
-      ImageInspect();
-      return;
-    } else {
+    default:
       return fsm_.Update(INSPECT_FAILED);
     }
+  }
+
+  // IMG ANALYSIS ACTION CLIENT
+
+  // Send a move command
+  bool ImageInspect() {
+    // Send goal
+    isaac_msgs::ImageInspectionGoal goal;
+    goal.type = isaac_msgs::ImageInspectionGoal::VENT;
+    client_i_.SendGoal(goal);
+    ROS_ERROR_STREAM("sent image inspection goal");
+
+    // Take Sci Cam picture
+    SciCam("SINGLE_PIC");
+    return true;
   }
 
   // Feedback of an action
@@ -851,15 +832,14 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   ff_util::FSM fsm_;
   ff_util::FreeFlyerActionClient<ff_msgs::MotionAction> client_m_;
   ff_util::FreeFlyerActionClient<ff_msgs::DockAction> client_d_;
+  ff_util::FreeFlyerActionClient<isaac_msgs::SciCamAction> client_s_;
   ff_util::FreeFlyerActionClient<isaac_msgs::ImageInspectionAction> client_i_;
   ff_msgs::DockState dock_state_;
   ff_util::FreeFlyerActionServer<isaac_msgs::InspectionAction> server_;
   ff_util::ConfigServer cfg_;
   ros::Publisher pub_state_;
   ros::Publisher pub_guest_sci_;
-  ros::Subscriber sub_sci_cam_;
   ros::ServiceServer server_set_state_;
-  ros::Timer sci_cam_timeout_;
   isaac_msgs::InspectionGoal goal_;
   int goal_counter_= 0;
   std::string m_fsm_subevent_, m_fsm_substate_;
@@ -868,8 +848,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   isaac_msgs::InspectionResult result_;
   int motion_retry_number_= 0;
   int max_motion_retry_number_ = 0;
-  // Flag to wait for sci camera
-  int sci_cam_req_ = 0;
   bool ground_active_ = false;
   bool sim_mode_ = false;
 
