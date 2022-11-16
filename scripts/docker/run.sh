@@ -34,7 +34,7 @@ print_help()
   echo -e "\t\t\t\tdefault=isaac_source/../../isaac_data_interface"
   echo -e "\t-m | --mast-source-dir\t\tSpecify the mast source directory to use"
   echo -e "\t\t\t\tdefault=isaac_source/../../mast/src"
-  echo -e "\t--no-mast\t\t\tDon't run MAST"
+  echo -e "\t--mast\t\t\tRun MAST"
   echo -e "\t-vm\t\t\t\tRun the simulation locally - compatible with VM setup"
   echo -e "\t-remote\t\t\t\tRun the remote images (bypass building docker images locally)"
   echo -e "\t-analyst\t\t\tRun analyst notebook"
@@ -53,21 +53,37 @@ print_usage()
 
 # Initialize variables
 os=`cat /etc/os-release | grep -oP "(?<=VERSION_CODENAME=).*"`
-mast=1          # MAST is ON by default
-vm=0            # We are not running in a virtual machine by default
-remote=0
-ground=0
+sim_args="dds:=false robot:=sim_pub wifi:=station"
+display="true"
+vendor_name=`(lshw -C display | grep vendor) 2>/dev/null`
+if [ "$vendor_name" == *"Nvidia"* ]; then
+  gpu="true"
+else
+  gpu="false"
+fi
+mast=0          # MAST is OFF by default
+ground=0        # Ground SW HIL OFF by default
 analyst=0
+mount="false"
 robot=bumble
 no_sim=0
+REMOTE="isaac"
 
 while [ "$1" != "" ]; do
     case $1 in
+        -h | --help )                 print_help
+                                      exit
+                                      ;;
         -x | --xenial )               os="xenial"
                                       ;;
         -b | --bionic )               os="bionic"
                                       ;;
         -f | --focal )                os="focal"
+                                      ;;
+        -r | --remote )               export REMOTE="ghcr.io/nasa/"
+                                      ;;
+        -a | --astrobee-source-dir )  shift
+                                      astrobee_source=$1
                                       ;;
         -d | --iui-source-dir )       shift
                                       iui_source=$1
@@ -75,13 +91,16 @@ while [ "$1" != "" ]; do
         -m | --mast-source-dir )      shift
                                       mast_source=$1
                                       ;;
-        --no-mast )                   mast=0
-                                      ;;
-        -vm )                         vm=1
-                                      ;;
-        -remote )                     remote=1
+        --mast )                      mast=1
                                       ;;
         -analyst )                    analyst=1
+                                      ;;
+        -n | --no-display )           display="false"
+                                      ;;
+        -g | --gpu)                   gpu="$2"
+                                      shift
+                                      ;;
+        --mount )                     mount="true"
                                       ;;
         --no-sim )                    no_sim=1
                                       ;;
@@ -90,8 +109,8 @@ while [ "$1" != "" ]; do
         -robot )                      shift
                                       robot=$1
                                       ;;
-        -h | --help )                 print_help
-                                      exit
+        --args )                      sim_args+=" $2"
+                                      shift
                                       ;;
         * )                           print_usage
                                       exit 1
@@ -99,105 +118,132 @@ while [ "$1" != "" ]; do
     shift
 done
 
-thisdir=$(dirname "$(readlink -f "$0")")
-rootdir=${thisdir}/../..
+# collect remaining non-option arguments
+cmd="$*"
+if [ -z "$cmd" ]; then
+    cmd="roslaunch isaac sim.launch $sim_args"
+fi
+
+# echo "cmd: $cmd"
+
+######################################################################
+# Resolve paths
+######################################################################
+script_dir=$(dirname "$(readlink -f "$0")")
+src_dir=$(dirname $(dirname "$script_dir"))
 
 # Define root dir of different repos
-isaac_source=${rootdir}/./
-iui_source=${iui_source:-${rootdir}/../../isaac_user_interface}
-mast_source=${mast_source:-${rootdir}/../../mast/src}
-robot=${robot:-bumble}
+export ASTROBEE_PATH=${astrobee_source:-$(dirname $(dirname "$src_dir"))/astrobee/src}
+export ISAAC_PATH=${src_dir}
+export IUI_PATH=${iui_source:-$(dirname $(dirname "$src_dir"))/isaac_user_interface}
+export MAST_PATH=${mast_source:-$(dirname $(dirname "$src_dir"))/mast/src}
 
-export ISAAC_PATH=${isaac_source}
-export IUI_PATH=${iui_source}
-export MAST_PATH=${mast_source}
+# Print debug variables
+echo -e ======================================================================
+echo -e "astrobee path: \t "${ASTROBEE_PATH}
+echo -e "isaac path: \t "${ISAAC_PATH}
+echo -e "isaac ui path: \t "${IUI_PATH}
+echo -e "mast path: \t "${MAST_PATH} " \t build mast?:" $mast
+echo -e ======================================================================
 
-# Define data locations for analyst notebook
-export DATA_PATH=${HOME}/data
-export BAGS_PATH=$(readlink -f ${HOME}/data/bags)
+######################################################################
+# Set up tag
+######################################################################
 
-echo "ISAAC UI path: "${iui_source}
-echo "Build MAST?:" $mast " MAST path: "${mast_source}
-
-UBUNTU_VERSION=16.04
-ROS_VERSION=kinetic
-PYTHON=''
-
-if [ "$os" = "bionic" ]; then
-  UBUNTU_VERSION=18.04
-  ROS_VERSION=melodic
-  PYTHON=''
-
+if [ "$os" = "xenial" ]; then
+  export tag=isaac:latest-ubuntu16.04
+elif [ "$os" = "bionic" ]; then
+  export tag=isaac:latest-ubuntu18.04
 elif [ "$os" = "focal" ]; then
-  UBUNTU_VERSION=20.04
-  ROS_VERSION=noetic
-  PYTHON='3'
+  export tag=isaac:latest-ubuntu20.04
 fi
 
-if [ $remote -eq 1 ]; then
-  export REMOTE=ghcr.io/nasa/
-fi
+######################################################################
+# Set up docker compose
+######################################################################
 
 # Launch the rosmaster container + isaac network + IDI
-files="-f ${thisdir}/docker_compose/ros.docker-compose.yml -f ${thisdir}/docker_compose/iui.docker-compose.yml"
-echo -e "The ISAAC UI is hosted in: http://localhost:8080"
-echo -e "The ArangoDB database is hosted in: http://localhost:8529"
+files="-f ${script_dir}/docker_compose/ros.docker-compose.yml -f ${script_dir}/docker_compose/iui.docker-compose.yml -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+echo -e "isaac ui hosted in: \t http://localhost:8080"
+echo -e "database hosted in: \t http://localhost:8529"
 
 # Launch MAST
+######################################################################
 if [ $mast -eq 1 ]; then
-  files+=" -f ${thisdir}/docker_compose/mast.docker_compose.yml"
+  files+=" -f ${script_dir}/docker_compose/mast.docker_compose.yml"
 fi
 
 # Launch the analyst notebook
+######################################################################
 if [ $analyst -eq 1 ]; then
-  files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
-  echo -e "The Analyst Notebook is hosted in: http://localhost:8888/lab?token=isaac"
+  # Define data locations for analyst notebook
+  export DATA_PATH=${HOME}/data
+  export BAGS_PATH=$(readlink -f ${HOME}/data/bags)
+
+  files+=" -f ${script_dir}/docker_compose/analyst.docker-compose.yml"
+  echo -e "analyst notebook hosted in: \t http://localhost:8888/lab?token=isaac"
 fi
 
-docker-compose ${files}  up -d
+# Set up astrobee display
+######################################################################
+
+display_args=""
+if [ "$display" = "true" ]; then
+    # setup XServer for Docker
+    export XSOCK=/tmp/.X11-unix
+    export XAUTH=/tmp/.docker.xauth
+    touch $XAUTH
+    xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
+
+    files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.display.yml"
+
+    if [ "$gpu" = "true" ]; then
+        files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.gpu.yml"
+    fi
+fi
+
+# Set up astrobee mount
+######################################################################
+
+mount_args=""
+if [ "$mount" = "true" ]; then
+    files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.mount.yml"
+fi
 
 if [ $ground -eq 1 ]; then
-  echo "GROUND"
-  # Start native astrobee simulation and connect to socket network
-  export ROS_IP=`ip -4 addr show docker0 | grep -oP "(?<=inet ).*(?=/)"`
-  export ROS_MASTER_URI=http://172.19.0.5:11311
-  roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait
-
-elif [  $vm -eq 1 ]; then
-  echo "VM"
-  # Start native astrobee simulation and connect to socket network
-  export ROS_IP=`ip -4 addr show docker0 | grep -oP "(?<=inet ).*(?=/)"`
-  export ROS_MASTER_URI=http://172.19.0.5:11311
-  roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait
+  echo "GROUND SW ONLY (for HIL)"
+  robot=${robot:-bumble}
+  cmd=roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait
 
 elif  [ $no_sim -eq 1 ]; then
   echo "NO SIM"
-  # Start native astrobee simulation and connect to socket network
-  export ROS_IP=`ip -4 addr show docker0 | grep -oP "(?<=inet ).*(?=/)"`
-  export ROS_MASTER_URI=http://172.19.0.5:11311
-  roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen robot:=${robot} rviz:=true --wait
-
-else
-  XSOCK=/tmp/.X11-unix
-  XAUTH=/tmp/.docker.xauth
-  touch $XAUTH
-  xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
-
-  docker run -d --rm --name isaac \
-          --network docker_isaac \
-          --volume=$XSOCK:$XSOCK:rw \
-          --volume=$XAUTH:$XAUTH:rw \
-          --volume=`pwd`/simulation.config:/src/astrobee/astrobee/config/simulation/simulation.config:ro \
-          --volume=`pwd`/simulation.config:/opt/astrobee/config/simulation/simulation.config:ro \
-          --env="XAUTHORITY=${XAUTH}" \
-          --env="DISPLAY" \
-          --user="astrobee" \
-          --env="ROS_MASTER_URI=http://rosmaster:11311" \
-          --gpus all \
-        isaac \
-      /ros_entrypoint.sh roslaunch isaac sim.launch dds:=false wifi:=station streaming_mapper:=true acoustics_cam:=true
+  cmd=roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen robot:=${robot} rviz:=true --wait
 
 fi
 
+# Up compose
+######################################################################
+
+echo -e ======================================================================
+docker compose ${files} up -d
 
 
+echo -e "Started containers, press 'q' to down container and exit"
+
+# Down compose
+######################################################################
+
+count=0
+while : ; do
+read -n 1 k <&1
+if [[ $k = q ]] ; then
+printf "\nQuitting from the program\n"
+break
+else
+((count=$count+1))
+printf "\nIterate for $count times\n"
+echo "Press 'q' to exit"
+fi
+done
+
+docker compose ${files} down
