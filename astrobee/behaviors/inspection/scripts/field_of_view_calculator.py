@@ -102,6 +102,12 @@ CONFIGS = [
         "focalLengthPixels": [608.8073, 607.61439],
         "omega": 0.998693,
     },
+    {
+        "name": "DockCam",
+        "imageSizePixels": [1280, 960],
+        "focalLengthPixels": [753.51021, 751.3611],
+        "omega": 1.00762,
+    },
 ]
 
 for config in CONFIGS:
