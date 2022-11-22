@@ -579,7 +579,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   void SciCamTimeout(const ros::TimerEvent& event) {
     sci_cam_timeout_.stop();
     // The sci cam image was not received
-    if (sci_cam_req_ < 2) {
+    if (sci_cam_req_ < cfg_.Get<int>("sci_cam_max_trials")) {
       ROS_WARN_STREAM("sci cam didn't repond, resending it again");
       ImageInspect();
       return;
