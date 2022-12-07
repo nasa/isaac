@@ -19,8 +19,8 @@
 
 // Include inspection library header
 #include <inspection/inspection.h>
-#define PI 3.1415
-#define EPS 1e-5
+#include <inspection/pano.h>
+#include <math.h>
 /**
  * \ingroup beh
  */
@@ -96,10 +96,10 @@ namespace inspection {
     }
 
     // Parameters Panorama survey
-    pan_min_  = cfg_->Get<double>("pan_min") * PI / 180.0;
-    pan_max_  = cfg_->Get<double>("pan_max") * PI / 180.0;
-    tilt_min_ = cfg_->Get<double>("tilt_min") * PI / 180.0;
-    tilt_max_ = cfg_->Get<double>("tilt_max") * PI / 180.0;
+    pan_min_  = cfg_->Get<double>("pan_min") * M_PI / 180.0;
+    pan_max_  = cfg_->Get<double>("pan_max") * M_PI / 180.0;
+    tilt_min_ = cfg_->Get<double>("tilt_min") * M_PI / 180.0;
+    tilt_max_ = cfg_->Get<double>("tilt_max") * M_PI / 180.0;
     overlap_  = cfg_->Get<double>("overlap");
   }
 
@@ -549,70 +549,32 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
     fx = cam_mat(0, 0);
     fy = cam_mat(1, 1);
 
-    // Calculate field of views
+    // Calculate fields of view
     float h_fov = 2 * atan(W / (2 * fx));
     float v_fov = 2 * atan(H / (2 * fy));
 
-    // Calculate spacing between pictures
-    double k_pan  = (pan_max_ - pan_min_) / std::ceil((pan_max_ - pan_min_) / (h_fov * (1 - overlap_)));
-    double k_tilt = (tilt_max_ - tilt_min_) / std::ceil((tilt_max_ - tilt_min_) / (v_fov * (1 - overlap_)));
+    int nrows, ncols;
+    std::vector<PanoAttitude> orientations;
+    // pano_orientations() doesn't support panos with non-zero center (not needed)
+    assert(pan_min_ == -pan_max_);
+    assert(tilt_min_ == -tilt_max_);
+    double attitude_tolerance = 0;  // dummy, discuss this later
 
-    // Case where max and min is zero
-    if (std::isnan(k_pan)) k_pan = PI;
-    if (std::isnan(k_tilt)) k_tilt = PI;
+    // generate coverage pattern pan/tilt values
+    pano_orientations(&orientations, &nrows, &ncols,
+                      tilt_max_, pan_max_,
+                      h_fov, v_fov,
+                      overlap_, attitude_tolerance);
 
-    // If it's a full 360, skip the last one
-    if (pan_max_ - pan_min_ >= 2*PI) pan_max_-= 2 * EPS;  // Go through all the points
-
-    // Generate all the pan/tilt values
-    int i = 0;
-    bool top_view = false;
-    bool bottom_view = false;
-    for (double pan = pan_min_; pan <= pan_max_ + EPS; pan += k_pan) {
-      // zig zag through views
-      if (i%2 == 0) {
-        for (double tilt = tilt_min_; tilt <= tilt_max_ + EPS; tilt += k_tilt) {
-          // Avoid taking multiple pictures at top and bottom
-          if (tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) {
-            if (bottom_view) {continue;} else {bottom_view = true;}
-          }
-          if (tilt < PI/2 + EPS && tilt > PI/2 - EPS) {
-            if (top_view) {continue;} else {top_view = true;}
-          }
-
-          ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
-          panorama_rotation.setRPY(0, tilt, pan);
-          panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
-          point.orientation.x = panorama_rotation.x();
-          point.orientation.y = panorama_rotation.y();
-          point.orientation.z = panorama_rotation.z();
-          point.orientation.w = panorama_rotation.w();
-          panorama_relative.poses.push_back(point);
-        }
-      } else {
-        for (double tilt = tilt_max_; tilt >= tilt_min_ - EPS; tilt -= k_tilt) {
-          // Avoid taking multiple pictures at top and bottom
-          if (tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) {
-            if (bottom_view) {continue;} else {bottom_view = true;}
-          }
-          if (tilt < PI/2 + EPS && tilt > PI/2 - EPS) {
-            if (top_view) {continue;} else {top_view = true;}
-          }
-
-
-          ROS_DEBUG_STREAM("pan:" << pan * 180 / PI << " tilt:" << tilt * 180 / PI);
-          panorama_rotation.setRPY(0, tilt, pan);
-          panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
-          point.orientation.x = panorama_rotation.x();
-          point.orientation.y = panorama_rotation.y();
-          point.orientation.z = panorama_rotation.z();
-          point.orientation.w = panorama_rotation.w();
-          panorama_relative.poses.push_back(point);
-          // if ((tilt < -PI/2 + EPS && tilt > -PI/2 - EPS) || (tilt < PI/2 + EPS && tilt > PI/2 - EPS))
-          //   break;
-        }
-      }
-      i++;
+    for (const auto& orient : orientations) {
+      ROS_DEBUG_STREAM("pan:" << orient.pan * 180 / M_PI << " tilt:" << orient.tilt * 180 / M_PI);
+      panorama_rotation.setRPY(0, orient.tilt, orient.pan);
+      panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
+      point.orientation.x = panorama_rotation.x();
+      point.orientation.y = panorama_rotation.y();
+      point.orientation.z = panorama_rotation.z();
+      point.orientation.w = panorama_rotation.w();
+      panorama_relative.poses.push_back(point);
     }
 
     // Go through all the panorama points
