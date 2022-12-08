@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef INSPECTION_PANO_H_
-#define INSPECTION_PANO_H_
+#ifndef INSPECTION_PANORAMA_SURVEY_H_
+#define INSPECTION_PANORAMA_SURVEY_H_
 
 #include <cstdint>
 #include <unordered_map>
@@ -32,10 +32,10 @@ namespace inspection {
 
 class PanoAttitude {
  public:
-  double pan;  // radians, 0=forward, increases to the right
+  double pan;   // radians, 0=forward, increases to the right
   double tilt;  // radians, 0=forward, increases upward
-  int16_t iy;  // row index, 0=top row
-  int16_t ix;  // column index, 0=left column
+  int16_t iy;   // row index, 0=top row
+  int16_t ix;   // column index, 0=left column
 
   inline PanoAttitude(double _pan, double _tilt, int16_t _iy, int16_t _ix) :
     pan(_pan),
@@ -45,13 +45,6 @@ class PanoAttitude {
   {}
 };
 
-void pano_orientations(std::vector<PanoAttitude>* orientations_out,
-                       int* nrows_out,
-                       int* ncols_out,
-                       double pan_radius, double tilt_radius,
-                       double h_fov, double v_fov,
-                       double overlap, double attitude_tolerance);
-
 typedef std::pair<int, int> OrientLookupKey;
 typedef std::pair<int, inspection::PanoAttitude> OrientLookupValue;
 typedef std::unordered_map<OrientLookupKey, OrientLookupValue, boost::hash<OrientLookupKey> > OrientLookupMap;
@@ -59,7 +52,7 @@ typedef std::unordered_map<OrientLookupKey, OrientLookupValue, boost::hash<Orien
 void get_orient_lookup(OrientLookupMap* orient_lookup_out,
                        const std::vector<PanoAttitude>& orientations);
 
-void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
+void GeneratePanoOrientations(std::vector<PanoAttitude>* orientations_out,
                         int* nrows_out,
                         int* ncols_out,
                         double pan_radius, double tilt_radius,
@@ -68,4 +61,4 @@ void pano_orientations2(std::vector<PanoAttitude>* orientations_out,
 
 }  // namespace inspection
 
-#endif  // INSPECTION_PANO_H_
+#endif  // INSPECTION_PANORAMA_SURVEY_H_

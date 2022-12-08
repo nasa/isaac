@@ -67,22 +67,61 @@
 
 // C++ headers
 #include <vector>
+#include <string>
+#include <map>
 
 /**
  * \ingroup beh
  */
 namespace inspection {
 
+
+class CameraView {
+ public:
+  // Constructor
+  explicit CameraView(std::string cam_name);
+
+  Eigen::Matrix4d getProjectionMatrix();
+  double getHFOV();
+  double getVFOV();
+
+  bool getCamXYFromPose(const geometry_msgs::Pose point, int &x, int &y);
+
+  bool getPoseFromXYD(const int x, const int y, const double d, geometry_msgs::Pose &point);
+
+  double getPointDistance(const geometry_msgs::Pose point, std::string depth_cam_name);
+
+ protected:
+  bool setProjectionMatrix(Eigen::Matrix3d cam_mat);
+
+ private:
+  std::string cam_name_;
+  config_reader::ConfigReader cfg_cam_;
+  int W_, H_;
+  float fx_, fy_;
+  Eigen::Matrix4d P_;
+  const float max_distance_ = 2.0;
+  const float min_distance_ = 0.2;
+
+  tf2_ros::Buffer tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+};
+
+
+
+
 /*
   This class provides the high-level logic that allows the freeflyer to
-  define the optimal inspection pose. It evaluates:
+  define the inspection poses for the different survey types.
+  It calls the survey generator and evaluates plans regarding:
 
-  * Visibility constraints
+  * Visibility constraints (anomaly inspection only)
   * Keepout and Keepin zones
   * Obstacle map
 
-  It returns a vector of possible inspection poses that can be updated
-  in case the move action fails due to planning or unmapped obstacle.
+  It returns a vector of inspection poses. In the case of an anomaly inspection
+  in case the move action fails due to planning or unmapped obstacle, it
+  saves the sorted alternatives such that no replanning isn't necessary.
   It also constains functions that allow inspection visualization.
 */
 class Inspection {
@@ -91,15 +130,19 @@ class Inspection {
   Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg);
   // Read parameters from config server
   void ReadParam();
-  // Generate inspection segment
-  bool GenSegment(geometry_msgs::Pose goal);
+
   // Remove head of segment if planing failed
   bool RemoveInspectionPose();
   // Get te head of the inspection poses segment
-  geometry_msgs::Pose GetInspectionPose();
+  geometry_msgs::PoseArray GetCurrentInspectionPose();
+  geometry_msgs::PoseArray GetNextInspectionPose();
+  geometry_msgs::PoseArray GetAlternateInspectionPose();
 
-  // Generate the survey for panorama pictures
-  void GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama);
+  // Generate the supported inspection methods
+  bool GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly);
+  bool GenerateGeometrySurvey(geometry_msgs::PoseArray &points_geometry);
+  bool GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama);
+  bool GenerateVolumetricSurvey(geometry_msgs::PoseArray &points_volume);
 
  protected:
   // Ensure all clients are connected
@@ -108,11 +151,6 @@ class Inspection {
   void CheckZonesTimeoutCallback();
   // Timeout on a map check request
   void CheckMapTimeoutCallback();
-  // This function generates a sorted list based on the max viewing angle and resolution
-  bool GenerateSortedList(geometry_msgs::PoseArray &points);
-  // This function transforms the points from the camera rf to the body rf
-  bool TransformList(geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &points_out,
-                      tf2::Transform target_transform);
   // Checks the given points agains whether the target is visible
   // from a camera picture
   bool VisibilityConstraint(geometry_msgs::PoseArray &points);
@@ -121,25 +159,36 @@ class Inspection {
                          geometry_msgs::Vector3 const& cubemax);
   bool ZonesConstraint(geometry_msgs::PoseArray &points);
   bool ObstaclesConstraint(geometry_msgs::PoseArray &points);
+  // This function transforms the points from the camera rf to the body rf
+  bool TransformList(geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &points_out,
+                      tf2::Transform target_transform);
+
   // Draws the possible inspection poses
   void DrawInspectionPoses(geometry_msgs::PoseArray &points,
                             ros::Publisher &publisher);
   // Draws visibility frostum projection
   void DrawInspectionFrostum();
 
+  // This function generates a sorted list based on the max viewing angle and resolution
+  bool GenerateSortedList(geometry_msgs::PoseArray &points);
+
  private:
   ff_util::FreeFlyerServiceClient<ff_msgs::GetZones> client_z_;
   ff_util::FreeFlyerServiceClient<ff_msgs::GetMap> client_o_;
+
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-  ros::Publisher pub_;
-  tf2::Quaternion target_to_scicam_rot_;
 
+
+  // General inspection variables
   geometry_msgs::PoseArray points_;    // Vector containing inspection poses
+  tf2::Quaternion target_to_cam_rot_;
+
+  // Camera Projection functions
+  std::map<std::string, CameraView> cameras_;
 
   // Parameter clients
   ff_util::ConfigServer *cfg_;
-  config_reader::ConfigReader cfg_cam_;
 
   // Inspection parameters
   double opt_distance_;
@@ -154,10 +203,14 @@ class Inspection {
   double target_size_y_;
 
   // Panorame parameters
+  bool auto_fov_;
   double pan_min_;
   double pan_max_;
   double tilt_min_;
   double tilt_max_;
+  double h_fov_;
+  double v_fov_;
+  double att_tol_;
   double overlap_;
 
   // Publish Markers
@@ -166,6 +219,18 @@ class Inspection {
   ros::Publisher pub_zones_check_;
   ros::Publisher pub_map_check_;
 };
+
+
+// class CameraView {
+//   CameraView(std::string cam_name);
+  bool getProjectionMatrix();
+  bool PositionToXY(geometry_msgs::Pose point, int &x, int &y);
+  // private:
+  bool setProjectionMatrix();
+
+
+// }
+
 
 }  // namespace inspection
 #endif  // INSPECTION_INSPECTION_H_

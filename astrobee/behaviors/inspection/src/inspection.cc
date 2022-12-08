@@ -19,7 +19,8 @@
 
 // Include inspection library header
 #include <inspection/inspection.h>
-#include <inspection/pano.h>
+#include <inspection/panorama_survey.h>
+#include <inspection/anomaly_survey.h>
 #include <math.h>
 /**
  * \ingroup beh
@@ -27,7 +28,8 @@
 namespace inspection {
 /*
   This class provides the high-level logic that allows the freeflyer to
-  define the optimal inspection pose. It evaluates:
+  define the optimal inspection pose. It reads the configurations and 
+  evaluates:
 
   * Visibility constraints
   * Keepout and Keepin zones
@@ -38,77 +40,64 @@ namespace inspection {
   It also constains functions that allow inspection visualization.
 */
 
-  Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
-    // Setug config readers
-    cfg_ = cfg;
+Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
+  // Setug config readers
+  cfg_ = cfg;
 
-    cfg_cam_.AddFile("cameras.config");
-    if (!cfg_cam_.ReadFiles())
-      ROS_FATAL("Failed to read config files.");
+  // Create a transform buffer to listen for transforms
+  tf_listener_ = std::shared_ptr<tf2_ros::TransformListener>(new tf2_ros::TransformListener(tf_buffer_));
 
-    // Create a transform buffer to listen for transforms
-    tf_listener_ = std::shared_ptr<tf2_ros::TransformListener>(
-      new tf2_ros::TransformListener(tf_buffer_));
-    // Service clients
-    // Initialize the zones call
-    client_z_.SetConnectedCallback(std::bind(&Inspection::ConnectedCallback, this));
-    client_z_.SetTimeoutCallback(std::bind(&Inspection::CheckZonesTimeoutCallback, this));
-    client_z_.Create(nh, SERVICE_MOBILITY_GET_ZONES);
-    // Initialize the obstacle map call
-    client_o_.SetConnectedCallback(std::bind(&Inspection::ConnectedCallback, this));
-    client_o_.SetTimeoutCallback(std::bind(&Inspection::CheckMapTimeoutCallback, this));
-    client_o_.Create(nh, SERVICE_MOBILITY_GET_OBSTACLE_MAP);
+  // Service clients
+  // Initialize the zones call
+  client_z_.SetTimeoutCallback(std::bind(&Inspection::CheckZonesTimeoutCallback, this));
+  client_z_.Create(nh, SERVICE_MOBILITY_GET_ZONES);
 
-    // Publish
-    pub_no_filter_ = nh->advertise<visualization_msgs::MarkerArray>(
-                      "markers/no_filter", 1, true);
-    pub_vis_check_ = nh->advertise<visualization_msgs::MarkerArray>(
-                      "markers/vis_check", 1, true);
-    pub_zones_check_ = nh->advertise<visualization_msgs::MarkerArray>(
-                      "markers/zones_check", 1, true);
-    pub_map_check_ = nh->advertise<visualization_msgs::MarkerArray>(
-                      "markers/map_check", 1, true);
-  }
+  // Initialize the obstacle map call
+  client_o_.SetTimeoutCallback(std::bind(&Inspection::CheckMapTimeoutCallback, this));
+  client_o_.Create(nh, SERVICE_MOBILITY_GET_OBSTACLE_MAP);
+
+  // Publish debug messages
+  pub_no_filter_ = nh->advertise<visualization_msgs::MarkerArray>("markers/no_filter", 1, true);
+  pub_vis_check_ = nh->advertise<visualization_msgs::MarkerArray>("markers/vis_check", 1, true);
+  pub_zones_check_ = nh->advertise<visualization_msgs::MarkerArray>("markers/zones_check", 1, true);
+  pub_map_check_ = nh->advertise<visualization_msgs::MarkerArray>("markers/map_check", 1, true);
+}
 
   void Inspection::ReadParam() {
-    // Parameters Anomaly survey
+    // Parameters Anomaly survey ---
     dist_resolution_    = cfg_->Get<double>("distance_resolution");
-    angle_resolution_   = cfg_->Get<double>("angle_resolution");
-    max_angle_          = cfg_->Get<double>("max_angle");
+    angle_resolution_   = cfg_->Get<double>("angle_resolution") * M_PI / 180.0;
+    max_angle_          = cfg_->Get<double>("max_angle")        * M_PI / 180.0;
     max_distance_       = cfg_->Get<double>("max_distance");
     min_distance_       = cfg_->Get<double>("min_distance");
     target_size_x_      = cfg_->Get<double>("target_size_x");
     target_size_y_      = cfg_->Get<double>("target_size_y");
 
-    // Get transform from target to sci cam
+    // Get transform from target to cam
+    // Camera uses z-axis pointing at the target and the target does z-axis pointing at camera
     try {
-      geometry_msgs::TransformStamped tf_target_to_sci_cam = tf_buffer_.lookupTransform("sci_cam", "target",
+      geometry_msgs::TransformStamped tf_target_to_cam = tf_buffer_.lookupTransform("cam", "target",
                                ros::Time(0));
-      opt_distance_ = tf_target_to_sci_cam.transform.translation.z;
-      target_to_scicam_rot_ = tf2::Quaternion(
-                          tf_target_to_sci_cam.transform.rotation.x,
-                          tf_target_to_sci_cam.transform.rotation.y,
-                          tf_target_to_sci_cam.transform.rotation.z,
-                          tf_target_to_sci_cam.transform.rotation.w);
+      opt_distance_ = tf_target_to_cam.transform.translation.z;
+      target_to_cam_rot_ = tf2::Quaternion(
+                          tf_target_to_cam.transform.rotation.x,
+                          tf_target_to_cam.transform.rotation.y,
+                          tf_target_to_cam.transform.rotation.z,
+                          tf_target_to_cam.transform.rotation.w);
     } catch (tf2::TransformException &ex) {
       ROS_ERROR("ERROR getting target to sci_cam transform: %s", ex.what());
-      target_to_scicam_rot_ = tf2::Quaternion(0, 0, 0, 1);
+      target_to_cam_rot_ = tf2::Quaternion(0, 0, 0, 1);
     }
 
     // Parameters Panorama survey
-    pan_min_  = cfg_->Get<double>("pan_min") * M_PI / 180.0;
-    pan_max_  = cfg_->Get<double>("pan_max") * M_PI / 180.0;
-    tilt_min_ = cfg_->Get<double>("tilt_min") * M_PI / 180.0;
-    tilt_max_ = cfg_->Get<double>("tilt_max") * M_PI / 180.0;
+    pan_min_  = cfg_->Get<double>("pan_min")  * M_PI  / 180.0;
+    pan_max_  = cfg_->Get<double>("pan_max")  * M_PI  / 180.0;
+    tilt_min_ = cfg_->Get<double>("tilt_min") * M_PI  / 180.0;
+    tilt_max_ = cfg_->Get<double>("tilt_max") * M_PI  / 180.0;
+    h_fov_    = cfg_->Get<double>("h_fov")    * M_PI  / 180.0;
+    v_fov_    = cfg_->Get<double>("v_fov")    * M_PI  / 180.0;
+    att_tol_  = cfg_->Get<double>("att_tol")  * M_PI  / 180.0;
     overlap_  = cfg_->Get<double>("overlap");
-  }
-
-  // Ensure all clients are connected
-  void Inspection::ConnectedCallback() {
-    ROS_DEBUG_STREAM("ConnectedCallback()");
-    if (!client_z_.IsConnected()) return;       // Zone check service
-    if (!client_o_.IsConnected()) return;       // Map check service
-    // fsm_.Update(READY);                         // Ready!
   }
 
   // Timeout on a zone check request
@@ -121,195 +110,53 @@ namespace inspection {
     ROS_ERROR("Timeout connecting to the get map service");
   }
 
+  // In case move failed, remove this point
   bool Inspection::RemoveInspectionPose() {
     points_.poses.erase(points_.poses.begin());
 
-    DrawInspectionPoses(points_, pub_map_check_);
+    // DrawInspectionPoses(points_, pub_map_check_);
     if (points_.poses.empty())
       return false;
     else
       return true;
   }
 
-  geometry_msgs::Pose Inspection::GetInspectionPose() {
-    return points_.poses.front();
+  // Get the Inspection point on front of possibilities
+  geometry_msgs::PoseArray Inspection::GetCurrentInspectionPose() {
+    geometry_msgs::PoseArray result;
+    result.header = points_.header;
+    result.poses.push_back(points_.poses.front());
+    return result;
   }
 
-  // MOVE ACTION CLIENT
-  // Generate inspection segment
-  bool Inspection::GenSegment(geometry_msgs::Pose goal) {
-    // Update parameters
-    ReadParam();
-    // Insert Offset
-    tf2::Transform vent_transform;
-    vent_transform.setOrigin(tf2::Vector3(
-                      goal.position.x,
-                      goal.position.y,
-                      goal.position.z));
-    vent_transform.setRotation(tf2::Quaternion(
-                      goal.orientation.x,
-                      goal.orientation.y,
-                      goal.orientation.z,
-                      goal.orientation.w));
-
-    // Create the sorted point segment
-    points_.poses.clear();
-    points_.header.frame_id = "sci_cam";
-    GenerateSortedList(points_);
-    // ROS_ERROR_STREAM("end GenerateSortedList");
-
-    // Draw the poses generated that capture the target
-    if (!VisibilityConstraint(points_)) {
-      ROS_ERROR_STREAM("Visibility Constrained: Did not find a possible inspection point");
-      return false;
-    }
-    // DrawInspectionPoses(points_, pub_vis_check_);
-
-    // Transform the points from the camera reference frame to the robot body
-    TransformList(points_, points_, vent_transform);
-
-    // Check candidate segment agains zones
-    if (!ZonesConstraint(points_)) {
-      ROS_ERROR_STREAM("Zones Constrained: Did not find a possible inspection point");
-      return false;
-    }
-
-    // Check candidate segment against obstacle map
-    if (!ObstaclesConstraint(points_)) {
-      ROS_ERROR_STREAM("Obstacles Constrained: Did not find a possible inspection point");
-      return false;
-    }
-    // ROS_ERROR_STREAM("end ObstaclesConstraint");
-    return true;
+  // Get the Inspection point on front of possibilities
+  geometry_msgs::PoseArray Inspection::GetNextInspectionPose() {
+    geometry_msgs::PoseArray result;
+    result.header = points_.header;
+    result.poses.push_back(points_.poses.front());
+    return result;
   }
 
-  // This function generates a sorted list based on the max viewing angle and resolution
-  bool Inspection::GenerateSortedList(geometry_msgs::PoseArray &points) {
-    geometry_msgs::Pose point;
-
-    // Insert point
-    point.orientation.x = 1;
-    point.orientation.y = 0;
-    point.orientation.z = 0;
-    point.orientation.w = 0;
-
-    // Go through all the alternative points in preference order
-    for (double r = 0; (r < max_distance_ - opt_distance_) ||
-                       (r < opt_distance_ - min_distance_); r += dist_resolution_) {
-      for (double theta = 0; theta < max_angle_; theta += angle_resolution_) {
-        for (double phi = 0; phi < 2*3.14; phi += angle_resolution_) {
-              // ROS_ERROR_STREAM("r: " << r << " phi: " << phi << " z: " << theta);
-          if ((opt_distance_ + r < max_distance_) && r != 0) {   // avoid publishing twice on zero
-            // Insert point
-            point.position.x = (opt_distance_ + r) * sin(theta) * cos(phi);
-            point.position.y = (opt_distance_ + r) * sin(theta) * sin(phi);
-            point.position.z = (opt_distance_ + r)  * cos(theta);
-            points_.poses.push_back(point);
-            // Insert point
-            if (theta != 0) {   // avoid publishing twice on zero
-              point.position.x = (opt_distance_ + r) * sin(-theta) * cos(phi);
-              point.position.y = (opt_distance_ + r) * sin(-theta) * sin(phi);
-              point.position.z = (opt_distance_ + r)  * cos(-theta);
-              points_.poses.push_back(point);
-            }
-          }
-          if (opt_distance_ - r > min_distance_) {
-            // Insert point
-            point.position.x = (opt_distance_ - r) * sin(theta) * cos(phi);
-            point.position.y = (opt_distance_ - r) * sin(theta) * sin(phi);
-            point.position.z = (opt_distance_ - r)  * cos(theta);
-            points_.poses.push_back(point);
-            // Insert point
-            if (theta != 0) {   // avoid publishing twice on zero
-              point.position.x = (opt_distance_ - r) * sin(-theta) * cos(phi);
-              point.position.y = (opt_distance_ - r) * sin(-theta) * sin(phi);
-              point.position.z = (opt_distance_ - r)  * cos(-theta);
-              points_.poses.push_back(point);
-            }
-          }
-          if (theta == 0)
-            break;
-        }
-      }
-    }
-    return 0;
+  // Get the Inspection point on front of possibilities
+  geometry_msgs::PoseArray Inspection::GetAlternateInspectionPose() {
+    geometry_msgs::PoseArray result;
+    result.header = points_.header;
+    result.poses.push_back(points_.poses.front());
+    return result;
   }
 
   // Checks the given points agains whether the target is visible
   // from a camera picture
   bool Inspection::VisibilityConstraint(geometry_msgs::PoseArray &points) {
-    // Get camera parameters
-    Eigen::Matrix3d cam_mat;
-    float fx, fy, s, cx, cy;
-    int W, H;
-
-    config_reader::ConfigReader::Table camera(&cfg_cam_, points.header.frame_id.c_str());
-    // Read in distorted image size.
-    if (!camera.GetInt("width", &W))
-      fprintf(stderr, "Could not read camera width.");
-    if (!camera.GetInt("height", &H))
-      fprintf(stderr, "Could not read camera height.");
-
-    config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
-    for (int i = 0; i < 9; i++) {
-      if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
-        fprintf(stderr, "Failed to read vector intrinsic_matrix.");
-        break;
-      }
-    }
-    // Read in focal length, optical offset and skew
-    fx = cam_mat(0, 0);
-    fy = cam_mat(1, 1);
-    s  = cam_mat(0, 1);
-    cx = cam_mat(0, 2);
-    cy = cam_mat(1, 2);
-
-    // Build the matrix with the points to evaluate
-    Eigen::MatrixXd p(4, 4);
-    p << target_size_x_,  target_size_x_, -target_size_x_, -target_size_x_,
-         target_size_y_, -target_size_y_,  target_size_y_, -target_size_y_,
-         0,             0,             0,              0,
-         1,             1,             1,              1;
-
-    // Build projection matrix
-    float farmnear = max_distance_ - min_distance_;
-    Eigen::Matrix4d P;
-    P << 2*fx/W,     0,       0,                                                0,
-         2*s/W,      2*fy/H,  0,                                                0,
-         2*(cx/W)-1, 2*(cy/H)-1, max_distance_ / (farmnear),                    1,
-         0,          0,          -min_distance_ * (max_distance_ / (farmnear)), 1;
-
     // Go through all the points in sorted segment
     std::vector<geometry_msgs::Pose>::const_iterator it = points.poses.begin();
     while (it != points.poses.end()) {
-      // Build the View matrix
-      Eigen::Quaterniond R(1, 0, 0, 0);                                    // Rotation Matrix Identity
-      Eigen::Vector3d T(it->position.x, it->position.y, it->position.z);   // Translation Vector
-      Eigen::Matrix4d V;                                                   // Transformation Matrix
-      V.setIdentity();                                                     // Identity to make bottom row 0,0,0,1
-      V.block<3, 3>(0, 0) = R.normalized().toRotationMatrix();;
-      V.block<3, 1>(0, 3) = T;
-      // Transform point
-      Eigen::MatrixXd q = P * V.inverse() * p;
-
-      bool eliminated = false;
-      for (int i = 0; i < q.cols(); ++i) {
-        if (q(0, i)/q(3, i) < -1 ||   // the point lies beyond the left border of the screen
-            q(0, i)/q(3, i) >  1 ||   // the point lies beyond the right border of the screen
-            q(1, i)/q(3, i) < -1 ||   // the point lies beyond the bottom border of the screen
-            q(1, i)/q(3, i) >  1 ||   // the point lies beyond the top border of the screen
-            q(2, i)/q(3, i) < -1 ||   // the point lies beyond the near plane of the camera,
-                                      //     i.e., the point is behind the camera or too close for the camera to see.
-            q(2, i)/q(3, i) >  1) {   // the point lies beyond the far plane of the camera,
-                                      //     i.e., the point is too far away for the camera to see
-              // Eliminate point
-              points.poses.erase(it);
-              eliminated = true;
-              break;
-        }
-      }
-      if (!eliminated)
+      int x, y;
+      if (!cameras_.find(points.header.frame_id)->second.getCamXYFromPose(*it, x, y)) {
         ++it;
+      } else {
+        points.poses.erase(it);
+      }
     }
 
     // Check if there are any points left
@@ -371,21 +218,20 @@ namespace inspection {
   }
 
   // Check if a point is inside a cuboid
-bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
-                                      geometry_msgs::Vector3 const& cubemin,
-                                      geometry_msgs::Vector3 const& cubemax) {
-  if (x.x < std::min(cubemin.x, cubemax.x) ||
-      x.y < std::min(cubemin.y, cubemax.y) ||
-      x.z < std::min(cubemin.z, cubemax.z) ||
-      x.x > std::max(cubemin.x, cubemax.x) ||
-      x.y > std::max(cubemin.y, cubemax.y) ||
-      x.z > std::max(cubemin.z, cubemax.z))
-    return false;
-  return true;
-}
+  bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
+                                        geometry_msgs::Vector3 const& cubemin,
+                                        geometry_msgs::Vector3 const& cubemax) {
+    if (x.x < std::min(cubemin.x, cubemax.x) ||
+        x.y < std::min(cubemin.y, cubemax.y) ||
+        x.z < std::min(cubemin.z, cubemax.z) ||
+        x.x > std::max(cubemin.x, cubemax.x) ||
+        x.y > std::max(cubemin.y, cubemax.y) ||
+        x.z > std::max(cubemin.z, cubemax.z))
+      return false;
+    return true;
+  }
 
   bool Inspection::ZonesConstraint(geometry_msgs::PoseArray &points) {
-    ROS_DEBUG_STREAM("Service zones");
     ff_msgs::GetZones srv;
     if (client_z_.Call(srv)) {
       // Check each setpoint in the segment against the zones
@@ -396,9 +242,10 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
         bool point_exists_within_keepin = false;
         bool point_exists_within_keepout = false;
         for (jt = srv.response.zones.begin(); jt != srv.response.zones.end(); jt++) {
-          if (jt->type == ff_msgs::Zone::KEEPIN)
+          if (jt->type == ff_msgs::Zone::KEEPIN) {
             if (PointInsideCuboid(it->position, jt->min, jt->max))
               point_exists_within_keepin = true;
+          }
           if (jt->type == ff_msgs::Zone::KEEPOUT) {
             if (PointInsideCuboid(it->position, jt->min, jt->max)) {
               ROS_DEBUG_STREAM("KEEPOUT violation");
@@ -415,7 +262,10 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
           ++it;
         }
       }
+    } else {
+      ROS_ERROR_STREAM("Could not call zones service, is it connected?");
     }
+
     // Check if there are any points left
     if (points.poses.empty())
       return false;
@@ -446,8 +296,9 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
           }
         }
       }
-    }
-
+      } else {
+        ROS_ERROR_STREAM("Could not call obstacle service, is it connected?");
+      }
     // Check if there are any points left
     if (points.poses.empty())
       return false;
@@ -507,10 +358,71 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
   void Inspection::DrawInspectionFrostum() {
   }
 
-  // Generate the survey for panorama pictures
-  void Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama) {
+
+  // Generate inspection segment
+  bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly) {
     // Update parameters
     ReadParam();
+    // Insert Offset
+    for (int i = 0; i < points_anomaly.poses.size(); ++i) {
+      tf2::Transform anomaly_transform;
+      anomaly_transform.setOrigin(tf2::Vector3(
+                        points_anomaly.poses[i].position.x,
+                        points_anomaly.poses[i].position.y,
+                        points_anomaly.poses[i].position.z));
+      anomaly_transform.setRotation(tf2::Quaternion(
+                        points_anomaly.poses[i].orientation.x,
+                        points_anomaly.poses[i].orientation.y,
+                        points_anomaly.poses[i].orientation.z,
+                        points_anomaly.poses[i].orientation.w));
+
+      // Create the sorted point segment
+      points_.poses.clear();
+      points_.header.frame_id = "sci_cam";
+      GenerateSortedList(points_);
+
+      // Draw the poses generated that capture the target
+      if (!VisibilityConstraint(points_)) {
+        ROS_ERROR_STREAM("Visibility Constrained: Did not find a possible inspection point");
+        return false;
+      }
+      // DrawInspectionPoses(points_, pub_vis_check_);
+
+      // Transform the points from the camera reference frame to the robot body
+      TransformList(points_, points_, anomaly_transform);
+
+      // Check candidate segment agains zones
+      if (!ZonesConstraint(points_)) {
+        ROS_ERROR_STREAM("Zones Constrained: Did not find a possible inspection point");
+        return false;
+      }
+
+      // Check candidate segment against obstacle map
+      if (!ObstaclesConstraint(points_)) {
+        ROS_ERROR_STREAM("Obstacles Constrained: Did not find a possible inspection point");
+        return false;
+      }
+    }
+    // ROS_ERROR_STREAM("end ObstaclesConstraint");
+    return true;
+  }
+
+
+  // Insert here any geometric survey functionality
+  bool Inspection::GenerateGeometrySurvey(geometry_msgs::PoseArray &points_geometry) {
+    return true;
+  }
+
+  // Generate the survey for panorama pictures
+  bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama) {
+    // Update parameters
+    ReadParam();
+
+    // Make sure camera is loaded
+    std::string cam_name = points_panorama.header.frame_id.c_str();
+    if (cameras_.find(cam_name) == cameras_.end())
+      cameras_.emplace(cam_name, cam_name);
+
 
     geometry_msgs::PoseArray panorama_relative;
     geometry_msgs::PoseArray panorama_transformed;
@@ -518,58 +430,40 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
 
     // Insert point
     geometry_msgs::Pose point;
-    panorama_relative.header.frame_id = points_panorama.header.frame_id.c_str();
+    panorama_relative.header.frame_id = cam_name.c_str();
     point.position.x = 0.0;
     point.position.y = 0.0;
     point.position.z = 0.0;
     tf2::Quaternion panorama_rotation;
 
-
-    // Get camera parameters
-    Eigen::Matrix3d cam_mat;
-    float fx, fy;
-    int W, H;
-
-    // Read in distorted image size.
-    config_reader::ConfigReader::Table camera(&cfg_cam_, points_panorama.header.frame_id.c_str());
-    if (!camera.GetInt("width", &W)) {
-      ROS_ERROR("Could not read camera width.");
-    }
-    if (!camera.GetInt("height", &H)) {
-      ROS_ERROR("Could not read camera height.");
-    }
-    config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
-    for (int i = 0; i < 9; i++) {
-      if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
-        ROS_ERROR("Failed to read vector intrinsic_matrix.");
-        break;
-      }
-    }
-    // Read in focal length
-    fx = cam_mat(0, 0);
-    fy = cam_mat(1, 1);
-
     // Calculate fields of view
-    float h_fov = 2 * atan(W / (2 * fx));
-    float v_fov = 2 * atan(H / (2 * fy));
+    float h_fov, v_fov;
+    if (auto_fov_) {
+      h_fov = cameras_.find(cam_name)->second.getHFOV();
+      v_fov = cameras_.find(cam_name)->second.getVFOV();
+    } else {
+      h_fov = h_fov_;
+      v_fov = v_fov_;
+    }
 
     int nrows, ncols;
     std::vector<PanoAttitude> orientations;
+
     // pano_orientations() doesn't support panos with non-zero center (not needed)
     assert(pan_min_ == -pan_max_);
     assert(tilt_min_ == -tilt_max_);
     double attitude_tolerance = 0;  // dummy, discuss this later
 
     // generate coverage pattern pan/tilt values
-    pano_orientations(&orientations, &nrows, &ncols,
+    GeneratePanoOrientations(&orientations, &nrows, &ncols,
                       tilt_max_, pan_max_,
                       h_fov, v_fov,
-                      overlap_, attitude_tolerance);
+                      overlap_, att_tol_);
 
     for (const auto& orient : orientations) {
       ROS_DEBUG_STREAM("pan:" << orient.pan * 180 / M_PI << " tilt:" << orient.tilt * 180 / M_PI);
       panorama_rotation.setRPY(0, orient.tilt, orient.pan);
-      panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_scicam_rot_;
+      panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
       point.orientation.x = panorama_rotation.x();
       point.orientation.y = panorama_rotation.y();
       point.orientation.z = panorama_rotation.z();
@@ -597,7 +491,12 @@ bool Inspection::PointInsideCuboid(geometry_msgs::Point const& x,
                                     std::end(panorama_transformed.poses));
     }
     points_panorama = panorama_survey;
+    return true;
   }
 
+  // Insert here any volumetric survey functionality
+  bool Inspection::GenerateVolumetricSurvey(geometry_msgs::PoseArray &points_geometry) {
+    return true;
+  }
 }  // namespace inspection
 

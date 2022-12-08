@@ -16,7 +16,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(isaac_gazebo)
 
 # Specify C++14 standard
@@ -39,6 +39,9 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 find_package(gazebo REQUIRED)
+
+# Add gazebo to the link directorries
+link_directories(${GAZEBO_LIBRARY_DIRS})
 
 # Call catkin
 catkin_package(

@@ -24,9 +24,9 @@
 #include <fstream>
 #include <utility>
 #include <unordered_map>
-#include "inspection/pano.h"
+#include "inspection/panorama_survey.h"
 
-typedef decltype(&inspection::pano_orientations) orientations_func_t;
+typedef decltype(&inspection::GeneratePanoOrientations) orientations_func_t;
 
 class TestCase {
  public:
@@ -155,23 +155,7 @@ void do_test_cases(const std::string& label, orientations_func_t orientations_fu
 }
 
 int main(int argc, char* argv[]) {
-  int which_algo = 2;
-  if (argc >= 2) {
-    std::string arg = argv[1];
-    if (arg == "1") {
-      which_algo = 1;
-    } else if (arg == "2") {
-      which_algo = 2;
-    } else {
-      std::cerr << "usage: test_pano [1|2]" << std::endl;
-      std::cerr << "couldn't parse argument" << std::endl;
-    }
-  }
+  do_test_cases("=== GeneratePanoOrientations === ", &inspection::GeneratePanoOrientations);
 
-  if (which_algo == 1) {
-    do_test_cases("=== pano_orientations === ", &inspection::pano_orientations);
-  } else {
-    do_test_cases("=== pano_orientations2 === ", &inspection::pano_orientations2);
-  }
   return 0;
 }

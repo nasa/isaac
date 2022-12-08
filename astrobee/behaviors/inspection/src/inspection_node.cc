@@ -116,85 +116,52 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     fsm_.Add(STATE::WAITING,
       GOAL_INSPECT | GOAL_UNPAUSE, [this](FSM::Event const& event) -> FSM::State {
         Dock("UNDOCK");
-        return STATE::INIT_INSPECTION;
+        return STATE::MOVING_TO_APPROACH_POSE;
       });
     // [2]
-    fsm_.Add(STATE::INIT_INSPECTION,
-      DOCK_SUCCESS, [this](FSM::Event const& event) -> FSM::State {
+    fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
+      DOCK_SUCCESS | MOTION_SUCCESS | NEXT_INSPECT, [this](FSM::Event const& event) -> FSM::State {
+        // Increment the counter
+        goal_counter_++;
+        // Check if there is more to inspect
+        if (goal_counter_ >= goal_.inspect_poses.poses.size()) {
+          // Inspection is over, return
+          Result(RESPONSE::SUCCESS, "Inspection Over");
+          return STATE::WAITING;
+        }
+
         switch (goal_.command) {
-        // Vent command
+        // Anomaly command
         case isaac_msgs::InspectionGoal::ANOMALY:
-          if (inspection_->GenSegment(goal_.inspect_poses.poses[goal_counter_])) {
-            MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetInspectionPose());
-            return STATE::MOVING_TO_APPROACH_POSE;
-          } else {
-            Result(RESPONSE::MOTION_APPROACH_FAILED);
-            return STATE::WAITING;
-          }
+          // if (inspection_->GenerateAnomalySurvey(goal_.inspect_poses.poses[goal_counter_])) {
+          //   MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetNextInspectionPose());
+          //   return STATE::MOVING_TO_APPROACH_POSE;
+          // } else {
+          //   Result(RESPONSE::MOTION_APPROACH_FAILED);
+          //   return STATE::WAITING;
+          // }
         // Geometry or Panorama command
         case isaac_msgs::InspectionGoal::GEOMETRY:
         case isaac_msgs::InspectionGoal::PANORAMA:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, goal_.inspect_poses.poses[goal_counter_]);
-          return STATE::MOVING_TO_APPROACH_POSE;
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetNextInspectionPose());
+          return STATE::VISUAL_INSPECTION;
         // Volumetric command
         case isaac_msgs::InspectionGoal::VOLUMETRIC:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, goal_.inspect_poses.poses[goal_counter_]);
-          return STATE::VOL_INSPECTION;
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetNextInspectionPose());
+          return STATE::MOVING_TO_APPROACH_POSE;
         }
         return STATE::WAITING;
       });
-    fsm_.Add(STATE::INIT_INSPECTION,
+    fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       DOCK_FAILED, [this](FSM::Event const& event) -> FSM::State {
         Result(RESPONSE::DOCK_FAILED);
         return STATE::WAITING;
       });
     // [3]
-    fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
+    fsm_.Add(STATE::VISUAL_INSPECTION,
       MOTION_SUCCESS, [this](FSM::Event const& event) -> FSM::State {
         ImageInspect();
-        return STATE::VISUAL_INSPECTION;
-      });
-    // [4]
-    fsm_.Add(STATE::VISUAL_INSPECTION,
-      NEXT_INSPECT, [this](FSM::Event const& event) -> FSM::State {
-        // After successful inspection, can increment the counter
-        goal_counter_++;
-        // There is more to inspect
-        if (goal_counter_ < goal_.inspect_poses.poses.size()) {
-          switch (goal_.command) {
-          // Vent command
-          case isaac_msgs::InspectionGoal::ANOMALY:
-            if (inspection_->GenSegment(goal_.inspect_poses.poses[goal_counter_])) {
-              MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetInspectionPose());
-              return STATE::MOVING_TO_APPROACH_POSE;
-            } else {
-              Result(RESPONSE::MOTION_APPROACH_FAILED);
-              return STATE::WAITING;
-            }
-          case isaac_msgs::InspectionGoal::GEOMETRY:
-          case isaac_msgs::InspectionGoal::PANORAMA:
-            MoveInspect(ff_msgs::MotionGoal::NOMINAL, goal_.inspect_poses.poses[goal_counter_]);
-            return STATE::MOVING_TO_APPROACH_POSE;
-          }
-        }
-        // Inspection is over, return
-        Result(RESPONSE::SUCCESS, "Inspection Over");
-        return STATE::WAITING;
-      });
-    // [5]
-    fsm_.Add(STATE::VOL_INSPECTION,
-      MOTION_SUCCESS, [this](FSM::Event const& event) -> FSM::State {
-        // After successful inspection, can increment the counter
-        goal_counter_++;
-        // There is more to inspect
-        if (goal_counter_ < goal_.inspect_poses.poses.size()) {
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, goal_.inspect_poses.poses[goal_counter_]);
-          return STATE::VOL_INSPECTION;
-        }
-        // Inspection is over, return
-        Result(RESPONSE::SUCCESS, "Inspection Over");
-        Dock("DOCK");
-        return STATE::RETURN_INSPECTION;
+        return STATE::MOVING_TO_APPROACH_POSE;
       });
     // [6]
     fsm_.Add(STATE::RETURN_INSPECTION,
@@ -358,7 +325,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
 
   // Send a move command
-  bool MoveInspect(std::string const& mode, geometry_msgs::Pose pose) {
+  bool MoveInspect(std::string const& mode, geometry_msgs::PoseArray poses) {
     // Create a new motion goal
     ff_msgs::MotionGoal goal;
     goal.command = ff_msgs::MotionGoal::MOVE;
@@ -366,38 +333,30 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
     // Package up the desired end pose
     geometry_msgs::PoseStamped inspection_pose;
-    inspection_pose.pose = pose;
     inspection_pose.header.stamp = ros::Time::now();
-    goal.states.push_back(inspection_pose);
-
-    // Load parameters from config file
-    std::string planner = cfg_.Get<std::string>("planner");
-    bool coll_check = cfg_.Get<bool>("enable_collision_checking");
-
-    bool replanning = cfg_.Get<bool>("enable_replanning");
-    int replanning_attempts = cfg_.Get<int>("max_replanning_attempts");
-    bool validation = cfg_.Get<bool>("enable_validation");
-    bool boostrapping = cfg_.Get<bool>("enable_bootstrapping");
-    bool immediate = cfg_.Get<bool>("enable_immediate");
+    for (int i = 0; i < poses.poses.size(); ++i) {
+      inspection_pose.pose = poses.poses[i];
+      goal.states.push_back(inspection_pose);
+    }
 
     // Reconfigure the choreographer
     ff_util::ConfigClient choreographer_cfg(GetPlatformHandle(), NODE_CHOREOGRAPHER);
-    choreographer_cfg.Set<std::string>("planner", planner);
-    choreographer_cfg.Set<bool>("enable_collision_checking", coll_check);
+    choreographer_cfg.Set<std::string>("planner", cfg_.Get<std::string>("planner"));
+
     switch (goal_.command) {
-    // Vent command
     case isaac_msgs::InspectionGoal::ANOMALY:
-      choreographer_cfg.Set<bool>("enable_faceforward",
-              cfg_.Get<bool>("enable_faceforward_anomaly"));    break;
+      choreographer_cfg.Set<bool>("enable_faceforward", cfg_.Get<bool>("enable_faceforward_anomaly"));
+      break;
     case isaac_msgs::InspectionGoal::GEOMETRY:
-      choreographer_cfg.Set<bool>("enable_faceforward",
-              cfg_.Get<bool>("enable_faceforward_geometry"));    break;
+      choreographer_cfg.Set<bool>("enable_faceforward", cfg_.Get<bool>("enable_faceforward_geometry"));
+      break;
     }
-    choreographer_cfg.Set<bool>("enable_replanning", replanning);
-    choreographer_cfg.Set<int>("max_replanning_attempts", replanning_attempts);
-    choreographer_cfg.Set<bool>("enable_validation", validation);
-    choreographer_cfg.Set<bool>("enable_bootstrapping", boostrapping);
-    choreographer_cfg.Set<bool>("enable_immediate", immediate);
+    choreographer_cfg.Set<bool>("enable_collision_checking", cfg_.Get<bool>("enable_collision_checking"));
+    choreographer_cfg.Set<bool>("enable_replanning",         cfg_.Get<bool>("enable_replanning"));
+    choreographer_cfg.Set<int> ("max_replanning_attempts",   cfg_.Get<int> ("max_replanning_attempts"));
+    choreographer_cfg.Set<bool>("enable_validation",         cfg_.Get<bool>("enable_validation"));
+    choreographer_cfg.Set<bool>("enable_bootstrapping",      cfg_.Get<bool>("enable_bootstrapping"));
+    choreographer_cfg.Set<bool>("enable_immediate",          cfg_.Get<bool>("enable_immediate"));
     if (!choreographer_cfg.Reconfigure()) {
       NODELET_ERROR_STREAM("Failed to reconfigure choreographer");
       return false;
@@ -416,56 +375,51 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // Result of a move action
   void MResultCallback(ff_util::FreeFlyerActionState::Enum result_code,
     ff_msgs::MotionResultConstPtr const& result) {
+    // Check for invalid results
+    if (result == nullptr) {
+      ROS_ERROR_STREAM("Invalid result received Motion");
+      return fsm_.Update(MOTION_FAILED);
+    }
+
+    // If successful, return Success
     switch (result_code) {
       case ff_util::FreeFlyerActionState::SUCCESS:
         motion_retry_number_ = 0;
         return fsm_.Update(MOTION_SUCCESS);
     }
-    if (result != nullptr) {
-      switch (result->response) {
-        case ff_msgs::MotionResult::PLAN_FAILED:
-        case ff_msgs::MotionResult::VALIDATE_FAILED:
-        case ff_msgs::MotionResult::OBSTACLE_DETECTED:
-        case ff_msgs::MotionResult::REPLAN_NOT_ENOUGH_TIME:
-        case ff_msgs::MotionResult::REPLAN_FAILED:
-        case ff_msgs::MotionResult::REVALIDATE_FAILED:
-        case ff_msgs::MotionResult::VIOLATES_KEEP_OUT:
-        case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
-        {
-          // Try to find an alternate inspection position
-          if (inspection_->RemoveInspectionPose()) {
-            MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetInspectionPose());
-            return;
-          } else {
-            ROS_ERROR_STREAM("No inspection pose possible for selected target");
-          }
-          break;
+    switch (result->response) {
+      case ff_msgs::MotionResult::PLAN_FAILED:
+      case ff_msgs::MotionResult::VALIDATE_FAILED:
+      case ff_msgs::MotionResult::OBSTACLE_DETECTED:
+      case ff_msgs::MotionResult::REPLAN_NOT_ENOUGH_TIME:
+      case ff_msgs::MotionResult::REPLAN_FAILED:
+      case ff_msgs::MotionResult::REVALIDATE_FAILED:
+      case ff_msgs::MotionResult::VIOLATES_KEEP_OUT:
+      case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
+      {
+        // Try to find an alternate inspection position
+        if (inspection_->RemoveInspectionPose()) {
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetAlternateInspectionPose());
+          return;
+        } else {
+          ROS_ERROR_STREAM("No alternative inspection pose possible for current station");
         }
-        case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION:
-        case ff_msgs::MotionResult::TOLERANCE_VIOLATION_ATTITUDE:
-        case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
-        case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
-        {  // If it fails because of a motion error, retry
-          if (motion_retry_number_ < max_motion_retry_number_) {
-            motion_retry_number_++;
-            switch (goal_.command) {
-            // Vent command
-            case isaac_msgs::InspectionGoal::ANOMALY:
-              MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetInspectionPose());
-              break;
-            case isaac_msgs::InspectionGoal::GEOMETRY:
-            case isaac_msgs::InspectionGoal::VOLUMETRIC:
-              MoveInspect(ff_msgs::MotionGoal::NOMINAL, goal_.inspect_poses.poses[goal_counter_]);
-              break;
-            }
-          }
+        break;
+      }
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_ATTITUDE:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
+      {  // If it fails because of a motion error, retry
+        if (motion_retry_number_ < max_motion_retry_number_) {
+          motion_retry_number_++;
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
         }
       }
-
-      ROS_ERROR_STREAM("Motion failed result error: " << result->response);
-    } else {
-      ROS_ERROR_STREAM("Invalid result received Motion");
     }
+
+    ROS_ERROR_STREAM("Motion failed result error: " << result->response);
+
     return fsm_.Update(MOTION_FAILED);
   }
 
@@ -693,7 +647,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     result_.anomaly_result.clear();
     result_.inspection_result.clear();
     result_.picture_time.clear();
-    goal_counter_ = 0;
+    goal_counter_ = -1;
     ROS_DEBUG_STREAM("RESET COUNTER");
 
     // Check if there is at least one valid inspection pose
@@ -708,23 +662,26 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     switch (goal_.command) {
     // Vent command
     case isaac_msgs::InspectionGoal::ANOMALY:
-      NODELET_DEBUG("Received Goal Vent");
+      NODELET_DEBUG("Received Goal Anomaly");
+      inspection_->GenerateAnomalySurvey(goal_.inspect_poses);
       return fsm_.Update(GOAL_INSPECT);
       break;
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_DEBUG("Received Goal Geometry");
+      inspection_->GenerateGeometrySurvey(goal_.inspect_poses);
       return fsm_.Update(GOAL_INSPECT);
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
-      ROS_ERROR("Received Goal Panorama");
+      NODELET_DEBUG("Received Goal Panorama");
       inspection_->GeneratePanoramaSurvey(goal_.inspect_poses);
       return fsm_.Update(GOAL_INSPECT);
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:
       NODELET_DEBUG("Received Goal Volumetric");
+      inspection_->GenerateVolumetricSurvey(goal_.inspect_poses);
       return fsm_.Update(GOAL_INSPECT);
       break;
     // Invalid command
@@ -816,7 +773,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case STATE::RETURN_INSPECTION:
       msg.fsm_state = "RETURN_INSPECTION";                 break;
     }
-    ROS_DEBUG_STREAM("State changed to " << msg.fsm_state);
+    NODELET_DEBUG_STREAM("State changed to " << msg.fsm_state);
     // Broadcast the docking state
     pub_state_.publish(msg);
     // Send the feedback if needed
@@ -826,7 +783,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       break;
     default:
       {
-        ROS_DEBUG_STREAM("InspectionFeedback ");
+        NODELET_DEBUG_STREAM("InspectionFeedback ");
         isaac_msgs::InspectionFeedback feedback;
         feedback.state = msg;
         server_.SendFeedback(feedback);
@@ -861,7 +818,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   ros::ServiceServer server_set_state_;
   ros::Timer sci_cam_timeout_;
   isaac_msgs::InspectionGoal goal_;
-  int goal_counter_= 0;
+  int goal_counter_= -1;
   std::string m_fsm_subevent_, m_fsm_substate_;
   std::string d_fsm_subevent_, d_fsm_substate_;
   std::string i_fsm_substate_;
