@@ -87,7 +87,7 @@ namespace inspection {
     return 2 * atan(H_ / (2 * fy_));
   }
 
-  bool CameraView::getCamXYFromPose(const geometry_msgs::Pose point, int& x, int& y) {
+  bool CameraView::getCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
     // Get current camera position
     geometry_msgs::TransformStamped tf_cam_to_world = tf_buffer_.lookupTransform(cam_name_, "world",
                                                             ros::Time(0));
@@ -101,9 +101,9 @@ namespace inspection {
     //      1,             1,             1,              1;
 
     Eigen::Vector4d p;
-    p << point.position.x,
-         point.position.y,
-         point.position.z,
+    p << point.x,
+         point.y,
+         point.z,
          1;
 
     // Build the View matrix
@@ -138,12 +138,36 @@ namespace inspection {
     return true;
   }
 
-  bool CameraView::getPoseFromXYD(const int x, const int y, const double d, geometry_msgs::Pose &point) {}
+  bool CameraView::getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y,
+                                   geometry_msgs::Point& point) {
+    // Convert from u (column / width), v (row/height) to position in array
+    // where X,Y,Z data starts
+    int arrayPosition = x*pCloud.row_step + y*pCloud.point_step;
 
-  double CameraView::getPointDistance(const geometry_msgs::Pose point, std::string depth_cam_name) {
+    // compute position in array where x,y,z data start
+    int arrayPosX = arrayPosition + pCloud.fields[0].offset;  // X has an offset of 0
+    int arrayPosY = arrayPosition + pCloud.fields[1].offset;  // Y has an offset of 4
+    int arrayPosZ = arrayPosition + pCloud.fields[2].offset;  // Z has an offset of 8
+
+    float X = 0.0;
+    float Y = 0.0;
+    float Z = 0.0;
+
+    memcpy(&X, &pCloud.data[arrayPosX], sizeof(float));
+    memcpy(&Y, &pCloud.data[arrayPosY], sizeof(float));
+    memcpy(&Z, &pCloud.data[arrayPosZ], sizeof(float));
+
+    // put data into the point p
+    point.x = X;
+    point.y = Y;
+    point.z = Z;
+
+    return true;
+  }
+
+  double CameraView::getPointDistance(const geometry_msgs::Point point, std::string depth_cam_name) {
     // Create depth cam camera model
     CameraView depth_cam(depth_cam_name);
-
 
 
     // Get most recent depth message
@@ -158,16 +182,14 @@ namespace inspection {
       return -1;
     }
 
-    // Get depth from image coordinate
+    // Get target image coordinate
     int depth_cam_x, depth_cam_y;
     double depth_cam_d;
-    depth_cam.getCamXYFromPose(point, depth_cam_x, depth_cam_y);
-
-
+    depth_cam.getCamXYFromPoint(point, depth_cam_x, depth_cam_y);
 
     // Project target estimate to 3D space
-    geometry_msgs::Pose new_point;
-    depth_cam.getPoseFromXYD(depth_cam_x, depth_cam_y, depth_cam_d, new_point);
+    geometry_msgs::Point new_point;
+    depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
 
 
 
@@ -175,12 +197,12 @@ namespace inspection {
     geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform(cam_name_, "world",
                                                             ros::Time(0));
 
-    return sqrt((tf_img_cam_to_world.transform.translation.x - point.position.x)
-                  * (tf_img_cam_to_world.transform.translation.x - point.position.x)
-              + (tf_img_cam_to_world.transform.translation.y - point.position.y)
-                  * (tf_img_cam_to_world.transform.translation.y - point.position.y)
-              + (tf_img_cam_to_world.transform.translation.z - point.position.z)
-                  * (tf_img_cam_to_world.transform.translation.z - point.position.z));
+    return sqrt((tf_img_cam_to_world.transform.translation.x - new_point.x)
+                  * (tf_img_cam_to_world.transform.translation.x - new_point.x)
+              + (tf_img_cam_to_world.transform.translation.y - new_point.y)
+                  * (tf_img_cam_to_world.transform.translation.y - new_point.y)
+              + (tf_img_cam_to_world.transform.translation.z - new_point.z)
+                  * (tf_img_cam_to_world.transform.translation.z - new_point.z));
   }
 
 
@@ -198,9 +220,11 @@ namespace inspection {
     float farmnear = max_distance_ - min_distance_;
 
     P_ << 2*fx_/W_,    0,           0,                                            0,
-         2*s/W_,      2*fy_/H_,     0,                                            0,
-         2*(cx/W_)-1, 2*(cy/H_)-1, max_distance_ / (farmnear),                   1,
-         0,           0,          -min_distance_ * (max_distance_ / (farmnear)), 1;
+          2*s/W_,      2*fy_/H_,    0,                                            0,
+          2*(cx/W_)-1, 2*(cy/H_)-1, max_distance_ / (farmnear),                   1,
+          0,           0,          -min_distance_ * (max_distance_ / (farmnear)), 1;
+
+    return true;
   }
 
 }  // namespace inspection

@@ -152,7 +152,7 @@ Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
     std::vector<geometry_msgs::Pose>::const_iterator it = points.poses.begin();
     while (it != points.poses.end()) {
       int x, y;
-      if (!cameras_.find(points.header.frame_id)->second.getCamXYFromPose(*it, x, y)) {
+      if (!cameras_.find(points.header.frame_id)->second.getCamXYFromPoint(it->position, x, y)) {
         ++it;
       } else {
         points.poses.erase(it);

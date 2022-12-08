@@ -85,11 +85,11 @@ class CameraView {
   double getHFOV();
   double getVFOV();
 
-  bool getCamXYFromPose(const geometry_msgs::Pose point, int &x, int &y);
+  bool getCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
 
-  bool getPoseFromXYD(const int x, const int y, const double d, geometry_msgs::Pose &point);
+  bool getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y, geometry_msgs::Point &point);
 
-  double getPointDistance(const geometry_msgs::Pose point, std::string depth_cam_name);
+  double getPointDistance(const geometry_msgs::Point point, std::string depth_cam_name);
 
  protected:
   bool setProjectionMatrix(Eigen::Matrix3d cam_mat);
