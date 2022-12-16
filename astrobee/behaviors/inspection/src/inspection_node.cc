@@ -143,11 +143,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         // Geometry or Panorama command
         case isaac_msgs::InspectionGoal::GEOMETRY:
         case isaac_msgs::InspectionGoal::PANORAMA:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetNextInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getNextInspectionPose());
           return STATE::VISUAL_INSPECTION;
         // Volumetric command
         case isaac_msgs::InspectionGoal::VOLUMETRIC:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetNextInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getNextInspectionPose());
           return STATE::MOVING_TO_APPROACH_POSE;
         }
         return STATE::WAITING;
@@ -293,8 +293,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
 
     // Timer for the sci cam camera
-    sci_cam_timeout_ = nh_->createTimer(ros::Duration(cfg_.Get<int>("sci_cam_timeout")), &InspectionNode::SciCamTimeout,
-                                        this, false, false);
+    sci_cam_timeout_ = nh_->createTimer(ros::Duration(cfg_.Get<double>("sci_cam_timeout")),
+                                        &InspectionNode::SciCamTimeout, this, false, false);
 
     // Initiate inspection library
     inspection_ = new Inspection(nh, &cfg_);
@@ -398,8 +398,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
       {
         // Try to find an alternate inspection position
-        if (inspection_->RemoveInspectionPose()) {
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetAlternateInspectionPose());
+        if (inspection_->removeInspectionPose()) {
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
           return;
         } else {
           ROS_ERROR_STREAM("No alternative inspection pose possible for current station");
@@ -413,7 +413,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       {  // If it fails because of a motion error, retry
         if (motion_retry_number_ < max_motion_retry_number_) {
           motion_retry_number_++;
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
         }
       }
     }
@@ -475,6 +475,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
+    double focus_distance = inspection_->getDistanceToTarget();
+    ROS_ERROR_STREAM("FINAL DISTANCE: " << focus_distance);
 
     // Signal an imminent sci cam image
     sci_cam_req_ = sci_cam_req_ + 1;
@@ -491,7 +493,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd_args.push_back(arg);
 
     arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-    arg.s = "{\"name\": \"takePicture\"}";
+    arg.s = "{\"name\": \"takePicture\", \"haz_dist\": " + std::to_string(focus_distance) +"}";
     cmd_args.push_back(arg);
 
     ff_msgs::CommandStamped cmd;
@@ -662,27 +664,27 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     switch (goal_.command) {
     // Vent command
     case isaac_msgs::InspectionGoal::ANOMALY:
-      NODELET_DEBUG("Received Goal Anomaly");
-      inspection_->GenerateAnomalySurvey(goal_.inspect_poses);
-      return fsm_.Update(GOAL_INSPECT);
+      ROS_ERROR_STREAM("Received Goal Anomaly");
+      if (inspection_->generateAnomalySurvey(goal_.inspect_poses))
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_DEBUG("Received Goal Geometry");
-      inspection_->GenerateGeometrySurvey(goal_.inspect_poses);
-      return fsm_.Update(GOAL_INSPECT);
+      if (inspection_->generateGeometrySurvey(goal_.inspect_poses))
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
       NODELET_DEBUG("Received Goal Panorama");
-      inspection_->GeneratePanoramaSurvey(goal_.inspect_poses);
-      return fsm_.Update(GOAL_INSPECT);
+      if (inspection_->generatePanoramaSurvey(goal_.inspect_poses))
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:
       NODELET_DEBUG("Received Goal Volumetric");
-      inspection_->GenerateVolumetricSurvey(goal_.inspect_poses);
-      return fsm_.Update(GOAL_INSPECT);
+      if (inspection_->generateVolumetricSurvey(goal_.inspect_poses))
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Invalid command
     default:
@@ -694,6 +696,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       break;
     }
     }
+
+    isaac_msgs::InspectionResult result;
+    result.fsm_result = "Not a valid goal, could not find feasible inspection plan";
+    result.response = RESPONSE::INVALID_COMMAND;
+    server_.SendResult(ff_util::FreeFlyerActionState::ABORTED, result);
   }
 
   // Complete the current inspection action
@@ -712,7 +719,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // Callback to handle reconfiguration requests
   bool ReconfigureCallback(dynamic_reconfigure::Config & config) {
     if (cfg_.Reconfigure(config)) {
-      inspection_->ReadParam();
+      inspection_->readParam();
       return true;
     }
     return false;

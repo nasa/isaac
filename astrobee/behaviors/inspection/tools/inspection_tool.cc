@@ -75,10 +75,10 @@ DEFINE_double(pan_min, -180.0, "Panorama: minimum pan");
 DEFINE_double(overlap, 0.5, "Panorama: overlap between images");
 
 // Plan files
-DEFINE_string(anomaly_poses, "/resources/vent_jpm.txt", "Vent pose list to inspect");
+DEFINE_string(anomaly_poses, "/resources/inspection_iss.txt", "Vent pose list to inspect");
 DEFINE_string(geometry_poses, "/resources/survey_bay_6.txt", "Geometry poses list to map");
-DEFINE_string(panorama_poses, "/resources/panorama_jpm.txt", "Panorama poses list to map");
-DEFINE_string(volumetric_poses, "/resources/wifi_jpm.txt", "Wifi poses list to map");
+DEFINE_string(panorama_poses, "/resources/panorama_iss.txt", "Panorama poses list to map");
+DEFINE_string(volumetric_poses, "/resources/volumetric_iss.txt", "Wifi poses list to map");
 
 // Timeout values for action
 DEFINE_double(connect, 10.0, "Action connect timeout");

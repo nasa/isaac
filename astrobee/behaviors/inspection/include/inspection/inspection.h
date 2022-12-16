@@ -36,6 +36,7 @@
 #include <ff_util/ff_fsm.h>
 #include <ff_util/config_server.h>
 #include <ff_util/config_client.h>
+#include <msg_conversions/msg_conversions.h>
 #include <config_reader/config_reader.h>
 #include <ff_util/ff_flight.h>
 #include <isaac_util/isaac_names.h>
@@ -47,7 +48,6 @@
 
 // Software messages
 #include <visualization_msgs/MarkerArray.h>
-#include <isaac_msgs/InspectionState.h>
 #include <ff_msgs/Zone.h>
 #include <geometry_msgs/PoseArray.h>
 
@@ -75,7 +75,13 @@
  */
 namespace inspection {
 
-
+/*
+  This class provides camera functionality that allows us
+  to project the 3D point into the camera frame and the
+  other way around. It automatically reads the camera
+  parameters from the config files based on the camera
+  name, such that no setup is necessary.
+*/
 class CameraView {
  public:
   // Constructor
@@ -85,11 +91,19 @@ class CameraView {
   double getHFOV();
   double getVFOV();
 
+  double getH();
+  double getW();
+
+  // Gets the points x y where the point is in the image. If outside the image, then it will return false
+  // If the robot pose is not specified, it's considered to be the current one
+  bool getCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &x, int &y);
   bool getCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
 
   bool getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y, geometry_msgs::Point &point);
 
-  double getPointDistance(const geometry_msgs::Point point, std::string depth_cam_name);
+  double getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name);
+  double getDistanceFromCenter(std::string depth_cam_name);
+  bool debug_ = false;
 
  protected:
   bool setProjectionMatrix(Eigen::Matrix3d cam_mat);
@@ -106,7 +120,6 @@ class CameraView {
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 };
-
 
 
 
@@ -129,20 +142,22 @@ class Inspection {
   // Constructor
   Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg);
   // Read parameters from config server
-  void ReadParam();
+  void readParam();
 
   // Remove head of segment if planing failed
-  bool RemoveInspectionPose();
+  bool removeInspectionPose();
   // Get te head of the inspection poses segment
-  geometry_msgs::PoseArray GetCurrentInspectionPose();
-  geometry_msgs::PoseArray GetNextInspectionPose();
-  geometry_msgs::PoseArray GetAlternateInspectionPose();
+  geometry_msgs::PoseArray getCurrentInspectionPose();
+  geometry_msgs::PoseArray getNextInspectionPose();
+  geometry_msgs::PoseArray getAlternateInspectionPose();
+
+  double getDistanceToTarget();
 
   // Generate the supported inspection methods
-  bool GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly);
-  bool GenerateGeometrySurvey(geometry_msgs::PoseArray &points_geometry);
-  bool GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama);
-  bool GenerateVolumetricSurvey(geometry_msgs::PoseArray &points_volume);
+  bool generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly);
+  bool generateGeometrySurvey(geometry_msgs::PoseArray &points_geometry);
+  bool generatePanoramaSurvey(geometry_msgs::PoseArray &points_panorama);
+  bool generateVolumetricSurvey(geometry_msgs::PoseArray &points_volume);
 
  protected:
   // Ensure all clients are connected
@@ -153,7 +168,7 @@ class Inspection {
   void CheckMapTimeoutCallback();
   // Checks the given points agains whether the target is visible
   // from a camera picture
-  bool VisibilityConstraint(geometry_msgs::PoseArray &points);
+  bool VisibilityConstraint(geometry_msgs::PoseArray &points, tf2::Transform target_transform);
   bool PointInsideCuboid(geometry_msgs::Point const& x,
                          geometry_msgs::Vector3 const& cubemin,
                          geometry_msgs::Vector3 const& cubemax);
@@ -179,9 +194,12 @@ class Inspection {
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-
   // General inspection variables
-  geometry_msgs::PoseArray points_;    // Vector containing inspection poses
+  std::string mode_;
+  int inspection_counter_;
+
+  geometry_msgs::PoseArray goal_;                 // Vector containing inspection goals
+  std::vector<geometry_msgs::PoseArray> points_;  // Vector containing inspection poses
   tf2::Quaternion target_to_cam_rot_;
 
   // Camera Projection functions
@@ -191,7 +209,7 @@ class Inspection {
   ff_util::ConfigServer *cfg_;
 
   // Inspection parameters
-  double opt_distance_;
+  double target_distance_;
   double dist_resolution_;
   double angle_resolution_;
   double max_angle_;
@@ -203,7 +221,7 @@ class Inspection {
   double target_size_y_;
 
   // Panorame parameters
-  bool auto_fov_;
+  bool auto_fov_ = 0;
   double pan_min_;
   double pan_max_;
   double tilt_min_;
