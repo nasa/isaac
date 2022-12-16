@@ -101,10 +101,11 @@ namespace inspection {
   bool CameraView::getCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
                                      int& y) {
     // Get current camera position
-    ROS_ERROR_STREAM("VisibilityConstraint cam " << cam_name_);
+    ROS_ERROR_STREAM("VisibilityConstraint cam body to" << cam_name_);
     geometry_msgs::TransformStamped tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_,
-                                                            ros::Time(0));
+                                                            ros::Time(0), ros::Duration(2.0));
 
+    ROS_ERROR_STREAM("VisibilityConstraint cam passed transform");
     Eigen::Vector4d p;
     p << point.x,
          point.y,
