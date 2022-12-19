@@ -85,7 +85,7 @@ void Inspection::readParam() {
                         tf_target_to_cam.transform.rotation.z,
                         tf_target_to_cam.transform.rotation.w);
   } catch (tf2::TransformException &ex) {
-    ROS_ERROR("ERROR getting target to sci_cam transform: %s", ex.what());
+    ROS_ERROR("Failed getting target to sci_cam transform: %s", ex.what());
     target_to_cam_rot_ = tf2::Quaternion(0, 0, 0, 1);
   }
 
@@ -209,7 +209,7 @@ bool Inspection::TransformList(geometry_msgs::PoseArray points_in, geometry_msgs
                              ros::Time(0), ros::Duration(1.0));
     sci_cam_to_body = msg_conversions::ros_tf_to_tf2_transform(tf_sci_cam_to_body.transform);
   } catch (tf2::TransformException &ex) {
-    ROS_ERROR("ERROR getting sci_cam transform: %s", ex.what());
+    ROS_ERROR("Failed getting transform: %s", ex.what());
     sci_cam_to_body.setOrigin(tf2::Vector3(0, 0, 0));
     sci_cam_to_body.setRotation(tf2::Quaternion(0, 0, 0, 1));
   }

@@ -100,9 +100,16 @@ namespace inspection {
 
   bool CameraView::getCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
                                      int& y) {
+    // Initialize x,y
+    x = 0; y = 0;
     // Get current camera position
-    geometry_msgs::TransformStamped tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_,
-                                                            ros::Time(0), ros::Duration(1.0));
+    geometry_msgs::TransformStamped tf_body_to_cam;
+    try {
+      tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0));
+    } catch (tf2::TransformException &ex) {
+      ROS_ERROR("Failed getting transform: %s", ex.what());
+      return false;
+    }
     Eigen::Vector4d p;
     p << point.x,
          point.y,
@@ -125,6 +132,9 @@ namespace inspection {
     V.block<3, 1>(0, 3) = T;
     // Transform point
     Eigen::Vector4d q = P_ * V.inverse() * p;
+
+    x = static_cast<int>(((q(0) / q(3)) + 1) * W_ / 2);
+    y = static_cast<int>(((q(1) / q(3)) + 1) * H_ / 2);
 
     if (q(0) / q(3) < -1 ||   // the point lies beyond the left border of the screen
         q(0) / q(3) >  1 ||   // the point lies beyond the right border of the screen
@@ -172,18 +182,22 @@ namespace inspection {
       return false;
     }
 
-    x = static_cast<int>(((q(0) / q(3)) + 1) * W_ / 2);
-    y = static_cast<int>(((q(1) / q(3)) + 1) * W_ / 2);
 
     return true;
   }
 
 
   bool CameraView::getCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
+    // Initialize x,y
+    x = 0; y = 0;
     // Get current camera position if it's not given
-    geometry_msgs::TransformStamped robot_pose = tf_buffer_.lookupTransform("world", "body",
-                                                            ros::Time(0), ros::Duration(1.0));
-
+    geometry_msgs::TransformStamped robot_pose;
+    try {
+      robot_pose = tf_buffer_.lookupTransform("world", "body", ros::Time(0), ros::Duration(1.0));
+    } catch (tf2::TransformException &ex) {
+      ROS_ERROR("Failed getting transform: %s", ex.what());
+      return false;
+    }
     return getCamXYFromPoint(msg_conversions::ros_transform_to_ros_pose(robot_pose.transform), point, x, y);
   }
 
@@ -248,8 +262,14 @@ namespace inspection {
                                                                   << new_point.x);
 
     // Calculate distance between estimated target and camera
-    geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform(depth_cam_name + "_cam", cam_name_,
-                                                            ros::Time(0), ros::Duration(1.0));
+    geometry_msgs::TransformStamped tf_img_cam_to_world;
+    try {
+      tf_img_cam_to_world = tf_buffer_.lookupTransform(depth_cam_name + "_cam", cam_name_,
+                                                              ros::Time(0), ros::Duration(1.0));
+    } catch (tf2::TransformException &ex) {
+      ROS_ERROR("Failed getting transform: %s", ex.what());
+      return false;
+    }
 
     return sqrt((tf_img_cam_to_world.transform.translation.x - new_point.x)
                   * (tf_img_cam_to_world.transform.translation.x - new_point.x)
