@@ -101,11 +101,8 @@ namespace inspection {
   bool CameraView::getCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
                                      int& y) {
     // Get current camera position
-    ROS_ERROR_STREAM("VisibilityConstraint cam body to" << cam_name_);
     geometry_msgs::TransformStamped tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_,
-                                                            ros::Time(0), ros::Duration(2.0));
-
-    ROS_ERROR_STREAM("VisibilityConstraint cam passed transform");
+                                                            ros::Time(0), ros::Duration(1.0));
     Eigen::Vector4d p;
     p << point.x,
          point.y,
@@ -137,65 +134,60 @@ namespace inspection {
                               //     i.e., the point is behind the camera or too close for the camera to see.
         q(2) / q(3) >  1) {   // the point lies beyond the far plane of the camera,
                               //     i.e., the point is too far away for the camera to see
-    if (debug_) {
-      ROS_ERROR_STREAM(V.inverse() * p);
-    ROS_ERROR_STREAM("VisibilityConstraint T pos" << camera_pose.getOrigin().x() << " "
-                                << camera_pose.getOrigin().y() << " " << camera_pose.getOrigin().z());
-    ROS_ERROR_STREAM("VisibilityConstraint T quat"
-                     << camera_pose.getRotation().w() << " " << camera_pose.getRotation().x() << " "
-                     << camera_pose.getRotation().y() << " " << camera_pose.getRotation().z());
-    ROS_ERROR_STREAM("VisibilityConstraint p " << point.x << " " << point.y << " " << point.z);
-    ROS_ERROR_STREAM("VisibilityConstraint q " << q(0) / q(3) << " " << q(1) / q(3) << " " << q(2) / q(3));
+      if (debug_) {
+        ROS_DEBUG_STREAM(V.inverse() * p);
+        ROS_DEBUG_STREAM("VisibilityConstraint T pos" << camera_pose.getOrigin().x() << " "
+                                    << camera_pose.getOrigin().y() << " " << camera_pose.getOrigin().z());
+        ROS_DEBUG_STREAM("VisibilityConstraint T quat"
+                         << camera_pose.getRotation().w() << " " << camera_pose.getRotation().x() << " "
+                         << camera_pose.getRotation().y() << " " << camera_pose.getRotation().z());
+        ROS_DEBUG_STREAM("VisibilityConstraint p " << point.x << " " << point.y << " " << point.z);
+        ROS_DEBUG_STREAM("VisibilityConstraint q " << q(0) / q(3) << " " << q(1) / q(3) << " " << q(2) / q(3));
 
-    Eigen::Matrix4d corners_near;
-    corners_near << 1, -1, 1, -1, -1, -1, 1, 1, -1, -1, -1, -1, 1, 1, 1, 1;
-    Eigen::Matrix4d p_near = P_.inverse() * corners_near;
-    ROS_ERROR_STREAM("p_near 1 " << p_near(0, 0) / p_near(3, 0) << " " << p_near(1, 0) / p_near(3, 0) << " "
-                                 << p_near(2, 0) / p_near(3, 0));
-    ROS_ERROR_STREAM("p_near 2 " << p_near(0, 1) / p_near(3, 1) << " " << p_near(1, 1) / p_near(3, 1) << " "
-                                 << p_near(2, 1) / p_near(3, 1));
-    ROS_ERROR_STREAM("p_near 3 " << p_near(0, 2) / p_near(3, 2) << " " << p_near(1, 2) / p_near(3, 2) << " "
-                                 << p_near(2, 2) / p_near(3, 2));
-    ROS_ERROR_STREAM("p_near 4 " << p_near(0, 3) / p_near(3, 3) << " " << p_near(1, 3) / p_near(3, 3) << " "
-                                 << p_near(2, 3) / p_near(3, 3));
+        Eigen::Matrix4d corners_near;
+        corners_near << 1, -1, 1, -1, -1, -1, 1, 1, -1, -1, -1, -1, 1, 1, 1, 1;
+        Eigen::Matrix4d p_near = P_.inverse() * corners_near;
+        ROS_DEBUG_STREAM("p_near 1 " << p_near(0, 0) / p_near(3, 0) << " " << p_near(1, 0) / p_near(3, 0) << " "
+                                     << p_near(2, 0) / p_near(3, 0));
+        ROS_DEBUG_STREAM("p_near 2 " << p_near(0, 1) / p_near(3, 1) << " " << p_near(1, 1) / p_near(3, 1) << " "
+                                     << p_near(2, 1) / p_near(3, 1));
+        ROS_DEBUG_STREAM("p_near 3 " << p_near(0, 2) / p_near(3, 2) << " " << p_near(1, 2) / p_near(3, 2) << " "
+                                     << p_near(2, 2) / p_near(3, 2));
+        ROS_DEBUG_STREAM("p_near 4 " << p_near(0, 3) / p_near(3, 3) << " " << p_near(1, 3) / p_near(3, 3) << " "
+                                     << p_near(2, 3) / p_near(3, 3));
 
-    Eigen::Matrix4d corners_far;
-    corners_far << 1, -1, 1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1;
-    Eigen::Matrix4d p_far = P_.inverse() * corners_far;
-    ROS_ERROR_STREAM("p_far 1 " << p_far(0, 0) / p_far(3, 0) << " " << p_far(1, 0) / p_far(3, 0) << " "
-                                << p_far(2, 0) / p_far(3, 0));
-    ROS_ERROR_STREAM("p_far 2 " << p_far(0, 1) / p_far(3, 1) << " " << p_far(1, 1) / p_far(3, 1) << " "
-                                << p_far(2, 1) / p_far(3, 1));
-    ROS_ERROR_STREAM("p_far 3 " << p_far(0, 2) / p_far(3, 2) << " " << p_far(1, 2) / p_far(3, 2) << " "
-                                << p_far(2, 2) / p_far(3, 2));
-    ROS_ERROR_STREAM("p_far 4 " << p_far(0, 3) / p_far(3, 3) << " " << p_far(1, 3) / p_far(3, 3) << " "
-                                << p_far(2, 3) / p_far(3, 3));
+        Eigen::Matrix4d corners_far;
+        corners_far << 1, -1, 1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1;
+        Eigen::Matrix4d p_far = P_.inverse() * corners_far;
+        ROS_DEBUG_STREAM("p_far 1 " << p_far(0, 0) / p_far(3, 0) << " " << p_far(1, 0) / p_far(3, 0) << " "
+                                    << p_far(2, 0) / p_far(3, 0));
+        ROS_DEBUG_STREAM("p_far 2 " << p_far(0, 1) / p_far(3, 1) << " " << p_far(1, 1) / p_far(3, 1) << " "
+                                    << p_far(2, 1) / p_far(3, 1));
+        ROS_DEBUG_STREAM("p_far 3 " << p_far(0, 2) / p_far(3, 2) << " " << p_far(1, 2) / p_far(3, 2) << " "
+                                    << p_far(2, 2) / p_far(3, 2));
+        ROS_DEBUG_STREAM("p_far 4 " << p_far(0, 3) / p_far(3, 3) << " " << p_far(1, 3) / p_far(3, 3) << " "
+                                    << p_far(2, 3) / p_far(3, 3));
+      }
+      // Eliminate point
+      return false;
     }
-
-          // Eliminate point
-          return false;
-    }
-
 
     x = static_cast<int>(((q(0) / q(3)) + 1) * W_ / 2);
     y = static_cast<int>(((q(1) / q(3)) + 1) * W_ / 2);
 
     return true;
   }
-  bool CameraView::getCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
-    // Get current camera position
-    ROS_ERROR_STREAM("getCamXYFromPoint get current pose");
-    geometry_msgs::TransformStamped robot_pose = tf_buffer_.lookupTransform("world", "body",
-                                                            ros::Time(0), ros::Duration(2.0));
-    ROS_ERROR_STREAM("got getCamXYFromPoint get current pose");
 
+
+  bool CameraView::getCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
+    // Get current camera position if it's not given
+    geometry_msgs::TransformStamped robot_pose = tf_buffer_.lookupTransform("world", "body",
+                                                            ros::Time(0), ros::Duration(1.0));
 
     return getCamXYFromPoint(msg_conversions::ros_transform_to_ros_pose(robot_pose.transform), point, x, y);
   }
 
-
-
-
+  // Get point from camera pixel location and point cloud
   bool CameraView::getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y,
                                    geometry_msgs::Point& point) {
     // Convert from u (column / width), v (row/height) to position in array
@@ -224,45 +216,40 @@ namespace inspection {
   }
 
   double CameraView::getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name) {
-    ROS_ERROR_STREAM_ONCE("getDistanceFromTarget");
     // Create depth cam camera model
-    CameraView depth_cam(depth_cam_name);
+    CameraView depth_cam(depth_cam_name + "_cam");
     depth_cam.debug_ = true;
-
 
     // Get target image coordinate
     int depth_cam_x, depth_cam_y;
     double depth_cam_d;
     if (!depth_cam.getCamXYFromPoint(point.position, depth_cam_x, depth_cam_y)) {
-      ROS_ERROR_STREAM("point outside haz cam view ");
+      ROS_ERROR_STREAM("Point outside depth cam view ");
       return -1;
     }
-    ROS_ERROR_STREAM_ONCE("getDistanceFromPoint getCamXYFromPoint " << depth_cam_x << " " << depth_cam_y);
 
     // Get most recent depth message
     std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
     std::string cam_suffix = TOPIC_HARDWARE_PICOFLEXX_SUFFIX;
-
     boost::shared_ptr<sensor_msgs::PointCloud2 const> msg;
     msg = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(
-      cam_prefix + "haz" + cam_suffix, ros::Duration(3.5));  // Wait enought time to accomodate simulation
-    ROS_ERROR_STREAM("TOPIC: " << cam_prefix << "haz" << cam_suffix);
+      cam_prefix + depth_cam_name + cam_suffix, ros::Duration(3.5));  // Wait enought time to accomodate simulation
     if (msg == NULL) {
-      ROS_ERROR_STREAM("No point clound message received from " << depth_cam_name);
+      ROS_ERROR_STREAM("No point clound message received from " << depth_cam_name << "_cam"
+                                                                << " using topic: " << cam_prefix << depth_cam_name
+                                                                << cam_suffix);
       return -1;
     }
-
-
 
     // Project target estimate to 3D space
     geometry_msgs::Point new_point;
     depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
-    ROS_ERROR_STREAM_ONCE("getDistanceFromPoint getPointFromXYD " << new_point.x << " " << new_point.y << " "
+    ROS_DEBUG_STREAM("New target using haz cam interception: " << new_point.x << " " << new_point.y << " "
                                                                   << new_point.x);
 
     // Calculate distance between estimated target and camera
-    geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform(depth_cam_name, cam_name_,
-                                                            ros::Time(0));
+    geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform(depth_cam_name + "_cam", cam_name_,
+                                                            ros::Time(0), ros::Duration(1.0));
 
     return sqrt((tf_img_cam_to_world.transform.translation.x - new_point.x)
                   * (tf_img_cam_to_world.transform.translation.x - new_point.x)
@@ -272,51 +259,51 @@ namespace inspection {
                   * (tf_img_cam_to_world.transform.translation.z - new_point.z));
   }
 
-  double CameraView::getDistanceFromCenter(std::string depth_cam_name) {
-    // Create depth cam camera model
-    CameraView depth_cam(depth_cam_name);
+  // double CameraView::getDistanceFromCenter(std::string depth_cam_name) {
+  //   // Create depth cam camera model
+  //   CameraView depth_cam(depth_cam_name);
 
 
-    // Get most recent depth message
-    std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
-    std::string cam_suffix = TOPIC_HARDWARE_PICOFLEXX_SUFFIX;
+  //   // Get most recent depth message
+  //   std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
+  //   std::string cam_suffix = TOPIC_HARDWARE_PICOFLEXX_SUFFIX;
 
-    boost::shared_ptr<sensor_msgs::PointCloud2 const> msg;
-    msg = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(
-                      cam_prefix + "haz" + cam_suffix, ros::Duration(0.5));
-    if (msg == NULL) {
-      ROS_INFO("No point clound message received");
-      return -1;
-    }
+  //   boost::shared_ptr<sensor_msgs::PointCloud2 const> msg;
+  //   msg = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(
+  //                     cam_prefix + "haz" + cam_suffix, ros::Duration(0.5));
+  //   if (msg == NULL) {
+  //     ROS_INFO("No point clound message received");
+  //     return -1;
+  //   }
 
 
-    // Calculate mean position of camera center points
-    geometry_msgs::Point new_point;
-    geometry_msgs::Point average_middle;
-    average_middle.x = 0.0; average_middle.y = 0.0; average_middle.z = 0.0;
-    int range_h = 20, range_w = 20;
-    for (int depth_cam_x = depth_cam.getW() / 2 - range_h / 2; depth_cam_x < depth_cam.getW() / 2 + range_h / 2;
-         ++depth_cam_x) {
-      for (int depth_cam_y = depth_cam.getH() / 2 - range_w / 2; depth_cam_y < depth_cam.getH() / 2 + range_w / 2;
-           ++depth_cam_y) {
-        depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
-        average_middle.x = average_middle.x + new_point.x / (range_h * range_w);
-        average_middle.y = average_middle.y + new_point.x / (range_h * range_w);
-        average_middle.z = average_middle.z + new_point.x / (range_h * range_w);
-      }
-    }
+  //   // Calculate mean position of camera center points
+  //   geometry_msgs::Point new_point;
+  //   geometry_msgs::Point average_middle;
+  //   average_middle.x = 0.0; average_middle.y = 0.0; average_middle.z = 0.0;
+  //   int range_h = 20, range_w = 20;
+  //   for (int depth_cam_x = depth_cam.getW() / 2 - range_h / 2; depth_cam_x < depth_cam.getW() / 2 + range_h / 2;
+  //        ++depth_cam_x) {
+  //     for (int depth_cam_y = depth_cam.getH() / 2 - range_w / 2; depth_cam_y < depth_cam.getH() / 2 + range_w / 2;
+  //          ++depth_cam_y) {
+  //       depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
+  //       average_middle.x = average_middle.x + new_point.x / (range_h * range_w);
+  //       average_middle.y = average_middle.y + new_point.x / (range_h * range_w);
+  //       average_middle.z = average_middle.z + new_point.x / (range_h * range_w);
+  //     }
+  //   }
 
-    // Calculate distance between estimated target and camera
-    geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform("world", cam_name_,
-                                                            ros::Time(0));
+  //   // Calculate distance between estimated target and camera
+  //   geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform("world", cam_name_,
+  //                                                           ros::Time(0));
 
-    return sqrt((tf_img_cam_to_world.transform.translation.x - average_middle.x)
-                  * (tf_img_cam_to_world.transform.translation.x - new_point.x)
-              + (tf_img_cam_to_world.transform.translation.y - average_middle.y)
-                  * (tf_img_cam_to_world.transform.translation.y - average_middle.y)
-              + (tf_img_cam_to_world.transform.translation.z - average_middle.z)
-                  * (tf_img_cam_to_world.transform.translation.z - average_middle.z));
-  }
+  //   return sqrt((tf_img_cam_to_world.transform.translation.x - average_middle.x)
+  //                 * (tf_img_cam_to_world.transform.translation.x - new_point.x)
+  //             + (tf_img_cam_to_world.transform.translation.y - average_middle.y)
+  //                 * (tf_img_cam_to_world.transform.translation.y - average_middle.y)
+  //             + (tf_img_cam_to_world.transform.translation.z - average_middle.z)
+  //                 * (tf_img_cam_to_world.transform.translation.z - average_middle.z));
+  // }
 
 
   bool CameraView::setProjectionMatrix(Eigen::Matrix3d cam_mat) {

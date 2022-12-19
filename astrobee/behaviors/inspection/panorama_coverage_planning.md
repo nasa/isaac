@@ -1,4 +1,4 @@
-\page inspection Panorama coverage planning
+\page pano_coverage Panorama coverage planning
 
 A panorama coverage plan is a sequence of image center pan/tilt
 values. The objective of panorama coverage planning is to generate a
@@ -43,7 +43,7 @@ using a typical equirectangular projection, the rectangular area of each
 image becomes increasingly warped as the tilt value approaches the poles
 at +/-90 degrees (Fig. 1).
 
-| ![Image warping](plot_3_one_column_borders.png "Image warping") |
+| ![Image warping](/doc/images/plot_3_one_column_borders.png "Image warping") |
 |:--:|
 | Figure 1: Image warping. Note that the red image FOV farther from tilt=0 is more warped than the green image FOV. |
 
@@ -103,7 +103,7 @@ As of this writing (2022/02), using the experimental
 `pano_orientations2()` planner, the resulting panorama plan has 56
 images in 7 rows, with at most 10 images in a row (Fig. 2).
 
-| ![5_mapper_and_hugin sequence](plot_5_mapper_and_hugin_seq.png "5_mapper_and_hugin sequence") |
+| ![5_mapper_and_hugin sequence](/doc/images/plot_5_mapper_and_hugin_seq.png "5_mapper_and_hugin sequence") |
 |:--:|
 | Figure 2: `5_mapper_and_hugin` sequence |
 

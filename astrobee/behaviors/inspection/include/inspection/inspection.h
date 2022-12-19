@@ -151,6 +151,7 @@ class Inspection {
   geometry_msgs::PoseArray getNextInspectionPose();
   geometry_msgs::PoseArray getAlternateInspectionPose();
 
+  // Get distance from camera to target
   double getDistanceToTarget();
 
   // Generate the supported inspection methods
@@ -166,6 +167,7 @@ class Inspection {
   void CheckZonesTimeoutCallback();
   // Timeout on a map check request
   void CheckMapTimeoutCallback();
+
   // Checks the given points agains whether the target is visible
   // from a camera picture
   bool VisibilityConstraint(geometry_msgs::PoseArray &points, tf2::Transform target_transform);
@@ -219,9 +221,10 @@ class Inspection {
   double aspect_ratio_;
   double target_size_x_;
   double target_size_y_;
+  std::string depth_cam_;
 
   // Panorame parameters
-  bool auto_fov_ = 0;
+  bool auto_fov_;
   double pan_min_;
   double pan_max_;
   double tilt_min_;

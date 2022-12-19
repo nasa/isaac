@@ -470,13 +470,12 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       isaac_msgs::ImageInspectionGoal goal;
       goal.type = isaac_msgs::ImageInspectionGoal::VENT;
       client_i_.SendGoal(goal);
-      ROS_ERROR_STREAM("sent image inspection goal");
     }
 
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
     double focus_distance = inspection_->getDistanceToTarget();
-    ROS_ERROR_STREAM("FINAL DISTANCE: " << focus_distance);
+    ROS_DEBUG_STREAM("DISTANCE TO TARGET: " << focus_distance);
 
     // Signal an imminent sci cam image
     sci_cam_req_ = sci_cam_req_ + 1;
@@ -517,6 +516,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   void SciCamCallback(const sensor_msgs::CompressedImage::ConstPtr& msg) {
     // The sci cam image was received
     if (sci_cam_req_ != 0) {
+      ROS_DEBUG_STREAM("Scicam picture acquired " << ros::Time::now());
       // Clear local variables
       sci_cam_timeout_.stop();
       sci_cam_req_ = 0;
@@ -524,10 +524,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       result_.picture_time.push_back(msg->header.stamp);
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
-        ROS_ERROR_STREAM("wait for result()");
+        ROS_DEBUG_STREAM("wait for anomaly detection node result()");
         return;
       }
-      ROS_DEBUG_STREAM("Scicam picture acquired " << ros::Time::now());
       return fsm_.Update(NEXT_INSPECT);
     }
     return;
@@ -536,7 +535,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     sci_cam_timeout_.stop();
     // The sci cam image was not received
     if (sci_cam_req_ < cfg_.Get<int>("sci_cam_max_trials")) {
-      ROS_WARN_STREAM("sci cam didn't repond, resending it again");
+      ROS_WARN_STREAM("Scicam didn't repond, resending it again");
       ImageInspect();
       return;
     } else {
@@ -664,7 +663,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     switch (goal_.command) {
     // Vent command
     case isaac_msgs::InspectionGoal::ANOMALY:
-      ROS_ERROR_STREAM("Received Goal Anomaly");
+      NODELET_DEBUG("Received Goal Anomaly");
       if (inspection_->generateAnomalySurvey(goal_.inspect_poses))
         return fsm_.Update(GOAL_INSPECT);
       break;
