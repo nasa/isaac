@@ -143,7 +143,8 @@ geometry_msgs::PoseArray Inspection::getNextInspectionPose() {
 
 double Inspection::getDistanceToTarget() {
   if (mode_ == "anomaly") {
-    return cameras_.find("sci_cam")->second.getDistanceFromTarget(goal_.poses[inspection_counter_], depth_cam_);
+    return cameras_.find("sci_cam")->second.getDistanceFromTarget(goal_.poses[inspection_counter_], depth_cam_,
+                                                                  target_size_x_, target_size_y_);
   } else {
     return -1;
   }

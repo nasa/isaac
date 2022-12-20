@@ -228,19 +228,49 @@ namespace inspection {
 
     return true;
   }
+  bool CameraView::InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, int test_x, int test_y) {
+    int i, j;
+    bool c = false;
+    int n_vert = 4;
+    for (i = 0, j = n_vert-1; i < n_vert; j = i++) {
+      if (((vert_y[i] > test_y) != (vert_y[j] > test_y)) &&
+       (test_x < (vert_x[j] - vert_x[i]) * (test_y - vert_y[i]) / (vert_y[j]-vert_y[i]) + vert_x[i]) )
+         c = !c;
+    }
+    return c;
+  }
 
-  double CameraView::getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name) {
+  double CameraView::getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name, double size_x,
+                                           double size_y) {
     // Create depth cam camera model
     CameraView depth_cam(depth_cam_name + "_cam");
     depth_cam.debug_ = true;
 
-    // Get target image coordinate
-    int depth_cam_x, depth_cam_y;
-    double depth_cam_d;
-    if (!depth_cam.getCamXYFromPoint(point.position, depth_cam_x, depth_cam_y)) {
-      ROS_ERROR_STREAM("Point outside depth cam view ");
-      return -1;
+    tf2::Transform target_transform = msg_conversions::ros_pose_to_tf2_transform(point);
+
+    tf2::Transform p1, p2, p3, p4;
+    std::vector<int> vert_x{0, 0, 0, 0}, vert_y{0, 0, 0, 0};
+    p1 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, size_y, 0));
+    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p1).position, vert_x[0], vert_y[0])) {
+      ROS_ERROR_STREAM("Point p1 outside depth cam view");
     }
+    p2 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, -size_y, 0));
+    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p2).position, vert_x[1], vert_y[1])) {
+      ROS_ERROR_STREAM("Point p2 outside depth cam view");
+    }
+    p3 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, size_y, 0));
+    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p3).position, vert_x[2], vert_y[2])) {
+      ROS_ERROR_STREAM("Point p3 outside depth cam view");
+    }
+    p4 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, -size_y, 0));
+    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p4).position, vert_x[3], vert_y[3])) {
+      ROS_ERROR_STREAM("Point p4 outside depth cam view");
+    }
+
+    ROS_DEBUG_STREAM("target p1 " << p1.getOrigin().x() << " " << p1.getOrigin().y() << " " << p1.getOrigin().z());
+    ROS_DEBUG_STREAM("target p2 " << p2.getOrigin().x() << " " << p2.getOrigin().y() << " " << p2.getOrigin().z());
+    ROS_DEBUG_STREAM("target p3 " << p3.getOrigin().x() << " " << p3.getOrigin().y() << " " << p3.getOrigin().z());
+    ROS_DEBUG_STREAM("target p4 " << p4.getOrigin().x() << " " << p4.getOrigin().y() << " " << p4.getOrigin().z());
 
     // Get most recent depth message
     std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
@@ -255,76 +285,40 @@ namespace inspection {
       return -1;
     }
 
-    // Project target estimate to 3D space
-    geometry_msgs::Point new_point;
-    depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
-    ROS_DEBUG_STREAM("New target using haz cam interception: " << new_point.x << " " << new_point.y << " "
-                                                                  << new_point.x);
+    geometry_msgs::Point sum_point;
+    int points_counter = 0;
+    for (int depth_cam_x = 0; depth_cam_x < W_; ++depth_cam_x) {
+      for (int depth_cam_y = 0; depth_cam_y < H_; ++depth_cam_y) {
+        if (InsideTarget(vert_x, vert_y, depth_cam_x, depth_cam_y)) {
+          depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
+          points_counter += 1;
+          sum_point.x += new_point.x;
+          sum_point.y += new_point.y;
+          sum_point.z += new_point.z;
+        }
+      }
+    }
+    ROS_DEBUG_STREAM("Sum target using haz cam interception: " << sum_point.x / points_counter << " "
+                                                               << sum_point.y / points_counter << " "
+                                                               << sum_point.x / points_counter);
 
     // Calculate distance between estimated target and camera
-    geometry_msgs::TransformStamped tf_img_cam_to_world;
+    geometry_msgs::TransformStamped tf_depth_cam_to_cam;
     try {
-      tf_img_cam_to_world = tf_buffer_.lookupTransform(depth_cam_name + "_cam", cam_name_,
+      tf_depth_cam_to_cam = tf_buffer_.lookupTransform(depth_cam_name + "_cam", cam_name_,
                                                               ros::Time(0), ros::Duration(1.0));
     } catch (tf2::TransformException &ex) {
       ROS_ERROR("Failed getting transform: %s", ex.what());
       return false;
     }
 
-    return sqrt((tf_img_cam_to_world.transform.translation.x - new_point.x)
-                  * (tf_img_cam_to_world.transform.translation.x - new_point.x)
-              + (tf_img_cam_to_world.transform.translation.y - new_point.y)
-                  * (tf_img_cam_to_world.transform.translation.y - new_point.y)
-              + (tf_img_cam_to_world.transform.translation.z - new_point.z)
-                  * (tf_img_cam_to_world.transform.translation.z - new_point.z));
+    return sqrt((tf_depth_cam_to_cam.transform.translation.x - sum_point.x / points_counter)
+                  * (tf_depth_cam_to_cam.transform.translation.x - sum_point.x / points_counter)
+              + (tf_depth_cam_to_cam.transform.translation.y - sum_point.y / points_counter)
+                  * (tf_depth_cam_to_cam.transform.translation.y - sum_point.y / points_counter)
+              + (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter)
+                  * (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter));
   }
-
-  // double CameraView::getDistanceFromCenter(std::string depth_cam_name) {
-  //   // Create depth cam camera model
-  //   CameraView depth_cam(depth_cam_name);
-
-
-  //   // Get most recent depth message
-  //   std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
-  //   std::string cam_suffix = TOPIC_HARDWARE_PICOFLEXX_SUFFIX;
-
-  //   boost::shared_ptr<sensor_msgs::PointCloud2 const> msg;
-  //   msg = ros::topic::waitForMessage<sensor_msgs::PointCloud2>(
-  //                     cam_prefix + "haz" + cam_suffix, ros::Duration(0.5));
-  //   if (msg == NULL) {
-  //     ROS_INFO("No point clound message received");
-  //     return -1;
-  //   }
-
-
-  //   // Calculate mean position of camera center points
-  //   geometry_msgs::Point new_point;
-  //   geometry_msgs::Point average_middle;
-  //   average_middle.x = 0.0; average_middle.y = 0.0; average_middle.z = 0.0;
-  //   int range_h = 20, range_w = 20;
-  //   for (int depth_cam_x = depth_cam.getW() / 2 - range_h / 2; depth_cam_x < depth_cam.getW() / 2 + range_h / 2;
-  //        ++depth_cam_x) {
-  //     for (int depth_cam_y = depth_cam.getH() / 2 - range_w / 2; depth_cam_y < depth_cam.getH() / 2 + range_w / 2;
-  //          ++depth_cam_y) {
-  //       depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
-  //       average_middle.x = average_middle.x + new_point.x / (range_h * range_w);
-  //       average_middle.y = average_middle.y + new_point.x / (range_h * range_w);
-  //       average_middle.z = average_middle.z + new_point.x / (range_h * range_w);
-  //     }
-  //   }
-
-  //   // Calculate distance between estimated target and camera
-  //   geometry_msgs::TransformStamped tf_img_cam_to_world = tf_buffer_.lookupTransform("world", cam_name_,
-  //                                                           ros::Time(0));
-
-  //   return sqrt((tf_img_cam_to_world.transform.translation.x - average_middle.x)
-  //                 * (tf_img_cam_to_world.transform.translation.x - new_point.x)
-  //             + (tf_img_cam_to_world.transform.translation.y - average_middle.y)
-  //                 * (tf_img_cam_to_world.transform.translation.y - average_middle.y)
-  //             + (tf_img_cam_to_world.transform.translation.z - average_middle.z)
-  //                 * (tf_img_cam_to_world.transform.translation.z - average_middle.z));
-  // }
-
 
   bool CameraView::setProjectionMatrix(Eigen::Matrix3d cam_mat) {
     // Get camera parameters

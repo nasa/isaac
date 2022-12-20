@@ -101,12 +101,14 @@ class CameraView {
 
   bool getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y, geometry_msgs::Point &point);
 
-  double getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name);
+  double getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
+                                double size_x, double size_y);
   double getDistanceFromCenter(std::string depth_cam_name);
   bool debug_ = false;
 
  protected:
   bool setProjectionMatrix(Eigen::Matrix3d cam_mat);
+  bool InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, int test_x, int test_y);
 
  private:
   std::string cam_name_;
