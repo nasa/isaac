@@ -40,7 +40,7 @@ namespace inspection {
   in case the move action fails due to planning or unmapped obstacle.
   It also constains functions that allow inspection visualization.
 */
-  CameraView::CameraView(std::string cam_name) {
+  CameraView::CameraView(std::string cam_name, float f, float n)  : f_(f), n_(n) {
     cam_name_ = cam_name;
 
     cfg_cam_.AddFile("cameras.config");
@@ -243,30 +243,31 @@ namespace inspection {
   double CameraView::getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name, double size_x,
                                            double size_y) {
     // Create depth cam camera model
-    CameraView depth_cam(depth_cam_name + "_cam");
+    CameraView depth_cam(depth_cam_name + "_cam", f_, n_);
     depth_cam.debug_ = true;
 
+    // Establish where the corners are in the image
     tf2::Transform target_transform = msg_conversions::ros_pose_to_tf2_transform(point);
-
     tf2::Transform p1, p2, p3, p4;
     std::vector<int> vert_x{0, 0, 0, 0}, vert_y{0, 0, 0, 0};
     p1 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, size_y, 0));
     if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p1).position, vert_x[0], vert_y[0])) {
-      ROS_ERROR_STREAM("Point p1 outside depth cam view");
+      ROS_WARN_STREAM("Point p1 outside depth cam view");
     }
     p2 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, -size_y, 0));
     if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p2).position, vert_x[1], vert_y[1])) {
-      ROS_ERROR_STREAM("Point p2 outside depth cam view");
+      ROS_WARN_STREAM("Point p2 outside depth cam view");
     }
     p3 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, size_y, 0));
     if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p3).position, vert_x[2], vert_y[2])) {
-      ROS_ERROR_STREAM("Point p3 outside depth cam view");
+      ROS_WARN_STREAM("Point p3 outside depth cam view");
     }
     p4 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, -size_y, 0));
     if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p4).position, vert_x[3], vert_y[3])) {
-      ROS_ERROR_STREAM("Point p4 outside depth cam view");
+      ROS_WARN_STREAM("Point p4 outside depth cam view");
     }
 
+    // Debug messages
     ROS_DEBUG_STREAM("target p1 " << p1.getOrigin().x() << " " << p1.getOrigin().y() << " " << p1.getOrigin().z());
     ROS_DEBUG_STREAM("target p2 " << p2.getOrigin().x() << " " << p2.getOrigin().y() << " " << p2.getOrigin().z());
     ROS_DEBUG_STREAM("target p3 " << p3.getOrigin().x() << " " << p3.getOrigin().y() << " " << p3.getOrigin().z());
@@ -285,6 +286,8 @@ namespace inspection {
       return -1;
     }
 
+    // Project target points from depth image to 3D space + calculate average
+    geometry_msgs::Point new_point;
     geometry_msgs::Point sum_point;
     int points_counter = 0;
     for (int depth_cam_x = 0; depth_cam_x < W_; ++depth_cam_x) {
@@ -323,6 +326,7 @@ namespace inspection {
   bool CameraView::setProjectionMatrix(Eigen::Matrix3d cam_mat) {
     // Get camera parameters
     float s, cx, cy;
+
     // Read in focal length, optical offset and skew
     fx_ = cam_mat(0, 0);
     fy_ = cam_mat(1, 1);
@@ -331,37 +335,111 @@ namespace inspection {
     cy = cam_mat(1, 2);
 
     // Build projection matrix
-    float farmnear = max_distance_ - min_distance_;
-    // P_ << 2*fx_/W_,    0,           0,                                                                      0,
-    //       2*s/W_,      2*fy_/H_,    0,                                                                      0,
-    //       2*(cx/W_)-1, 2*(cy/H_)-1, (max_distance_ + min_distance_) / (max_distance_ - min_distance_),      1,
-    //       0,           0,           2 * max_distance_ * min_distance_ / (min_distance_ - max_distance_),    0;
-    // P_ << 2*fx_/W_,    0,           0,                                                                      0,
-    //       2*s/W_,      2*fy_/H_,    0,                                                                      0,
-    //       2*(cx/W_)-1, 2*(cy/H_)-1, -(max_distance_ + min_distance_) / (max_distance_ - min_distance_),     -1,
-    //       0,           0,           2 * max_distance_ * min_distance_ / (max_distance_ - min_distance_),    0;
-    // P_ << 2*fx_/W_,    0,            0,                                            0,
-    //       2*s/W_,      2*fy_/H_,     0,                                            0,
-    //       2*(cx/W_)-1, 2*(cy/H_)-1, -max_distance_ / (farmnear),                   1,
-    //       0,           0,           -min_distance_ * (max_distance_ / (farmnear)), 1;
-
-
-    P_ << 2*fx_/W_,    0,           0,               0,
-          2*s/W_,      2*fy_/H_,    0,               0,
-          2*(cx/W_)-1, 2*(cy/H_)-1, 2 / (farmnear), -(max_distance_ + min_distance_) / (farmnear),
-          0,           0,           0,               1;
+    P_ << 2 * fx_ / W_, 0, 0, 0, 2 * s / W_, 2 * fy_ / H_, 0, 0, 2 * (cx / W_) - 1, 2 * (cy / H_) - 1,
+      -(f_ + n_) / (f_ - n_), 2 * (f_ * n_) / (f_ - n_), 0, 0, -1, 0;
 
     return true;
   }
 
+
+void CameraView::DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher) {
+  // Get current camera position
+  geometry_msgs::TransformStamped tf_body_to_cam;
+  try {
+    tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0));
+  } catch (tf2::TransformException &ex) {
+    ROS_ERROR("Failed getting transform: %s", ex.what());
+    return;
+  }
+
+  tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
+                               msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam.transform);
+
+  // Build the View matrix
+  Eigen::Quaterniond R = msg_conversions::ros_to_eigen_quat(
+    msg_conversions::tf2_quat_to_ros_quat(camera_pose.getRotation()));  // Rotation Matrix Identity
+  Eigen::Vector3d T = msg_conversions::ros_point_to_eigen_vector(
+                          msg_conversions::tf2_transform_to_ros_pose(camera_pose).position);  // Translation Vector
+  Eigen::Matrix4d V;                                        // Transformation Matrix
+  V.setIdentity();                                          // Identity to make bottom row 0,0,0,1
+  V.block<3, 3>(0, 0) = R.normalized().toRotationMatrix();;
+  V.block<3, 1>(0, 3) = T;
+
+  Eigen::Matrix4d corners_near;
+  corners_near <<  1,  1, -1, -1, 1, -1, -1,  1, -1, -1, -1, -1, 1,  1,  1,  1;
+  Eigen::Matrix4d p_near = V * P_.inverse() * corners_near;
+
+
+  Eigen::Matrix4d corners_far;
+  corners_far <<  1,  1, -1, -1, 1, -1, -1,  1, 1, 1, 1, 1, 1,  1,  1,  1;
+  Eigen::Matrix4d p_far = V * P_.inverse() * corners_far;
+
+  visualization_msgs::MarkerArray msg_visual;
+
+  double x[] = {0, 0, 0};
+  // Initialize marker message
+  visualization_msgs::Marker marker;
+  visualization_msgs::MarkerArray markers;
+  // Fill in marker properties
+  marker.header.frame_id = "world";
+  marker.header.stamp = ros::Time::now();
+  marker.ns = "";
+  marker.type = visualization_msgs::Marker::LINE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  // With of the line
+  marker.scale.x = 0.01;
+  // Define color
+  marker.color.r = 0;
+  marker.color.g = 0;
+  marker.color.b = 1;
+  marker.color.a = 1.0;
+
+  marker.id = 0;
+
+  // Add near points
+  int n = 4;
+  geometry_msgs::Point p;
+  for (int i = 0; i < n; ++i) {
+    p.x = p_near(0, i) / p_near(3, i);
+    p.y = p_near(1, i) / p_near(3, i);
+    p.z = p_near(2, i) / p_near(3, i);
+    marker.points.push_back(p);
+
+    p.x = p_near(0, (i + 1) % n) / p_near(3, (i + 1) % n);
+    p.y = p_near(1, (i + 1) % n) / p_near(3, (i + 1) % n);
+    p.z = p_near(2, (i + 1) % n) / p_near(3, (i + 1) % n);
+    marker.points.push_back(p);
+  }
+  // Add far points
+  for (int i = 0; i < n; ++i) {
+    p.x = p_far(0, i) / p_far(3, i);
+    p.y = p_far(1, i) / p_far(3, i);
+    p.z = p_far(2, i) / p_far(3, i);
+    marker.points.push_back(p);
+
+    p.x = p_far(0, (i + 1) % n) / p_far(3, (i + 1) % n);
+    p.y = p_far(1, (i + 1) % n) / p_far(3, (i + 1) % n);
+    p.z = p_far(2, (i + 1) % n) / p_far(3, (i + 1) % n);
+    marker.points.push_back(p);
+  }
+  // Add conn points
+  for (int i = 0; i < n; ++i) {
+    p.x = p_far(0, i) / p_far(3, i);
+    p.y = p_far(1, i) / p_far(3, i);
+    p.z = p_far(2, i) / p_far(3, i);
+    marker.points.push_back(p);
+
+    p.x = p_near(0, i) / p_near(3, i);
+    p.y = p_near(1, i) / p_near(3, i);
+    p.z = p_near(2, i) / p_near(3, i);
+    marker.points.push_back(p);
+  }
+
+  // Add arrow for visualization
+  msg_visual.markers.push_back(marker);
+
+  // Publish marker message
+  publisher.publish(msg_visual);
+}
+
 }  // namespace inspection
-
-// GLdouble perspMatrix[16]={    2*fx/W,     0,          0,                       0,
-                              // 2*s/W,      2*fy/H,     0,                       0,
-                              // 2*(cx/W)-1, 2*(cy/H)-1, (zmax+zmin)/(zmax-zmin), 1,
-                              // 0,          0,          2*zmax*zmin/(zmin-zmax), 0};
-
-// GLdouble perspMatrix[16]={    2*fx/w,     0,           0,                     0,
-                              // 0,          2*fy/h,      0,                     0,
-                              // 2*(cx/w)-1, 2*(cy/h)-1, -(far+near)/(far-near),-1,
-                              // 0,          0,          -2*far*near/(far-near), 0};

@@ -56,10 +56,10 @@ Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
   client_o_.Create(nh, SERVICE_MOBILITY_GET_OBSTACLE_MAP);
 
   // Publish debug messages
-  pub_no_filter_ = nh->advertise<visualization_msgs::MarkerArray>("markers/no_filter", 1, true);
-  pub_vis_check_ = nh->advertise<visualization_msgs::MarkerArray>("markers/vis_check", 1, true);
-  pub_zones_check_ = nh->advertise<visualization_msgs::MarkerArray>("markers/zones_check", 1, true);
-  pub_map_check_ = nh->advertise<visualization_msgs::MarkerArray>("markers/map_check", 1, true);
+  pub_targets_ = nh->advertise<visualization_msgs::MarkerArray>(
+    TOPIC_BEHAVIORS_INSPECTION_MARKERS + std::string("/targets"), 1, true);
+  pub_cam_ =
+    nh->advertise<visualization_msgs::MarkerArray>(TOPIC_BEHAVIORS_INSPECTION_MARKERS + std::string("/cams"), 1, true);
 }
 
 void Inspection::readParam() {
@@ -122,6 +122,10 @@ bool Inspection::removeInspectionPose() {
 
 // Get the Inspection point on front of possibilities
 geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
+  // Draw camera frostum
+  cameras_.find(points_[inspection_counter_].header.frame_id)
+        ->second.DrawCameraFrostum(points_[inspection_counter_].poses.front(), pub_cam_);
+
   geometry_msgs::PoseArray result;
   result.header = points_[inspection_counter_].header;
   result.poses.push_back(points_[inspection_counter_].poses.front());
@@ -143,7 +147,8 @@ geometry_msgs::PoseArray Inspection::getNextInspectionPose() {
 
 double Inspection::getDistanceToTarget() {
   if (mode_ == "anomaly") {
-    return cameras_.find("sci_cam")->second.getDistanceFromTarget(goal_.poses[inspection_counter_], depth_cam_,
+    return cameras_.find(points_[inspection_counter_].header.frame_id)
+                          ->second.getDistanceFromTarget(goal_.poses[inspection_counter_], depth_cam_,
                                                                   target_size_x_, target_size_y_);
   } else {
     return -1;
@@ -320,7 +325,7 @@ bool Inspection::ObstaclesConstraint(geometry_msgs::PoseArray &points) {
 
 // Checks the given points agains whether the target is visible
 // from a camera picture
-void Inspection::DrawInspectionPoses(geometry_msgs::PoseArray &points, ros::Publisher &publisher) {
+void Inspection::DrawPoseMarkers(geometry_msgs::PoseArray &points, ros::Publisher &publisher) {
   // ROS_ERROR("Entering PubMapData");
   visualization_msgs::MarkerArray msg_visual;
 
@@ -339,35 +344,49 @@ void Inspection::DrawInspectionPoses(geometry_msgs::PoseArray &points, ros::Publ
   // Arrow width
   marker.scale.y = 0.01;
   // Arrow height
-  marker.scale.z = 0.05;
+  marker.scale.z = 0.01;
 
   for (int i = 0; i < points.poses.size(); ++i) {
-    marker.id = i;
     // Pivot point
     marker.pose.position = points.poses[i].position;
+
     // Poits along the x-axis
+    marker.id =  i * 3;
     marker.pose.orientation = points.poses[i].orientation;
     // Define color
-    // marker.color = IntensityMapColor((float) i / (float) points.size(), 1.0);
-    if (i == 0) {
-      marker.color.r = 0;
-      marker.color.g = 1;
-      marker.color.b = 0;
-      marker.color.a = 1.0;
-    } else if (i == 1) {
-      marker.color.r = 1;
-      marker.color.g = 0;
-      marker.color.b = 0;
-      marker.color.a = 1.0;
-    }
+    marker.color.r = 1;
+    marker.color.g = 0;
+    marker.color.b = 0;
+    marker.color.a = 1.0;
+    // Add arrow for visualization
+    msg_visual.markers.push_back(marker);
+
+    // Poits along the y-axis
+    marker.id =  1 + i * 3;
+    marker.pose.orientation = msg_conversions::eigen_to_ros_quat(
+      msg_conversions::ros_to_eigen_quat(points.poses[i].orientation) * Eigen::Quaterniond(0.707, 0, 0, 0.707));
+    // Define color
+    marker.color.r = 0;
+    marker.color.g = 1;
+    marker.color.b = 0;
+    marker.color.a = 1.0;
+    // Add arrow for visualization
+    msg_visual.markers.push_back(marker);
+
+    // Poits along the z-axis
+    marker.id =  2 + i * 3;
+    marker.pose.orientation = msg_conversions::eigen_to_ros_quat(
+      msg_conversions::ros_to_eigen_quat(points.poses[i].orientation) * Eigen::Quaterniond(0.707, 0, -0.707, 0));
+    // Define color
+    marker.color.r = 0;
+    marker.color.g = 0;
+    marker.color.b = 1;
+    marker.color.a = 1.0;
     // Add arrow for visualization
     msg_visual.markers.push_back(marker);
   }
   // Publish marker message
   publisher.publish(msg_visual);
-}
-
-void Inspection::DrawInspectionFrostum() {
 }
 
 
@@ -376,6 +395,9 @@ bool Inspection::generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
   mode_ = "anomaly";
   inspection_counter_ = -1;
   goal_ = points_anomaly;
+  // Draw pose targets for rviz visualization
+  DrawPoseMarkers(points_anomaly, pub_targets_);
+
   // Update parameters
   readParam();
   // Insert Offset
@@ -391,7 +413,8 @@ bool Inspection::generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
     // Make sure camera is loaded
     std::string cam_name = points_anomaly.header.frame_id.c_str();
     if (cameras_.find(cam_name) == cameras_.end())
-      cameras_.emplace(cam_name, cam_name);
+      cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
+                       std::make_tuple(cam_name, max_distance_, min_distance_));
 
     // Generate Sorted list of inspection candidates for this target
     GenerateSortedList(points_[i]);
@@ -430,6 +453,9 @@ bool Inspection::generateGeometrySurvey(geometry_msgs::PoseArray &points_geometr
   mode_ = "geometry";
   inspection_counter_ = -1;
   goal_ = points_geometry;
+  // Draw pose targets for rviz visualization
+  DrawPoseMarkers(points_geometry, pub_targets_);
+
   points_.clear();
 
   geometry_msgs::PoseArray pose;
@@ -447,6 +473,8 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   mode_ = "panorama";
   inspection_counter_ = -1;
   goal_ = points_panorama;
+  // Draw pose targets for rviz visualization
+  DrawPoseMarkers(points_panorama, pub_targets_);
   points_.clear();
   // Update parameters
   readParam();
@@ -454,8 +482,8 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   // Make sure camera is loaded
   std::string cam_name = points_panorama.header.frame_id.c_str();
   if (cameras_.find(cam_name) == cameras_.end())
-    cameras_.emplace(cam_name, cam_name);
-
+    cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
+                     std::make_tuple(cam_name, max_distance_, min_distance_));
 
   geometry_msgs::PoseArray panorama_relative;
   geometry_msgs::PoseArray panorama_transformed;
@@ -515,6 +543,8 @@ bool Inspection::generateVolumetricSurvey(geometry_msgs::PoseArray &points_volum
   mode_ = "volumetric";
   inspection_counter_ = -1;
   goal_ = points_volume;
+  // Draw pose targets for rviz visualization
+  DrawPoseMarkers(points_volume, pub_targets_);
   points_.clear();
 
   geometry_msgs::PoseArray pose;

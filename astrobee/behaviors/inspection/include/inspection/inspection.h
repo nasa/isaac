@@ -85,7 +85,7 @@ namespace inspection {
 class CameraView {
  public:
   // Constructor
-  explicit CameraView(std::string cam_name);
+  explicit CameraView(std::string cam_name, float f = 1.0, float n = 0.19);
 
   Eigen::Matrix4d getProjectionMatrix();
   double getHFOV();
@@ -104,7 +104,12 @@ class CameraView {
   double getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
                                 double size_x, double size_y);
   double getDistanceFromCenter(std::string depth_cam_name);
+
+  void DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher);
+
   bool debug_ = false;
+  float f_;
+  float n_;
 
  protected:
   bool setProjectionMatrix(Eigen::Matrix3d cam_mat);
@@ -116,8 +121,6 @@ class CameraView {
   int W_, H_;
   float fx_, fy_;
   Eigen::Matrix4d P_;
-  const float max_distance_ = 2.0;
-  const float min_distance_ = 0.2;
 
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -183,10 +186,10 @@ class Inspection {
                       tf2::Transform target_transform);
 
   // Draws the possible inspection poses
-  void DrawInspectionPoses(geometry_msgs::PoseArray &points,
+  void DrawPoseMarkers(geometry_msgs::PoseArray &points,
                             ros::Publisher &publisher);
   // Draws visibility frostum projection
-  void DrawInspectionFrostum();
+  void DrawCameraFrostum();
 
   // This function generates a sorted list based on the max viewing angle and resolution
   bool GenerateSortedList(geometry_msgs::PoseArray &points);
@@ -237,10 +240,8 @@ class Inspection {
   double overlap_;
 
   // Publish Markers
-  ros::Publisher pub_no_filter_;
-  ros::Publisher pub_vis_check_;
-  ros::Publisher pub_zones_check_;
-  ros::Publisher pub_map_check_;
+  ros::Publisher pub_targets_;
+  ros::Publisher pub_cam_;
 };
 
 
