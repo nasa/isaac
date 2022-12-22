@@ -121,35 +121,29 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // [2]
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       DOCK_SUCCESS | MOTION_SUCCESS | NEXT_INSPECT, [this](FSM::Event const& event) -> FSM::State {
-        // Increment the counter
-        goal_counter_++;
+        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 00");
         // Check if there is more to inspect
-        if (goal_counter_ >= goal_.inspect_poses.poses.size()) {
+        if (!inspection_->nextInspectionPose()) {
           // Inspection is over, return
           Result(RESPONSE::SUCCESS, "Inspection Over");
           return STATE::WAITING;
         }
 
         switch (goal_.command) {
-        // Anomaly command
+        // Anomaly, Geometry or Panorama command
         case isaac_msgs::InspectionGoal::ANOMALY:
-          // if (inspection_->GenerateAnomalySurvey(goal_.inspect_poses.poses[goal_counter_])) {
-          //   MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetNextInspectionPose());
-          //   return STATE::MOVING_TO_APPROACH_POSE;
-          // } else {
-          //   Result(RESPONSE::MOTION_APPROACH_FAILED);
-          //   return STATE::WAITING;
-          // }
-        // Geometry or Panorama command
         case isaac_msgs::InspectionGoal::GEOMETRY:
         case isaac_msgs::InspectionGoal::PANORAMA:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getNextInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
+        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 01");
           return STATE::VISUAL_INSPECTION;
         // Volumetric command
         case isaac_msgs::InspectionGoal::VOLUMETRIC:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getNextInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
+        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 02");
           return STATE::MOVING_TO_APPROACH_POSE;
         }
+        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 03");
         return STATE::WAITING;
       });
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
@@ -203,6 +197,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         case STATE::VISUAL_INSPECTION:
           break;
         }
+        // If in motion make sure you redo current pose
+        inspection_->redoInspectionPose();
+
         // After cancellations, wait
         return STATE::WAITING;
       });
@@ -579,9 +576,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Skip command
       case isaac_msgs::InspectionGoal::SKIP:
       {
-        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size() - 1) {
+        if (inspection_->nextInspectionPose()) {
           // Skip the current pose
-          goal_counter_++;
           result.fsm_result = "Skipped pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
@@ -597,10 +593,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Repeat last executed step command
       case isaac_msgs::InspectionGoal::REPEAT:
       {
-        if (!goal_.inspect_poses.poses.empty() && goal_counter_ > 0) {
-          // Go back to the last pose
-          goal_counter_--;
-
+        if (inspection_->redoInspectionPose()) {
           result.fsm_result = "Will repeat last pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
@@ -615,18 +608,19 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       }
       // Save command
       case isaac_msgs::InspectionGoal::SAVE:
-        if (!goal_.inspect_poses.poses.empty() && goal_counter_ < goal_.inspect_poses.poses.size()) {
+        geometry_msgs::PoseArray poses = inspection_->getInspectionPoses();
+        if (!poses.poses.empty()) {
           std::ofstream myfile;
           std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
           myfile.open(path);
-          for (int i = goal_counter_; i < goal_.inspect_poses.poses.size(); i++) {
-            myfile << goal_.inspect_poses.poses[i].position.x << " "
-                   << goal_.inspect_poses.poses[i].position.y << " "
-                   << goal_.inspect_poses.poses[i].position.z << " "
-                   << goal_.inspect_poses.poses[i].orientation.x << " "
-                   << goal_.inspect_poses.poses[i].orientation.y << " "
-                   << goal_.inspect_poses.poses[i].orientation.z << " "
-                   << goal_.inspect_poses.poses[i].orientation.w << "\n";
+          for (int i = 0; i < poses.poses.size(); i++) {
+            myfile << poses.poses[i].position.x << " "
+                   << poses.poses[i].position.y << " "
+                   << poses.poses[i].position.z << " "
+                   << poses.poses[i].orientation.x << " "
+                   << poses.poses[i].orientation.y << " "
+                   << poses.poses[i].orientation.z << " "
+                   << poses.poses[i].orientation.w << "\n";
           }
           myfile.close();
           result.fsm_result = "Saved";
@@ -648,7 +642,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     result_.anomaly_result.clear();
     result_.inspection_result.clear();
     result_.picture_time.clear();
-    goal_counter_ = -1;
     ROS_DEBUG_STREAM("RESET COUNTER");
 
     // Check if there is at least one valid inspection pose
@@ -824,7 +817,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   ros::ServiceServer server_set_state_;
   ros::Timer sci_cam_timeout_;
   isaac_msgs::InspectionGoal goal_;
-  int goal_counter_= -1;
   std::string m_fsm_subevent_, m_fsm_substate_;
   std::string d_fsm_subevent_, d_fsm_substate_;
   std::string i_fsm_substate_;

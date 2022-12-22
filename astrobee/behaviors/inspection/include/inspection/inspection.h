@@ -153,8 +153,9 @@ class Inspection {
   bool removeInspectionPose();
   // Get te head of the inspection poses segment
   geometry_msgs::PoseArray getCurrentInspectionPose();
-  geometry_msgs::PoseArray getNextInspectionPose();
-  geometry_msgs::PoseArray getAlternateInspectionPose();
+  bool nextInspectionPose();
+  bool redoInspectionPose();
+  geometry_msgs::PoseArray getInspectionPoses();
 
   // Get distance from camera to target
   double getDistanceToTarget();
@@ -210,6 +211,7 @@ class Inspection {
   tf2::Quaternion target_to_cam_rot_;
 
   // Camera Projection functions
+  std::string curr_camera_;
   std::map<std::string, CameraView> cameras_;
 
   // Parameter clients

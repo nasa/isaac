@@ -90,13 +90,12 @@ void Inspection::readParam() {
   }
 
   // Parameters Panorama survey
-  auto_fov_ = cfg_->Get<bool>("auto_fov");
+  h_fov_    = cfg_->Get<double>("h_fov")    * M_PI  / 180.0;
+  v_fov_    = cfg_->Get<double>("v_fov")    * M_PI  / 180.0;
   pan_min_  = cfg_->Get<double>("pan_min")  * M_PI  / 180.0;
   pan_max_  = cfg_->Get<double>("pan_max")  * M_PI  / 180.0;
   tilt_min_ = cfg_->Get<double>("tilt_min") * M_PI  / 180.0;
   tilt_max_ = cfg_->Get<double>("tilt_max") * M_PI  / 180.0;
-  h_fov_    = cfg_->Get<double>("h_fov")    * M_PI  / 180.0;
-  v_fov_    = cfg_->Get<double>("v_fov")    * M_PI  / 180.0;
   att_tol_  = cfg_->Get<double>("att_tol")  * M_PI  / 180.0;
   overlap_  = cfg_->Get<double>("overlap");
 }
@@ -122,10 +121,13 @@ bool Inspection::removeInspectionPose() {
 
 // Get the Inspection point on front of possibilities
 geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
+        ROS_ERROR_STREAM("getCurrentInspectionPose machine 00" << curr_camera_);
   // Draw camera frostum
-  cameras_.find(points_[inspection_counter_].header.frame_id)
+  if (cameras_.find(curr_camera_) == cameras_.end())
+    cameras_.find(points_[inspection_counter_].header.frame_id)
         ->second.DrawCameraFrostum(points_[inspection_counter_].poses.front(), pub_cam_);
 
+        ROS_ERROR_STREAM("getCurrentInspectionPose machine 01");
   geometry_msgs::PoseArray result;
   result.header = points_[inspection_counter_].header;
   result.poses.push_back(points_[inspection_counter_].poses.front());
@@ -136,23 +138,46 @@ geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
                                   << " y:" << result.poses.front().orientation.y
                                   << " z:" << result.poses.front().orientation.z
                                   << " w:" << result.poses.front().orientation.w);
+        ROS_ERROR_STREAM("getCurrentInspectionPose machine 02");
   return result;
 }
 
-// Get the Inspection point on front of possibilities
-geometry_msgs::PoseArray Inspection::getNextInspectionPose() {
+// Skip pose
+bool Inspection::nextInspectionPose() {
+        ROS_ERROR_STREAM("nextInspectionPose size " << points_.size());
   inspection_counter_ += 1;
-  return getCurrentInspectionPose();
+  if (inspection_counter_ < points_.size())
+    return true;
+  else
+    return false;
+}
+// Redo pose
+bool Inspection::redoInspectionPose() {
+  inspection_counter_ -= 1;
+  if (inspection_counter_ < 0)
+    return false;
+  else
+    return true;
+}
+// Get poses
+geometry_msgs::PoseArray Inspection::getInspectionPoses() {
+  geometry_msgs::PoseArray result;
+  result.header = points_.front().header;
+  for (int i = inspection_counter_; i < points_.size(); ++i) {
+    result.poses.push_back(points_[i].poses.front());
+  }
+  return result;
 }
 
 double Inspection::getDistanceToTarget() {
   if (mode_ == "anomaly") {
-    return cameras_.find(points_[inspection_counter_].header.frame_id)
-                          ->second.getDistanceFromTarget(goal_.poses[inspection_counter_], depth_cam_,
-                                                                  target_size_x_, target_size_y_);
-  } else {
-    return -1;
-  }
+    if (cameras_.find(curr_camera_) == cameras_.end()) {
+      return cameras_.find(curr_camera_)->second.getDistanceFromTarget(goal_.poses[inspection_counter_],
+                                                              depth_cam_, target_size_x_, target_size_y_);
+
+    }
+  } 
+  return -1;
 }
 
 // Checks the given points agains whether the target is visible
@@ -329,7 +354,6 @@ void Inspection::DrawPoseMarkers(geometry_msgs::PoseArray &points, ros::Publishe
   // ROS_ERROR("Entering PubMapData");
   visualization_msgs::MarkerArray msg_visual;
 
-  double x[] = {0, 0, 0};
   // Initialize marker message
   visualization_msgs::Marker marker;
   visualization_msgs::MarkerArray markers;
@@ -408,10 +432,11 @@ bool Inspection::generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
     // Create the sorted point segment
     points_.clear();
     points_.push_back(geometry_msgs::PoseArray());
-    points_[i].header.frame_id = "sci_cam";
+    points_[i].header.frame_id = points_anomaly.header.frame_id;
 
     // Make sure camera is loaded
     std::string cam_name = points_anomaly.header.frame_id.c_str();
+    curr_camera_ = cam_name.c_str();
     if (cameras_.find(cam_name) == cameras_.end())
       cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
                        std::make_tuple(cam_name, max_distance_, min_distance_));
@@ -481,6 +506,7 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 
   // Make sure camera is loaded
   std::string cam_name = points_panorama.header.frame_id.c_str();
+  curr_camera_ = cam_name.c_str();
   if (cameras_.find(cam_name) == cameras_.end())
     cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
                      std::make_tuple(cam_name, max_distance_, min_distance_));
@@ -498,13 +524,8 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 
   // Calculate fields of view
   float h_fov, v_fov;
-  if (auto_fov_) {
-    h_fov = cameras_.find(cam_name)->second.getHFOV();
-    v_fov = cameras_.find(cam_name)->second.getVFOV();
-  } else {
-    h_fov = h_fov_;
-    v_fov = v_fov_;
-  }
+  h_fov = (h_fov_ < 0) ? cameras_.find(cam_name)->second.getHFOV() : h_fov_;
+  v_fov = (v_fov_ < 0) ? cameras_.find(cam_name)->second.getVFOV() : v_fov_;
 
   int nrows, ncols;
   std::vector<PanoAttitude> orientations;
@@ -512,29 +533,35 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   // pano_orientations() doesn't support panos with non-zero center (not needed)
   assert(pan_min_ == -pan_max_);
   assert(tilt_min_ == -tilt_max_);
-  double attitude_tolerance = 0;  // dummy, discuss this later
 
+  ROS_ERROR_STREAM("starting GeneratePanoOrientations " << tilt_max_ << " " << pan_max_ << " "  << h_fov << " " << v_fov << " " 
+                    << overlap_ << " " << att_tol_);
   // Generate coverage pattern pan/tilt values
   GeneratePanoOrientations(&orientations, &nrows, &ncols,
                     tilt_max_, pan_max_,
                     h_fov, v_fov,
                     overlap_, att_tol_);
+  ROS_ERROR_STREAM("finished GeneratePanoOrientations00");
 
-  for (const auto& orient : orientations) {
-    ROS_DEBUG_STREAM("pan:" << orient.pan * 180 / M_PI << " tilt:" << orient.tilt * 180 / M_PI);
-    panorama_rotation.setRPY(0, orient.tilt, orient.pan);
-    panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
-    point.orientation = msg_conversions::tf2_quat_to_ros_quat(panorama_rotation);
-    panorama_relative.poses.push_back(point);
-  }
 
   // Go through all the panorama center locations
+  panorama_relative.poses.resize(1);
   for (int i = 0; i < points_panorama.poses.size(); ++i) {
-    // Transform the points from the camera reference frame to the robot body
-    tf2::Transform panorama_pose = msg_conversions::ros_pose_to_tf2_transform(points_panorama.poses[i]);
-    TransformList(panorama_relative, panorama_transformed, panorama_pose);
-    points_.push_back(panorama_transformed);
+    for (const auto& orient : orientations) {
+      ROS_DEBUG_STREAM("pan:" << orient.pan * 180 / M_PI << " tilt:" << orient.tilt * 180 / M_PI);
+      panorama_rotation.setRPY(0, orient.tilt, orient.pan);
+      panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
+      point.orientation = msg_conversions::tf2_quat_to_ros_quat(panorama_rotation);
+      panorama_relative.poses[0] = point;
+
+      // Transform the points from the camera reference frame to the robot body
+      tf2::Transform panorama_pose = msg_conversions::ros_pose_to_tf2_transform(points_panorama.poses[i]);
+      TransformList(panorama_relative, panorama_transformed, panorama_pose);
+      points_.push_back(panorama_transformed);
+    }
   }
+
+  ROS_ERROR_STREAM("GeneratePanoOrientations size " << points_.size());
   return true;
 }
 
