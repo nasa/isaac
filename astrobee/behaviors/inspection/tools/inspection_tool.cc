@@ -120,15 +120,17 @@ bool has_only_whitespace_or_comments(const std::string & str) {
 }
 
 // Read inspection poses from given files
-bool ReadPanoramaConfig(double *pan_radius_degrees, double *tilt_rad_deg, double *h_fov_deg, double *v_fov_deg, double *overlap, double *plan_att_tol_deg) {
+bool ReadPanoramaConfig(double* pan_radius_degrees, double* tilt_rad_deg, double* h_fov_deg, double* v_fov_deg,
+                        double* overlap, double* plan_att_tol_deg) {
   std::ifstream ifs(std::string(ros::package::getPath("inspection") + "/resources/pano_test_cases.csv").c_str());
 
   // Check if file exists
   if (!ifs.is_open()) {
-    std::cout << "Could not open file: " << ros::package::getPath("inspection") + "/resources/pano_test_cases.csv" << std::endl;
+    std::cout << "Could not open file: " << ros::package::getPath("inspection") + "/resources/pano_test_cases.csv"
+              << std::endl;
     return false;
   }
-    
+
   std::string line;
   std::string label;
   double test_att_tol_deg;
@@ -138,7 +140,8 @@ bool ReadPanoramaConfig(double *pan_radius_degrees, double *tilt_rad_deg, double
     line.erase(std::remove(line.begin(), line.end(), '"'), line.end());
 
     std::istringstream is(line);
-    if ((is >> label >> *pan_radius_degrees >> *tilt_rad_deg >> *h_fov_deg >> *v_fov_deg >> *overlap >> *plan_att_tol_deg  >> test_att_tol_deg)) {
+    if ((is >> label >> *pan_radius_degrees >> *tilt_rad_deg >> *h_fov_deg >> *v_fov_deg >> *overlap >>
+         *plan_att_tol_deg >> test_att_tol_deg)) {
       if (FLAGS_panorama_mode == label) {
         return true;
       }
@@ -149,7 +152,6 @@ bool ReadPanoramaConfig(double *pan_radius_degrees, double *tilt_rad_deg, double
   }
   std::cout << "Could not find panorama_mode specified"  << std::endl;
   return false;
-
 }
 
 // Read inspection poses from given files

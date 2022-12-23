@@ -121,13 +121,11 @@ bool Inspection::removeInspectionPose() {
 
 // Get the Inspection point on front of possibilities
 geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
-        ROS_ERROR_STREAM("getCurrentInspectionPose machine 00" << curr_camera_);
   // Draw camera frostum
-  if (cameras_.find(curr_camera_) == cameras_.end())
-    cameras_.find(points_[inspection_counter_].header.frame_id)
-        ->second.DrawCameraFrostum(points_[inspection_counter_].poses.front(), pub_cam_);
+  if (cameras_.find(curr_camera_) != cameras_.end()) {
+    cameras_.find(curr_camera_)->second.DrawCameraFrostum(points_[inspection_counter_].poses.front(), pub_cam_);
+  }
 
-        ROS_ERROR_STREAM("getCurrentInspectionPose machine 01");
   geometry_msgs::PoseArray result;
   result.header = points_[inspection_counter_].header;
   result.poses.push_back(points_[inspection_counter_].poses.front());
@@ -138,13 +136,11 @@ geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
                                   << " y:" << result.poses.front().orientation.y
                                   << " z:" << result.poses.front().orientation.z
                                   << " w:" << result.poses.front().orientation.w);
-        ROS_ERROR_STREAM("getCurrentInspectionPose machine 02");
   return result;
 }
 
 // Skip pose
 bool Inspection::nextInspectionPose() {
-        ROS_ERROR_STREAM("nextInspectionPose size " << points_.size());
   inspection_counter_ += 1;
   if (inspection_counter_ < points_.size())
     return true;
@@ -163,7 +159,7 @@ bool Inspection::redoInspectionPose() {
 geometry_msgs::PoseArray Inspection::getInspectionPoses() {
   geometry_msgs::PoseArray result;
   result.header = points_.front().header;
-  for (int i = inspection_counter_; i < points_.size(); ++i) {
+  for (int i = inspection_counter_ + 1; i < points_.size(); ++i) {
     result.poses.push_back(points_[i].poses.front());
   }
   return result;
@@ -174,9 +170,8 @@ double Inspection::getDistanceToTarget() {
     if (cameras_.find(curr_camera_) == cameras_.end()) {
       return cameras_.find(curr_camera_)->second.getDistanceFromTarget(goal_.poses[inspection_counter_],
                                                               depth_cam_, target_size_x_, target_size_y_);
-
     }
-  } 
+  }
   return -1;
 }
 
@@ -534,15 +529,11 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   assert(pan_min_ == -pan_max_);
   assert(tilt_min_ == -tilt_max_);
 
-  ROS_ERROR_STREAM("starting GeneratePanoOrientations " << tilt_max_ << " " << pan_max_ << " "  << h_fov << " " << v_fov << " " 
-                    << overlap_ << " " << att_tol_);
   // Generate coverage pattern pan/tilt values
   GeneratePanoOrientations(&orientations, &nrows, &ncols,
-                    tilt_max_, pan_max_,
+                    pan_max_, tilt_max_,
                     h_fov, v_fov,
                     overlap_, att_tol_);
-  ROS_ERROR_STREAM("finished GeneratePanoOrientations00");
-
 
   // Go through all the panorama center locations
   panorama_relative.poses.resize(1);
@@ -560,8 +551,6 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
       points_.push_back(panorama_transformed);
     }
   }
-
-  ROS_ERROR_STREAM("GeneratePanoOrientations size " << points_.size());
   return true;
 }
 

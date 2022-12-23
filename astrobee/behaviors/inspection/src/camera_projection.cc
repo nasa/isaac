@@ -376,7 +376,6 @@ void CameraView::DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Pu
 
   visualization_msgs::MarkerArray msg_visual;
 
-  double x[] = {0, 0, 0};
   // Initialize marker message
   visualization_msgs::Marker marker;
   visualization_msgs::MarkerArray markers;

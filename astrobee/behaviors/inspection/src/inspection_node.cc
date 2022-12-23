@@ -121,7 +121,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // [2]
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       DOCK_SUCCESS | MOTION_SUCCESS | NEXT_INSPECT, [this](FSM::Event const& event) -> FSM::State {
-        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 00");
         // Check if there is more to inspect
         if (!inspection_->nextInspectionPose()) {
           // Inspection is over, return
@@ -135,15 +134,12 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         case isaac_msgs::InspectionGoal::GEOMETRY:
         case isaac_msgs::InspectionGoal::PANORAMA:
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
-        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 01");
           return STATE::VISUAL_INSPECTION;
         // Volumetric command
         case isaac_msgs::InspectionGoal::VOLUMETRIC:
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
-        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 02");
           return STATE::MOVING_TO_APPROACH_POSE;
         }
-        ROS_ERROR_STREAM("MOVING_TO_APPROACH_POSE machine 03");
         return STATE::WAITING;
       });
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
@@ -187,18 +183,17 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           break;
         // Motion in progress
         case STATE::MOVING_TO_APPROACH_POSE:
+        // Visual Inspection in progress
+        case STATE::VISUAL_INSPECTION:
+          // If in motion make sure you redo current pose
+          inspection_->redoInspectionPose();
           client_m_.CancelGoal();
           break;
         case STATE::RETURN_INSPECTION:
           client_m_.CancelGoal();
           client_d_.CancelGoal();
           break;
-        // Visual Inspection in progress
-        case STATE::VISUAL_INSPECTION:
-          break;
         }
-        // If in motion make sure you redo current pose
-        inspection_->redoInspectionPose();
 
         // After cancellations, wait
         return STATE::WAITING;
@@ -614,13 +609,19 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
           myfile.open(path);
           for (int i = 0; i < poses.poses.size(); i++) {
+            // Convert quat to RPY for readability
+            tf2::Quaternion q;
+            tf2::fromMsg(poses.poses[i].orientation, q);
+            tf2::Matrix3x3 m(q);
+            double roll, pitch, yaw;
+            m.getRPY(roll, pitch, yaw);
+
             myfile << poses.poses[i].position.x << " "
                    << poses.poses[i].position.y << " "
                    << poses.poses[i].position.z << " "
-                   << poses.poses[i].orientation.x << " "
-                   << poses.poses[i].orientation.y << " "
-                   << poses.poses[i].orientation.z << " "
-                   << poses.poses[i].orientation.w << "\n";
+                   << roll  * 180.0 / M_PI  << " "
+                   << pitch * 180.0 / M_PI  << " "
+                   << yaw   * 180.0 / M_PI << "\n";
           }
           myfile.close();
           result.fsm_result = "Saved";
