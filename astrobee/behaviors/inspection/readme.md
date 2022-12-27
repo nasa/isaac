@@ -28,11 +28,14 @@ Inspection coordination:
 Inspection modes:
 
 
-*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.
+*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. Target reference frames are defined as the z-axis pointing outwards to where the camera would be, x-axis is along the picture width and the y-axis is along the picture height, like so:
+
+![Target reference frame](/doc/images/ref_frame_anomaly.png)
+
 
 *geometry*: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.
 
-*panorama*: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see \sub page pano_coverage.
+*panorama*: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page \subpage pano_coverage.
 
 *volumetric*: This will perform a volumetric survey
 
