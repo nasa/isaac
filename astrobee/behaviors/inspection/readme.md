@@ -2,8 +2,8 @@
 
 This directory provides two tools: inspection_tool and sci_cam_tool.
 
-Using the inspection tool
----------
+### Using the inspection tool
+
 
 This tool is used to initiate inspection actions. To run the tool:
 	
@@ -39,8 +39,7 @@ Inspection modes:
 
 *volumetric*: This will perform a volumetric survey
 
-Using sci_cam_tool
----------
+### Using sci_cam_tool
 
 This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:
 
@@ -68,8 +67,7 @@ They will also show up in the sci cam window in RVIZ.
 
 If requests to take a single picture come at a high rate, some of them will be dropped.
 
-Using export panorama tool
----------
+### Using export panorama tool
 
 This tool was created to allow for panorama surveys to be created and exported. This is useful to make panorama plans beforehand to ensure reproduceability.
 
