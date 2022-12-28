@@ -1,5 +1,6 @@
 # ROS
 *.bag
+.catkin_tools/*
 
 # Fortran module files
 *.mod
