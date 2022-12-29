@@ -87,23 +87,22 @@ class CameraView {
   // Constructor
   explicit CameraView(std::string cam_name, float f = 1.0, float n = 0.19);
 
-  Eigen::Matrix4d getProjectionMatrix();
-  double getHFOV();
-  double getVFOV();
+  Eigen::Matrix4d GetProjectionMatrix();
+  double GetHFOV();
+  double GetVFOV();
 
-  double getH();
-  double getW();
+  double GetH();
+  double GetW();
 
   // Gets the points x y where the point is in the image. If outside the image, then it will return false
   // If the robot pose is not specified, it's considered to be the current one
-  bool getCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &x, int &y);
-  bool getCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
+  bool GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &x, int &y);
+  bool GetCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
 
-  bool getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y, geometry_msgs::Point &point);
+  bool GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y, geometry_msgs::Point &point);
 
-  double getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
+  double GetDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
                                 double size_x, double size_y);
-  double getDistanceFromCenter(std::string depth_cam_name);
 
   void DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher);
 
@@ -112,7 +111,7 @@ class CameraView {
   float n_;
 
  protected:
-  bool setProjectionMatrix(Eigen::Matrix3d cam_mat);
+  bool SetProjectionMatrix(Eigen::Matrix3d cam_mat);
   bool InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, int test_x, int test_y);
 
  private:
@@ -137,9 +136,9 @@ class CameraView {
   * Keepout and Keepin zones
   * Obstacle map
 
-  It returns a vector of inspection poses. In the case of an anomaly inspection
-  in case the move action fails due to planning or unmapped obstacle, it
-  saves the sorted alternatives such that no replanning isn't necessary.
+  It returns a vector of inspection poses. "In the case of an anomaly inspection,
+  if the move action fails due to planning or an unmapped obstacle, it saves the
+  sorted alternatives such that replanning isn't necessary.
   It also constains functions that allow inspection visualization.
 */
 class Inspection {
@@ -147,24 +146,24 @@ class Inspection {
   // Constructor
   Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg);
   // Read parameters from config server
-  void readParam();
+  void ReadParam();
 
   // Remove head of segment if planing failed
-  bool removeInspectionPose();
+  bool RemoveInspectionPose();
   // Get te head of the inspection poses segment
-  geometry_msgs::PoseArray getCurrentInspectionPose();
-  bool nextInspectionPose();
-  bool redoInspectionPose();
-  geometry_msgs::PoseArray getInspectionPoses();
+  geometry_msgs::PoseArray GetCurrentInspectionPose();
+  bool NextInspectionPose();
+  bool RedoInspectionPose();
+  geometry_msgs::PoseArray GetInspectionPoses();
 
   // Get distance from camera to target
-  double getDistanceToTarget();
+  double GetDistanceToTarget();
 
   // Generate the supported inspection methods
-  bool generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly);
-  bool generateGeometrySurvey(geometry_msgs::PoseArray &points_geometry);
-  bool generatePanoramaSurvey(geometry_msgs::PoseArray &points_panorama);
-  bool generateVolumetricSurvey(geometry_msgs::PoseArray &points_volume);
+  bool GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly);
+  bool GenerateGeometrySurvey(geometry_msgs::PoseArray &points_geometry);
+  bool GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama);
+  bool GenerateVolumetricSurvey(geometry_msgs::PoseArray &points_volume);
 
  protected:
   // Ensure all clients are connected
@@ -245,17 +244,6 @@ class Inspection {
   ros::Publisher pub_targets_;
   ros::Publisher pub_cam_;
 };
-
-
-// class CameraView {
-//   CameraView(std::string cam_name);
-  bool getProjectionMatrix();
-  bool PositionToXY(geometry_msgs::Pose point, int &x, int &y);
-  // private:
-  bool setProjectionMatrix();
-
-
-// }
 
 
 }  // namespace inspection

@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
   ReadFile(path_inspection + FLAGS_panorama_poses, goal);
 
   // ROS_ERROR("Generate Panorama");
-  inspection_.generatePanoramaSurvey(goal.inspect_poses);
+  inspection_.GeneratePanoramaSurvey(goal.inspect_poses);
 
   // Write in file
   std::ofstream myfile;

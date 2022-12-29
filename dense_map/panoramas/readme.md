@@ -9,7 +9,7 @@ To run the tool:
 
 	rosrun inspection stitch_panorama.py -bag_name $BAG_NAME -work_dir $SCI_CAM_DIR
 
-where $BAG_NAME is the bagfile which the script uses to identify which sci_cam images to use and initializes the attitude in the hugin file accordig to localization data. The $SCI_CAM_DIR is he folder location to the sci_cam images copied from the HLP.
+where $BAG_NAME is the bagfile which the script uses to identify which sci_cam images to use and initializes the attitude in the hugin file accordig to localization data. The $SCI_CAM_DIR is the folder location to the sci_cam images copied from the HLP.
 
 Other optional arguments are:
 
