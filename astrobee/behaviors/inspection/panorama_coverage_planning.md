@@ -48,8 +48,8 @@ at +/-90 degrees (Fig. 1).
 | Figure 1: Image warping. Note that the red image FOV farther from tilt=0 is more warped than the green image FOV. |
 
 The primary effect of the warping is to make the effective image
-coverage wider nearer the poles. We take advantage of this effect by
-reducing the number of images in grid rows nearer the poles. A downside
+coverage wider near the poles. We take advantage of this effect by
+reducing the number of images in grid rows near the poles. A downside
 of reducing the image count is that the images no longer form a grid, so
 the column-major raster sequencing is only approximate (Fig. 2).
 

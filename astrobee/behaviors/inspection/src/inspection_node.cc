@@ -122,7 +122,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       DOCK_SUCCESS | MOTION_SUCCESS | NEXT_INSPECT, [this](FSM::Event const& event) -> FSM::State {
         // Check if there is more to inspect
-        if (!inspection_->nextInspectionPose()) {
+        if (!inspection_->NextInspectionPose()) {
           // Inspection is over, return
           Result(RESPONSE::SUCCESS, "Inspection Over");
           return STATE::WAITING;
@@ -133,11 +133,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         case isaac_msgs::InspectionGoal::ANOMALY:
         case isaac_msgs::InspectionGoal::GEOMETRY:
         case isaac_msgs::InspectionGoal::PANORAMA:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
           return STATE::VISUAL_INSPECTION;
         // Volumetric command
         case isaac_msgs::InspectionGoal::VOLUMETRIC:
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
           return STATE::MOVING_TO_APPROACH_POSE;
         }
         return STATE::WAITING;
@@ -186,7 +186,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         // Visual Inspection in progress
         case STATE::VISUAL_INSPECTION:
           // If in motion make sure you redo current pose
-          inspection_->redoInspectionPose();
+          inspection_->RedoInspectionPose();
           client_m_.CancelGoal();
           break;
         case STATE::RETURN_INSPECTION:
@@ -390,8 +390,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
       {
         // Try to find an alternate inspection position
-        if (inspection_->removeInspectionPose()) {
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
+        if (inspection_->RemoveInspectionPose()) {
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
           return;
         } else {
           ROS_ERROR_STREAM("No alternative inspection pose possible for current station");
@@ -405,7 +405,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       {  // If it fails because of a motion error, retry
         if (motion_retry_number_ < max_motion_retry_number_) {
           motion_retry_number_++;
-          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->getCurrentInspectionPose());
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
         }
       }
     }
@@ -466,7 +466,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
-    double focus_distance = inspection_->getDistanceToTarget();
+    double focus_distance = inspection_->GetDistanceToTarget();
     ROS_DEBUG_STREAM("DISTANCE TO TARGET: " << focus_distance);
 
     // Signal an imminent sci cam image
@@ -571,7 +571,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Skip command
       case isaac_msgs::InspectionGoal::SKIP:
       {
-        if (inspection_->nextInspectionPose()) {
+        if (inspection_->NextInspectionPose()) {
           // Skip the current pose
           result.fsm_result = "Skipped pose";
           result.response = RESPONSE::SUCCESS;
@@ -588,7 +588,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Repeat last executed step command
       case isaac_msgs::InspectionGoal::REPEAT:
       {
-        if (inspection_->redoInspectionPose()) {
+        if (inspection_->RedoInspectionPose()) {
           result.fsm_result = "Will repeat last pose";
           result.response = RESPONSE::SUCCESS;
           server_.SendResult(ff_util::FreeFlyerActionState::SUCCESS, result);
@@ -603,7 +603,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       }
       // Save command
       case isaac_msgs::InspectionGoal::SAVE:
-        geometry_msgs::PoseArray poses = inspection_->getInspectionPoses();
+        geometry_msgs::PoseArray poses = inspection_->GetInspectionPoses();
         if (!poses.poses.empty()) {
           std::ofstream myfile;
           std::string path = ros::package::getPath("inspection") + "/resources/current.txt";
@@ -658,25 +658,25 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Vent command
     case isaac_msgs::InspectionGoal::ANOMALY:
       NODELET_DEBUG("Received Goal Anomaly");
-      if (inspection_->generateAnomalySurvey(goal_.inspect_poses))
+      if (inspection_->GenerateAnomalySurvey(goal_.inspect_poses))
         return fsm_.Update(GOAL_INSPECT);
       break;
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_DEBUG("Received Goal Geometry");
-      if (inspection_->generateGeometrySurvey(goal_.inspect_poses))
+      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses))
         return fsm_.Update(GOAL_INSPECT);
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
       NODELET_DEBUG("Received Goal Panorama");
-      if (inspection_->generatePanoramaSurvey(goal_.inspect_poses))
+      if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses))
         return fsm_.Update(GOAL_INSPECT);
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:
       NODELET_DEBUG("Received Goal Volumetric");
-      if (inspection_->generateVolumetricSurvey(goal_.inspect_poses))
+      if (inspection_->GenerateVolumetricSurvey(goal_.inspect_poses))
         return fsm_.Update(GOAL_INSPECT);
       break;
     // Invalid command
@@ -712,7 +712,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // Callback to handle reconfiguration requests
   bool ReconfigureCallback(dynamic_reconfigure::Config & config) {
     if (cfg_.Reconfigure(config)) {
-      inspection_->readParam();
+      inspection_->ReadParam();
       return true;
     }
     return false;

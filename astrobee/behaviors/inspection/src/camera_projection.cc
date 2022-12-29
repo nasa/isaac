@@ -69,36 +69,36 @@ namespace inspection {
       }
     }
 
-    setProjectionMatrix(cam_mat);
+    SetProjectionMatrix(cam_mat);
   }
 
 
   // Return the Projection Matrix
-  Eigen::Matrix4d  CameraView::getProjectionMatrix() {
+  Eigen::Matrix4d  CameraView::GetProjectionMatrix() {
     return P_;
   }
 
   // Return the Horizontal Field of View
-  double  CameraView::getHFOV() {
+  double  CameraView::GetHFOV() {
     return 2 * atan(W_ / (2 * fx_));
   }
 
   // Return the Vertical Field of View
-  double  CameraView::getVFOV() {
+  double  CameraView::GetVFOV() {
     return 2 * atan(H_ / (2 * fy_));
   }
 
   // Return the Horizontal Field of View
-  double  CameraView::getH() {
+  double  CameraView::GetH() {
     return H_;
   }
 
   // Return the Vertical Field of View
-  double  CameraView::getW() {
+  double  CameraView::GetW() {
     return W_;
   }
 
-  bool CameraView::getCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
+  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
                                      int& y) {
     // Initialize x,y
     x = 0; y = 0;
@@ -187,7 +187,7 @@ namespace inspection {
   }
 
 
-  bool CameraView::getCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
+  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
     // Initialize x,y
     x = 0; y = 0;
     // Get current camera position if it's not given
@@ -198,11 +198,11 @@ namespace inspection {
       ROS_ERROR("Failed getting transform: %s", ex.what());
       return false;
     }
-    return getCamXYFromPoint(msg_conversions::ros_transform_to_ros_pose(robot_pose.transform), point, x, y);
+    return GetCamXYFromPoint(msg_conversions::ros_transform_to_ros_pose(robot_pose.transform), point, x, y);
   }
 
   // Get point from camera pixel location and point cloud
-  bool CameraView::getPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y,
+  bool CameraView::GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y,
                                    geometry_msgs::Point& point) {
     // Convert from u (column / width), v (row/height) to position in array
     // where X,Y,Z data starts
@@ -240,7 +240,7 @@ namespace inspection {
     return c;
   }
 
-  double CameraView::getDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name, double size_x,
+  double CameraView::GetDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name, double size_x,
                                            double size_y) {
     // Create depth cam camera model
     CameraView depth_cam(depth_cam_name + "_cam", f_, n_);
@@ -251,19 +251,19 @@ namespace inspection {
     tf2::Transform p1, p2, p3, p4;
     std::vector<int> vert_x{0, 0, 0, 0}, vert_y{0, 0, 0, 0};
     p1 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, size_y, 0));
-    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p1).position, vert_x[0], vert_y[0])) {
+    if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p1).position, vert_x[0], vert_y[0])) {
       ROS_WARN_STREAM("Point p1 outside depth cam view");
     }
     p2 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, -size_y, 0));
-    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p2).position, vert_x[1], vert_y[1])) {
+    if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p2).position, vert_x[1], vert_y[1])) {
       ROS_WARN_STREAM("Point p2 outside depth cam view");
     }
     p3 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, size_y, 0));
-    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p3).position, vert_x[2], vert_y[2])) {
+    if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p3).position, vert_x[2], vert_y[2])) {
       ROS_WARN_STREAM("Point p3 outside depth cam view");
     }
     p4 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, -size_y, 0));
-    if (!depth_cam.getCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p4).position, vert_x[3], vert_y[3])) {
+    if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p4).position, vert_x[3], vert_y[3])) {
       ROS_WARN_STREAM("Point p4 outside depth cam view");
     }
 
@@ -293,7 +293,7 @@ namespace inspection {
     for (int depth_cam_x = 0; depth_cam_x < W_; ++depth_cam_x) {
       for (int depth_cam_y = 0; depth_cam_y < H_; ++depth_cam_y) {
         if (InsideTarget(vert_x, vert_y, depth_cam_x, depth_cam_y)) {
-          depth_cam.getPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
+          depth_cam.GetPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
           points_counter += 1;
           sum_point.x += new_point.x;
           sum_point.y += new_point.y;
@@ -323,7 +323,7 @@ namespace inspection {
                   * (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter));
   }
 
-  bool CameraView::setProjectionMatrix(Eigen::Matrix3d cam_mat) {
+  bool CameraView::SetProjectionMatrix(Eigen::Matrix3d cam_mat) {
     // Get camera parameters
     float s, cx, cy;
 

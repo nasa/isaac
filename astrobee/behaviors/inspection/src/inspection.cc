@@ -62,7 +62,7 @@ Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
     nh->advertise<visualization_msgs::MarkerArray>(TOPIC_BEHAVIORS_INSPECTION_MARKERS + std::string("/cams"), 1, true);
 }
 
-void Inspection::readParam() {
+void Inspection::ReadParam() {
   // Parameters Anomaly survey ---
   dist_resolution_    = cfg_->Get<double>("distance_resolution");
   angle_resolution_   = cfg_->Get<double>("angle_resolution") * M_PI / 180.0;
@@ -111,7 +111,7 @@ void Inspection::CheckMapTimeoutCallback() {
 }
 
 // In case move failed, remove this point
-bool Inspection::removeInspectionPose() {
+bool Inspection::RemoveInspectionPose() {
   points_[inspection_counter_].poses.erase(points_[inspection_counter_].poses.begin());
   if (points_[inspection_counter_].poses.empty())
     return false;
@@ -120,7 +120,7 @@ bool Inspection::removeInspectionPose() {
 }
 
 // Get the Inspection point on front of possibilities
-geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
+geometry_msgs::PoseArray Inspection::GetCurrentInspectionPose() {
   // Draw camera frostum
   if (cameras_.find(curr_camera_) != cameras_.end()) {
     cameras_.find(curr_camera_)->second.DrawCameraFrostum(points_[inspection_counter_].poses.front(), pub_cam_);
@@ -140,7 +140,7 @@ geometry_msgs::PoseArray Inspection::getCurrentInspectionPose() {
 }
 
 // Skip pose
-bool Inspection::nextInspectionPose() {
+bool Inspection::NextInspectionPose() {
   inspection_counter_ += 1;
   if (inspection_counter_ < points_.size())
     return true;
@@ -148,7 +148,7 @@ bool Inspection::nextInspectionPose() {
     return false;
 }
 // Redo pose
-bool Inspection::redoInspectionPose() {
+bool Inspection::RedoInspectionPose() {
   inspection_counter_ -= 1;
   if (inspection_counter_ < 0)
     return false;
@@ -156,7 +156,7 @@ bool Inspection::redoInspectionPose() {
     return true;
 }
 // Get poses
-geometry_msgs::PoseArray Inspection::getInspectionPoses() {
+geometry_msgs::PoseArray Inspection::GetInspectionPoses() {
   geometry_msgs::PoseArray result;
   result.header = points_.front().header;
   for (int i = inspection_counter_ + 1; i < points_.size(); ++i) {
@@ -165,10 +165,10 @@ geometry_msgs::PoseArray Inspection::getInspectionPoses() {
   return result;
 }
 
-double Inspection::getDistanceToTarget() {
+double Inspection::GetDistanceToTarget() {
   if (mode_ == "anomaly") {
     if (cameras_.find(curr_camera_) == cameras_.end()) {
-      return cameras_.find(curr_camera_)->second.getDistanceFromTarget(goal_.poses[inspection_counter_],
+      return cameras_.find(curr_camera_)->second.GetDistanceFromTarget(goal_.poses[inspection_counter_],
                                                               depth_cam_, target_size_x_, target_size_y_);
     }
   }
@@ -204,13 +204,13 @@ bool Inspection::VisibilityConstraint(geometry_msgs::PoseArray &points, tf2::Tra
 
     int x, y;
     if (cameras_.find(points.header.frame_id)
-          ->second.getCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p1).position, x, y) &&
+          ->second.GetCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p1).position, x, y) &&
         cameras_.find(points.header.frame_id)
-          ->second.getCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p2).position, x, y) &&
+          ->second.GetCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p2).position, x, y) &&
         cameras_.find(points.header.frame_id)
-          ->second.getCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p3).position, x, y) &&
+          ->second.GetCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p3).position, x, y) &&
         cameras_.find(points.header.frame_id)
-          ->second.getCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p4).position, x, y)) {
+          ->second.GetCamXYFromPoint(*it, msg_conversions::tf2_transform_to_ros_pose(p4).position, x, y)) {
       ++it;
     } else {
       points.poses.erase(it);
@@ -410,7 +410,7 @@ void Inspection::DrawPoseMarkers(geometry_msgs::PoseArray &points, ros::Publishe
 
 
 // Generate inspection segment
-bool Inspection::generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly) {
+bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly) {
   mode_ = "anomaly";
   inspection_counter_ = -1;
   goal_ = points_anomaly;
@@ -418,7 +418,7 @@ bool Inspection::generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
   DrawPoseMarkers(points_anomaly, pub_targets_);
 
   // Update parameters
-  readParam();
+  ReadParam();
   // Insert Offset
   for (int i = 0; i < points_anomaly.poses.size(); ++i) {
     tf2::Transform anomaly_transform;
@@ -469,7 +469,7 @@ bool Inspection::generateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
 
 
 // Insert here any geometric survey functionality
-bool Inspection::generateGeometrySurvey(geometry_msgs::PoseArray &points_geometry) {
+bool Inspection::GenerateGeometrySurvey(geometry_msgs::PoseArray &points_geometry) {
   mode_ = "geometry";
   inspection_counter_ = -1;
   goal_ = points_geometry;
@@ -489,7 +489,7 @@ bool Inspection::generateGeometrySurvey(geometry_msgs::PoseArray &points_geometr
 }
 
 // Generate the survey for panorama pictures
-bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panorama) {
+bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panorama) {
   mode_ = "panorama";
   inspection_counter_ = -1;
   goal_ = points_panorama;
@@ -497,7 +497,7 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   DrawPoseMarkers(points_panorama, pub_targets_);
   points_.clear();
   // Update parameters
-  readParam();
+  ReadParam();
 
   // Make sure camera is loaded
   std::string cam_name = points_panorama.header.frame_id.c_str();
@@ -519,8 +519,8 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 
   // Calculate fields of view
   float h_fov, v_fov;
-  h_fov = (h_fov_ < 0) ? cameras_.find(cam_name)->second.getHFOV() : h_fov_;
-  v_fov = (v_fov_ < 0) ? cameras_.find(cam_name)->second.getVFOV() : v_fov_;
+  h_fov = (h_fov_ < 0) ? cameras_.find(cam_name)->second.GetHFOV() : h_fov_;
+  v_fov = (v_fov_ < 0) ? cameras_.find(cam_name)->second.GetVFOV() : v_fov_;
 
   int nrows, ncols;
   std::vector<PanoAttitude> orientations;
@@ -555,7 +555,7 @@ bool Inspection::generatePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 }
 
 // Insert here any volumetric survey functionality
-bool Inspection::generateVolumetricSurvey(geometry_msgs::PoseArray &points_volume) {
+bool Inspection::GenerateVolumetricSurvey(geometry_msgs::PoseArray &points_volume) {
   mode_ = "volumetric";
   inspection_counter_ = -1;
   goal_ = points_volume;
