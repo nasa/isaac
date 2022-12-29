@@ -342,7 +342,7 @@ namespace inspection {
   }
 
 
-void CameraView::DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher) {
+void CameraView::DrawCameraFrustum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher) {
   // Get current camera position
   geometry_msgs::TransformStamped tf_body_to_cam;
   try {

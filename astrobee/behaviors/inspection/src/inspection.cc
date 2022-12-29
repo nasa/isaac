@@ -123,7 +123,7 @@ bool Inspection::RemoveInspectionPose() {
 geometry_msgs::PoseArray Inspection::GetCurrentInspectionPose() {
   // Draw camera frostum
   if (cameras_.find(curr_camera_) != cameras_.end()) {
-    cameras_.find(curr_camera_)->second.DrawCameraFrostum(points_[inspection_counter_].poses.front(), pub_cam_);
+    cameras_.find(curr_camera_)->second.DrawCameraFrustum(points_[inspection_counter_].poses.front(), pub_cam_);
   }
 
   geometry_msgs::PoseArray result;
@@ -369,7 +369,7 @@ void Inspection::DrawPoseMarkers(geometry_msgs::PoseArray &points, ros::Publishe
     // Pivot point
     marker.pose.position = points.poses[i].position;
 
-    // Poits along the x-axis
+    // Points along the x-axis
     marker.id =  i * 3;
     marker.pose.orientation = points.poses[i].orientation;
     // Define color
@@ -380,7 +380,7 @@ void Inspection::DrawPoseMarkers(geometry_msgs::PoseArray &points, ros::Publishe
     // Add arrow for visualization
     msg_visual.markers.push_back(marker);
 
-    // Poits along the y-axis
+    // Points along the y-axis
     marker.id =  1 + i * 3;
     marker.pose.orientation = msg_conversions::eigen_to_ros_quat(
       msg_conversions::ros_to_eigen_quat(points.poses[i].orientation) * Eigen::Quaterniond(0.707, 0, 0, 0.707));
@@ -392,7 +392,7 @@ void Inspection::DrawPoseMarkers(geometry_msgs::PoseArray &points, ros::Publishe
     // Add arrow for visualization
     msg_visual.markers.push_back(marker);
 
-    // Poits along the z-axis
+    // Points along the z-axis
     marker.id =  2 + i * 3;
     marker.pose.orientation = msg_conversions::eigen_to_ros_quat(
       msg_conversions::ros_to_eigen_quat(points.poses[i].orientation) * Eigen::Quaterniond(0.707, 0, -0.707, 0));
