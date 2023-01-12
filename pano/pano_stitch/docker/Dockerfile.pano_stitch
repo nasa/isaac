@@ -1,0 +1,13 @@
+
+ARG UBUNTU_VERSION=20.04
+ARG REMOTE=ghcr.io/nasa
+
+FROM ${REMOTE}/astrobee:latest-ubuntu${UBUNTU_VERSION}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    hugin \
+  && rm -rf /var/lib/apt/lists/*
+
+ENTRYPOINT ["/astrobee_init.sh"]
+CMD ["/bin/bash"]
