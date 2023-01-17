@@ -123,6 +123,8 @@ class CameraView {
 
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
+  geometry_msgs::TransformStamped tf_body_to_cam_;
 };
 
 
