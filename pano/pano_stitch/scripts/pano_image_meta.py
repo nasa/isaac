@@ -50,9 +50,8 @@ def get_image_meta(inbag_path, num_images=None):
     images = []
     with rosbag.Bag(inbag_path) as bag:
         img_meta = None
-        topics = IMAGE_TOPIC + [POSE_TOPIC]
-        for topic, msg, t in bag.read_messages(topics):
-            if topic in IMAGE_TOPIC:
+        for topic, msg, t in bag.read_messages([IMAGE_TOPIC, POSE_TOPIC]):
+            if topic == IMAGE_TOPIC:
                 if num_images is not None and len(images) == num_images:
                     break
 

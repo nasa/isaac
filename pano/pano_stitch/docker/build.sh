@@ -1,4 +1,4 @@
 #!/bin/sh
+set -x
 cd ${HOME}/isaac/src
-docker build . -f pano/pano_stitch/docker/Dockerfile.pano_stitch -t isaac/pano_stitch
-
+docker build . -f pano/pano_stitch/docker/pano_stitch.Dockerfile -t isaac/pano_stitch
