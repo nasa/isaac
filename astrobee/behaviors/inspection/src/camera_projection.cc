@@ -70,6 +70,13 @@ namespace inspection {
     }
 
     SetProjectionMatrix(cam_mat);
+
+    // Get relative camera position
+    try {
+      tf_body_to_cam_ = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0));
+    } catch (tf2::TransformException &ex) {
+      ROS_ERROR("Failed getting transform: %s", ex.what());
+    }
   }
 
 
@@ -98,25 +105,18 @@ namespace inspection {
     return W_;
   }
 
+  //
   bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
                                      int& y) {
     // Initialize x,y
     x = 0; y = 0;
-    // Get current camera position
-    geometry_msgs::TransformStamped tf_body_to_cam;
-    try {
-      tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0));
-    } catch (tf2::TransformException &ex) {
-      ROS_ERROR("Failed getting transform: %s", ex.what());
-      return false;
-    }
     Eigen::Vector4d p;
     p << point.x,
          point.y,
          point.z,
          1;
     tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
-                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam.transform);
+                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_.transform);
 
     // Build the View matrix
     Eigen::Quaterniond R(camera_pose.getRotation().w(),
@@ -201,7 +201,7 @@ namespace inspection {
     return GetCamXYFromPoint(msg_conversions::ros_transform_to_ros_pose(robot_pose.transform), point, x, y);
   }
 
-  // Get point from camera pixel location and point cloud
+  // Get 3D point from camera pixel location and point cloud
   bool CameraView::GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y,
                                    geometry_msgs::Point& point) {
     // Convert from u (column / width), v (row/height) to position in array
@@ -228,6 +228,10 @@ namespace inspection {
 
     return true;
   }
+
+  // Checks if a point is inside a poligon, in this case with 4 sides.
+  // Explanation of the method and example implementation in:
+  // https://www.eecs.umich.edu/courses/eecs380/HANDOUTS/PROJ2/InsidePoly.html
   bool CameraView::InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, int test_x, int test_y) {
     int i, j;
     bool c = false;
@@ -240,6 +244,7 @@ namespace inspection {
     return c;
   }
 
+  // Get the distance from the camera to the target using depth camera information
   double CameraView::GetDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name, double size_x,
                                            double size_y) {
     // Create depth cam camera model
@@ -247,6 +252,10 @@ namespace inspection {
     depth_cam.debug_ = true;
 
     // Establish where the corners are in the image
+    // Be aware that at this point the target has been confirmed to be fully within the selected
+    // inspection camera, so even if the GetCamXYFromPoint function returns false it just means that it is
+    // outside view because the fov of the depth camera might be smaller than the fov of the selected
+    // inspection camera
     tf2::Transform target_transform = msg_conversions::ros_pose_to_tf2_transform(point);
     tf2::Transform p1, p2, p3, p4;
     std::vector<int> vert_x{0, 0, 0, 0}, vert_y{0, 0, 0, 0};
@@ -323,6 +332,8 @@ namespace inspection {
                   * (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter));
   }
 
+  // Define the projection matrix based on camera parameters using the pinhole model
+  // Note that this definition considers low distortion
   bool CameraView::SetProjectionMatrix(Eigen::Matrix3d cam_mat) {
     // Get camera parameters
     float s, cx, cy;
@@ -335,110 +346,103 @@ namespace inspection {
     cy = cam_mat(1, 2);
 
     // Build projection matrix
-    P_ << 2 * fx_ / W_, 0, 0, 0, 2 * s / W_, 2 * fy_ / H_, 0, 0, 2 * (cx / W_) - 1, 2 * (cy / H_) - 1,
-      -(f_ + n_) / (f_ - n_), 2 * (f_ * n_) / (f_ - n_), 0, 0, -1, 0;
+    P_ << 2 * fx_ / W_,      0,                 0,                      0,
+          2 * s / W_,        2 * fy_ / H_,      0,                      0,
+          2 * (cx / W_) - 1, 2 * (cy / H_) - 1, -(f_ + n_) / (f_ - n_), 2 * (f_ * n_) / (f_ - n_),
+          0,                 0,                 -1,                     0;
 
     return true;
   }
 
+  // Draw the camera frustum using a marker array for rviz visualization
+  void CameraView::DrawCameraFrustum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher) {
+    tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
+                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_.transform);
 
-void CameraView::DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher) {
-  // Get current camera position
-  geometry_msgs::TransformStamped tf_body_to_cam;
-  try {
-    tf_body_to_cam = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0));
-  } catch (tf2::TransformException &ex) {
-    ROS_ERROR("Failed getting transform: %s", ex.what());
-    return;
+    // Build the View matrix
+    Eigen::Quaterniond R = msg_conversions::ros_to_eigen_quat(
+      msg_conversions::tf2_quat_to_ros_quat(camera_pose.getRotation()));  // Rotation Matrix Identity
+    Eigen::Vector3d T = msg_conversions::ros_point_to_eigen_vector(
+                            msg_conversions::tf2_transform_to_ros_pose(camera_pose).position);  // Translation Vector
+    Eigen::Matrix4d V;                                        // Transformation Matrix
+    V.setIdentity();                                          // Identity to make bottom row 0,0,0,1
+    V.block<3, 3>(0, 0) = R.normalized().toRotationMatrix();;
+    V.block<3, 1>(0, 3) = T;
+
+    Eigen::Matrix4d corners_near;
+    corners_near <<  1,  1, -1, -1, 1, -1, -1,  1, -1, -1, -1, -1, 1,  1,  1,  1;
+    Eigen::Matrix4d p_near = V * P_.inverse() * corners_near;
+
+
+    Eigen::Matrix4d corners_far;
+    corners_far <<  1,  1, -1, -1, 1, -1, -1,  1, 1, 1, 1, 1, 1,  1,  1,  1;
+    Eigen::Matrix4d p_far = V * P_.inverse() * corners_far;
+
+    visualization_msgs::MarkerArray msg_visual;
+
+    // Initialize marker message
+    visualization_msgs::Marker marker;
+    visualization_msgs::MarkerArray markers;
+    // Fill in marker properties
+    marker.header.frame_id = "world";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "";
+    marker.type = visualization_msgs::Marker::LINE_LIST;
+    marker.action = visualization_msgs::Marker::ADD;
+    // With of the line
+    marker.scale.x = 0.01;
+    // Define color
+    marker.color.r = 0;
+    marker.color.g = 0;
+    marker.color.b = 1;
+    marker.color.a = 1.0;
+
+    marker.id = 0;
+
+    // Add near points
+    int n = 4;
+    geometry_msgs::Point p;
+    for (int i = 0; i < n; ++i) {
+      p.x = p_near(0, i) / p_near(3, i);
+      p.y = p_near(1, i) / p_near(3, i);
+      p.z = p_near(2, i) / p_near(3, i);
+      marker.points.push_back(p);
+
+      p.x = p_near(0, (i + 1) % n) / p_near(3, (i + 1) % n);
+      p.y = p_near(1, (i + 1) % n) / p_near(3, (i + 1) % n);
+      p.z = p_near(2, (i + 1) % n) / p_near(3, (i + 1) % n);
+      marker.points.push_back(p);
+    }
+    // Add far points
+    for (int i = 0; i < n; ++i) {
+      p.x = p_far(0, i) / p_far(3, i);
+      p.y = p_far(1, i) / p_far(3, i);
+      p.z = p_far(2, i) / p_far(3, i);
+      marker.points.push_back(p);
+
+      p.x = p_far(0, (i + 1) % n) / p_far(3, (i + 1) % n);
+      p.y = p_far(1, (i + 1) % n) / p_far(3, (i + 1) % n);
+      p.z = p_far(2, (i + 1) % n) / p_far(3, (i + 1) % n);
+      marker.points.push_back(p);
+    }
+    // Add conn points
+    for (int i = 0; i < n; ++i) {
+      p.x = p_far(0, i) / p_far(3, i);
+      p.y = p_far(1, i) / p_far(3, i);
+      p.z = p_far(2, i) / p_far(3, i);
+      marker.points.push_back(p);
+
+      p.x = p_near(0, i) / p_near(3, i);
+      p.y = p_near(1, i) / p_near(3, i);
+      p.z = p_near(2, i) / p_near(3, i);
+      marker.points.push_back(p);
+    }
+
+    // Add arrow for visualization
+    msg_visual.markers.push_back(marker);
+
+    // Publish marker message
+    publisher.publish(msg_visual);
   }
-
-  tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
-                               msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam.transform);
-
-  // Build the View matrix
-  Eigen::Quaterniond R = msg_conversions::ros_to_eigen_quat(
-    msg_conversions::tf2_quat_to_ros_quat(camera_pose.getRotation()));  // Rotation Matrix Identity
-  Eigen::Vector3d T = msg_conversions::ros_point_to_eigen_vector(
-                          msg_conversions::tf2_transform_to_ros_pose(camera_pose).position);  // Translation Vector
-  Eigen::Matrix4d V;                                        // Transformation Matrix
-  V.setIdentity();                                          // Identity to make bottom row 0,0,0,1
-  V.block<3, 3>(0, 0) = R.normalized().toRotationMatrix();;
-  V.block<3, 1>(0, 3) = T;
-
-  Eigen::Matrix4d corners_near;
-  corners_near <<  1,  1, -1, -1, 1, -1, -1,  1, -1, -1, -1, -1, 1,  1,  1,  1;
-  Eigen::Matrix4d p_near = V * P_.inverse() * corners_near;
-
-
-  Eigen::Matrix4d corners_far;
-  corners_far <<  1,  1, -1, -1, 1, -1, -1,  1, 1, 1, 1, 1, 1,  1,  1,  1;
-  Eigen::Matrix4d p_far = V * P_.inverse() * corners_far;
-
-  visualization_msgs::MarkerArray msg_visual;
-
-  // Initialize marker message
-  visualization_msgs::Marker marker;
-  visualization_msgs::MarkerArray markers;
-  // Fill in marker properties
-  marker.header.frame_id = "world";
-  marker.header.stamp = ros::Time::now();
-  marker.ns = "";
-  marker.type = visualization_msgs::Marker::LINE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  // With of the line
-  marker.scale.x = 0.01;
-  // Define color
-  marker.color.r = 0;
-  marker.color.g = 0;
-  marker.color.b = 1;
-  marker.color.a = 1.0;
-
-  marker.id = 0;
-
-  // Add near points
-  int n = 4;
-  geometry_msgs::Point p;
-  for (int i = 0; i < n; ++i) {
-    p.x = p_near(0, i) / p_near(3, i);
-    p.y = p_near(1, i) / p_near(3, i);
-    p.z = p_near(2, i) / p_near(3, i);
-    marker.points.push_back(p);
-
-    p.x = p_near(0, (i + 1) % n) / p_near(3, (i + 1) % n);
-    p.y = p_near(1, (i + 1) % n) / p_near(3, (i + 1) % n);
-    p.z = p_near(2, (i + 1) % n) / p_near(3, (i + 1) % n);
-    marker.points.push_back(p);
-  }
-  // Add far points
-  for (int i = 0; i < n; ++i) {
-    p.x = p_far(0, i) / p_far(3, i);
-    p.y = p_far(1, i) / p_far(3, i);
-    p.z = p_far(2, i) / p_far(3, i);
-    marker.points.push_back(p);
-
-    p.x = p_far(0, (i + 1) % n) / p_far(3, (i + 1) % n);
-    p.y = p_far(1, (i + 1) % n) / p_far(3, (i + 1) % n);
-    p.z = p_far(2, (i + 1) % n) / p_far(3, (i + 1) % n);
-    marker.points.push_back(p);
-  }
-  // Add conn points
-  for (int i = 0; i < n; ++i) {
-    p.x = p_far(0, i) / p_far(3, i);
-    p.y = p_far(1, i) / p_far(3, i);
-    p.z = p_far(2, i) / p_far(3, i);
-    marker.points.push_back(p);
-
-    p.x = p_near(0, i) / p_near(3, i);
-    p.y = p_near(1, i) / p_near(3, i);
-    p.z = p_near(2, i) / p_near(3, i);
-    marker.points.push_back(p);
-  }
-
-  // Add arrow for visualization
-  msg_visual.markers.push_back(marker);
-
-  // Publish marker message
-  publisher.publish(msg_visual);
-}
 
 }  // namespace inspection

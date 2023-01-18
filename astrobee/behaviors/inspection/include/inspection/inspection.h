@@ -104,7 +104,7 @@ class CameraView {
   double GetDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
                                 double size_x, double size_y);
 
-  void DrawCameraFrostum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher);
+  void DrawCameraFrustum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher);
 
   bool debug_ = false;
   float f_;
@@ -123,6 +123,8 @@ class CameraView {
 
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
+  geometry_msgs::TransformStamped tf_body_to_cam_;
 };
 
 
@@ -189,7 +191,7 @@ class Inspection {
   void DrawPoseMarkers(geometry_msgs::PoseArray &points,
                             ros::Publisher &publisher);
   // Draws visibility frostum projection
-  void DrawCameraFrostum();
+  void DrawCameraFrustum();
 
   // This function generates a sorted list based on the max viewing angle and resolution
   bool GenerateSortedList(geometry_msgs::PoseArray &points);
