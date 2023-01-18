@@ -26,6 +26,7 @@
 #include <ros/package.h>
 
 // FSW includes
+#include <msg_conversions/msg_conversions.h>
 #include <config_reader/config_reader.h>
 #include <ff_util/ff_names.h>
 #include <isaac_util/isaac_names.h>
@@ -50,7 +51,7 @@
 #include <vector>
 #include <cmath>
 
-#define DEG2RAD 3.1415/180.0
+#define DEG2RAD M_PI/180.0
 
 // Robot namespace
 DEFINE_string(ns, "", "Robot namespace");
@@ -66,19 +67,39 @@ DEFINE_bool(geometry, false, "Send the inspection command");
 DEFINE_bool(panorama, false, "Send the inspection command");
 DEFINE_bool(volumetric, false, "Send the inspection command");
 
-// Configurable Parameters
+// General parameters
 DEFINE_string(camera, "sci_cam", "Camera to use");
-DEFINE_double(tilt_max, 90.0, "Panorama: maximum tilt");
-DEFINE_double(tilt_min, -90.0, "Panorama: minimum tilt");
-DEFINE_double(pan_max, 180.0, "Panorama: maximum pan");
+
+
+// Configurable Parameters anomaly
+DEFINE_double(target_distance, 0.3,  "Anomaly: desired distance to target");
+DEFINE_double(min_distance,    0.2,  "Anomaly: minimum distance to target");
+DEFINE_double(max_distance,    0.7,  "Anomaly: maximum distance to target");
+DEFINE_double(max_angle,       15.0, "Anomaly: maximum angle (deg) to target");
+DEFINE_double(target_size_x,   0.05, "Anomaly: target size x - width");
+DEFINE_double(target_size_y,   0.05, "Anomaly: target size y - height");
+DEFINE_string(depth_cam,  "haz", "Anomaly: depth cam to be used for distance measurements");
+
+// Configurable Parameters panorama
+DEFINE_string(panorama_mode, "", "Panorama configuration pre-set");
 DEFINE_double(pan_min, -180.0, "Panorama: minimum pan");
-DEFINE_double(overlap, 0.5, "Panorama: overlap between images");
+DEFINE_double(pan_max,  180.0, "Panorama: maximum pan");
+DEFINE_double(tilt_min, -90.0, "Panorama: minimum tilt");
+DEFINE_double(tilt_max,  90.0, "Panorama: maximum tilt");
+DEFINE_double(h_fov,     -1.0, "Panorama: camera horizontal fov, default -1 uses camera matrix");
+DEFINE_double(v_fov,     -1.0, "Panorama: camera vertical fov, default -1 uses camera matrix");
+DEFINE_double(overlap,    0.5, "Panorama: overlap between images");
+DEFINE_double(att_tol,    5.0, "Panorama: attitude tolerance due to mobility");
+
+// One pose plans
+DEFINE_string(pos, "", "Desired position in cartesian format 'X Y Z' (meters)");
+DEFINE_string(att, "", "Desired attitude in RPY format 'roll pitch yaw' (degrees)");
 
 // Plan files
-DEFINE_string(anomaly_poses, "/resources/vent_jpm.txt", "Vent pose list to inspect");
+DEFINE_string(anomaly_poses, "/resources/inspection_iss.txt", "Vent pose list to inspect");
 DEFINE_string(geometry_poses, "/resources/survey_bay_6.txt", "Geometry poses list to map");
-DEFINE_string(panorama_poses, "/resources/panorama_jpm.txt", "Panorama poses list to map");
-DEFINE_string(volumetric_poses, "/resources/wifi_jpm.txt", "Wifi poses list to map");
+DEFINE_string(panorama_poses, "/resources/panorama_iss.txt", "Panorama poses list to map");
+DEFINE_string(volumetric_poses, "/resources/volumetric_iss.txt", "Wifi poses list to map");
 
 // Timeout values for action
 DEFINE_double(connect, 10.0, "Action connect timeout");
@@ -98,14 +119,50 @@ bool has_only_whitespace_or_comments(const std::string & str) {
   return true;
 }
 
-void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
+// Read inspection poses from given files
+bool ReadPanoramaConfig(double* pan_radius_degrees, double* tilt_rad_deg, double* h_fov_deg, double* v_fov_deg,
+                        double* overlap, double* plan_att_tol_deg) {
+  std::ifstream ifs(std::string(ros::package::getPath("inspection") + "/resources/pano_test_cases.csv").c_str());
+
+  // Check if file exists
+  if (!ifs.is_open()) {
+    std::cout << "Could not open file: " << ros::package::getPath("inspection") + "/resources/pano_test_cases.csv"
+              << std::endl;
+    return false;
+  }
+
+  std::string line;
+  std::string label;
+  double test_att_tol_deg;
+  while (getline(ifs, line)) {
+    if (has_only_whitespace_or_comments(line)) continue;
+    std::replace(line.begin(), line.end(), ',', ' ');
+    line.erase(std::remove(line.begin(), line.end(), '"'), line.end());
+
+    std::istringstream is(line);
+    if ((is >> label >> *pan_radius_degrees >> *tilt_rad_deg >> *h_fov_deg >> *v_fov_deg >> *overlap >>
+         *plan_att_tol_deg >> test_att_tol_deg)) {
+      if (FLAGS_panorama_mode == label) {
+        return true;
+      }
+    } else {
+      std::cout << "Ignoring invalid line: " << line  << std::endl;
+      continue;
+    }
+  }
+  std::cout << "Could not find panorama_mode specified"  << std::endl;
+  return false;
+}
+
+// Read inspection poses from given files
+geometry_msgs::PoseArray ReadPosesFile(std::string file) {
+    geometry_msgs::PoseArray poses;
     geometry_msgs::Pose pose;
-    goal.inspect_poses.header.frame_id = FLAGS_camera;
     // Read file geometry
     std::ifstream ifs((file).c_str());
     if (!ifs.is_open()) {
       std::cout << "Could not open file: " << file << std::endl;
-      return;
+      return poses;
     }
     std::string line;
     tf2::Quaternion quat_robot;
@@ -117,42 +174,28 @@ void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
       double euler_roll, euler_pitch, euler_yaw;
       double quat_x, quat_y, quat_z, quat_w;
       if ((is >> origin_x >> origin_y >> origin_z >> quat_x >> quat_y >> quat_z >> quat_w)) {
-          // Position
-          pose.position.x = origin_x;
-          pose.position.y = origin_y;
-          pose.position.z = origin_z;
-
-          // Orientation
-          pose.orientation.x = quat_x;
-          pose.orientation.y = quat_y;
-          pose.orientation.z = quat_z;
-          pose.orientation.w = quat_w;
-          goal.inspect_poses.poses.push_back(pose);
+        quat_robot = tf2::Quaternion(quat_x, quat_y, quat_z, quat_w);
 
       } else {
         std::istringstream is(line);
         if ((is >> origin_x >> origin_y >> origin_z >> euler_roll >> euler_pitch >> euler_yaw)) {
-          // Position
-          pose.position.x = origin_x;
-          pose.position.y = origin_y;
-          pose.position.z = origin_z;
-
-          quat_robot.setRPY(euler_roll * DEG2RAD,
-                            euler_pitch * DEG2RAD,
-                            euler_yaw * DEG2RAD);
-          // Orientation
-          pose.orientation.x = quat_robot.x();
-          pose.orientation.y = quat_robot.y();
-          pose.orientation.z = quat_robot.z();
-          pose.orientation.w = quat_robot.w();
-          goal.inspect_poses.poses.push_back(pose);
+          quat_robot.setRPY(euler_roll * DEG2RAD, euler_pitch * DEG2RAD, euler_yaw * DEG2RAD);
 
         } else {
           std::cout << "Ignoring invalid line: " << line  << std::endl;
           continue;
         }
       }
+      // Position
+      pose.position.x = origin_x;
+      pose.position.y = origin_y;
+      pose.position.z = origin_z;
+      // Orientation
+      pose.orientation = msg_conversions::tf2_quat_to_ros_quat(quat_robot);
+      // Add pose to array
+      poses.poses.push_back(pose);
     }
+    return poses;
 }
 
 
@@ -241,37 +284,22 @@ void SendGoal(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
   } else if (FLAGS_save) {
     goal.command = isaac_msgs::InspectionGoal::SAVE;
   } else if (FLAGS_anomaly) {
-    // Fill in command type
     goal.command = isaac_msgs::InspectionGoal::ANOMALY;
-
-    // Read file
-    // std::cout << "Reading: " << FLAGS_anomaly_poses << std::endl;
-    ReadFile(path + FLAGS_anomaly_poses, goal);
-
+    path.append(FLAGS_anomaly_poses);
   } else if (FLAGS_geometry) {
-    // Fill in command type
     goal.command = isaac_msgs::InspectionGoal::GEOMETRY;
-
-    // Read file
-    // std::cout << "Reading: " << FLAGS_geometry_poses << std::endl;
-    ReadFile(path + FLAGS_geometry_poses, goal);
-
+    path.append(FLAGS_geometry_poses);
   } else if (FLAGS_panorama) {
-    // Fill in command type
     goal.command = isaac_msgs::InspectionGoal::PANORAMA;
-
-    // Read file
-    // std::cout << "Reading: " << FLAGS_panorama_poses << std::endl;
-    ReadFile(path + FLAGS_panorama_poses, goal);
-
+    path.append(FLAGS_panorama_poses);
   } else if (FLAGS_volumetric) {
-    // Fill in command type
     goal.command = isaac_msgs::InspectionGoal::VOLUMETRIC;
-
-    // Read file
-    // std::cout << "Reading: " << FLAGS_volumetric_poses << std::endl;
-    ReadFile(path + FLAGS_volumetric_poses, goal);
+    path.append(FLAGS_volumetric_poses);
   }
+  // Read file
+  std::cout << "Reading: " << path << std::endl;
+  goal.inspect_poses = ReadPosesFile(path);
+  goal.inspect_poses.header.frame_id = FLAGS_camera;
 
   client->SendGoal(goal);
 }
@@ -404,21 +432,62 @@ int main(int argc, char *argv[]) {
     std::placeholders::_1, std::placeholders::_2));
   client.SetConnectedCallback(std::bind(ConnectedCallback, &client));
   client.Create(&nh, ACTION_BEHAVIORS_INSPECTION);
-  // Configure inspection parameters
-  if (FLAGS_panorama) {
+
+  // Configure panorama anomaly parameters
+  if (FLAGS_anomaly) {
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
-    cfg.Set<double>("pan_min", FLAGS_pan_min);
-    cfg.Set<double>("pan_max", FLAGS_pan_max);
-    cfg.Set<double>("tilt_min", FLAGS_tilt_min);
-    cfg.Set<double>("tilt_max", FLAGS_tilt_max);
-    cfg.Set<double>("overlap", FLAGS_overlap);
+    cfg.Set<double>("target_distance", FLAGS_target_distance);
+    cfg.Set<double>("min_distance", FLAGS_min_distance);
+    cfg.Set<double>("max_distance", FLAGS_max_distance);
+    cfg.Set<double>("max_angle", FLAGS_max_angle);
+    cfg.Set<double>("target_size_x", FLAGS_target_size_x);
+    cfg.Set<double>("target_size_y", FLAGS_target_size_y);
+    cfg.Set<std::string>("depth_cam", FLAGS_depth_cam);
     if (!cfg.Reconfigure()) {
       std::cout << "Could not reconfigure the inspection node " << std::endl;
       ros::shutdown();
     }
   }
 
-std::cout << "\r "
+  // Configure panorama inspection parameters
+  if (FLAGS_panorama) {
+    ROS_ERROR_STREAM("starting panorama");
+    ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
+
+    if (FLAGS_panorama_mode == "") {
+    ROS_ERROR_STREAM("mode specified panorama");
+      cfg.Set<double>("h_fov", FLAGS_h_fov);
+      cfg.Set<double>("v_fov", FLAGS_v_fov);
+
+      cfg.Set<double>("pan_min", FLAGS_pan_min);
+      cfg.Set<double>("pan_max", FLAGS_pan_max);
+      cfg.Set<double>("tilt_min", FLAGS_tilt_min);
+      cfg.Set<double>("tilt_max", FLAGS_tilt_max);
+      cfg.Set<double>("overlap", FLAGS_overlap);
+      cfg.Set<double>("att_tol", FLAGS_att_tol);
+    } else {
+      // Read file panorama config
+      double pan_radius_degrees, tilt_rad_deg, h_fov_deg, v_fov_deg, overlap, plan_att_tol_deg;
+      if (ReadPanoramaConfig(&pan_radius_degrees, &tilt_rad_deg, &h_fov_deg, &v_fov_deg, &overlap, &plan_att_tol_deg)) {
+        cfg.Set<double>("h_fov", h_fov_deg);
+        cfg.Set<double>("v_fov", v_fov_deg);
+
+        cfg.Set<double>("pan_min", -pan_radius_degrees);
+        cfg.Set<double>("pan_max",  pan_radius_degrees);
+        cfg.Set<double>("tilt_min", -tilt_rad_deg);
+        cfg.Set<double>("tilt_max",  tilt_rad_deg);
+        cfg.Set<double>("overlap", overlap);
+        cfg.Set<double>("att_tol", plan_att_tol_deg);
+      }
+    }
+
+    if (!cfg.Reconfigure()) {
+      std::cout << "Could not reconfigure the inspection node " << std::endl;
+      ros::shutdown();
+    }
+  }
+
+  std::cout << "\r "
             << "Available actions:\n"
             << "0) Exit \n"
             << "1) Pause \n"

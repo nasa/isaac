@@ -11,6 +11,8 @@ This tool is used to initiate inspection actions. To run the tool:
 
 As of now, the actions available are:
 
+Inspection coordination:
+
 *pause*: Pauses the current action being performed, the goal is kept, so a resume command will resume the action.
 
 *resume*: Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step. 
@@ -22,11 +24,18 @@ As of now, the actions available are:
 
 *save*: Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using 
 
-*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.
+
+Inspection modes:
+
+
+*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. Target reference frames are defined as the z-axis pointing outwards to where the camera would be, x-axis is along the picture width and the y-axis is along the picture height, like so:
+
+![Target reference frame](/doc/images/ref_frame_anomaly.png)
+
 
 *geometry*: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.
 
-*panorama*: it will do a panorama survey of all points specified
+*panorama*: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page \subpage pano_coverage.
 
 *volumetric*: This will perform a volumetric survey
 
@@ -82,24 +91,3 @@ Other options that can be specified are:
       default: "/resources/scicam_panorama.txt"
     -tilt_max (Panorama: maximum tilt) type: double default: 90
     -tilt_min (Panorama: minimum tilt) type: double default: -90
-
-
-Using the stitch panorama script
----------
-
-This script firstly creates the hugin panorama stitcher file for a specific panorama, initializes it with the localization data, runs multiple optimizations and finally produces the final stitched result
-
-To run the tool:
-
-	rosrun inspection stitch_panorama.py -bag_name $BAG_NAME -work_dir $SCI_CAM_DIR
-
-where $BAG_NAME is the bagfile which the script uses to identify which sci_cam images to use and initializes the attitude in the hugin file accordig to localization data. The $SCI_CAM_DIR is he folder location to the sci_cam images copied from the HLP.
-
-Other optional arguments are:
-
-    -input_hugin     (Input Hugin pto file.) type: string
-    -output_hugin    (Output Hugin pto file.) type: string
-    --no-stitching   (Generate hugin and optimize only.)
-    --stitching-only (Stitch hugin file only)
-
-The --no-stitching option followed by the --stitch-only option is useful if manual checks/changes are desired to the hugin file before stitching the panorama (which takes a long time), it particularly useful if the localization data is not sufficient for the panorama output to be properly centered around the (0,0,0) ISS reference frame.  

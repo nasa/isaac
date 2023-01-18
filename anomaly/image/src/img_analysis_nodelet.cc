@@ -60,13 +60,13 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
     // [0]
     fsm_.Add(STATE::WAITING,
       IMAGE_WAIT, [this](FSM::Event const& event) -> FSM::State {
-        ROS_ERROR_STREAM("CHANGE STATE TO ANALYSING");
+        ROS_DEBUG_STREAM("CHANGE STATE TO ANALYSING");
         return STATE::ANALYSING;
       });
     // [1]
     fsm_.Add(STATE::ANALYSING,
       IMAGE_ANALYSED, [this](FSM::Event const& event) -> FSM::State {
-        ROS_ERROR_STREAM("CHANGE STATE TO WAITING");
+        ROS_DEBUG_STREAM("CHANGE STATE TO WAITING");
         return STATE::WAITING;
       });
   }
@@ -162,7 +162,7 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
 
   // A new arm action has been called
   void GoalCallback(isaac_msgs::ImageInspectionGoalConstPtr const& goal) {
-    ROS_ERROR_STREAM("RECEIVED()");
+    ROS_DEBUG_STREAM("Received new Goal");
     goal_ = *goal;
     sci_cam_req_ = true;
     return fsm_.Update(IMAGE_WAIT);
@@ -180,14 +180,13 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
     case STATE::ANALYSING:
       feedback.state = STATE::ANALYSING;                    break;
     }
-    ROS_ERROR_STREAM("State changed to " << feedback.state);
+    ROS_DEBUG_STREAM("State changed to " << feedback.state);
     // Send the feedback if needed
     switch (state) {
     case STATE::WAITING:
       break;
     default:
       {
-        ROS_ERROR_STREAM("send feedback");
         server_.SendFeedback(feedback);
       }
     }
@@ -216,12 +215,12 @@ class ImageAnalysisNode : public ff_util::FreeFlyerNodelet {
 
   // Preempt the current action with a new action
   void PreemptCallback() {
-    ROS_ERROR("PreemptCallback");
+    ROS_DEBUG_STREAM("PreemptCallback");
   }
 
   // A Cancellation request arrives
   void CancelCallback() {
-    ROS_ERROR("CancelCallback");
+    ROS_DEBUG_STREAM("CancelCallback");
   }
 
  private:
