@@ -90,37 +90,36 @@ $(document).ready(function(){initNavTree('analyst.html',''); initResizable(); })
 <div class="title">Analyst Notebook </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h2><a class="anchor" id="autotoc_md27"></a>
-Preparing Analyst Setup</h2>
-<p>The jupyter notebooks will be able to access data that is in the <code>$HOME/data</code> and <code>$HOME/data/bags</code>, therefore, make sure all the relevant bag files are there</p>
-<h2><a class="anchor" id="autotoc_md28"></a>
-Starting the Analyst Notebook</h2>
+<div class="textblock"><h1><a class="anchor" id="autotoc_md36"></a>
+Starting the Analyst Notebook</h1>
+<p><b>The jupyter notebooks will be able to access data that is in the <code>$HOME/data</code> and <code>$HOME/data/bags</code>, therefore, make sure all the relevant bag files are there</b></p>
 <p>For the Analyst notebook to be functional, it needs to start side-by-side with the database and the IUI (ISAAC user interface). To do so, the recommended method is to use the remote docker images, as: </p><pre class="fragment">$ISAAC_SRC/scripts/docker/run.sh --no-mast -analyst --no-sim -remote
 </pre><p>The ISAAC UI is hosted in: <a href="http://localhost:8080">http://localhost:8080</a> The ArangoDB database is hosted in: <a href="http://localhost:8529">http://localhost:8529</a> The Analyst Notebook is hosted in: <a href="http://localhost:8888/lab?token=isaac">http://localhost:8888/lab?token=isaac</a></p>
-<h2><a class="anchor" id="autotoc_md29"></a>
-Intro Tutorials</h2>
+<h1><a class="anchor" id="autotoc_md37"></a>
+Intro Tutorials</h1>
 <p>Please follow all the tutorial to familiarize yourself with the available functions and to detect if something is not working properly.</p>
-<h3><a class="anchor" id="autotoc_md30"></a>
-1) Import Bagfile data to database (optional if using remote database)</h3>
+<h2><a class="anchor" id="autotoc_md38"></a>
+1) Import Bagfile data to database (optional if using remote database)</h2>
 <p>Open the tutorial <a href="http://localhost:8888/lab/tree/1_import_bagfiles.ipynb">here</a>.</p>
 <p>This tutorial covers how to upload bag files to a local database. Be aware that uploading large bag files might take a long time. If possible select only the time intervals/topic names that are required for analysis to speed up the process.</p>
-<h3><a class="anchor" id="autotoc_md31"></a>
-2) Read data from the Database</h3>
+<h2><a class="anchor" id="autotoc_md39"></a>
+2) Read data from the Database</h2>
 <p>Open the tutorial <a href="http://localhost:8888/lab/tree/2_read_database.ipynb">here</a>.</p>
 <p>This tutorial covers how to display data uploaded to the database. It contains some examples of the most common data type / topics. You can filter the data that gets collected from the database using queries.</p>
-<h3><a class="anchor" id="autotoc_md32"></a>
-3) Export results to ISAAC user interface</h3>
+<h2><a class="anchor" id="autotoc_md40"></a>
+3) Export results to ISAAC user interface</h2>
 <p>Open the tutorial <a href="http://localhost:8888/lab/tree/3_export_result_to_iui.ipynb">here</a>.</p>
 <p>This tutorial covers the available methods to visualize data in the ISAAC user interface (IUI).</p>
 <p>Open the IUI 3D viewer <a href="http://localhost:8080">here</a>.</p>
-<h2><a class="anchor" id="autotoc_md33"></a>
-Case study Tutorials</h2>
-<h3><a class="anchor" id="autotoc_md34"></a>
-Collecting simulation data to train a CNN + validate with ISS data</h3>
+<h1><a class="anchor" id="autotoc_md41"></a>
+Case study Tutorials</h1>
+<h2><a class="anchor" id="autotoc_md42"></a>
+Collecting simulation data to train a CNN + validate with ISS data</h2>
 <p>Open the tutorial \href<a href="http://localhost:8888/lab/tree/build_CNN_with_pytorch.ipynb">here</a>.</p>
 <p>Here, we use simulation tools to automatically build a train and test dataset. The simulation dataset builder uses arguments as target position model positions and gaussian noise to build. Using the simulated data, we use pytorch to train the classifier of a previously trained CNN. We optimize the CNN using the train dataset, and use the test dataset to decide which iteration of the optimization to keep. With the trained CNN we can run new colledted data through it, namely real image captured data.</p>
-<h3><a class="anchor" id="autotoc_md35"></a>
-Building a volumetric map of WiFi signal intensity + analyse model + visualize data</h3>
+<h2><a class="anchor" id="autotoc_md43"></a>
+Building a volumetric map of WiFi signal intensity + analyse model + visualize data</h2>
+<p>Open the tutorial </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

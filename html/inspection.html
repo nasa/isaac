@@ -91,8 +91,8 @@ $(document).ready(function(){initNavTree('inspection.html',''); initResizable();
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>This directory provides two tools: inspection_tool and sci_cam_tool.</p>
-<h2><a class="anchor" id="autotoc_md52"></a>
-Using the inspection tool</h2>
+<h3><a class="anchor" id="autotoc_md60"></a>
+Using the inspection tool</h3>
 <p>This tool is used to initiate inspection actions. To run the tool: </p><pre class="fragment">rosrun inspection inspection_tool -$ACTION [OPTIONS]
 </pre><p>As of now, the actions available are:</p>
 <p>Inspection coordination:</p>
@@ -107,8 +107,8 @@ Using the inspection tool</h2>
 <p><em>geometry</em>: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.</p>
 <p><em>panorama</em>: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page <a class="el" href="pano_coverage.html">Panorama coverage planning</a>.</p>
 <p><em>volumetric</em>: This will perform a volumetric survey</p>
-<h2><a class="anchor" id="autotoc_md53"></a>
-Using sci_cam_tool</h2>
+<h3><a class="anchor" id="autotoc_md61"></a>
+Using sci_cam_tool</h3>
 <p>This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:</p>
 <p>Start the simulator, for example as: </p><pre class="fragment">roslaunch astrobee sim.launch
 </pre><p>Start this tool, for example as: </p><pre class="fragment">rosrun inspection sci_cam_tool
@@ -119,8 +119,8 @@ Using sci_cam_tool</h2>
 <p>The pictures will be published on the topic </p><pre class="fragment">/hw/cam_sci/compressed
 </pre><p>They will also show up in the sci cam window in RVIZ.</p>
 <p>If requests to take a single picture come at a high rate, some of them will be dropped.</p>
-<h2><a class="anchor" id="autotoc_md54"></a>
-Using export panorama tool</h2>
+<h3><a class="anchor" id="autotoc_md62"></a>
+Using export panorama tool</h3>
 <p>This tool was created to allow for panorama surveys to be created and exported. This is useful to make panorama plans beforehand to ensure reproduceability.</p>
 <p>To export the panorama file: </p><pre class="fragment">rosrun inspection export_panorama -panorama_poses $PANORAMA_POSES -panorama_out $OUTPUL_PLAN
 </pre><p>where $PANORAMA_POSES is a text file container the poses of the panorama centers, and $OUTPUT_PLAN is the output path of the panorama w.r.t. the package folder. Other options that can be specified are: </p><pre class="fragment">-camera (Camera to use) type: string default: "sci_cam"
