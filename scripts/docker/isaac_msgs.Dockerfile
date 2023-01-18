@@ -27,7 +27,7 @@ ARG ROS_VERSION=kinetic
 ARG PYTHON=""
 
 # Copy over the isaac_msgs
-COPY isaac_msgs /src/msgs/src/communications/
+COPY communications/isaac_msgs /src/msgs/src/communications/
 
 RUN cd /src/msgs \
     && export CMAKE_PREFIX_PATH=/opt/ros/${ROS_VERSION} \
