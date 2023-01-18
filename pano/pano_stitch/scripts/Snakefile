@@ -1,0 +1,17 @@
+
+import json
+import yaml
+
+configfile: "/stitch/pano_meta.yaml"
+
+rule all:
+  input:
+    expand("/stitch/{scene_id}/pano.png", scene_id=config["scenes"].keys())
+
+rule stitch:
+  output:
+    "/stitch/{scene_id}/pano.png"
+  params:
+    m=lambda wildcards: config["scenes"][wildcards.scene_id]
+  shell:
+    "/src/isaac/src/pano/pano_stitch/scripts/stitch_panorama.py --no-lens --world=iss --robot={params.m[robot]} --images-dir={params.m[images_dir]} {params.m[bag_path]} --output-dir=/stitch/{wildcards.scene_id}"

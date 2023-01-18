@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+# Copyright (c) 2017, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The Astrobee platform is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+"""
+Detect panoramas (bag files and associated SciCam images) and write template config file for stitching.
+
+Example: rosrun pano_stitch scripts/config_panos.py /input /stitch/pano_meta.yaml
+"""
+
+import argparse
+import os
+import re
+
+import yaml
+
+import pano_image_meta
+
+SCI_CAM_IMG_REGEX = re.compile(r"\d{10}\.\d{3}\.jpg$")
+
+ROBOT_REGEX = re.compile(r"(\b|_)(?P<robot>honey|bumble|queen)(\b|_)", re.IGNORECASE)
+ACTIVITY_REGEX = re.compile(r"(\b|_)(?P<activity>isaac\d+)(\b|_)", re.IGNORECASE)
+MODULE_REGEX = re.compile(
+    r"(\b|_)(?P<module>JEM|NOD2|USL|COL|NOD1)(\b|_)", re.IGNORECASE
+)
+BAY_REGEX = re.compile(r"(\b|_)bay(?P<bay>\d+)(\b|_)", re.IGNORECASE)
+
+SCENE_REGEXES = (
+    ("activity", ACTIVITY_REGEX),
+    ("robot", ROBOT_REGEX),
+    ("module", MODULE_REGEX),
+    ("bay", BAY_REGEX),
+)
+
+FIELD_PREFIXES = {
+    "bay": "bay",
+}
+
+
+def detect_pano_meta(in_folder):
+    bags = {}
+    sci_cam_images = {}
+    for dirname, subdirs, files in os.walk(in_folder):
+        for f in files:
+            if f.endswith(".bag"):
+                bag_path = os.path.join(dirname, f)
+                bags[bag_path] = pano_image_meta.get_image_meta(bag_path, 1)
+            elif SCI_CAM_IMG_REGEX.search(f):
+                sci_cam_images[f] = dirname
+
+    scenes = {}
+    pano_meta = {"scenes": scenes}
+    for i, (bag_path, bag_meta) in enumerate(bags.items()):
+        if not bag_meta:
+            # bag_meta would have length 0 if e.g. the bag has no SciCam images
+            continue
+
+        scene_meta = {
+            "scene_id": None,
+            "bag_path": bag_path,
+            "images_dir": None,
+            "robot": None,
+            "activity": None,
+            "module": None,
+            "bay": None,
+        }
+        scene_meta["images_dir"] = sci_cam_images.get(
+            bag_meta[0]["img_path"], "REQUIRED"
+        )
+
+        for field, regex in SCENE_REGEXES:
+            m = regex.search(bag_path)
+            if m:
+                val = m.group(field).lower()
+                if val.isdigit():
+                    val = int(val)
+                scene_meta[field] = val
+            else:
+                scene_meta[field] = None
+
+        scene_id = "scene%03d" % i
+        for field, regex in SCENE_REGEXES:
+            if field in scene_meta:
+                scene_id += "_%s%s" % (FIELD_PREFIXES.get(field, ""), scene_meta[field])
+
+        scene_meta["scene_id"] = scene_id
+        scenes[scene_id] = scene_meta
+
+    return pano_meta
+
+
+def write_pano_meta(pano_meta, out_yaml_path):
+    with open(out_yaml_path, "w") as out_yaml:
+        out_yaml.write(yaml.dump(pano_meta, default_flow_style=False, sort_keys=False))
+
+
+def config_panos(in_folder, out_yaml_path):
+    pano_meta = detect_pano_meta(in_folder)
+    write_pano_meta(pano_meta, out_yaml_path)
+
+
+class CustomFormatter(
+    argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter
+):
+    pass
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=CustomFormatter
+    )
+    parser.add_argument(
+        "in_folder",
+        type=str,
+        help="input path for folder to search for bag files and SciCam images",
+        default="/input",
+    )
+    parser.add_argument(
+        "out_yaml",
+        type=str,
+        help="output path for YAML pano stitch config",
+        default="/stitch/pano_meta.yaml",
+    )
+    args = parser.parse_args()
+
+    config_panos(args.in_folder, args.out_yaml)
+
+
+if __name__ == "__main__":
+    main()

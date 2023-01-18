@@ -46,12 +46,15 @@ class CustomFormatter(
     pass
 
 
-def get_image_meta(inbag_path):
+def get_image_meta(inbag_path, num_images=None):
     images = []
     with rosbag.Bag(inbag_path) as bag:
         img_meta = None
         for topic, msg, t in bag.read_messages([IMAGE_TOPIC, POSE_TOPIC]):
             if topic == IMAGE_TOPIC:
+                if num_images is not None and len(images) == num_images:
+                    break
+
                 img_meta = {}
                 images.append(img_meta)
 

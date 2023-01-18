@@ -446,7 +446,8 @@ def duplicate_console_to_log(log_path):
 
     # Unbuffer stdout (ensures stdout and stderr interleave properly). As of
     # Python 3.3+ this might not work and no longer be needed.
-    sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
+    if sys.version_info < (3, 3):
+        sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
 
     tee = subprocess.Popen(["tee", "--append", log_path], stdin=subprocess.PIPE)
     os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
