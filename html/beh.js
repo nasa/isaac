@@ -11,6 +11,6 @@ var beh =
       [ "Collecting simulation data to train a CNN + validate with ISS data", "analyst.html#autotoc_md34", null ],
       [ "Building a volumetric map of WiFi signal intensity + analyse model + visualize data", "analyst.html#autotoc_md35", null ]
     ] ],
-    [ "Inspection Behavior", "inspection.html", null ],
+    [ "Inspection Behavior", "inspection.html", "inspection" ],
     [ "Cargo Behavior", "cargo.html", null ]
 ];

@@ -96,16 +96,16 @@ $(document).ready(function(){initNavTree('wifi_driver.html',''); initResizable()
 <p>For the 'all' option, one needs to give the rights to the node executable, as: </p><pre class="fragment">setcap cap_net_admin+ep /path/to/wifi/node
 </pre><p> (as a default, the node executable is in the build folder in devel/lib/wifi/wifi_tool)</p>
 <p>All the parameters are in astrobee/config/hw/wifi.config General Parameters: </p><pre class="fragment">interface_name: to find ou the interface name, one can find out the interface name by running ifconfig in the cmd line.
-</pre><h3><a class="anchor" id="autotoc_md48"></a>
+</pre><h3><a class="anchor" id="autotoc_md55"></a>
 Scan Station</h3>
 <p>Publishes information to the topic hw/wifi/station. It only includes signal strength of the wifi network to which the robot is currently connected to. Scan Station Parameters: </p><pre class="fragment">time_scan_station: update rate of the station scan, can be set upt to 50ms.
-</pre><h3><a class="anchor" id="autotoc_md49"></a>
+</pre><h3><a class="anchor" id="autotoc_md56"></a>
 Scan All</h3>
 <p>Publishes information to the topic hw/wifi/all. Scan All Parameters: </p><pre class="fragment">time_scan_station: update rate of the station scan, can be set up to 50ms.
 time_scan_all: time in between scans, note that even if the time is set to a low limit, information acquisition rate is limited.
 max_networks: maximum number of networks that will be acquired during 'all' scan.
 </pre><p>All data is published as messages on ROS topics using the prefix hw/wifi.</p>
-<h3><a class="anchor" id="autotoc_md50"></a>
+<h3><a class="anchor" id="autotoc_md57"></a>
 Lib mnl</h3>
 <p>This package is needed in hardware/wifi node, such that we can scan the wifi networks. If you are missing this package, and have sudo rights, do: </p><pre class="fragment">sudo apt-get install libmnl-dev
 </pre><p>Otherwise, it can be installed from source as follows: </p><pre class="fragment">mkdir $HOME/projects

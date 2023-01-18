@@ -45,6 +45,7 @@ var NAVTREE =
     [ "Subsystems", "subsystems.html", "subsystems" ],
     [ "Tutorials", "md_isaac_Tutorials.html", "md_isaac_Tutorials" ],
     [ "Ros To Guest Science Bridge", "ros_gs_bridge.html", null ],
+    [ "Panoramas", "panoramas.html", null ],
     [ "Class Index", "classes.html", null ]
   ] ]
 ];

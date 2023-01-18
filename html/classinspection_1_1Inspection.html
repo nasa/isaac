@@ -103,18 +103,36 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a3c701590cc6bd1544a81c0111ff00c46"><td class="memItemLeft" align="right" valign="top"><a id="a3c701590cc6bd1544a81c0111ff00c46"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>ReadParam</b> ()</td></tr>
 <tr class="separator:a3c701590cc6bd1544a81c0111ff00c46"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af627099b4a80546f33c5ecfa9a59667e"><td class="memItemLeft" align="right" valign="top"><a id="af627099b4a80546f33c5ecfa9a59667e"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>GenSegment</b> (geometry_msgs::Pose goal)</td></tr>
-<tr class="separator:af627099b4a80546f33c5ecfa9a59667e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad4215e9cfc5e25b64365fb29ad29dadc"><td class="memItemLeft" align="right" valign="top"><a id="ad4215e9cfc5e25b64365fb29ad29dadc"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>RemoveInspectionPose</b> ()</td></tr>
 <tr class="separator:ad4215e9cfc5e25b64365fb29ad29dadc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a44c6832d940181fcecbbfa23b330ac17"><td class="memItemLeft" align="right" valign="top"><a id="a44c6832d940181fcecbbfa23b330ac17"></a>
-geometry_msgs::Pose&#160;</td><td class="memItemRight" valign="bottom"><b>GetInspectionPose</b> ()</td></tr>
-<tr class="separator:a44c6832d940181fcecbbfa23b330ac17"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1422432be79b1a544c41d387afab7160"><td class="memItemLeft" align="right" valign="top"><a id="a1422432be79b1a544c41d387afab7160"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>GeneratePanoramaSurvey</b> (geometry_msgs::PoseArray &amp;points_panorama)</td></tr>
-<tr class="separator:a1422432be79b1a544c41d387afab7160"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3729a8b66b6939447d04a4be3260e86b"><td class="memItemLeft" align="right" valign="top"><a id="a3729a8b66b6939447d04a4be3260e86b"></a>
+geometry_msgs::PoseArray&#160;</td><td class="memItemRight" valign="bottom"><b>GetCurrentInspectionPose</b> ()</td></tr>
+<tr class="separator:a3729a8b66b6939447d04a4be3260e86b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4dd85cedb7b6380a8c390b1b25944104"><td class="memItemLeft" align="right" valign="top"><a id="a4dd85cedb7b6380a8c390b1b25944104"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>NextInspectionPose</b> ()</td></tr>
+<tr class="separator:a4dd85cedb7b6380a8c390b1b25944104"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6c028d6127257ff51adf553a49e681c1"><td class="memItemLeft" align="right" valign="top"><a id="a6c028d6127257ff51adf553a49e681c1"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>RedoInspectionPose</b> ()</td></tr>
+<tr class="separator:a6c028d6127257ff51adf553a49e681c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae593c5190fcfc92ea424b843dd264ec7"><td class="memItemLeft" align="right" valign="top"><a id="ae593c5190fcfc92ea424b843dd264ec7"></a>
+geometry_msgs::PoseArray&#160;</td><td class="memItemRight" valign="bottom"><b>GetInspectionPoses</b> ()</td></tr>
+<tr class="separator:ae593c5190fcfc92ea424b843dd264ec7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6b64d7920231f004ff29f59e1f84362e"><td class="memItemLeft" align="right" valign="top"><a id="a6b64d7920231f004ff29f59e1f84362e"></a>
+double&#160;</td><td class="memItemRight" valign="bottom"><b>GetDistanceToTarget</b> ()</td></tr>
+<tr class="separator:a6b64d7920231f004ff29f59e1f84362e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a598c7b1123fc3c40da1f68a27e907ccc"><td class="memItemLeft" align="right" valign="top"><a id="a598c7b1123fc3c40da1f68a27e907ccc"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>GenerateAnomalySurvey</b> (geometry_msgs::PoseArray &amp;points_anomaly)</td></tr>
+<tr class="separator:a598c7b1123fc3c40da1f68a27e907ccc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeb3d35ee8326f7a2090e8f1f24168a9a"><td class="memItemLeft" align="right" valign="top"><a id="aeb3d35ee8326f7a2090e8f1f24168a9a"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>GenerateGeometrySurvey</b> (geometry_msgs::PoseArray &amp;points_geometry)</td></tr>
+<tr class="separator:aeb3d35ee8326f7a2090e8f1f24168a9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a99ade31adaedc202192d5fa74b04be2b"><td class="memItemLeft" align="right" valign="top"><a id="a99ade31adaedc202192d5fa74b04be2b"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>GeneratePanoramaSurvey</b> (geometry_msgs::PoseArray &amp;points_panorama)</td></tr>
+<tr class="separator:a99ade31adaedc202192d5fa74b04be2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8f8b880fdd7f9e0fcb7d70077d31073c"><td class="memItemLeft" align="right" valign="top"><a id="a8f8b880fdd7f9e0fcb7d70077d31073c"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>GenerateVolumetricSurvey</b> (geometry_msgs::PoseArray &amp;points_volume)</td></tr>
+<tr class="separator:a8f8b880fdd7f9e0fcb7d70077d31073c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-methods"></a>
 Protected Member Functions</h2></td></tr>
@@ -127,15 +145,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>CheckZonesTimeoutCall
 <tr class="memitem:a537c97fa12d4385fef57331bb78036bf"><td class="memItemLeft" align="right" valign="top"><a id="a537c97fa12d4385fef57331bb78036bf"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>CheckMapTimeoutCallback</b> ()</td></tr>
 <tr class="separator:a537c97fa12d4385fef57331bb78036bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a441d6f6f13070d46352e3a57c4a8dff4"><td class="memItemLeft" align="right" valign="top"><a id="a441d6f6f13070d46352e3a57c4a8dff4"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>GenerateSortedList</b> (geometry_msgs::PoseArray &amp;points)</td></tr>
-<tr class="separator:a441d6f6f13070d46352e3a57c4a8dff4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a67b8a830ea3b6a01eeea16fb7141858b"><td class="memItemLeft" align="right" valign="top"><a id="a67b8a830ea3b6a01eeea16fb7141858b"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>TransformList</b> (geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &amp;points_out, tf2::Transform target_transform)</td></tr>
-<tr class="separator:a67b8a830ea3b6a01eeea16fb7141858b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a34b5138530e60991aa564b18c8c74007"><td class="memItemLeft" align="right" valign="top"><a id="a34b5138530e60991aa564b18c8c74007"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>VisibilityConstraint</b> (geometry_msgs::PoseArray &amp;points)</td></tr>
-<tr class="separator:a34b5138530e60991aa564b18c8c74007"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2e855b6eb174a1ad51e23e3448d83d96"><td class="memItemLeft" align="right" valign="top"><a id="a2e855b6eb174a1ad51e23e3448d83d96"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>VisibilityConstraint</b> (geometry_msgs::PoseArray &amp;points, tf2::Transform target_transform)</td></tr>
+<tr class="separator:a2e855b6eb174a1ad51e23e3448d83d96"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6e7de0c9111c699dcdefb6c86c0162f7"><td class="memItemLeft" align="right" valign="top"><a id="a6e7de0c9111c699dcdefb6c86c0162f7"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>PointInsideCuboid</b> (geometry_msgs::Point const &amp;x, geometry_msgs::Vector3 const &amp;cubemin, geometry_msgs::Vector3 const &amp;cubemax)</td></tr>
 <tr class="separator:a6e7de0c9111c699dcdefb6c86c0162f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -145,15 +157,22 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>ZonesConstraint</b> (
 <tr class="memitem:a1a42d66c6f926ad85d90c708c89a2ef9"><td class="memItemLeft" align="right" valign="top"><a id="a1a42d66c6f926ad85d90c708c89a2ef9"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>ObstaclesConstraint</b> (geometry_msgs::PoseArray &amp;points)</td></tr>
 <tr class="separator:a1a42d66c6f926ad85d90c708c89a2ef9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a91c8187871af15c54e0a8200d608875b"><td class="memItemLeft" align="right" valign="top"><a id="a91c8187871af15c54e0a8200d608875b"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>DrawInspectionPoses</b> (geometry_msgs::PoseArray &amp;points, ros::Publisher &amp;publisher)</td></tr>
-<tr class="separator:a91c8187871af15c54e0a8200d608875b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa5b13e20ea1426317530665b5cdd706c"><td class="memItemLeft" align="right" valign="top"><a id="aa5b13e20ea1426317530665b5cdd706c"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>DrawInspectionFrostum</b> ()</td></tr>
-<tr class="separator:aa5b13e20ea1426317530665b5cdd706c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a67b8a830ea3b6a01eeea16fb7141858b"><td class="memItemLeft" align="right" valign="top"><a id="a67b8a830ea3b6a01eeea16fb7141858b"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>TransformList</b> (geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &amp;points_out, tf2::Transform target_transform)</td></tr>
+<tr class="separator:a67b8a830ea3b6a01eeea16fb7141858b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a69ec49ba59b4f31d594fabf02dd2028b"><td class="memItemLeft" align="right" valign="top"><a id="a69ec49ba59b4f31d594fabf02dd2028b"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>DrawPoseMarkers</b> (geometry_msgs::PoseArray &amp;points, ros::Publisher &amp;publisher)</td></tr>
+<tr class="separator:a69ec49ba59b4f31d594fabf02dd2028b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6b08d33ed366cb6fafd8f06d48329a10"><td class="memItemLeft" align="right" valign="top"><a id="a6b08d33ed366cb6fafd8f06d48329a10"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>DrawCameraFrustum</b> ()</td></tr>
+<tr class="separator:a6b08d33ed366cb6fafd8f06d48329a10"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a441d6f6f13070d46352e3a57c4a8dff4"><td class="memItemLeft" align="right" valign="top"><a id="a441d6f6f13070d46352e3a57c4a8dff4"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>GenerateSortedList</b> (geometry_msgs::PoseArray &amp;points)</td></tr>
+<tr class="separator:a441d6f6f13070d46352e3a57c4a8dff4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this class was generated from the following files:<ul>
 <li>astrobee/behaviors/inspection/include/inspection/<a class="el" href="inspection_8h_source.html">inspection.h</a></li>
+<li>astrobee/behaviors/inspection/src/anomaly_survey.cc</li>
 <li>astrobee/behaviors/inspection/src/inspection.cc</li>
 </ul>
 </div><!-- contents -->

@@ -91,20 +91,23 @@ $(document).ready(function(){initNavTree('inspection.html',''); initResizable();
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>This directory provides two tools: inspection_tool and sci_cam_tool.</p>
-<h2><a class="anchor" id="autotoc_md44"></a>
+<h2><a class="anchor" id="autotoc_md52"></a>
 Using the inspection tool</h2>
 <p>This tool is used to initiate inspection actions. To run the tool: </p><pre class="fragment">rosrun inspection inspection_tool -$ACTION [OPTIONS]
 </pre><p>As of now, the actions available are:</p>
+<p>Inspection coordination:</p>
 <p><em>pause</em>: Pauses the current action being performed, the goal is kept, so a resume command will resume the action.</p>
 <p><em>resume</em>: Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step.</p>
 <p><em>repeat</em>: Resumes the survey repeating the last inspection pose.</p>
 <p><em>skip</em>: Skips the surrent inspection pose, useful if a certain pose is unreachable.</p>
 <p><em>save</em>: Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using</p>
-<p><em>anomaly</em>: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it.</p>
+<p>Inspection modes:</p>
+<p><em>anomaly</em>: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. Target reference frames are defined as the z-axis pointing outwards to where the camera would be, x-axis is along the picture width and the y-axis is along the picture height, like so:</p>
+<p><img src="ref_frame_anomaly.png" alt="" class="inline" title="Target reference frame"/>   </p>
 <p><em>geometry</em>: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.</p>
-<p><em>panorama</em>: it will do a panorama survey of all points specified</p>
+<p><em>panorama</em>: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page <a class="el" href="pano_coverage.html">Panorama coverage planning</a>.</p>
 <p><em>volumetric</em>: This will perform a volumetric survey</p>
-<h2><a class="anchor" id="autotoc_md45"></a>
+<h2><a class="anchor" id="autotoc_md53"></a>
 Using sci_cam_tool</h2>
 <p>This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:</p>
 <p>Start the simulator, for example as: </p><pre class="fragment">roslaunch astrobee sim.launch
@@ -116,7 +119,7 @@ Using sci_cam_tool</h2>
 <p>The pictures will be published on the topic </p><pre class="fragment">/hw/cam_sci/compressed
 </pre><p>They will also show up in the sci cam window in RVIZ.</p>
 <p>If requests to take a single picture come at a high rate, some of them will be dropped.</p>
-<h2><a class="anchor" id="autotoc_md46"></a>
+<h2><a class="anchor" id="autotoc_md54"></a>
 Using export panorama tool</h2>
 <p>This tool was created to allow for panorama surveys to be created and exported. This is useful to make panorama plans beforehand to ensure reproduceability.</p>
 <p>To export the panorama file: </p><pre class="fragment">rosrun inspection export_panorama -panorama_poses $PANORAMA_POSES -panorama_out $OUTPUL_PLAN
@@ -131,18 +134,7 @@ Using export panorama tool</h2>
   default: "/resources/scicam_panorama.txt"
 -tilt_max (Panorama: maximum tilt) type: double default: 90
 -tilt_min (Panorama: minimum tilt) type: double default: -90
-</pre><h2><a class="anchor" id="autotoc_md47"></a>
-Using the stitch panorama script</h2>
-<p>This script firstly creates the hugin panorama stitcher file for a specific panorama, initializes it with the localization data, runs multiple optimizations and finally produces the final stitched result</p>
-<p>To run the tool: </p><pre class="fragment">rosrun inspection stitch_panorama.py -bag_name $BAG_NAME -work_dir $SCI_CAM_DIR
-</pre><p>where $BAG_NAME is the bagfile which the script uses to identify which sci_cam images to use and initializes the attitude in the hugin file accordig to localization data. The $SCI_CAM_DIR is he folder location to the sci_cam images copied from the HLP.</p>
-<p>Other optional arguments are: </p><pre class="fragment">-input_hugin     (Input Hugin pto file.) type: string
--output_hugin    (Output Hugin pto file.) type: string
---no-stitching   (Generate hugin and optimize only.)
---stitching-only (Stitch hugin file only)
-</pre><p>The &ndash;no-stitching option followed by the &ndash;stitch-only option is useful if manual checks/changes are desired to the hugin file before stitching the panorama (which takes a long time), it particularly useful if the localization data is not sufficient for the panorama output to be properly centered around the (0,0,0) ISS reference frame. <br  />
- </p>
-</div></div><!-- contents -->
+</pre> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->
 <!-- HTML footer for doxygen 1.9.0-->
