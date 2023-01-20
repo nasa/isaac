@@ -6,7 +6,7 @@ This document describes how to stitch panoramas collected by an Astrobee robot f
 
 We follow an approach using a Docker container that should be highly repeatable. Much of this process can also be run natively in your host OS if needed, but we don't cover that.
 
-## Install the Docker image for panorama stitching
+## Install the Docker container for panorama stitching
 
 ### Prerequisites
 
@@ -14,7 +14,7 @@ We follow an approach using a Docker container that should be highly repeatable.
 
 - Check out the source code from the `isaac` repo and set the `ISAAC_WS` environment variable following the [Instructions on installing and using the ISAAC Software](https://nasa.github.io/isaac/html/md_INSTALL.html)
 
-### Build the Docker image
+### Build the container
 
 Run:
 ```bash
@@ -26,8 +26,8 @@ $ISAAC_WS/src/pano/docker/build.sh
 ### Input requirements
 
 The expected input data for stitching a single panorama is:
-- `bag_path`: Points to an Astrobee telemetry bag file recorded during an ISAAC panorama-style survey. The only SciCam image timestamps in the bag should be from within a single panorama.
-- `images_dir`: Points to a folder containing the full-resolution SciCam image JPEG files saved on the HLP at the same time when the bag was recorded. Note that it's typical and no problem if a single image folder contains SciCam images that span multiple panoramas (and multiple bag files). However, the stitching script does assume all SciCam images for any given bag are in the same folder.
+- `bag_path`: An Astrobee telemetry bag file recorded during an ISAAC panorama-style survey. The only SciCam image timestamps in the bag should be from within a single panorama.
+- `images_dir`: A folder containing the full-resolution SciCam image JPEG files saved on the HLP at the same time when the bag was recorded. Note that it's typical and no problem if a single image folder contains SciCam images that span multiple panoramas (and multiple bag files). However, the stitching script does assume all SciCam images for any given bag are in the same folder.
 
 Multiple panoramas can be stitched in a single batch job.
 
@@ -35,7 +35,7 @@ Multiple panoramas can be stitched in a single batch job.
 
 Here are some typical pre-processing steps you might need before stitching when working with real Astrobee data:
 
-- The documentation on [Using Astrobee Robot Telemetry Logs](https://nasa.github.io/astrobee/html/using_telemetry.html) applies. For example, if processing older bags that have obsolete message types, you might need to run the `rosbag_fix_all.py` script.
+- The documentation on [Using Astrobee Robot Telemetry Logs](https://nasa.github.io/astrobee/html/using_telemetry.html) applies. For example, if using bags that have obsolete message types, you might need to run the `rosbag_fix_all.py` script.
 - If you have a bag that includes telemetry from multiple panoramas (or other SciCam image timestamps), you should split it up so that each bag contains one panorama and no other SciCam data.
 - You may find it more convenient to work with filtered telemetry bags that contains only the messages required by the panorama stitching. This is particularly useful if you need to transfer the bags to a different host before stitching (minimizing transfer data volume and storage required on the stitching host). It also speeds up stitching slightly. You can generate filtered bags like this:
     ```bash
@@ -45,7 +45,6 @@ Here are some typical pre-processing steps you might need before stitching when 
 
 ### Configure folders for processing
 
-Run:
 ```bash
 # choose your own folders in the host OS
 export ISAAC_PANO_INPUT="$HOME/pano_input"
@@ -84,7 +83,7 @@ $ISAAC_WS/src/pano/docker/exec.sh mycmd arg1 arg2 ...
 
 Inside the container, run:
 ```bash
-rosrun pano_stitch scripts/config_panos.py
+/src/isaac/src/pano/scripts/config_panos.py
 ```
 
 This will create the panorama config file `pano_meta.yaml` in the output folder. You should verify the config file looks correct by opening `$ISAAC_PANO_OUTPUT/pano_meta.yaml` in your favorite editor in the host OS.
@@ -92,97 +91,49 @@ This will create the panorama config file `pano_meta.yaml` in the output folder.
 Below is an example `pano_meta.yaml`:
 ```yaml
 scenes:
-  scene000_isaac10_queen_nod2_bay2:
-    bag_path: /input/isaac10_queen/20220617_1554_survey_nod2_bay2_std_panorama.bag
-    images_dir: /input/isaac10_queen/isaac_sci_cam_image_delayed
-    robot: queen
-    activity: isaac10
-    module: nod2
-    bay: 2
-    position:
-      x: 10.996580718096382
-      y: 0.0018100984828177873
-      z: 4.899023194998069
-    start_time: '2022-06-17T15:57:23.139000Z'
-    end_time: '2022-06-17T16:08:06.880000Z'
-    extra_stitch_args: ''
-    extra_tour_params: {}
-  scene001_isaac11_bumble_usl_bay6:
-    bag_path: /input/isaac11_bumble/20220711_1238_survey_usl_bay6_std_panorama_run1.bag
+  scene000_isaac11_bumble_usl_bay4:
+    bag_path: /input/isaac11_bumble/isaac11_bumble_usl_bay4.bag
     images_dir: /input/isaac11_bumble/isaac_sci_cam_image_delayed
     robot: bumble
     activity: isaac11
     module: usl
-    bay: 6
-    position:
-      x: -0.3593667375653261
-      y: 0.0072030887961762385
-      z: 4.885617819225414
-    start_time: '2022-07-11T12:40:00.841000Z'
-    end_time: '2022-07-11T12:51:01.391000Z'
+    bay: 4
     extra_stitch_args: ''
-    extra_tour_params: {}
+  scene001_isaac11_queen_usl_bay1:
+    bag_path: /input/isaac11_queen/isaac11_queen_usl_bay1.bag
+    images_dir: /input/isaac11_queen/isaac_sci_cam_image_delayed
+    robot: queen
+    activity: isaac11
+    module: usl
+    bay: 1
+    extra_stitch_args: ''
 ```
 
-Ideally, the `config_panos.py` script will set all the config fields correctly, but it is not especially smart and could get fooled in some situations. It fills many of the later fields by attempting to parse the `bag_path`. If you want its auto-configure to work better, you can rename your bags in advance to filenames that follow the conventions in the example. If a field is not detected, its value will be set to `null`.
+Ideally, the `config_panos.py` script will set all the config fields correctly, but it is not especially smart and could get fooled in some situations. It fills many of the later fields by attempting to parse the `bag_path`. You can help it by renaming your bags to filenames that follow the conventions in the example. If it fails to auto-configure a field, its value will be set to `null`.
 
 Here's what to check in the config file:
 - Each entry in the `scenes` list defines a single panorama to stitch. All of your panoramas should appear in the list.
 - The header line for each panorama defines its `scene_id`. This id is normally not important, but it does control the name of the output subfolder for that panorama, as well as its scene id in the Pannellum tour. If you find a meaningful id helpful for debugging, you can set it to whatever you like, as long as every panorama has a unique id.
-- The `bag_path` and `images_dir` fields should contain valid paths that specify the location of the input data for that panorama. They should match, in that all of the SciCam image timestamps in the bag should refer to SciCam images in the folder.
+- The `bag_path` and `images_dir` fields should contain valid paths that specify the location of the input data for that panorama. They should match, in that the SciCam image timestamps in the bag should correspond to SciCam images in the folder.
 - The `robot` field should correctly specify the robot that collected the panorama. This field is used to look up the correct SciCam lens calibration parameters to use during stitching.
-- The `activity`, `module`, `bay`, `position`, `start_time`, and `end_time` fields don't affect the stitching step but should be set correctly so they can be displayed to users in the final output tour.
-- The `extra_stitch_args` field provides a way for advanced users to pass extra options to the `stitch_panorama.py` script for a specific panorama. It would typically be used for debugging and tuning when the stitching process fails or produces a low-quality result.
-- The `extra_tour_params` field provides a way for advanced users to overwrite the parameters for a specific panorama in the `tour.json` file that configures the Pannellum display interface.
+- The `activity`, `module`, and `bay` fields don't affect the stitching step but should be filled in correctly because they are displayed to users in the final output tour.
+- The `extra_stitch_args` field provides a way for advanced users to modify the stitching parameters on a per-panorama basis. It would typically be used for debugging and tuning when the stitching process fails.
 
-### Stitch the panoramas and generate the tour
+### Stitch the panoramas
 
 Inside the container, run:
 ```bash
-snakemake -s /src/isaac/src/pano/pano_view/scripts/Snakefile -d /output -c1
+snakemake -s /src/isaac/src/pano/pano_stitch/scripts/Snakefile -d /output -c1
 ```
 
 This will trigger the `snakemake` build system to stitch the panoramas. There is one job per panorama in the config file, and `snakemake` will try to run these jobs in parallel up to the number of cores specified in the `-c` argument. (When `-c` is specified with no arguments, it will use the number of cores allocated to the container.)
 
 Note that some of the individual steps within each panorama stitch (e.g., `enblend`) run multi-threaded, and each individually tries to use all available cores, which could cause problems when stitching multiple panoramas in parallel. Both `snakemake` and `enblend` provide ways to manage this, which could be an area for future work.
 
-### View the tour
+### Generate the tour
 
 TODO
 
+### View the tour
 
-### Generate target pose from image
-
-Once you have the json file exported you can generate the target pose where the attitude of the target is extracted based on the camera point of view at the time of the picture:
-(1) use the bagfile where that panorama was recorded to extract the point cloud and estimate target pose
-(2) use the mesh generated by the geometry mapper (optional)
-or both and compare results. To use the tool, you will first have to define `ASTROBEE_CONFIG_DIR`, `ASTROBEE_RESOURCE_DIR`, `ASTROBEE_ROBOT`, `ASTROBEE_WORLD`, and then run:
-
-    rosrun pano_view find_point_coordinate [OPTIONS]
-
-General parameters
-| Parameter            | Default value         | Description                                                                |
-| -------------------- | --------------------- | --------------------------------------------------------                   |
-| camera               | "sci_cam"             | Camera to use                                                              |
-| depth                | "haz"                 | Depth camera name                                                          |
-| json_config          | ""                    | json file with configure data                                              |
-| bag_name             | ""                    | Bagname where image can be found. Make sure it has haz cam and ground truth|
-| mesh_name            | ""                    | Meshfile path                                                              |
-| depth_cam_topic      | "/hw/depth_haz/points"| Point Cloud topic name                                                     |
-| ground_truth_topic   | "/gnc/ekf"            | Robot pose topic name                                                      |
-
-The script will print in the screen the target pose estimates.
-An example of this script would be:
-
-    rosrun pano_view find_point_coordinate -bag_name bag_name.bag -mesh_name mesh_name.obj -json_config test/viewpoint.json
-
-An example output would be:
-
-    Closest timestamp depth: 0.050772; Closest timestamp pose: 0.000275373
-    Point Cloud Point to vector distance: 0.00341976
-    Intersection point pcl: (0.997071, 0.238026, -0.571279)(0,4.71044,-14.8078)
-    Intersection point mesh: (0.993323, 0.237302, -0.5721)(0,4.71044,-14.8078)
-
-Things to look for are that the timestamps are not too large, this would mean that results are unreliable.
-Pay attention to the point cloud point to vector distance to make sure that the point is not too far away from the target vector, meaning that the point cloud does not include the target which is possible due to different field of views between the cameras.
-Lastly the mesh and pcl should not disagree, if they do, some manual analysis is needed. Be aware that the attitude provided is defined by the direction pointing at the target assuming roll zero.
+TODO
