@@ -57,7 +57,6 @@ def detect_pano_meta(in_folder):
     pano metadata.
     """
 
-
     bags = {}
     sci_cam_images = {}
     for dirname, subdirs, files in os.walk(in_folder):
@@ -148,7 +147,7 @@ def main():
         "--out-yaml",
         type=str,
         help="output path for YAML pano stitch config",
-        default="/stitch/pano_meta.yaml",
+        default="/output/pano_meta.yaml",
         required=False,
     )
     parser.add_argument(

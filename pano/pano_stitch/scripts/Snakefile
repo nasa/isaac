@@ -22,11 +22,14 @@ Snakemake rules for batch stitching multiple panoramas.
 
 from dot_dict import DotDict
 
-configfile: "/stitch/pano_meta.yaml"
+# When using this Snakefile, use the --directory option to snakemake to set the
+# desired output directory (e.g., "/output").
+
+configfile: "pano_meta.yaml"
 
 rule all:
     input:
-        expand("/stitch/{scene_id}/pano.png", scene_id=config["scenes"].keys())
+        expand("{scene_id}/pano.png", scene_id=config["scenes"].keys())
 
 # We set up an explicit check if the output pano exists before
 # restitching.  This avoids unwanted restitching of all panos based on
@@ -35,7 +38,7 @@ rule all:
 
 rule stitch:
     output:
-        "/stitch/{scene_id}/pano.png"
+        "{scene_id}/pano.png"
     params:
         s=lambda wildcards: DotDict(config["scenes"][wildcards.scene_id])
     shell:
@@ -45,5 +48,5 @@ rule stitch:
          " --robot={params.s.robot}"
          " --images-dir={params.s.images_dir}"
          " {params.s.bag_path}"
-         " --output-dir=/stitch/{wildcards.scene_id}"
+         " --output-dir={wildcards.scene_id}"
          " {params.s.extra_stitch_args}")
