@@ -17,14 +17,14 @@
 # under the License.
 
 """
-Detect panoramas (bag files and associated SciCam images) and write template config file for stitching.
-
-Example: rosrun pano_stitch scripts/config_panos.py /input /stitch/pano_meta.yaml
+Detect panoramas (bag files and associated SciCam images) and write
+template config file for stitching.
 """
 
 import argparse
 import os
 import re
+import sys
 
 import yaml
 
@@ -52,6 +52,12 @@ FIELD_PREFIXES = {
 
 
 def detect_pano_meta(in_folder):
+    """
+    Detect panoramas (bag files and associated SciCam images). Return
+    pano metadata.
+    """
+
+
     bags = {}
     sci_cam_images = {}
     for dirname, subdirs, files in os.walk(in_folder):
@@ -70,47 +76,53 @@ def detect_pano_meta(in_folder):
             continue
 
         scene_meta = {
-            "scene_id": None,
             "bag_path": bag_path,
             "images_dir": None,
             "robot": None,
             "activity": None,
             "module": None,
             "bay": None,
+            "extra_stitch_args": "",
         }
-        scene_meta["images_dir"] = sci_cam_images.get(
-            bag_meta[0]["img_path"], "REQUIRED"
-        )
+        scene_meta["images_dir"] = sci_cam_images.get(bag_meta[0]["img_path"])
 
         for field, regex in SCENE_REGEXES:
-            m = regex.search(bag_path)
-            if m:
-                val = m.group(field).lower()
+            match = regex.search(bag_path)
+            if match:
+                val = match.group(field).lower()
                 if val.isdigit():
                     val = int(val)
                 scene_meta[field] = val
-            else:
-                scene_meta[field] = None
 
         scene_id = "scene%03d" % i
         for field, regex in SCENE_REGEXES:
             if field in scene_meta:
                 scene_id += "_%s%s" % (FIELD_PREFIXES.get(field, ""), scene_meta[field])
 
-        scene_meta["scene_id"] = scene_id
         scenes[scene_id] = scene_meta
 
     return pano_meta
 
 
-def write_pano_meta(pano_meta, out_yaml_path):
+def write_pano_meta(pano_meta, out_yaml_path, force):
+    """
+    Write pano metadata to a YAML file, to be used as a configfile for
+    snakemake.
+    """
+    if os.path.exists(out_yaml_path) and not force:
+        print(
+            "output file %s exists and --force not specified, not overwriting"
+            % out_yaml_path
+        )
+        sys.exit(1)
     with open(out_yaml_path, "w") as out_yaml:
         out_yaml.write(yaml.dump(pano_meta, default_flow_style=False, sort_keys=False))
+    print("wrote to %s" % out_yaml_path)
 
 
-def config_panos(in_folder, out_yaml_path):
+def config_panos(in_folder, out_yaml_path, force):
     pano_meta = detect_pano_meta(in_folder)
-    write_pano_meta(pano_meta, out_yaml_path)
+    write_pano_meta(pano_meta, out_yaml_path, force)
 
 
 class CustomFormatter(
@@ -124,20 +136,32 @@ def main():
         description=__doc__, formatter_class=CustomFormatter
     )
     parser.add_argument(
-        "in_folder",
+        "-i",
+        "--in-folder",
         type=str,
         help="input path for folder to search for bag files and SciCam images",
         default="/input",
+        required=False,
     )
     parser.add_argument(
-        "out_yaml",
+        "-o",
+        "--out-yaml",
         type=str,
         help="output path for YAML pano stitch config",
         default="/stitch/pano_meta.yaml",
+        required=False,
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="overwrite output file if it exists",
+        default=False,
+        required=False,
     )
     args = parser.parse_args()
 
-    config_panos(args.in_folder, args.out_yaml)
+    config_panos(args.in_folder, args.out_yaml, args.force)
 
 
 if __name__ == "__main__":
