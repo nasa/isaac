@@ -173,6 +173,13 @@ def parse_args():
         help="Skip specified images. Comma-separated list of substrings to match image file against (you can just specify the timestamps of the images you want to skip).",
     )
     parser.add_argument(
+        "--enblend-options",
+        type=str,
+        required=False,
+        default="--primary-seam-generator=nft",
+        help="Extra options to pass to enblend. Should be a quoted string that can contain multiple options. Sometimes adding --no-optimize --fine-mask can help. See comments in script.",
+    )
+    parser.add_argument(
         "--world",
         type=str,
         required=False,
@@ -469,7 +476,7 @@ def main():
 
     pto_base = os.path.join(output_dir, "build", "stitch.pto")
     pto = PathSequence(pto_base, True)
-    pto_final = pto.insert_suffix("_final")
+    pto_preremap = pto.insert_suffix("_preremap")
 
     if not args.only_stitching:
         src_images = get_image_meta(args.inbag, args.images_dir, args.skip_images)
@@ -640,6 +647,21 @@ def main():
         cmd = ["autooptimiser", "-m", "-o", pto.next(), current]
         run_cmd(cmd)
 
+        # Need to copy last pto from optimization to a standard
+        # location, so it can be used on any subsequent
+        # --stitching-only runs.
+        shutil.copyfile(pto.get_path(), pto_preremap)
+
+    if not args.no_stitching:
+        print("%s Starting stitching" % get_timestamp())
+
+        pto_remap_base = os.path.join(output_dir, "build", "stitch_remap.pto")
+        pto_remap = PathSequence(pto_remap_base, True)
+
+        # copy last file from pto preremap sequence to be the first in
+        # the pto remap sequence
+        shutil.copyfile(pto_preremap, pto_remap.get_path())
+
         # Configure image output
         cmd = [
             "pano_modify",
@@ -652,20 +674,24 @@ def main():
             # images. Empirically, this makes them smaller but not as small as
             # PNG, so we'll do one more conversion at the end.
             "--ldr-compression=DEFLATE",
-            pto.get_path(),
+            pto_remap.get_path(),
             "-o",
-            pto.next(),
+            pto_remap.next(),
         ]
         run_cmd(cmd)
 
+        p = hsi.Panorama()
+
         # Set enblend options for stitching
-        read_pto(p, pto.get_path())
+        read_pto(p, pto_remap.get_path())
+
+        p.getOptions().enblendOptions += " " + args.enblend_options
 
         # Black dropout areas workaround #1: Switch primary seam generator to
         # less advanced but possibly more robust older version. This is probably
         # the better way to handle it (increases speed as well). Some places
         # online recommend trying this.
-        p.getOptions().enblendOptions += " --primary-seam-generator=nft"
+        # p.getOptions().enblendOptions += " --primary-seam-generator=nft"
 
         # Black dropout areas workaround #2: Turn off seam optimization. This
         # seems to help in some cases but not as often? May not be needed if
@@ -673,14 +699,12 @@ def main():
         # p.getOptions().enblendOptions += " --no-optimize --fine-mask"
 
         print("Set enblend options: %s" % p.getOptions().enblendOptions)
-        write_pto(p, pto.next())
+        write_pto(p, pto_remap.next())
 
-        # Need to copy last pto in sequence to be "final", so it will be used
-        # on any subsequent --stitching-only runs.
-        shutil.copyfile(pto.get_path(), pto_final)
+        pto_final = pto.insert_suffix("_final")
+        shutil.copyfile(pto_remap.get_path(), pto_final)
+        print("Wrote final stitching metadata to %s" % pto_final)
 
-    if not args.no_stitching:
-        print("%s Starting stitching" % get_timestamp())
         # Generate panorama
         pano_path = os.path.join(output_dir, "build", "pano")
         cmd = [
