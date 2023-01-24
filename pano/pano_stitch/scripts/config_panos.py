@@ -29,7 +29,6 @@ import sys
 import pano_image_meta
 import yaml
 
-
 SCI_CAM_IMG_REGEX = re.compile(r"\d{10}\.\d{3}\.jpg$")
 
 ROBOT_REGEX = re.compile(r"(\b|_)(?P<robot>honey|bumble|queen)(\b|_)", re.IGNORECASE)
