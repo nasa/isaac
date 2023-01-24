@@ -6,7 +6,7 @@ This document describes how to stitch panoramas collected by an Astrobee robot f
 
 We follow an approach using a Docker container that should be highly repeatable. Much of this process can also be run natively in your host OS if needed, but we don't cover that.
 
-## Install the Docker container for panorama stitching
+## Install the Docker image for panorama stitching
 
 ### Prerequisites
 
@@ -14,7 +14,7 @@ We follow an approach using a Docker container that should be highly repeatable.
 
 - Check out the source code from the `isaac` repo and set the `ISAAC_WS` environment variable following the [Instructions on installing and using the ISAAC Software](https://nasa.github.io/isaac/html/md_INSTALL.html)
 
-### Build the container
+### Build the Docker image
 
 Run:
 ```bash
@@ -26,8 +26,8 @@ $ISAAC_WS/src/pano/docker/build.sh
 ### Input requirements
 
 The expected input data for stitching a single panorama is:
-- `bag_path`: An Astrobee telemetry bag file recorded during an ISAAC panorama-style survey. The only SciCam image timestamps in the bag should be from within a single panorama.
-- `images_dir`: A folder containing the full-resolution SciCam image JPEG files saved on the HLP at the same time when the bag was recorded. Note that it's typical and no problem if a single image folder contains SciCam images that span multiple panoramas (and multiple bag files). However, the stitching script does assume all SciCam images for any given bag are in the same folder.
+- `bag_path`: Points to an Astrobee telemetry bag file recorded during an ISAAC panorama-style survey. The only SciCam image timestamps in the bag should be from within a single panorama.
+- `images_dir`: Points to a folder containing the full-resolution SciCam image JPEG files saved on the HLP at the same time when the bag was recorded. Note that it's typical and no problem if a single image folder contains SciCam images that span multiple panoramas (and multiple bag files). However, the stitching script does assume all SciCam images for any given bag are in the same folder.
 
 Multiple panoramas can be stitched in a single batch job.
 
@@ -35,7 +35,7 @@ Multiple panoramas can be stitched in a single batch job.
 
 Here are some typical pre-processing steps you might need before stitching when working with real Astrobee data:
 
-- The documentation on [Using Astrobee Robot Telemetry Logs](https://nasa.github.io/astrobee/html/using_telemetry.html) applies. For example, if using bags that have obsolete message types, you might need to run the `rosbag_fix_all.py` script.
+- The documentation on [Using Astrobee Robot Telemetry Logs](https://nasa.github.io/astrobee/html/using_telemetry.html) applies. For example, if processing older bags that have obsolete message types, you might need to run the `rosbag_fix_all.py` script.
 - If you have a bag that includes telemetry from multiple panoramas (or other SciCam image timestamps), you should split it up so that each bag contains one panorama and no other SciCam data.
 - You may find it more convenient to work with filtered telemetry bags that contains only the messages required by the panorama stitching. This is particularly useful if you need to transfer the bags to a different host before stitching (minimizing transfer data volume and storage required on the stitching host). It also speeds up stitching slightly. You can generate filtered bags like this:
     ```bash
@@ -45,6 +45,7 @@ Here are some typical pre-processing steps you might need before stitching when 
 
 ### Configure folders for processing
 
+Run:
 ```bash
 # choose your own folders in the host OS
 export ISAAC_PANO_INPUT="$HOME/pano_input"
@@ -109,15 +110,15 @@ scenes:
     extra_stitch_args: ''
 ```
 
-Ideally, the `config_panos.py` script will set all the config fields correctly, but it is not especially smart and could get fooled in some situations. It fills many of the later fields by attempting to parse the `bag_path`. You can help it by renaming your bags to filenames that follow the conventions in the example. If it fails to auto-configure a field, its value will be set to `null`.
+Ideally, the `config_panos.py` script will set all the config fields correctly, but it is not especially smart and could get fooled in some situations. It fills many of the later fields by attempting to parse the `bag_path`. If you want its auto-configure to work better, you can rename your bags in advance to filenames that follow the conventions in the example. If a field is not detected, its value will be set to `null`.
 
 Here's what to check in the config file:
 - Each entry in the `scenes` list defines a single panorama to stitch. All of your panoramas should appear in the list.
 - The header line for each panorama defines its `scene_id`. This id is normally not important, but it does control the name of the output subfolder for that panorama, as well as its scene id in the Pannellum tour. If you find a meaningful id helpful for debugging, you can set it to whatever you like, as long as every panorama has a unique id.
-- The `bag_path` and `images_dir` fields should contain valid paths that specify the location of the input data for that panorama. They should match, in that the SciCam image timestamps in the bag should correspond to SciCam images in the folder.
+- The `bag_path` and `images_dir` fields should contain valid paths that specify the location of the input data for that panorama. They should match, in that all of the SciCam image timestamps in the bag should refer to SciCam images in the folder.
 - The `robot` field should correctly specify the robot that collected the panorama. This field is used to look up the correct SciCam lens calibration parameters to use during stitching.
 - The `activity`, `module`, and `bay` fields don't affect the stitching step but should be filled in correctly because they are displayed to users in the final output tour.
-- The `extra_stitch_args` field provides a way for advanced users to modify the stitching parameters on a per-panorama basis. It would typically be used for debugging and tuning when the stitching process fails.
+- The `extra_stitch_args` field provides a way for advanced users to pass extra options to the `stitch_panorama.py` script on a per-panorama basis. It would typically be used for debugging and tuning when the stitching process fails or produces a low-quality result.
 
 ### Stitch the panoramas
 
