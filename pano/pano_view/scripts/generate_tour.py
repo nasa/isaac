@@ -129,6 +129,15 @@ def generate_tour_json(config, out_folder):
     tour["scenes"] = tour_scenes
 
     for scene_id, config_scene_meta in config["scenes"].items():
+        # Read tiler scene metadata
+        tiler_meta_path = os.path.join(out_folder, "scenes", scene_id, "config.json")
+        config_scene_meta["tiled"] = os.path.isfile(tiler_meta_path)
+        if not config_scene_meta["tiled"]:
+            print("warning: skipping %s (%s not found)" % (scene_id, tiler_meta_path))
+            continue
+        with open(tiler_meta_path, "r") as tiler_meta_stream:
+            tiler_meta = json.load(tiler_meta_stream)
+
         scene_meta = get_display_scene_meta(scene_id, config_scene_meta)
 
         tour_scene = TOUR_SCENE_INIT.copy()
@@ -141,11 +150,6 @@ def generate_tour_json(config, out_folder):
                 val = val.replace("  ", " ")
                 tour_scene_updates[field] = val
         tour_scene.update(tour_scene_updates)
-
-        # Read more scene metadata from the tiler
-        tiler_meta_path = os.path.join(out_folder, "scenes", scene_id, "config.json")
-        with open(tiler_meta_path, "r") as tiler_meta_stream:
-            tiler_meta = json.load(tiler_meta_stream)
 
         # Copy tiler metadata into scene. Paths output by the tiler
         # start with "/" but are actually relative to the tiler output
@@ -173,6 +177,9 @@ def generate_scene_index(config, out_folder):
     # Can improve this to be grouped by modules and bays sorted in increasing order.
     index = ["<ul>"]
     for scene_id, config_scene_meta in config["scenes"].items():
+        if not config_scene_meta["tiled"]:
+            continue
+
         scene_meta = get_display_scene_meta(scene_id, config_scene_meta)
         index.append(
             '<li><a href="pannellum.htm?config=tour.json&firstScene={scene_id}">{module} {bay}</a></li>'.format(
