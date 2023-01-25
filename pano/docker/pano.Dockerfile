@@ -26,7 +26,7 @@ RUN pip3 install --no-cache-dir --upgrade pip \
 # pannellum: library for viewing/navigating panorama tours
 RUN mkdir -p /opt \
   && cd /opt \
-  && git clone --quiet --depth 1 --single-branch --no-tags https://github.com/mpetroff/pannellum.git \
+  && git clone --quiet --depth 1 --branch standalone_load_event --single-branch --no-tags https://github.com/trey0/pannellum.git \
   && cd /opt/pannellum/utils/build \
   && python3 build.py
 
