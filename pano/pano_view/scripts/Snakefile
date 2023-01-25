@@ -43,7 +43,7 @@ rule stitch:
         scene=lambda wildcards: DotDict(config["scenes"][wildcards.scene_id])
     shell:
         ("[ -f {output} ] ||"
-         " rosrun pano_stitch stitch_panorama.py"
+         " rosrun pano_stitch scripts/stitch_panorama.py"
          " --no-lens"
          " --robot={params.scene.robot}"
          " --images-dir={params.scene.images_dir}"
@@ -71,19 +71,10 @@ rule tile:
          " {input}"
          " -o html/scenes/{wildcards.scene_id}")
 
-rule prep_source_images:
-    input:
-        expand("stitch/{scene_id}/pano.png", scene_id=config["scenes"].keys())
-    output:
-        touch("html/source_images/completed.txt")
-    shell:
-        "rosrun pano_view prep_source_images.py"
-
 rule tour:
     input:
-        expand("html/scenes/{scene_id}/config.json", scene_id=config["scenes"].keys()),
-        "html/source_images/completed.txt"
+        expand("html/scenes/{scene_id}/config.json", scene_id=config["scenes"].keys())
     output:
         "html/tour.json"
     shell:
-        "rosrun pano_view generate_tour.py"
+        "rosrun pano_view scripts/generate_tour.py"

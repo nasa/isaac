@@ -22,10 +22,12 @@ template config file for stitching.
 """
 
 import argparse
+import datetime
 import os
 import re
 import sys
 
+import numpy as np
 import pano_image_meta
 import yaml
 
@@ -50,6 +52,23 @@ FIELD_PREFIXES = {
 }
 
 
+def get_scene_position(bag_meta):
+    pos_data = np.zeros((len(bag_meta), 3))
+    for i, image_meta in enumerate(bag_meta):
+        pos_data[i, :] = [image_meta["x"], image_meta["y"], image_meta["z"]]
+    median_pos = np.median(pos_data, axis=0)
+    return {
+        "x": float(median_pos[0]),
+        "y": float(median_pos[1]),
+        "z": float(median_pos[2]),
+    }
+
+
+def get_image_timestamp(image_meta):
+    timestamp = datetime.datetime.utcfromtimestamp(image_meta["timestamp"])
+    return timestamp.isoformat() + "Z"
+
+
 def detect_pano_meta(in_folder):
     """
     Detect panoramas (bag files and associated SciCam images). Return
@@ -62,7 +81,7 @@ def detect_pano_meta(in_folder):
         for f in files:
             if f.endswith(".bag"):
                 bag_path = os.path.join(dirname, f)
-                bags[bag_path] = pano_image_meta.get_image_meta(bag_path, 1)
+                bags[bag_path] = pano_image_meta.get_image_meta(bag_path)
             elif SCI_CAM_IMG_REGEX.search(f):
                 sci_cam_images[f] = dirname
 
@@ -80,6 +99,9 @@ def detect_pano_meta(in_folder):
             "activity": None,
             "module": None,
             "bay": None,
+            "position": get_scene_position(bag_meta),
+            "start_time": get_image_timestamp(bag_meta[0]),
+            "end_time": get_image_timestamp(bag_meta[-1]),
             "extra_stitch_args": "",
         }
         scene_meta["images_dir"] = sci_cam_images.get(bag_meta[0]["img_path"])

@@ -17,15 +17,7 @@
  * under the License.
  */
 
-/* Default to sans-serif where no font is specified. */
-
-body {
-    font-family: sans-serif;
-}
-
-/**********************************************************************
- * Overview map
- **********************************************************************/
+/* Implement overview map styling for ISAAC panoramic tour. */
 
 .pnlm-overview-map {
     position: absolute;
@@ -69,80 +61,4 @@ body {
     background: url('../media/arrow.png');
     transform: translate(-50%, -50%);
     z-index: 5;
-}
-
-/**********************************************************************
- * Source image custom hot spot and tune Pannellum hot spot style
- **********************************************************************/
-
-.isaac-source-image {
-    background-image: url('../media/camera.png') !important;
-    background-position: 0 0px !important;
-}
-
-/* make this wider so scene link tooltips don't have to wrap */
-div.pnlm-tooltip span {
-    max-width: 300px;
-}
-
-/**********************************************************************
- * Nav bar and view options dropdown menu
- **********************************************************************/
-
-.isaac-navbar {
-    padding: 5px;
-}
-
-.isaac-drop-button {
-    background-color: #ddd;
-    color: #666;
-    padding: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    border: 1px solid #666;
-}
-
-.isaac-drop-button:hover, .isaac-drop-button:focus {
-    background-color: #ddd;
-    color: black;
-}
-
-.isaac-dropdown {
-    position: relative;
-    display: inline-block;
-}
-
-.isaac-dropdown-content {
-    display: none;
-    position: absolute;
-    background-color: #fff;
-    min-width: 200px;
-    overflow: auto;
-    border: 1px solid black;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    z-index: 1;
-}
-
-.isaac-dropdown-content .isaac-toggle-entry {
-    font-size: 12px;
-    color: black;
-    padding: 3px 4px;
-    text-decoration: none;
-    display: block;
-}
-
-.isaac-dropdown .isaac-toggle-entry:hover {
-    background-color: #ddd;
-}
-
-.isaac-dropdown .isaac-toggle-entry .checkbox:before {
-    content: "\2610";
-}
-
-.isaac-dropdown .isaac-toggle-entry.checked .checkbox:before {
-    content: "\2611";
-}
-
-.isaac-dropdown .show {
-    display: block;
 }
