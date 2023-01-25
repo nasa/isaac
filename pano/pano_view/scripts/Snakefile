@@ -29,7 +29,7 @@ configfile: "pano_meta.yaml"
 
 rule all:
     input:
-        expand("{scene_id}/pano.png", scene_id=config["scenes"].keys())
+        "html/tour.json"
 
 # We set up an explicit check if the output pano exists before
 # restitching.  This avoids unwanted restitching of all panos based on
@@ -38,15 +38,43 @@ rule all:
 
 rule stitch:
     output:
-        "{scene_id}/pano.png"
+        protected("stitch/{scene_id}/pano.png")
     params:
-        s=lambda wildcards: DotDict(config["scenes"][wildcards.scene_id])
+        scene=lambda wildcards: DotDict(config["scenes"][wildcards.scene_id])
     shell:
         ("[ -f {output} ] ||"
-         " /src/isaac/src/pano/pano_stitch/scripts/stitch_panorama.py"
+         " rosrun pano_stitch scripts/stitch_panorama.py"
          " --no-lens"
-         " --robot={params.s.robot}"
-         " --images-dir={params.s.images_dir}"
-         " {params.s.bag_path}"
-         " --output-dir={wildcards.scene_id}"
-         " {params.s.extra_stitch_args}")
+         " --robot={params.scene.robot}"
+         " --images-dir={params.scene.images_dir}"
+         " {params.scene.bag_path}"
+         " --output-dir=stitch/{wildcards.scene_id}"
+         " {params.scene.extra_stitch_args}")
+
+# Note we have to remove the output directory before running
+# generate.py because Snakemake tries to help by creating it, but
+# generate.py aborts if the directory exists to avoid accidentally
+# overwriting previous output.
+
+# As with stitching, if you want to force rebuild you should
+# explicitly delete the rule's output file (config.json).
+
+rule tile:
+    input:
+        "stitch/{scene_id}/pano.png"
+    output:
+        protected("html/scenes/{scene_id}/config.json")
+    shell:
+        ("[ -f {output} ] ||"
+         " rmdir $(dirname {output}) && "
+         " /opt/pannellum/utils/multires/generate.py"
+         " {input}"
+         " -o html/scenes/{wildcards.scene_id}")
+
+rule tour:
+    input:
+        expand("html/scenes/{scene_id}/config.json", scene_id=config["scenes"].keys())
+    output:
+        "html/tour.json"
+    shell:
+        "rosrun pano_view scripts/generate_tour.py"

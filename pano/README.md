@@ -84,7 +84,7 @@ $ISAAC_WS/src/pano/docker/exec.sh mycmd arg1 arg2 ...
 
 Inside the container, run:
 ```bash
-/src/isaac/src/pano/scripts/config_panos.py
+rosrun pano_stitch scripts/config_panos.py
 ```
 
 This will create the panorama config file `pano_meta.yaml` in the output folder. You should verify the config file looks correct by opening `$ISAAC_PANO_OUTPUT/pano_meta.yaml` in your favorite editor in the host OS.
@@ -117,23 +117,19 @@ Here's what to check in the config file:
 - The header line for each panorama defines its `scene_id`. This id is normally not important, but it does control the name of the output subfolder for that panorama, as well as its scene id in the Pannellum tour. If you find a meaningful id helpful for debugging, you can set it to whatever you like, as long as every panorama has a unique id.
 - The `bag_path` and `images_dir` fields should contain valid paths that specify the location of the input data for that panorama. They should match, in that all of the SciCam image timestamps in the bag should refer to SciCam images in the folder.
 - The `robot` field should correctly specify the robot that collected the panorama. This field is used to look up the correct SciCam lens calibration parameters to use during stitching.
-- The `activity`, `module`, and `bay` fields don't affect the stitching step but should be filled in correctly because they are displayed to users in the final output tour.
+- The `activity`, `module`, `bay`, `position`, `start_time`, and `end_time` fields don't affect the stitching step but should be set correctly so they can be displayed to users in the final output tour.
 - The `extra_stitch_args` field provides a way for advanced users to pass extra options to the `stitch_panorama.py` script on a per-panorama basis. It would typically be used for debugging and tuning when the stitching process fails or produces a low-quality result.
 
-### Stitch the panoramas
+### Stitch the panoramas and generate the tour
 
 Inside the container, run:
 ```bash
-snakemake -s /src/isaac/src/pano/pano_stitch/scripts/Snakefile -d /output -c1
+snakemake -s /src/isaac/src/pano/pano_view/scripts/Snakefile -d /output -c1
 ```
 
 This will trigger the `snakemake` build system to stitch the panoramas. There is one job per panorama in the config file, and `snakemake` will try to run these jobs in parallel up to the number of cores specified in the `-c` argument. (When `-c` is specified with no arguments, it will use the number of cores allocated to the container.)
 
 Note that some of the individual steps within each panorama stitch (e.g., `enblend`) run multi-threaded, and each individually tries to use all available cores, which could cause problems when stitching multiple panoramas in parallel. Both `snakemake` and `enblend` provide ways to manage this, which could be an area for future work.
-
-### Generate the tour
-
-TODO
 
 ### View the tour
 
