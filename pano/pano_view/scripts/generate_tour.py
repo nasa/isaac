@@ -52,7 +52,7 @@ SCENE_LINK_HOT_SPOT_TEXT = "{module} {bay}"
 
 # Pick a default starting yaw for each module. Pointing along the centerline
 # to start feels more natural.
-DEFAULT_YAW = {
+CENTERLINE_YAW = {
     "jem": 90,
     "nod2": 180,
     "col": 90,
@@ -154,7 +154,7 @@ def fill_field(tmpl, display_scene_meta):
     return MULTI_SPACE_REGEX.sub(" ", val).strip()
 
 
-def get_angles(p_from, p_to):
+def get_angles0(p_from, p_to):
     """
     Return yaw and pitch angles that will point a camera at p_from to
     a target at p_to. Both arguments are 3D points.
@@ -163,6 +163,32 @@ def get_angles(p_from, p_to):
     return {
         "yaw": np.arctan2(d[1], d[0]) * DEGREES_PER_RADIAN,
         "pitch": np.arctan2(d[2], np.sqrt(d[0] ** 2 + d[1] ** 2)) * DEGREES_PER_RADIAN,
+    }
+
+
+def get_angles(p_from, p_to, module_from, force_centerline=True):
+    """
+    Return yaw and pitch angles that will point a camera at p_from to
+    a target at p_to. Both arguments are 3D points. If
+    force_centerline is True, a module is defined for p_from, and a
+    centerline yaw is defined for that module, force the hot spot
+    angles to exactly align with the module centerline in whichever
+    direction is nearer to the target yaw.
+    """
+    angles = get_angles0(p_from, p_to)
+    module_yaw = CENTERLINE_YAW.get(module_from)
+
+    if module_yaw is None or not force_centerline:
+        return angles
+
+    diff = abs(angles["yaw"] - module_yaw)
+    if diff < 180:
+        yaw = module_yaw
+    else:
+        yaw = (module_yaw + 180) % 360
+    return {
+        "yaw": yaw,
+        "pitch": 0,
     }
 
 
@@ -203,13 +229,16 @@ def link_scenes(config, tour_scenes):
     for j1, j2 in np.transpose(np.nonzero(tree)):
         for j_from, j_to in ((j1, j2), (j2, j1)):
             scene_id_from = scene_id_lookup[j_from]
+            config_scene_meta_from = config["scenes"][scene_id_from]
             tour_scene_from = tour_scenes[scene_id_from]
 
             scene_id_to = scene_id_lookup[j_to]
             config_scene_meta_to = config["scenes"][scene_id_to]
             scene_meta_to = get_display_scene_meta(scene_id_to, config_scene_meta_to)
 
-            angles = get_angles(pos[j_from, :], pos[j_to, :])
+            angles = get_angles(
+                pos[j_from, :], pos[j_to, :], config_scene_meta_from.get("module")
+            )
             hot_spot = {
                 "type": "scene",
                 "sceneId": scene_id_to,
@@ -266,7 +295,7 @@ def generate_tour_json(config, out_folder):
         )
         tour_scene["multiRes"] = multi_res_meta
 
-        tour_scene["yaw"] = DEFAULT_YAW.get(config_scene_meta["module"], 0)
+        tour_scene["yaw"] = CENTERLINE_YAW.get(config_scene_meta["module"], 0)
         tour_scene["overviewMapPosition"] = get_overview_map_position(scene_meta)
 
         # Add scene to the tour.
