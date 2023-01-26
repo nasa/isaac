@@ -23,7 +23,11 @@ Generate a panoramic tour from stitched and tiled panos.
 import argparse
 import json
 import os
+import re
 
+import numpy as np
+import scipy.sparse.csgraph
+import scipy.spatial.distance
 import yaml
 
 PANO_VIEW_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -43,6 +47,27 @@ TOUR_SCENE_INIT = {
 SCENE_META_INIT = {
     "author": "NASA ISAAC Project",
 }
+
+SCENE_LINK_HOT_SPOT_TEXT = "{module} {bay}"
+
+# Pick a default starting yaw for each module. Pointing along the centerline
+# to start feels more natural.
+DEFAULT_YAW = {
+    "jem": 90,
+    "nod2": 180,
+    "col": 90,
+    "usl": 180,
+    "nod1": 180,
+}
+
+MULTI_SPACE_REGEX = re.compile(r" +")
+
+DEGREES_PER_RADIAN = 180 / np.pi
+
+# This is very roughly calibrated. Note: Overview map may not be exactly to scale!
+OVERVIEW_PX_PER_METER = 9.33
+OVERVIEW_X0_PX = 118 + OVERVIEW_PX_PER_METER * 1.64
+OVERVIEW_Y0_PX = 118
 
 
 def dosys(cmd, exit_on_error=True):
@@ -120,6 +145,85 @@ def get_display_scene_meta(scene_id, config_scene_meta):
     return scene_meta
 
 
+def fill_field(tmpl, display_scene_meta):
+    # Replace template {patterns} with variable values from display_scene_meta
+    val = tmpl.format(**display_scene_meta)
+    # Collapse multiple spaces to single space and strip leading and
+    # trailing whitespace. (Templates have space-separated fields and
+    # some fields may be empty... removing extra spaces looks better.)
+    return MULTI_SPACE_REGEX.sub(" ", val).strip()
+
+
+def get_angles(p_from, p_to):
+    """
+    Return yaw and pitch angles that will point a camera at p_from to
+    a target at p_to. Both arguments are 3D points.
+    """
+    d = p_to - p_from
+    return {
+        "yaw": np.arctan2(d[1], d[0]) * DEGREES_PER_RADIAN,
+        "pitch": np.arctan2(d[2], np.sqrt(d[0] ** 2 + d[1] ** 2)) * DEGREES_PER_RADIAN,
+    }
+
+
+def get_overview_map_position(scene_meta):
+    p = scene_meta["position"]
+    x = p["x"]
+    y = p["y"]
+    return (
+        OVERVIEW_Y0_PX + y * OVERVIEW_PX_PER_METER,
+        OVERVIEW_X0_PX - x * OVERVIEW_PX_PER_METER,
+    )
+
+
+def link_scenes(config, tour_scenes):
+    # Collect positions of scenes
+    n = len(config["scenes"])
+    pos = np.zeros((n, 3))
+    for i, config_scene_meta in enumerate(config["scenes"].values()):
+        p = config_scene_meta["position"]
+        pos[i, :] = (p["x"], p["y"], p["z"])
+
+    # Calculate Euclidean distance cost matrix M between scenes.
+    # M_ij is the Euclidean distance between scene i and scene j.
+    cost_matrix = scipy.spatial.distance.cdist(pos, pos, "euclidean")
+
+    # Calculate a minimum spanning tree that spans all scenes.  Each
+    # edge in the MST between two scenes will turn into a two-way
+    # hot-spot link between the scenes. Because the MST spans all
+    # scenes, you should be able to use the links to reach any scene
+    # from any other scene. Because we tend to capture panoramas on
+    # ISS module centerlines and the centerlines form a tree, with
+    # luck using the MST as a heuristic will give us a topology that
+    # matches the ISS module topology and will seem natural to users.
+    tree = scipy.sparse.csgraph.minimum_spanning_tree(cost_matrix)
+
+    scene_id_lookup = list(config["scenes"].keys())
+
+    for j1, j2 in np.transpose(np.nonzero(tree)):
+        for j_from, j_to in ((j1, j2), (j2, j1)):
+            scene_id_from = scene_id_lookup[j_from]
+            tour_scene_from = tour_scenes[scene_id_from]
+
+            scene_id_to = scene_id_lookup[j_to]
+            config_scene_meta_to = config["scenes"][scene_id_to]
+            scene_meta_to = get_display_scene_meta(scene_id_to, config_scene_meta_to)
+
+            angles = get_angles(pos[j_from, :], pos[j_to, :])
+            hot_spot = {
+                "type": "scene",
+                "sceneId": scene_id_to,
+                "text": fill_field(SCENE_LINK_HOT_SPOT_TEXT, scene_meta_to),
+                "yaw": angles["yaw"],
+                "pitch": angles["pitch"],
+                "targetYaw": angles["yaw"],
+                "targetPitch": angles["pitch"],
+            }
+
+            hot_spots = tour_scene_from.setdefault("hotSpots", [])
+            hot_spots.append(hot_spot)
+
+
 def generate_tour_json(config, out_folder):
     tour_default = TOUR_DEFAULT_INIT.copy()
     tour_default["firstScene"] = next(iter(config["scenes"].keys()))
@@ -146,9 +250,7 @@ def generate_tour_json(config, out_folder):
         tour_scene_updates = {}
         for field, val in tour_scene.items():
             if isinstance(val, str) and "{" in val:
-                val = val.format(**scene_meta)
-                val = val.replace("  ", " ")
-                tour_scene_updates[field] = val
+                tour_scene_updates[field] = fill_field(val, scene_meta)
         tour_scene.update(tour_scene_updates)
 
         # Copy tiler metadata into scene. Paths output by the tiler
@@ -164,8 +266,13 @@ def generate_tour_json(config, out_folder):
         )
         tour_scene["multiRes"] = multi_res_meta
 
+        tour_scene["yaw"] = DEFAULT_YAW.get(config_scene_meta["module"], 0)
+        tour_scene["overviewMapPosition"] = get_overview_map_position(scene_meta)
+
         # Add scene to the tour.
         tour_scenes[scene_id] = tour_scene
+
+    link_scenes(config, tour_scenes)
 
     out_path = os.path.join(out_folder, "tour.json")
     with open(out_path, "w") as out:
@@ -182,8 +289,13 @@ def generate_scene_index(config, out_folder):
 
         scene_meta = get_display_scene_meta(scene_id, config_scene_meta)
         index.append(
-            '<li><a href="pannellum.htm?config=tour.json&firstScene={scene_id}">{module} {bay}</a></li>'.format(
-                **scene_meta
+            fill_field(
+                (
+                    '<li><a href="pannellum.htm?config=tour.json&firstScene={scene_id}">'
+                    "{module} {bay}"
+                    "</a></li>"
+                ),
+                scene_meta,
             )
         )
     index.append("</ul>")
