@@ -727,6 +727,13 @@ def main():
         print("opencv_convert %s %s" % (tif_path, final_png_path))
         pano_img = cv2.imread(tif_path)
         cv2.imwrite(final_png_path, pano_img)
+
+        print(
+            "Preserving final metadata %s alongside output pano image"
+            % os.path.basename(pto_final)
+        )
+        shutil.copyfile(pto_final, output_dir)
+
         print("\n=== Final stitched pano in %s ===\n" % final_png_path)
 
     print("%s Finished run" % get_timestamp())
