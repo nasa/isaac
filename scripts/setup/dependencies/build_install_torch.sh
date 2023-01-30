@@ -23,8 +23,8 @@ PACKAGE_NAME=libtorch
 if [ -d $PACKAGE_NAME ]; then
   rm -rf $PACKAGE_NAME
 fi
-wget https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.5.0%2Bcpu.zip
-sudo unzip libtorch-cxx11-abi-shared-with-deps-1.5.0+cpu.zip -d /usr/include
+wget --quiet https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.5.0%2Bcpu.zip
+sudo unzip -q libtorch-cxx11-abi-shared-with-deps-1.5.0+cpu.zip -d /usr/include
 echo 'export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/include/libtorch/share/cmake/Torch' >> ~/.bashrc 
 export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/include/libtorch/share/cmake/Torch
 
