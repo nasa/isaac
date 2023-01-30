@@ -65,7 +65,7 @@ MULTI_SPACE_REGEX = re.compile(r" +")
 DEGREES_PER_RADIAN = 180 / np.pi
 
 # This is very roughly calibrated. Note: Overview map may not be exactly to scale!
-OVERVIEW_PX_PER_METER = 9.33
+OVERVIEW_PX_PER_METER = 8.63
 OVERVIEW_X0_PX = 118 + OVERVIEW_PX_PER_METER * 1.64
 OVERVIEW_Y0_PX = 118
 
@@ -166,7 +166,7 @@ def get_angles0(p_from, p_to):
     }
 
 
-def get_angles(p_from, p_to, module_from, force_centerline=True):
+def get_angles(p_from, p_to, module_from, force_centerline=False):
     """
     Return yaw and pitch angles that will point a camera at p_from to
     a target at p_to. Both arguments are 3D points. If
@@ -235,6 +235,7 @@ def link_scenes(config, tour_scenes):
             scene_id_to = scene_id_lookup[j_to]
             config_scene_meta_to = config["scenes"][scene_id_to]
             scene_meta_to = get_display_scene_meta(scene_id_to, config_scene_meta_to)
+            tour_scene_to = tour_scenes[scene_id_to]
 
             angles = get_angles(
                 pos[j_from, :], pos[j_to, :], config_scene_meta_from.get("module")
@@ -243,9 +244,9 @@ def link_scenes(config, tour_scenes):
                 "type": "scene",
                 "sceneId": scene_id_to,
                 "text": fill_field(SCENE_LINK_HOT_SPOT_TEXT, scene_meta_to),
-                "yaw": angles["yaw"],
+                "yaw": angles["yaw"] - tour_scene_from.get("northOffset", 0),
                 "pitch": angles["pitch"],
-                "targetYaw": angles["yaw"],
+                "targetYaw": angles["yaw"] - tour_scene_to.get("northOffset", 0),
                 "targetPitch": angles["pitch"],
             }
 
@@ -297,6 +298,13 @@ def generate_tour_json(config, out_folder):
 
         tour_scene["yaw"] = CENTERLINE_YAW.get(config_scene_meta["module"], 0)
         tour_scene["overviewMapPosition"] = get_overview_map_position(scene_meta)
+
+        extra_tour_params = config_scene_meta.get("extra_tour_params", {})
+        tour_scene.update(extra_tour_params)
+
+        # We need to adjust the yaw for northOffset if it is used.
+        north_offset = tour_scene.get("northOffset", 0)
+        tour_scene["yaw"] -= north_offset
 
         # Add scene to the tour.
         tour_scenes[scene_id] = tour_scene
