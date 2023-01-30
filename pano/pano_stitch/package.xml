@@ -15,5 +15,5 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>rosbag</build_depend>
-  <run_depend>rosbag</run_depend>
+  <exec_depend>rosbag</exec_depend>
 </package>
