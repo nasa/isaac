@@ -92,22 +92,36 @@ This will create the panorama config file `pano_meta.yaml` in the output folder.
 Below is an example `pano_meta.yaml`:
 ```yaml
 scenes:
-  scene000_isaac11_bumble_usl_bay4:
-    bag_path: /input/isaac11_bumble/isaac11_bumble_usl_bay4.bag
+  scene000_isaac10_queen_nod2_bay2:
+    bag_path: /input/isaac10_queen/20220617_1554_survey_nod2_bay2_std_panorama.bag
+    images_dir: /input/isaac10_queen/isaac_sci_cam_image_delayed
+    robot: queen
+    activity: isaac10
+    module: nod2
+    bay: 2
+    position:
+      x: 10.996580718096382
+      y: 0.0018100984828177873
+      z: 4.899023194998069
+    start_time: '2022-06-17T15:57:23.139000Z'
+    end_time: '2022-06-17T16:08:06.880000Z'
+    extra_stitch_args: ''
+    extra_tour_params: {}
+  scene001_isaac11_bumble_usl_bay6:
+    bag_path: /input/isaac11_bumble/20220711_1238_survey_usl_bay6_std_panorama_run1.bag
     images_dir: /input/isaac11_bumble/isaac_sci_cam_image_delayed
     robot: bumble
     activity: isaac11
     module: usl
-    bay: 4
+    bay: 6
+    position:
+      x: -0.3593667375653261
+      y: 0.0072030887961762385
+      z: 4.885617819225414
+    start_time: '2022-07-11T12:40:00.841000Z'
+    end_time: '2022-07-11T12:51:01.391000Z'
     extra_stitch_args: ''
-  scene001_isaac11_queen_usl_bay1:
-    bag_path: /input/isaac11_queen/isaac11_queen_usl_bay1.bag
-    images_dir: /input/isaac11_queen/isaac_sci_cam_image_delayed
-    robot: queen
-    activity: isaac11
-    module: usl
-    bay: 1
-    extra_stitch_args: ''
+    extra_tour_params: {}
 ```
 
 Ideally, the `config_panos.py` script will set all the config fields correctly, but it is not especially smart and could get fooled in some situations. It fills many of the later fields by attempting to parse the `bag_path`. If you want its auto-configure to work better, you can rename your bags in advance to filenames that follow the conventions in the example. If a field is not detected, its value will be set to `null`.
