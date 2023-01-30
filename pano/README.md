@@ -118,7 +118,8 @@ Here's what to check in the config file:
 - The `bag_path` and `images_dir` fields should contain valid paths that specify the location of the input data for that panorama. They should match, in that all of the SciCam image timestamps in the bag should refer to SciCam images in the folder.
 - The `robot` field should correctly specify the robot that collected the panorama. This field is used to look up the correct SciCam lens calibration parameters to use during stitching.
 - The `activity`, `module`, `bay`, `position`, `start_time`, and `end_time` fields don't affect the stitching step but should be set correctly so they can be displayed to users in the final output tour.
-- The `extra_stitch_args` field provides a way for advanced users to pass extra options to the `stitch_panorama.py` script on a per-panorama basis. It would typically be used for debugging and tuning when the stitching process fails or produces a low-quality result.
+- The `extra_stitch_args` field provides a way for advanced users to pass extra options to the `stitch_panorama.py` script for a specific panorama. It would typically be used for debugging and tuning when the stitching process fails or produces a low-quality result.
+- The `extra_tour_params` field provides a way for advanced users to overwrite the parameters for a specific panorama in the `tour.json` file that configures the Pannellum display interface.
 
 ### Stitch the panoramas and generate the tour
 

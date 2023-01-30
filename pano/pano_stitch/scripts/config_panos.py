@@ -114,6 +114,7 @@ def detect_pano_meta(in_folder):
             "start_time": get_image_timestamp(bag_meta[0]),
             "end_time": get_image_timestamp(bag_meta[-1]),
             "extra_stitch_args": "",
+            "extra_tour_params": {},
         }
         scene_meta["images_dir"] = sci_cam_images.get(bag_meta[0]["img_path"])
 
@@ -141,7 +142,9 @@ def write_pano_meta(pano_meta, out_yaml_path):
     snakemake.
     """
     with open(out_yaml_path, "w") as out_yaml:
-        out_yaml.write(yaml.safe_dump(pano_meta, default_flow_style=False, sort_keys=False))
+        out_yaml.write(
+            yaml.safe_dump(pano_meta, default_flow_style=False, sort_keys=False)
+        )
     print("wrote to %s" % out_yaml_path)
 
 
@@ -151,8 +154,9 @@ def add_pano_meta(new_meta, out_yaml_path):
     """
     with open(out_yaml_path, "r") as old_yaml_stream:
         old_meta = yaml.safe_load(old_yaml_stream)
-    old_bag_paths = set((os.path.realpath(scene["bag_path"])
-                         for scene in old_meta["scenes"].values()))
+    old_bag_paths = set(
+        (os.path.realpath(scene["bag_path"]) for scene in old_meta["scenes"].values())
+    )
 
     merged_meta = copy.deepcopy(old_meta)
     scene_prefix = re.compile(r"scene\d\d\d_")
@@ -172,12 +176,16 @@ def add_pano_meta(new_meta, out_yaml_path):
     num_added = num_out - num_old
     num_skipped = num_new - num_added
 
-    print("out of %d panos detected, %d were added and %d existing entries were skipped"
-          % (num_new, num_added, num_skipped))
+    print(
+        "out of %d panos detected, %d were added and %d existing entries were skipped"
+        % (num_new, num_added, num_skipped)
+    )
 
     tmp_path = out_yaml_path + ".tmp"
     with open(tmp_path, "w") as out_yaml:
-        out_yaml.write(yaml.safe_dump(merged_meta, default_flow_style=False, sort_keys=False))
+        out_yaml.write(
+            yaml.safe_dump(merged_meta, default_flow_style=False, sort_keys=False)
+        )
 
     stem, suffix = os.path.splitext(out_yaml_path)
     random.seed()
