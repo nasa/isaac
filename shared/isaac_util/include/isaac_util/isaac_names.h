@@ -38,6 +38,7 @@
 #define TOPIC_BEHAVIORS_INSPECTION_STATE            "beh/inspection/state"
 #define SERVICE_BEHAVIORS_INSPECTION_SET_STATE      "beh/inspection/set_state"
 #define ACTION_BEHAVIORS_INSPECTION                 "beh/inspection"
+#define TOPIC_BEHAVIORS_INSPECTION_MARKERS          "beh/inspection/markers"
 
 #define NODE_CARGO                                  "cargo"
 #define TOPIC_BEHAVIORS_CARGO_STATE                 "beh/cargo/state"

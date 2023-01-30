@@ -1,5 +1,6 @@
 # ROS
 *.bag
+.catkin_tools/*
 
 # Fortran module files
 *.mod
@@ -49,9 +50,15 @@ tags
 doc/html
 doc/latex
 
+# Pytorch models
+analyst/workspace/*.pt
+
 # Jupyter Notebooks
 analyst/workspace/.ipython
 analyst/workspace/.jupyter
 analyst/workspace/.local
 analyst/workspace/.ipynb_checkpoints
 analyst/workspace/.cache
+
+# vscode
+isaac.code-workspace
