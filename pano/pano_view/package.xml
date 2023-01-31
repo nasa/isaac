@@ -12,4 +12,6 @@
   <maintainer email="astrobee-fsw@nx.arc.nasa.gov">
     ISAAC Flight Software
   </maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
 </package>
