@@ -34,9 +34,8 @@ import re
 import sys
 
 import numpy as np
-import yaml
-
 import pano_image_meta
+import yaml
 
 SCI_CAM_IMG_REGEX = re.compile(r"\d{10}\.\d{3}\.jpg$")
 
