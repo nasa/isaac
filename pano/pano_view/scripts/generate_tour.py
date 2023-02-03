@@ -31,6 +31,14 @@ import scipy.spatial.distance
 import yaml
 
 PANO_VIEW_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+PACKAGES = [
+    "pannellum",
+    "openseadragon",
+    "annotorious-openseadragon",
+    "annotorious-selectorpack",
+    "annotorious-toolbar",
+]
+DEFAULT_PACKAGE_PATHS = {pkg: "/opt/" + pkg for pkg in PACKAGES}
 
 TOUR_DEFAULT_INIT = {
     "sceneFadeDuration": 1000,
@@ -84,7 +92,7 @@ def dosys(cmd, exit_on_error=True):
 def install_glob(src_glob, tgt_folder):
     if not os.path.isdir(tgt_folder):
         dosys("mkdir -p %s" % tgt_folder)
-    dosys("cp %s %s" % (src_glob, tgt_folder))
+    dosys("cp -r %s %s" % (src_glob, tgt_folder))
 
 
 def install_file(src_path, tgt_folder, tgt_name=None):
@@ -94,10 +102,11 @@ def install_file(src_path, tgt_folder, tgt_name=None):
         tgt_path = tgt_folder
     else:
         tgt_path = os.path.join(tgt_folder, tgt_name)
-    dosys("cp %s %s" % (src_path, tgt_path))
+    dosys("cp -r %s %s" % (src_path, tgt_path))
 
 
-def install_static_files(out_folder, pannellum_path, openseadragon_path):
+def install_static_files(out_folder, package_paths):
+    pannellum_path = package_paths["pannellum"]
     install_glob(
         os.path.join(pannellum_path, "build/pannellum.js"),
         os.path.join(out_folder, "js"),
@@ -115,6 +124,7 @@ def install_static_files(out_folder, pannellum_path, openseadragon_path):
         os.path.join(out_folder, "css"),
     )
 
+    openseadragon_path = package_paths["openseadragon"]
     install_glob(
         os.path.join(openseadragon_path, "openseadragon.min.js*"),
         os.path.join(out_folder, "js"),
@@ -122,6 +132,36 @@ def install_static_files(out_folder, pannellum_path, openseadragon_path):
     install_glob(
         os.path.join(openseadragon_path, "images/*"),
         os.path.join(out_folder, "media/openseadragon"),
+    )
+
+    anno_path = package_paths["annotorious-openseadragon"]
+    install_glob(
+        os.path.join(anno_path, "*.js"),
+        os.path.join(out_folder, "js"),
+    )
+    install_glob(
+        os.path.join(anno_path, "*.js.map"),
+        os.path.join(out_folder, "js"),
+    )
+    install_glob(
+        os.path.join(anno_path, "*.css"),
+        os.path.join(out_folder, "css"),
+    )
+
+    sel_path = package_paths["annotorious-selectorpack"]
+    install_glob(
+        os.path.join(sel_path, "*.js"),
+        os.path.join(out_folder, "js"),
+    )
+    install_glob(
+        os.path.join(sel_path, "*.js.map"),
+        os.path.join(out_folder, "js"),
+    )
+
+    toolbar_path = package_paths["annotorious-toolbar"]
+    install_glob(
+        os.path.join(toolbar_path, "annotorious-toolbar.min.js"),
+        os.path.join(out_folder, "js"),
     )
 
     install_glob(
@@ -412,11 +452,11 @@ def generate_scene_index(config, out_folder):
     print("wrote to %s" % out_path)
 
 
-def generate_tour(config_path, out_folder, pannellum_path, openseadragon_path):
+def generate_tour(config_path, out_folder, package_paths):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
 
-    install_static_files(out_folder, pannellum_path, openseadragon_path)
+    install_static_files(out_folder, package_paths)
     generate_tour_json(config, out_folder)
     generate_scene_index(config, out_folder)
     dosys("chmod a+rX %s" % out_folder)
@@ -449,23 +489,20 @@ def main():
         required=False,
     )
     parser.add_argument(
-        "--pannellum",
+        "--package-paths",
         type=str,
-        help="path where pannellum source is checked out (will install files from here)",
-        default="/opt/pannellum",
-        required=False,
-    )
-    parser.add_argument(
-        "--openseadragon",
-        type=str,
-        help="path where openseadragon install is found (will install files from here)",
-        default="/opt/openseadragon",
+        help="comma-separated list of package paths to override formatted like 'openseadragon=/opt/openseadragon'",
+        default=None,
         required=False,
     )
 
     args = parser.parse_args()
 
-    generate_tour(args.config, args.out_folder, args.pannellum, args.openseadragon)
+    package_paths = DEFAULT_PACKAGE_PATHS.copy()
+    if args.package_paths is not None:
+        updates = [assn.split("=", 1) for assn in args.package_paths.split(",")]
+        package_paths.update(dict(updates))
+    generate_tour(args.config, args.out_folder, package_paths)
 
 
 if __name__ == "__main__":
