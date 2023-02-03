@@ -17,7 +17,9 @@
  * under the License.
  */
 
-/* Implement overview map logic for ISAAC panoramic tour. */
+/**********************************************************************
+ * Overview map for panoramic tour
+ **********************************************************************/
 
 function getDist(pos0, pos1) {
     return Math.sqrt((pos0[0] - pos1[0]) ** 2 + (pos0[1] - pos1[1]) ** 2);
@@ -130,3 +132,111 @@ function initIsaacPano(event) {
 }
 
 document.addEventListener('pannellumloaded', initIsaacPano, false);
+
+/**********************************************************************
+ * View options dropdown menu
+ **********************************************************************/
+
+function isaacSleep(secs) {
+    return new Promise(resolve => setTimeout(resolve, secs * 1000));
+}
+
+/* When the user clicks on the button, toggle between hiding and showing the dropdown content */
+function isaacToggleDropDown() {
+    document.getElementById("isaac-view-dropdown").classList.toggle("show");
+}
+
+function isaacSetVisibility(className, visibility) {
+    var elts = document.getElementsByClassName(className)
+    var newDisplayStyle = visibility ? 'block' : 'none';
+    for (const elt of elts) {
+	elt.style.display = newDisplayStyle;
+    }
+}
+
+function isaacShowNavControls(visibility) {
+    isaacSetVisibility('pnlm-controls-container', visibility);
+}
+
+function isaacShowOverviewMap(visibility) {
+    isaacSetVisibility('pnlm-overview-map', visibility);
+}
+
+function isaacShowHotSpotType(hotSpotType, visibility) {
+    var config = window.viewer.getConfig();
+    var currentSceneId = window.viewer.getScene();
+
+    // Update hotSpots for all scenes. That way the visibility change
+    // will persist when the scene changes.
+    for (let [sceneId, scene] of Object.entries(config.scenes)) {
+	// back up original complete hotSpots array if needed
+	if (!scene.hasOwnProperty('initialHotSpots')) {
+	    scene.initialHotSpots = [...scene.hotSpots];
+	}
+
+	if (visibility) {
+	    // add hotSpots matching type
+	    for (const hotSpot of scene.initialHotSpots) {
+		if (hotSpot.type == hotSpotType) {
+		    // console.log("window.viewer.addHotSpot(" + hotSpot.id + "," + sceneId + ");");
+		    window.viewer.addHotSpot(hotSpot, sceneId);
+		}
+	    }
+	} else {
+	    // remove hotSpots matching type
+	    var hotSpotsCopy = [...scene.hotSpots];
+	    for (const hotSpot of hotSpotsCopy) {
+		if (hotSpot.type == hotSpotType) {
+		    // console.log("window.viewer.removeHotSpot(" + hotSpot.id + "," + sceneId + ");");
+		    window.viewer.removeHotSpot(hotSpot.id, sceneId);
+		}
+	    }
+	}
+    }
+}
+
+function isaacShowSceneLinks(visibility) {
+    isaacShowHotSpotType("scene", visibility);
+}
+
+function isaacShowSourceImageLinks(visibility) {
+    isaacShowHotSpotType("info", visibility);
+}
+
+const ISAAC_CHANGE_VISIBILITY_HANDLERS = {
+    "isaac-show-nav-controls": isaacShowNavControls,
+    "isaac-show-overview-map": isaacShowOverviewMap,
+    "isaac-show-scene-links": isaacShowSceneLinks,
+    "isaac-show-source-image-links": isaacShowSourceImageLinks,
+};
+
+function isaacToggleEntryCheckBox(event) {
+    var elt = event.srcElement;
+    elt.classList.toggle("checked");
+    var visibility = elt.classList.contains("checked");
+    ISAAC_CHANGE_VISIBILITY_HANDLERS[elt.id](visibility);
+}
+
+function isaacInitViewDropDown() {
+    document.getElementsByClassName("isaac-drop-button")[0].onclick = isaacToggleDropDown;
+
+    var toggleEntries = document.getElementsByClassName("isaac-toggle-entry");
+    for (const entry of toggleEntries) {
+	entry.onclick = isaacToggleEntryCheckBox;
+    }
+
+    // Close the dropdown if the user clicks outside of it
+    window.onclick = async function(event) {
+	if (!event.target.matches('.isaac-drop-button')) {
+	    var dropdowns = document.getElementsByClassName("isaac-dropdown-content");
+	    for (const dropdown of dropdowns) {
+		if (dropdown.classList.contains('show')) {
+		    await isaacSleep(0.4);
+		    dropdown.classList.remove('show');
+		}
+	    }
+	}
+    }
+}
+
+isaacInitViewDropDown();

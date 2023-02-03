@@ -87,7 +87,17 @@ def install_glob(src_glob, tgt_folder):
     dosys("cp %s %s" % (src_glob, tgt_folder))
 
 
-def install_static_files(out_folder, pannellum_path):
+def install_file(src_path, tgt_folder, tgt_name=None):
+    if not os.path.isdir(tgt_folder):
+        dosys("mkdir -p %s" % tgt_folder)
+    if tgt_name is None:
+        tgt_path = tgt_folder
+    else:
+        tgt_path = os.path.join(tgt_folder, tgt_name)
+    dosys("cp %s %s" % (src_path, tgt_path))
+
+
+def install_static_files(out_folder, pannellum_path, openseadragon_path):
     install_glob(
         os.path.join(pannellum_path, "build/pannellum.js"),
         os.path.join(out_folder, "js"),
@@ -104,6 +114,16 @@ def install_static_files(out_folder, pannellum_path):
         os.path.join(pannellum_path, "src/standalone/standalone.css"),
         os.path.join(out_folder, "css"),
     )
+
+    install_glob(
+        os.path.join(openseadragon_path, "openseadragon.min.js*"),
+        os.path.join(out_folder, "js"),
+    )
+    install_glob(
+        os.path.join(openseadragon_path, "images/*"),
+        os.path.join(out_folder, "media/openseadragon"),
+    )
+
     install_glob(
         os.path.join(PANO_VIEW_ROOT, "static/js/*"), os.path.join(out_folder, "js")
     )
@@ -119,6 +139,11 @@ def install_static_files(out_folder, pannellum_path):
     # with templates to provide greater flexibility, which would require
     # template rendering.
     install_glob(os.path.join(PANO_VIEW_ROOT, "templates/pannellum.htm"), out_folder)
+    install_file(
+        os.path.join(PANO_VIEW_ROOT, "templates/isaac_source_image.html"),
+        os.path.join(out_folder, "src"),
+        "index.html",
+    )
 
 
 def get_display_scene_meta(scene_id, config_scene_meta):
@@ -242,6 +267,7 @@ def link_scenes(config, tour_scenes):
             )
             hot_spot = {
                 "type": "scene",
+                "id": scene_id_to,
                 "sceneId": scene_id_to,
                 "text": fill_field(SCENE_LINK_HOT_SPOT_TEXT, scene_meta_to),
                 "yaw": angles["yaw"] - tour_scene_from.get("northOffset", 0),
@@ -252,6 +278,41 @@ def link_scenes(config, tour_scenes):
 
             hot_spots = tour_scene_from.setdefault("hotSpots", [])
             hot_spots.append(hot_spot)
+
+
+def link_source_images(config, tour_scenes, out_folder):
+    for scene_id, config_scene_meta in config["scenes"].items():
+        tour_scene = tour_scenes[scene_id]
+        hot_spots = tour_scene.setdefault("hotSpots", [])
+
+        src_images_meta_path = os.path.join(
+            out_folder, "source_images", scene_id, "meta.json"
+        )
+
+        if not os.path.exists(src_images_meta_path):
+            print("warning: no source images prepped for scene %s" % scene_id)
+            continue
+
+        with open(src_images_meta_path, "r") as src_images_meta_stream:
+            src_images_meta = json.load(src_images_meta_stream)
+
+        img_ids = sorted(src_images_meta.keys())
+        for i, img_id in enumerate(img_ids):
+            img_meta = src_images_meta[img_id]
+            hot_spots.append(
+                {
+                    "type": "info",
+                    "id": i,
+                    "text": "Image %d" % i,
+                    "yaw": img_meta["yaw"] - tour_scene.get("northOffset", 0),
+                    "pitch": img_meta["pitch"],
+                    "URL": "src/#scene=%s&imageId=%s" % (scene_id, img_id),
+                    "cssClass": "isaac-source-image pnlm-hotspot pnlm-sprite",
+                    "attributes": {
+                        "target": "_blank",
+                    },
+                }
+            )
 
 
 def generate_tour_json(config, out_folder):
@@ -310,6 +371,7 @@ def generate_tour_json(config, out_folder):
         tour_scenes[scene_id] = tour_scene
 
     link_scenes(config, tour_scenes)
+    link_source_images(config, tour_scenes, out_folder)
 
     out_path = os.path.join(out_folder, "tour.json")
     with open(out_path, "w") as out:
@@ -328,7 +390,7 @@ def generate_scene_index(config, out_folder):
         index.append(
             fill_field(
                 (
-                    '<li><a href="pannellum.htm?config=tour.json&firstScene={scene_id}">'
+                    '<li><a href="pannellum.htm#config=tour.json&firstScene={scene_id}">'
                     "{module} {bay}"
                     "</a></li>"
                 ),
@@ -350,11 +412,11 @@ def generate_scene_index(config, out_folder):
     print("wrote to %s" % out_path)
 
 
-def generate_tour(config_path, out_folder, pannellum_path):
+def generate_tour(config_path, out_folder, pannellum_path, openseadragon_path):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
 
-    install_static_files(out_folder, pannellum_path)
+    install_static_files(out_folder, pannellum_path, openseadragon_path)
     generate_tour_json(config, out_folder)
     generate_scene_index(config, out_folder)
     dosys("chmod a+rX %s" % out_folder)
@@ -393,10 +455,17 @@ def main():
         default="/opt/pannellum",
         required=False,
     )
+    parser.add_argument(
+        "--openseadragon",
+        type=str,
+        help="path where openseadragon install is found (will install files from here)",
+        default="/opt/openseadragon",
+        required=False,
+    )
 
     args = parser.parse_args()
 
-    generate_tour(args.config, args.out_folder, args.pannellum)
+    generate_tour(args.config, args.out_folder, args.pannellum, args.openseadragon)
 
 
 if __name__ == "__main__":
