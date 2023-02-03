@@ -39,6 +39,31 @@ RUN cd /tmp \
   && rm openseadragon-bin-4.0.0.tar.gz \
   && mv openseadragon-bin-4.0.0 /opt/openseadragon
 
+# annotorious-openseadragon: image annotation plugin for OpenSeaDragon
+RUN cd /tmp \
+  && wget --quiet https://github.com/recogito/annotorious-openseadragon/releases/download/v2.7.10/annotorious-openseadragon-2.7.10.zip \
+  && mkdir -p /tmp/anno \
+  && cd /tmp/anno \
+  && unzip -q ../annotorious-openseadragon-2.7.10.zip \
+  && cd /tmp \
+  && rm annotorious-openseadragon-2.7.10.zip \
+  && mv anno /opt/annotorious-openseadragon
+
+# annotorious-selectorpack: additional geometry types for annotorious-seadragon
+RUN cd /tmp \
+  && wget --quiet https://github.com/recogito/annotorious-selector-pack/releases/download/v0.5.1/annotorious-selectorpack-0.5.1.zip \
+  && mkdir -p /tmp/anno \
+  && cd /tmp/anno \
+  && unzip -q ../annotorious-selectorpack-0.5.1.zip \
+  && cd /tmp \
+  && rm annotorious-selectorpack-0.5.1.zip \
+  && mv anno /opt/annotorious-selectorpack
+
+# annotorious-toolbar: toolbar for adding annotorious annotations
+RUN mkdir -p /opt/annotorious-toolbar \
+  && cd /opt/annotorious-toolbar \
+  && wget --quiet https://cdn.jsdelivr.net/npm/@recogito/annotorious-toolbar@1.1.0/dist/annotorious-toolbar.min.js
+
 RUN echo 'source "/src/isaac/devel/setup.bash"\nexport ASTROBEE_CONFIG_DIR="/src/astrobee/src/astrobee/config"' >> "${HOME}/.bashrc"
 
 # Enables rosrun for pano packages. Can likely take this out

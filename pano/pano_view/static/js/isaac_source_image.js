@@ -62,6 +62,14 @@ function initIsaacSourceImage() {
         tileSources: '../../source_images/' + configFromUrl['scene'] + '/'
 	    + configFromUrl['imageId'] + '.dzi'
     });
+    var anno = OpenSeadragon.Annotorious(viewer);
+
+    Annotorious.SelectorPack(anno, {
+	tools: ['point']
+    });
+
+    console.log(document.getElementById('isaac-toolbar-container'));
+    Annotorious.Toolbar(anno, document.getElementById('isaac-toolbar-container'));
 }
 
 initIsaacSourceImage();
