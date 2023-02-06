@@ -16,8 +16,14 @@
 	flex-flow: column;
 	height: 100%;
     }
-    #isaac-toolbar-container {
+    #isaac-navbar {
 	flex: 0 1 auto;
+    }
+    #isaac-navbar div {
+	display: inline-block;
+    };
+    #isaac-toolbar-container {
+	height: 100%;
     }
     #container {
 	flex: 1 1 auto;
@@ -28,7 +34,11 @@
 </head>
 <body>
 <div class="flex-container">
-  <div id="isaac-toolbar-container"></div>
+  <div id="isaac-navbar">
+    <div id="isaac-toolbar-container"></div>
+    <button id="isaac-save">Save</button>
+    <button id="isaac-clear">Clear</button>
+  </div>
   <div id="container">
     <noscript>
       <p>Javascript is required to view this source image.</p>
