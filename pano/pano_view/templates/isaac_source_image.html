@@ -30,6 +30,9 @@
 	width: 100%;
 	height: 100%;
     }
+    #isaac-load-input {
+	display: none;
+    }
   </style>
 </head>
 <body>
@@ -40,6 +43,12 @@
     <div id="isaac-toolbar-container"></div>
     <button id="isaac-previous">Previous</button>
     <button id="isaac-next">Next</button>
+    <input
+      type="file"
+      id="isaac-load-input"
+      accept="application/json"
+      />
+    <button id="isaac-load">Load</button>
     <button id="isaac-save">Save</button>
     <button id="isaac-clear">Clear</button>
   </div>
