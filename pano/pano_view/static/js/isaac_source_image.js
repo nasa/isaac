@@ -212,6 +212,23 @@ function isaacUpdateAnnotations(fieldPath, value, history) {
     isaacHistorySaveState(history, isaacStorageGetRoot());
 }
 
+function isaacReadAsText(file) {
+    // Always return a Promise
+    return new Promise((resolve, reject) => {
+	let content = '';
+	const reader = new FileReader();
+	// Wait till complete
+	reader.onloadend = function(e) {
+	    resolve(e.target.result);
+	};
+	// Make sure to handle error states
+	reader.onerror = function(e) {
+	    reject(e);
+	};
+	reader.readAsText(file);
+    });
+}
+
 function initIsaacSourceImage() {
     var configFromUrl = parseUrlParameters();
 
@@ -254,10 +271,27 @@ function initIsaacSourceImage() {
 	event => isaacHistoryRedo(history, imageStoragePath, anno)
     );
 
-    document.getElementById('isaac-save').addEventListener("click", function(event) {
+    var isaacLoadInput = document.getElementById('isaac-load-input');
+    document.getElementById('isaac-load').addEventListener('click', function(event) {
+	isaacLoadInput.click();
+    });
+    isaacLoadInput.addEventListener('change', async function(event) {
+	console.log('load change event');
+	console.log(isaacLoadInput);
+	if (isaacLoadInput.files.length > 0) {
+	    var loadFile = isaacLoadInput.files[0];
+	    var loadText = await isaacReadAsText(loadFile);
+	    var storageItem = JSON.parse(loadText);
+	    isaacStorageSetRoot(storageItem);
+	    isaacHistorySaveState(history, storageItem);
+	    isaacRenderState(history, storageItem, imageStoragePath, anno);
+	}
+    });
+
+    document.getElementById('isaac-save').addEventListener('click', function(event) {
 	isaacSaveData(isaacStorageGetRoot(), 'annotations.json');
     });
-    document.getElementById('isaac-clear').addEventListener("click", function(event) {
+    document.getElementById('isaac-clear').addEventListener('click', function(event) {
 	isaacRenderState(history, {}, imageStoragePath, anno);
 	isaacUpdateAnnotations([], {}, history);
     });
@@ -273,8 +307,8 @@ function initIsaacSourceImage() {
 	    anno.panTo(annoId);
 	}
     }
-    document.getElementById('isaac-previous').addEventListener("click", reviewUpdater(-1));
-    document.getElementById('isaac-next').addEventListener("click", reviewUpdater(1))
+    document.getElementById('isaac-previous').addEventListener('click', reviewUpdater(-1));
+    document.getElementById('isaac-next').addEventListener('click', reviewUpdater(1))
 
     // Restore annotations on this image from HTML5 local storage
     var storageItem = isaacStorageGetRoot();
