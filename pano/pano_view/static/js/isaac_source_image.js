@@ -70,10 +70,7 @@ function isaacStorageSetRoot(obj) {
     window.localStorage.setItem('annotations', JSON.stringify(obj));
 }
 
-function isaacStorageGet(fieldPath) {
-    var storageItem = isaacStorageGetRoot();
-
-    var obj = storageItem;
+function isaacGetFieldPath(obj, fieldPath) {
     for (fieldElt of fieldPath) {
 	obj = obj[fieldElt];
 	if (obj == undefined) {
@@ -83,7 +80,17 @@ function isaacStorageGet(fieldPath) {
     return obj;
 }
 
+function isaacStorageGet(fieldPath) {
+    var storageItem = isaacStorageGetRoot();
+    return isaacGetFieldPath(storageItem, fieldPath);
+}
+
 function isaacStorageSet(fieldPath, value) {
+    if (fieldPath.length == 0) {
+	isaacStorageSetRoot(value);
+	return;
+    }
+
     var storageItem = isaacStorageGetRoot();
 
     var obj = storageItem;
@@ -141,6 +148,70 @@ function isaacSaveData(data, fileName) {
     a.remove();
 }
 
+var ISAAC_HISTORY_MAX_LENGTH = 10;
+
+function isaacHistoryUpdateEnabled(history) {
+    document.getElementById('isaac-undo').disabled = (history.undoStack.length == 0);
+    document.getElementById('isaac-redo').disabled = (history.redoStack.length == 0);
+}
+
+function isaacHistoryDebug(history) {
+    console.log("#undo=" + history.undoStack.length + " #redo=" + history.redoStack.length)
+}
+
+function isaacHistorySaveState(history, state) {
+    if (history.current != null) {
+	history.undoStack.push(history.current);
+    }
+    if (history.undoStack.length > ISAAC_HISTORY_MAX_LENGTH) {
+	history.undoStack.shift();
+    }
+    history.current = state;
+    history.redoStack = [];
+
+    isaacHistoryUpdateEnabled(history);
+    isaacHistoryDebug(history);
+}
+
+function isaacRenderState(history, state, imageStoragePath, anno) {
+    var imageAnnotations = isaacGetFieldPath(state, imageStoragePath) || [];
+    anno.setAnnotations(imageAnnotations);
+    isaacHistoryUpdateEnabled(history);
+}
+
+function isaacHistoryUndo(history, imageStoragePath, anno) {
+    if (history.undoStack.length == 0) {
+	console.log('got undo request with no undo stack, should never happen');
+	return;
+    }
+    history.redoStack.push(history.current);
+    history.current = history.undoStack.pop();
+
+    isaacStorageSetRoot(history.current);
+
+    isaacRenderState(history, history.current, imageStoragePath, anno);
+    isaacHistoryDebug(history);
+}
+
+function isaacHistoryRedo(history, imageStoragePath, anno) {
+    if (history.redoStack.length == 0) {
+	console.log('got redo request with no redo stack, should never happen');
+	return;
+    }
+    history.undoStack.push(history.current);
+    history.current = history.redoStack.pop();
+
+    isaacStorageSetRoot(history.current);
+
+    isaacRenderState(history, history.current, imageStoragePath, anno);
+    isaacHistoryDebug(history);
+}
+
+function isaacUpdateAnnotations(fieldPath, value, history) {
+    isaacStorageSet(fieldPath, value);
+    isaacHistorySaveState(history, isaacStorageGetRoot());
+}
+
 function initIsaacSourceImage() {
     var configFromUrl = parseUrlParameters();
 
@@ -152,11 +223,17 @@ function initIsaacSourceImage() {
 	    + configFromUrl['imageId'] + '.dzi'
     });
     var anno = OpenSeadragon.Annotorious(viewer);
+    var history = {
+	'current': null,
+	'undoStack': [],
+	'redoStack': []
+    };
 
     // Export symbols for debugging
     window.configFromUrl = configFromUrl;
     window.viewer = viewer;
     window.anno = anno;
+    window.isaacHistory = history;
 
     // Configure extra point drawing tool (default tools are rect and polygon only)
     Annotorious.SelectorPack(anno, {
@@ -167,47 +244,52 @@ function initIsaacSourceImage() {
     Annotorious.Toolbar(anno, document.getElementById('isaac-toolbar-container'));
 
     // Configure other button handlers
+    var imageStoragePath = [configFromUrl.scene, configFromUrl.imageId];
+    document.getElementById('isaac-undo').addEventListener(
+	"click",
+	event => isaacHistoryUndo(history, imageStoragePath, anno)
+    );
+    document.getElementById('isaac-redo').addEventListener(
+	"click",
+	event => isaacHistoryRedo(history, imageStoragePath, anno)
+    );
+
     document.getElementById('isaac-save').addEventListener("click", function(event) {
 	isaacSaveData(isaacStorageGetRoot(), 'annotations.json');
     });
     document.getElementById('isaac-clear').addEventListener("click", function(event) {
-	isaacStorageSetRoot({});
-	anno.clearAnnotations();
+	isaacRenderState(history, {}, imageStoragePath, anno);
+	isaacUpdateAnnotations([], {}, history);
     });
+
+    var reviewIndex = 0;
+    var reviewUpdater = function(delta) {
+	return function(event) {
+	    var annotations = isaacStorageGet(imageStoragePath);
+	    if (!annotations) return;
+	    reviewIndex = (reviewIndex + delta + annotations.length) % annotations.length;
+	    var annoId = annotations[reviewIndex].id;
+	    anno.selectAnnotation(annoId);
+	    anno.panTo(annoId);
+	}
+    }
+    document.getElementById('isaac-previous').addEventListener("click", reviewUpdater(-1));
+    document.getElementById('isaac-next').addEventListener("click", reviewUpdater(1))
 
     // Restore annotations on this image from HTML5 local storage
-    var imageAnnotations = isaacStorageGet([configFromUrl.scene, configFromUrl.imageId]);
-    if (imageAnnotations) {
-	anno.setAnnotations(imageAnnotations);
-    }
+    var storageItem = isaacStorageGetRoot();
+    isaacRenderState(history, storageItem, imageStoragePath, anno);
+    isaacHistorySaveState(history, storageItem);
 
     // Save subsequent drawing events to HTML5 local storage
-    var imageStoragePath = [configFromUrl.scene, configFromUrl.imageId];
     anno.on('createAnnotation', function(annotation) {
-	// isaacStorageSet([configFromUrl.scene, configFromUrl.imageId, annotation.id], annotation);
-	var annotations = isaacStorageSetDefault(imageStoragePath, []);
-	annotations.push(annotation);
-	isaacStorageSet(imageStoragePath, annotations);
+	isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
     });
     anno.on('updateAnnotation', function(annotation) {
-	var annotations = isaacStorageSetDefault(imageStoragePath, []);
-
-	var idx = annotations.findIndex(a => (a.id == annotation.id));
-	if (idx == undef) {
-	    console.log('warning: updated element not found, creating instead');
-	    annotations.push(annotation);
-	} else {
-	    annotations[idx] = annotation;
-	}
-
-	isaacStorageSet(imageStoragePath, annotations);
+	isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
     });
     anno.on('deleteAnnotation', function(annotation) {
-	var annotations = isaacStorageSetDefault(imageStoragePath, []);
-
-	annotations = annotations.filter(a => (a.id != annotation.id));
-
-	isaacStorageSet(imageStoragePath, annotations);
+	isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
     });
 }
 
