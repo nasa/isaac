@@ -69,6 +69,12 @@
       <name>handrail</name>
       <pose>11.947 -9.252 5.045 0 0 3.1415</pose>
     </include>
+    
+    <include>
+      <uri>model://astroberth</uri>
+      <name>berthfixture</name>
+      <pose>11.5 -9 4.5 0 0 0</pose>
+    </include>
 
     <light name='user_point_light_px' type='point'>
       <pose frame=''>30 0 0 0 -0 0</pose>

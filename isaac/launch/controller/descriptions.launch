@@ -22,6 +22,8 @@
   </group>
   <param name="/r2_iss/robot_description"
   textfile="$(find astrobee_r2)/urdf/model.urdf" />
+  <param name="/astroberth/robot_description"
+  textfile="$(find astroberth)/urdf/model.urdf" />
   <group ns="cargo">
   	<param name="/cargo/robot_description"
     	textfile="$(find isaac_description)/urdf/cargo_bag.urdf.xacro" />

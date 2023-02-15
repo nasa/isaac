@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="Berth Fixture V4 Shell.SLDASM">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.0215224647317914 0.00128082404423123 -0.0052293732035698"
+        rpy="0 0 0" />
+      <mass
+        value="0.703175905249134" />
+      <inertia
+        ixx="0.00588955182069366"
+        ixy="-3.19375286995013E-07"
+        ixz="-2.65645764256807E-05"
+        iyy="0.00585494843517985"
+        iyz="4.8114809434364E-06"
+        izz="0.0103537675732883" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="link_1">
+    <inertial>
+      <origin
+        xyz="-1.38777878078145E-17 0.003 1.56125112837913E-17"
+        rpy="0 0 0" />
+      <mass
+        value="0.349524689687676" />
+      <inertia
+        ixx="0.00169054996882395"
+        ixy="4.84676140167788E-22"
+        ixz="-2.64697796016969E-20"
+        iyy="0.00337900278950978"
+        iyz="-7.48472025278472E-20"
+        izz="0.00169054996882395" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="backplate"
+    type="fixed">
+    <origin
+      xyz="0.019151 0.056934 0.0029863"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="link_2">
+    <inertial>
+      <origin
+        xyz="2.16840434497101E-17 0.0180965368898085 6.93889390390723E-18"
+        rpy="0 0 0" />
+      <mass
+        value="0.0170895647574832" />
+      <inertia
+        ixx="1.71077379001631E-06"
+        ixy="-5.77276356547167E-23"
+        ixz="2.63030860992105E-11"
+        iyy="1.34498303816599E-05"
+        iyz="4.55413398946975E-22"
+        izz="1.3398839472784E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="Left_handle"
+    type="fixed">
+    <origin
+      xyz="-0.10785 0.040817 -0.0046588"
+      rpy="1.5708 -1.5708 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="link_3">
+    <inertial>
+      <origin
+        xyz="1.47451495458029E-17 0.0180965368898084 2.08166817117217E-17"
+        rpy="0 0 0" />
+      <mass
+        value="0.0170895647574832" />
+      <inertia
+        ixx="1.71077379001631E-06"
+        ixy="1.43835991966426E-21"
+        ixz="2.63030860991839E-11"
+        iyy="1.34498303816599E-05"
+        iyz="4.38993175322132E-22"
+        izz="1.3398839472784E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_3.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="right_handle"
+    type="fixed">
+    <origin
+      xyz="0.14615 0.04089 -0.0062057"
+      rpy="1.5708 1.5708 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="link_4">
+    <inertial>
+      <origin
+        xyz="-3.58514482174527E-07 0.015112589436889 0.00497743872995415"
+        rpy="0 0 0" />
+      <mass
+        value="0.0439772151330061" />
+      <inertia
+        ixx="6.31905054767043E-06"
+        ixy="3.05117901945839E-11"
+        ixz="-1.27191744394201E-10"
+        iyy="4.85472534463722E-05"
+        iyz="-1.4734504592263E-06"
+        izz="5.0237994269786E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_4.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://astroberth/meshes/link_4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="camera"
+    type="fixed">
+    <origin
+      xyz="0.021341 0.002235 0.12009"
+      rpy="2.3562 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_4" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>
