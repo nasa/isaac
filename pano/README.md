@@ -148,4 +148,4 @@ Note that some of the individual steps within each panorama stitch (e.g., `enble
 
 ### View the tour
 
-TODO
+In the host OS, point a web browser at `http://127.0.0.1:8080/`. The `run.sh` script forwards port 8080 of the host to port 80 of the container, where an Apache server is running to provide a preview of the tour.
