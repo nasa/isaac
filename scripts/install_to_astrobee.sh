@@ -79,17 +79,6 @@ if [[ ${FREEFLYER_TARGETS,,} =~ 'mlp' ]]; then
   fi
 fi
 
-if [[ ${FREEFLYER_TARGETS,,} =~ 'llp' ]]; then
-  # Install to LLP
-  if [[ "${llp_ips[${robot_index}]}" != "0.0.0.0" ]]; then # for dock, skip this step
-    echo "Copying files to LLP..."
-    if ! rsync -azh --delete --info=progress2  $target/ astrobee@llp_iss_${config_ver}:${FREEFLYER_INSTALL_DIR}
-    then
-      exit 1
-    fi
-  fi
-fi
-
 if [ -n "$ip_addr" ]; then
   echo '*** NOTE ***'
   echo 'Be sure to export the following before running anything from this machine: '

@@ -167,7 +167,7 @@ geometry_msgs::PoseArray Inspection::GetInspectionPoses() {
 
 double Inspection::GetDistanceToTarget() {
   if (mode_ == "anomaly") {
-    if (cameras_.find(curr_camera_) == cameras_.end()) {
+    if (cameras_.find(curr_camera_) != cameras_.end()) {
       return cameras_.find(curr_camera_)->second.GetDistanceFromTarget(goal_.poses[inspection_counter_],
                                                               depth_cam_, target_size_x_, target_size_y_);
     }
@@ -419,13 +419,13 @@ bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
 
   // Update parameters
   ReadParam();
+  // Create the sorted point segment
+  points_.clear();
   // Insert Offset
   for (int i = 0; i < points_anomaly.poses.size(); ++i) {
     tf2::Transform anomaly_transform;
     anomaly_transform = msg_conversions::ros_pose_to_tf2_transform(points_anomaly.poses[i]);
 
-    // Create the sorted point segment
-    points_.clear();
     points_.push_back(geometry_msgs::PoseArray());
     points_[i].header.frame_id = points_anomaly.header.frame_id;
 
@@ -526,8 +526,16 @@ bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   std::vector<PanoAttitude> orientations;
 
   // pano_orientations() doesn't support panos with non-zero center (not needed)
-  assert(pan_min_ == -pan_max_);
-  assert(tilt_min_ == -tilt_max_);
+  if (pan_min_ != -pan_max_) {
+    ROS_ERROR_STREAM(" Pan min: " << pan_min_ << " ; Pan max: " << pan_max_
+                                  << "; They are different! Making pan_min = pan_max");
+    pan_min_ = pan_max_;
+  }
+  if (tilt_min_ != -tilt_max_) {
+    ROS_ERROR_STREAM(" Tilt min: " << tilt_min_ << " ; Tilt max: " << tilt_max_
+                                   << "; They are different! Making tilt_min = tilt_max");
+    tilt_min_ = tilt_max_;
+  }
 
   // Generate coverage pattern pan/tilt values
   GeneratePanoOrientations(&orientations, &nrows, &ncols,

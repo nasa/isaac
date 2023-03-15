@@ -28,7 +28,7 @@
 // FSW includes
 #include <ff_util/config_server.h>
 #include <ff_util/config_client.h>
-#include <ff_util/ff_names.h>
+#include <ff_common/ff_names.h>
 #include <ff_util/ff_action.h>
 // #include <isaac_msgs/AckS.h>
 #include <geometry_msgs/PoseArray.h>

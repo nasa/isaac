@@ -113,7 +113,7 @@ class GazeboSensorPluginSciCam : public FreeFlyerSensorPlugin {
       boost::bind(&GazeboSensorPluginSciCam::ToggleCallback, this),
       boost::bind(&GazeboSensorPluginSciCam::ToggleCallback, this));
     pub_sci_cam_pose_ = nh->advertise<geometry_msgs::PoseStamped>(TOPIC_SCI_CAM_SIM_POSE, 10);
-    pub_sci_cam_info_ = nh->advertise<sensor_msgs::CameraInfo>(TOPIC_SCI_CAM_SIM_INFO, 10);
+    pub_sci_cam_info_ = nh->advertise<sensor_msgs::CameraInfo>("/hw/cam_sci_info", 10);
 
     // Read configuration
     config_reader::ConfigReader config;
