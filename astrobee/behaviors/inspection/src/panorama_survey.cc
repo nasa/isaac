@@ -128,7 +128,7 @@ LinSpace pano_1d(double range_radius, double fov,
   double W = range_radius * 2;
 
   if ((W + 2 * attitude_tolerance - fov) < 0) {
-    ROS_ERROR("Special case: Only one image needed. Center it.");
+    // Special case: Only one image needed. Center it.
     return LinSpace(0, 0, 1);
   }
 

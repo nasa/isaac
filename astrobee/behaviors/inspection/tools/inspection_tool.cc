@@ -451,11 +451,9 @@ int main(int argc, char *argv[]) {
 
   // Configure panorama inspection parameters
   if (FLAGS_panorama) {
-    ROS_ERROR_STREAM("starting panorama");
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
 
     if (FLAGS_panorama_mode == "") {
-    ROS_ERROR_STREAM("mode specified panorama");
       cfg.Set<double>("h_fov", FLAGS_h_fov);
       cfg.Set<double>("v_fov", FLAGS_v_fov);
 

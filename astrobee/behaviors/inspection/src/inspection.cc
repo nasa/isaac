@@ -529,12 +529,12 @@ bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   if (pan_min_ != -pan_max_) {
     ROS_ERROR_STREAM(" Pan min: " << pan_min_ << " ; Pan max: " << pan_max_
                                   << "; They are different! Making pan_min = pan_max");
-    pan_min_ = pan_max_;
+    return false;
   }
   if (tilt_min_ != -tilt_max_) {
     ROS_ERROR_STREAM(" Tilt min: " << tilt_min_ << " ; Tilt max: " << tilt_max_
                                    << "; They are different! Making tilt_min = tilt_max");
-    tilt_min_ = tilt_max_;
+    return false;
   }
 
   // Generate coverage pattern pan/tilt values
