@@ -40,7 +40,7 @@
 #include <isaac_util/isaac_names.h>
 
 // Software messages
-#include <sensor_msgs/CompressedImage.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <ff_msgs/CommandConstants.h>
 #include <ff_msgs/CommandStamped.h>
 #include <isaac_msgs/InspectionState.h>
@@ -224,9 +224,10 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     pub_guest_sci_ = nh->advertise<ff_msgs::CommandStamped>(
       TOPIC_COMMAND, 1, true);
 
-    // Subscribe to the sci camera topic to make sure a picture was taken
-    sub_sci_cam_ = nh->subscribe(TOPIC_HARDWARE_SCI_CAM + std::string("/compressed"), 1,
-                      &InspectionNode::SciCamCallback, this);
+    // Subscribe to the sci camera info topic to make sure a picture was taken
+    sub_sci_cam_info_ = nh->subscribe("/hw/cam_sci_info", 1,
+                      &InspectionNode::SciCamInfoCallback, this);
+
 
     // Allow the state to be manually set
     server_set_state_ = nh->advertiseService(SERVICE_BEHAVIORS_INSPECTION_SET_STATE,
@@ -505,7 +506,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     return 0;
   }
 
-  void SciCamCallback(const sensor_msgs::CompressedImage::ConstPtr& msg) {
+  void SciCamInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg) {
     // The sci cam image was received
     if (sci_cam_req_ != 0) {
       ROS_DEBUG_STREAM("Scicam picture acquired " << ros::Time::now());
@@ -814,7 +815,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   ff_util::ConfigServer cfg_;
   ros::Publisher pub_state_;
   ros::Publisher pub_guest_sci_;
-  ros::Subscriber sub_sci_cam_;
+  ros::Subscriber sub_sci_cam_info_;
   ros::ServiceServer server_set_state_;
   ros::Timer sci_cam_timeout_;
   isaac_msgs::InspectionGoal goal_;
@@ -831,6 +832,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
   // Inspection library
   Inspection* inspection_;
+
+ public:
+  // This fixes the Eigen aligment issue
+  // http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 PLUGINLIB_EXPORT_CLASS(inspection::InspectionNode, nodelet::Nodelet);
