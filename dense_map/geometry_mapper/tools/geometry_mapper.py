@@ -260,6 +260,13 @@ def process_args(args):
         help="Simply the mesh keeping only this fraction of the original edges.",
     )
     parser.add_argument(
+        "--max_texture_size",
+        dest="max_texture_size",
+        default="2048",
+        help="The maximum size (in pixels) of each texture file created for the produced textured mesh.",
+    )
+
+    parser.add_argument(
         "--merge_maps",
         dest="merge_maps",
         default="",
@@ -775,6 +782,7 @@ def run_texrecon(args, src_path, mesh, undist_dir, cam_type):
         "-d",
         "view_dir_dot_face_dir",
         "--keep_unseen_faces",
+        "--max_texture_size=" + str(args.max_texture_size),
     ]
 
     log_file = os.path.join(args.output_dir, "texrecon_" + cam_type + "_log.txt")

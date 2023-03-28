@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  isaac:
+    volumes:
+      - type: bind
+        source: ${ASTROBEE_PATH}
+        target: /src/astrobee/src
+      - type: bind
+        source: ${ISAAC_PATH}
+        target: /src/isaac/src
+
+    
+

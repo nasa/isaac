@@ -2,7 +2,7 @@
 
 This directory provides the cargo_tool
 
-### Using the cargo tool
+# Using the cargo tool
 
 This tool is used to initiate pickup and drop cargo actions.
 

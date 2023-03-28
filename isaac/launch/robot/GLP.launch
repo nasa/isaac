@@ -34,9 +34,7 @@
   <!-- Launch all nodelet managers -->
   <group if="$(eval optenv('ASTROBEE_NODEGRAPH','')=='')">
     <node pkg="nodelet" type="nodelet" args="manager"
-          name="build_map" output="$(arg output)"/>
-    <node pkg="nodelet" type="nodelet" args="manager"
-          name="anomaly" output="$(arg output)"/>
+          name="glp_anomaly" output="$(arg output)"/>
   </group>
 
   <!-- Launch dense map nodes -->
@@ -65,7 +63,7 @@
   <include file="$(find ff_util)/launch/ff_nodelet.launch">
     <arg name="class" value="img_analysis/ImageAnalysisNode" />
     <arg name="name" value="img_analysis" />
-    <arg name="manager" value="anomaly" />
+    <arg name="manager" value="glp_anomaly" />
     <arg name="spurn" value="$(arg spurn)" />
     <arg name="nodes" value="$(arg nodes)" />
     <arg name="extra" value="$(arg extra)" />

@@ -5,6 +5,8 @@ name: Build and Push Documentation to gh-pages Branch
 on:
   push:
     branches: ['develop']
+  workflow_dispatch:
+    branches: ['develop']
 
 jobs:
   build_and_push_docs:
@@ -12,11 +14,11 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: repo/
     - name: Checkout gh-pages
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: docs/
         ref: gh-pages

@@ -3,6 +3,7 @@ name: Build and Test CI for Pull Requests
 on:
   pull_request:
     branches: [ 'master', 'develop' ]
+  workflow_dispatch:
 
 jobs:
 
@@ -13,13 +14,13 @@ jobs:
     steps:
 
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/
@@ -58,13 +59,13 @@ jobs:
     steps:
 
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/
@@ -104,13 +105,13 @@ jobs:
     steps:
 
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/

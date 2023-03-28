@@ -2,7 +2,7 @@
 
 name: Compile APK
 
-on: ['push', 'pull_request']
+on: ['push', 'pull_request', 'workflow_dispatch']
 
 jobs:
   install_dependencies:
@@ -10,13 +10,13 @@ jobs:
 
     steps:
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/
@@ -51,6 +51,7 @@ jobs:
 
     - name: Install APK dependencies
       run: |
+        sudo apt-get update
         sudo apt-get install -y libc6-dev-i386 lib32z1 openjdk-8-jdk
         mkdir $HOME/android-sdk
         cd $HOME/android-sdk

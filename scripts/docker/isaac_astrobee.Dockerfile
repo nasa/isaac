@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y \
 COPY astrobee /src/isaac/src/astrobee/
 COPY isaac /src/isaac/src/isaac/
 COPY description /src/isaac/src/description/
-COPY isaac_msgs /src/isaac/src/isaac_msgs/
+COPY communications/isaac_msgs /src/isaac/src/communications/isaac_msgs/
 COPY shared /src/isaac/src/shared/
 
 RUN . /src/astrobee/devel/setup.sh \
