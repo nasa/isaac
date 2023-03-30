@@ -334,11 +334,16 @@ $(document).ready(function(){initNavTree('inspection_8h_source.html',''); initRe
 <div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;  <span class="comment">// Publish Markers</span></div>
 <div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;  ros::Publisher pub_targets_;</div>
 <div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;  ros::Publisher pub_cam_;</div>
-<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160;};</div>
-<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160; </div>
-<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160; </div>
-<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;}  <span class="comment">// namespace inspection</span></div>
-<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;<span class="preprocessor">#endif  // INSPECTION_INSPECTION_H_</span></div>
+<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160; </div>
+<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160; <span class="keyword">public</span>:</div>
+<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;  <span class="comment">// This fixes the Eigen aligment issue</span></div>
+<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;  <span class="comment">// http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html</span></div>
+<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;  EIGEN_MAKE_ALIGNED_OPERATOR_NEW</div>
+<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;};</div>
+<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160; </div>
+<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160; </div>
+<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;}  <span class="comment">// namespace inspection</span></div>
+<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;<span class="preprocessor">#endif  // INSPECTION_INSPECTION_H_</span></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <div class="ttc" id="aclassinspection_1_1Inspection_html"><div class="ttname"><a href="classinspection_1_1Inspection.html">inspection::Inspection</a></div><div class="ttdef"><b>Definition:</b> inspection.h:146</div></div>
