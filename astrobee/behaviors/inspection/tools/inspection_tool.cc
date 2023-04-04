@@ -28,7 +28,7 @@
 // FSW includes
 #include <msg_conversions/msg_conversions.h>
 #include <config_reader/config_reader.h>
-#include <ff_util/ff_names.h>
+#include <ff_common/ff_names.h>
 #include <isaac_util/isaac_names.h>
 #include <ff_util/ff_action.h>
 #include <ff_util/config_client.h>
@@ -451,11 +451,9 @@ int main(int argc, char *argv[]) {
 
   // Configure panorama inspection parameters
   if (FLAGS_panorama) {
-    ROS_ERROR_STREAM("starting panorama");
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
 
     if (FLAGS_panorama_mode == "") {
-    ROS_ERROR_STREAM("mode specified panorama");
       cfg.Set<double>("h_fov", FLAGS_h_fov);
       cfg.Set<double>("v_fov", FLAGS_v_fov);
 

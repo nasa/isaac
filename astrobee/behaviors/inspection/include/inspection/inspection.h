@@ -245,6 +245,11 @@ class Inspection {
   // Publish Markers
   ros::Publisher pub_targets_;
   ros::Publisher pub_cam_;
+
+ public:
+  // This fixes the Eigen aligment issue
+  // http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 

@@ -17,6 +17,7 @@
  * under the License.
  */
 
+#include <ros/ros.h>
 #include <boost/functional/hash.hpp>
 #include <cmath>
 #include <string>
@@ -37,13 +38,13 @@ namespace inspection {
 
 void assert_lte(double a, double b, double eps, const std::string& label) {
   if (!(a <= b + eps)) {
-    fprintf(stderr, "FAIL: at %s: %lf should be <= %lf, within tolerance %lg\n", label.c_str(), a, b, eps);
+    ROS_ERROR_STREAM("FAIL: at " << label.c_str() << ":" << a << " should be <= " << b << ", within tolerance " << eps);
   }
 }
 
 void assert_gte(double a, double b, double eps, const std::string& label) {
   if (!(a >= b - eps)) {
-    fprintf(stderr, "FAIL: at %s: %lf should be >= %lf, within tolerance %lg\n", label.c_str(), a, b, eps);
+    ROS_ERROR_STREAM("FAIL: at " << label.c_str() << ":" << a << " should be >= " << b << ", within tolerance " << eps);
   }
 }
 
