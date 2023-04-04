@@ -28,16 +28,20 @@
         (energy-level bumble 100)
         (energy-level queen 100)
         (data_storage_ava bumble 100)
-        (data_storage queen 0)       
+        (data_storage queen 0)   
+
+
+        (:constraints (order (bumble) panoram_JEM_bay_2) ) ;with a hint at which bay to go to
+    
     )
     ;instead
     ; goal for the task planner to solve
     ; can be multiple
     (:goal (and
-        (at queen JEM_bay_7)
-        (at bumble paramo)
-    ))
- 
+        (at queen panoram_JEM_bay_7)
+        (at queen panoram_JEM_bay_6)
+            ))
+
     (:metric minimize (total-time))
 )
         ;Constraints (required margins to maintain for resources remaining, inter-robot constraints such as collision avoidance)
