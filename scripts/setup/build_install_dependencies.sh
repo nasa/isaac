@@ -23,7 +23,7 @@
 
 DEP_LOC=$(dirname "$(readlink -f "$0")")/dependencies
 
-sudo apt-get install -y libgtest-dev
+sudo apt-get install -y unzip libgtest-dev
 
 # Comes pre-built in Ubuntu 20.04
 if [ "$(lsb_release -sr)" = "18.04" ]; then
