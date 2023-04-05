@@ -64,12 +64,6 @@ Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
 
 void Inspection::ReadParam() {
   // Parameters Anomaly survey ---
-  dist_resolution_    = cfg_->Get<double>("distance_resolution");
-  angle_resolution_   = cfg_->Get<double>("angle_resolution") * M_PI / 180.0;
-  max_angle_          = cfg_->Get<double>("max_angle")        * M_PI / 180.0;
-  max_distance_       = cfg_->Get<double>("max_distance");
-  min_distance_       = cfg_->Get<double>("min_distance");
-  target_distance_    = cfg_->Get<double>("target_distance");
   target_size_x_      = cfg_->Get<double>("target_size_x");
   target_size_y_      = cfg_->Get<double>("target_size_y");
   depth_cam_          = cfg_->Get<std::string>("depth_cam");
