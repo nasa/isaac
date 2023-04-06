@@ -36,16 +36,6 @@ override_dh_auto_install-arch:
 	# Make sure we only extend what we need
 	cd .. && CMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) catkin build
 
-# override only for arch dependent, for astrobee-config let it use default
-# override_dh_install-arch:
-# 	# Clean pycache before copying directories
-# 	pyclean debian || py3clean debian
-# 	# Move DDS stuff out of debian/tmp (astrobee-comms.files)
-# 	# so we don't intall it again to astrobee0
-# 	dh_movefiles
-# 	# Install the rest of the files as defined in <package>.install
-# 	dh_install
-
 # dpkg-shlibdebs and dpkq-query have issues finding dependencies in our chroot
 # Skip this step since it was not populating {shlibs:Depends} anyway.
 override_dh_shlibdeps:
