@@ -27,7 +27,7 @@ if [ -n "$(git status --porcelain)" ]; then
   exit -1
 fi
 
-EXTRA_FLAGS="-b -a armhf"
+EXTRA_FLAGS="-b -aarmhf"
 
 # In some cases we may want to build for amd64 (e.g. astrobee-comms for users)
 if [[ $* == *--native* ]]; then
