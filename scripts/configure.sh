@@ -295,7 +295,7 @@ if [ $native_build == 1 ] ; then
         --devel-space ${workspace_path}devel \
         --log-space ${workspace_path}log \
         --no-install \
-        --cmake-args ${extra_opts} -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        --cmake-args ${extra_opts}
 
 
 fi
