@@ -6,3 +6,4 @@ files
 debhelper-build-stamp
 *.substvars
 *.log
+*.lintian-overrides

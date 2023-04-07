@@ -25,6 +25,16 @@ if [ -d $PACKAGE_NAME ]; then
 fi
 wget --quiet https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.5.0%2Bcpu.zip
 sudo unzip -q libtorch-cxx11-abi-shared-with-deps-1.5.0+cpu.zip -d /usr/include
-echo 'export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/include/libtorch/share/cmake/Torch' >> ~/.bashrc 
-export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/include/libtorch/share/cmake/Torch
 
+## Torch CMAKE_PREFIX_PATH
+#  Astrobee always augments the CMAKE_PREFIX_PATH in .bashrc before testing
+#  if zsh is in use. We'll just add a conditional extension to every shell
+#  rc file we find (currently only looking at .bashrc and .zshrc)
+cmake_isaac_torch_path=/usr/include/libtorch/share/cmake/Torch
+for shell_cfg in "~/.bashrc" "~/.zshrc"; do
+    if [[ -f ${shell_cfg} ]] && [ $(grep -cF ${cmake_isaac_torch_path} ${shell_cfg}) -eq 0 ]; then
+        echo -e '\n## ISAAC Dependency - Torch CMAKE Path\n' >> ${shell_cfg}
+        echo 'if [[ ":$CMAKE_PREFIX_PATH:" != *":'${cmake_isaac_torch_path}':"* ]]; then CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH:+"$CMAKE_PREFIX_PATH:"}'${cmake_isaac_torch_path}'"; fi' >> ${shell_cfg}
+    fi
+done
+echo "Torch added to CMAKE_PREFIX_PATH in shell config file, source ~/.$(basename ${SHELL})rc before building"
