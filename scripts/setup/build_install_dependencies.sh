@@ -23,11 +23,15 @@
 
 DEP_LOC=$(dirname "$(readlink -f "$0")")/dependencies
 
-sudo apt-get install -y libgtest-dev
-cd /usr/src/gtest
-sudo cmake CMakeLists.txt
-sudo make
-sudo cp *.a /usr/lib
+sudo apt-get install -y unzip libgtest-dev
+
+# Comes pre-built in Ubuntu 20.04
+if [ "$(lsb_release -sr)" = "18.04" ]; then
+    cd /usr/src/gtest
+    sudo cmake CMakeLists.txt
+    sudo make
+    sudo cp *.a /usr/lib
+fi
 
 cd ${DEP_LOC}
 ./build_install_gp.sh || exit 1
