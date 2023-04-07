@@ -726,25 +726,25 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case isaac_msgs::InspectionGoal::ANOMALY:
       NODELET_ERROR("Received Goal Anomaly");
       if (inspection_->GenerateAnomalySurvey(goal_.inspect_poses))
-        // return fsm_.Update(GOAL_INSPECT);
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_ERROR("Received Goal Geometry");
       if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses))
-        // return fsm_.Update(GOAL_INSPECT);
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
       NODELET_ERROR("Received Goal Panorama");
       if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses))
-        // return fsm_.Update(GOAL_INSPECT);
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:
       NODELET_ERROR("Received Goal Volumetric");
       if (inspection_->GenerateVolumetricSurvey(goal_.inspect_poses))
-        // return fsm_.Update(GOAL_INSPECT);
+        return fsm_.Update(GOAL_INSPECT);
       break;
     // Invalid command
     default:
