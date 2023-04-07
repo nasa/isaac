@@ -18,7 +18,17 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-export ROS_DISTRO=kinetic
+ubuntu_version=$(cat /etc/os-release | grep -oP "(?<=VERSION_CODENAME=).*")
+if [ "$ubuntu_version" = "xenial" ]; then
+  export ROS_DISTRO=kinetic
+  export PYTHON_VERSION=2.7
+elif [ "$ubuntu_version" = "focal" ]; then
+  export ROS_DISTRO=noetic
+  export PYTHON_VERSION=3
+else
+  echo "Unsupported OS release. Found: $ubuntu_version"
+  exit 1
+fi
 
 # this script sets the ROS_IP, without it the other processors send back their hostname which can't be resolved
 if [ -e /etc/ros.sh ]; then
@@ -47,7 +57,7 @@ export ROS_PACKAGE_PATH=${ff_root}/share:${ff_root}/stacks:${isaac_root}/share:$
 
 export LD_LIBRARY_PATH=${ff_root}/lib:${isaac_root}/lib:${dds_root}:${ros_root}/lib:${ros_root}/lib/arm-linux-gnueabihf:/usr/local/lib:/lib:/usr/local/lib:${ff_root}/bin:${isaac_root}/bin
 export PATH=${ff_root}/bin:${isaac_root}/bin:${ros_root}/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-export PYTHONPATH=${ff_root}/lib/python2.7/dist-packages:${isaac_root}/lib/python2.7/dist-packages:${ros_root}/lib/python2.7/dist-packages
+export PYTHONPATH=${ff_root}/lib/python${PYTHON_VERSION}/dist-packages:${isaac_root}/lib/python${PYTHON_VERSION}/dist-packages:${ros_root}/lib/python${PYTHON_VERSION}/dist-packages
 export CMAKE_PREFIX_PATH=${ff_root}:${isaac_root}:${ros_root}
 
 unset dds_root
