@@ -90,7 +90,7 @@
       <arg name="nodes" value="$(arg nodes)" />
       <arg name="extra" value="$(arg extra)" />
       <arg name="debug" value="$(arg debug)" />
-      <arg name="default" value="true" />
+      <arg name="default" value="false" />
     </include>
 
     <!-- Wifi -->

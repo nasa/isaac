@@ -58,6 +58,8 @@ Inspection::Inspection(ros::NodeHandle* nh, ff_util::ConfigServer* cfg) {
   // Publish debug messages
   pub_targets_ = nh->advertise<visualization_msgs::MarkerArray>(
     TOPIC_BEHAVIORS_INSPECTION_MARKERS + std::string("/targets"), 1, true);
+  pub_markers_ = nh->advertise<visualization_msgs::MarkerArray>(
+    TOPIC_BEHAVIORS_INSPECTION_MARKERS + std::string("/markers"), 1, true);
   pub_cam_ =
     nh->advertise<visualization_msgs::MarkerArray>(TOPIC_BEHAVIORS_INSPECTION_MARKERS + std::string("/cams"), 1, true);
 }
@@ -106,6 +108,7 @@ void Inspection::CheckMapTimeoutCallback() {
 
 // In case move failed, remove this point
 bool Inspection::RemoveInspectionPose() {
+  ROS_ERROR_STREAM("Counter " << inspection_counter_);
   points_[inspection_counter_].poses.erase(points_[inspection_counter_].poses.begin());
   if (points_[inspection_counter_].poses.empty())
     return false;
@@ -135,22 +138,27 @@ geometry_msgs::PoseArray Inspection::GetCurrentInspectionPose() {
 
 // Skip pose
 bool Inspection::NextInspectionPose() {
-  inspection_counter_ += 1;
-  if (inspection_counter_ < points_.size())
+  ROS_ERROR_STREAM("NextInspectionPose " << inspection_counter_);
+  if (inspection_counter_ + 1 < points_.size()) {
+    inspection_counter_ += 1;
     return true;
-  else
+  } else {
     return false;
+  }
 }
 // Redo pose
 bool Inspection::RedoInspectionPose() {
-  inspection_counter_ -= 1;
-  if (inspection_counter_ < 0)
-    return false;
-  else
+  ROS_ERROR_STREAM("RedoInspectionPose " << inspection_counter_);
+  if (inspection_counter_ - 1 >= 0) {
+    inspection_counter_ -= 1;
     return true;
+  } else {
+    return false;
+  }
 }
 // Get poses
 geometry_msgs::PoseArray Inspection::GetInspectionPoses() {
+  ROS_ERROR_STREAM("GetInspectionPoses " << inspection_counter_);
   geometry_msgs::PoseArray result;
   result.header = points_.front().header;
   for (int i = inspection_counter_ + 1; i < points_.size(); ++i) {
@@ -160,6 +168,7 @@ geometry_msgs::PoseArray Inspection::GetInspectionPoses() {
 }
 
 double Inspection::GetDistanceToTarget() {
+  ROS_ERROR_STREAM("GetDistanceToTarget " << inspection_counter_);
   if (mode_ == "anomaly") {
     if (cameras_.find(curr_camera_) != cameras_.end()) {
       return cameras_.find(curr_camera_)->second.GetDistanceFromTarget(goal_.poses[inspection_counter_],
@@ -239,6 +248,8 @@ bool Inspection::TransformList(geometry_msgs::PoseArray points_in, geometry_msgs
     // Convert to tf2 transform
     target_to_sci_cam = msg_conversions::ros_pose_to_tf2_transform(points_in.poses[i]);
     // Convert to body world pose
+    tf2::Quaternion rotation = target_to_sci_cam.getRotation() * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
+    target_to_sci_cam.setRotation(rotation);
     tf2::Transform robot_pose = target_transform * target_to_sci_cam * sci_cam_to_body;
 
     // Write back transformed point
@@ -415,26 +426,45 @@ bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
   ReadParam();
   // Create the sorted point segment
   points_.clear();
+  geometry_msgs::PoseArray survey_template;
+  survey_template.header.frame_id = points_anomaly.header.frame_id;
+  // Generate Sorted list of inspection candidates for this target
+  GenerateSortedList(survey_template);
+
   // Insert Offset
   for (int i = 0; i < points_anomaly.poses.size(); ++i) {
     tf2::Transform anomaly_transform;
     anomaly_transform = msg_conversions::ros_pose_to_tf2_transform(points_anomaly.poses[i]);
 
-    points_.push_back(geometry_msgs::PoseArray());
-    points_[i].header.frame_id = points_anomaly.header.frame_id;
+    points_.push_back(survey_template);
 
     // Make sure camera is loaded
     std::string cam_name = points_anomaly.header.frame_id.c_str();
     curr_camera_ = cam_name.c_str();
     if (cameras_.find(cam_name) == cameras_.end())
       cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
-                       std::make_tuple(cam_name, max_distance_, min_distance_));
+                       std::make_tuple(cam_name, cfg_->Get<double>("max_distance"), cfg_->Get<double>("min_distance")));
 
-    // Generate Sorted list of inspection candidates for this target
-    GenerateSortedList(points_[i]);
 
     // Transform the points from the camera reference frame to the robot body
+  ROS_ERROR_STREAM("next pose position x:" << points_[i].poses.front().position.x
+                                  << " y:" << points_[i].poses.front().position.y
+                                  << " z:" << points_[i].poses.front().position.z
+                              << "quat x:" << points_[i].poses.front().orientation.x
+                                  << " y:" << points_[i].poses.front().orientation.y
+                                  << " z:" << points_[i].poses.front().orientation.z
+                                  << " w:" << points_[i].poses.front().orientation.w);
     TransformList(points_[i], points_[i], anomaly_transform);
+  ROS_ERROR_STREAM("next pose position x:" << points_[i].poses.front().position.x
+                                  << " y:" << points_[i].poses.front().position.y
+                                  << " z:" << points_[i].poses.front().position.z
+                              << "quat x:" << points_[i].poses.front().orientation.x
+                                  << " y:" << points_[i].poses.front().orientation.y
+                                  << " z:" << points_[i].poses.front().orientation.z
+                                  << " w:" << points_[i].poses.front().orientation.w);
+
+
+    DrawPoseMarkers(points_[i], pub_markers_);
 
     // Draw the poses generated that capture the target
     points_[i].header.frame_id = "sci_cam";
@@ -442,21 +472,21 @@ bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
       ROS_ERROR("Visibility Constrains: Did not find a possible inspection point");
       return false;
     }
-    ROS_INFO_STREAM("Visibility Constrained");
+    ROS_ERROR_STREAM("Visibility Constrained");
 
     // Check candidate segment agains zones
     if (!ZonesConstraint(points_[i])) {
       ROS_ERROR_STREAM("Zones Constrains: Did not find a possible inspection point");
       return false;
     }
-    ROS_INFO_STREAM("Zones Constrained");
+    ROS_ERROR_STREAM("Zones Constrained");
 
     // Check candidate segment against obstacle map
     if (!ObstaclesConstraint(points_[i])) {
       ROS_ERROR_STREAM("Obstacles Constrains: Did not find a possible inspection point");
       return false;
     }
-    ROS_INFO_STREAM("Obstacles Constrained");
+    ROS_ERROR_STREAM("Obstacles Constrained");
   }
   return true;
 }
@@ -498,7 +528,7 @@ bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   curr_camera_ = cam_name.c_str();
   if (cameras_.find(cam_name) == cameras_.end())
     cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
-                     std::make_tuple(cam_name, max_distance_, min_distance_));
+                     std::make_tuple(cam_name, cfg_->Get<double>("max_distance"), cfg_->Get<double>("min_distance")));
 
   geometry_msgs::PoseArray panorama_relative;
   geometry_msgs::PoseArray panorama_transformed;
@@ -538,18 +568,18 @@ bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
                     overlap_, att_tol_);
 
   // Go through all the panorama center locations
-  panorama_relative.poses.resize(1);
-  for (int i = 0; i < points_panorama.poses.size(); ++i) {
+  panorama_relative.poses.clear();
+  for (const auto& point_panorama : points_panorama.poses) {
     for (const auto& orient : orientations) {
       ROS_DEBUG_STREAM("pan:" << orient.pan * 180 / M_PI << " tilt:" << orient.tilt * 180 / M_PI);
       panorama_rotation.setRPY(0, orient.tilt, orient.pan);
-      panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
+      // panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
       point.orientation = msg_conversions::tf2_quat_to_ros_quat(panorama_rotation);
-      panorama_relative.poses[0] = point;
+      panorama_relative.poses.push_back(point);
 
       // Transform the points from the camera reference frame to the robot body
-      tf2::Transform panorama_pose = msg_conversions::ros_pose_to_tf2_transform(points_panorama.poses[i]);
-      TransformList(panorama_relative, panorama_transformed, panorama_pose);
+      TransformList(panorama_relative, panorama_transformed,
+                    msg_conversions::ros_pose_to_tf2_transform(point_panorama));
       points_.push_back(panorama_transformed);
     }
   }

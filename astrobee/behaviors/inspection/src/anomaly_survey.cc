@@ -33,11 +33,12 @@ namespace inspection {
 
     // Insert point in the target reference frame
     tf2::Quaternion quat_point;
-    double roll, pitch, yaw;
+    double pan, tilt;
 
     double dist_resolution = cfg_->Get<double>("distance_resolution");
     double angle_resolution_theta = cfg_->Get<double>("angle_resolution_theta") * M_PI / 180.0;
     double angle_resolution_phi = cfg_->Get<double>("angle_resolution_phi") * M_PI / 180.0;
+    double max_angle = cfg_->Get<double>("max_angle") * M_PI / 180.0;
 
     double max_distance = cfg_->Get<double>("max_distance");
     double min_distance = cfg_->Get<double>("min_distance");
@@ -46,29 +47,33 @@ namespace inspection {
     // Go through all the alternative points in preference order
     for (double r = 0; (r < max_distance - target_distance) ||
                        (r < target_distance - min_distance); r += dist_resolution) {
-      for (double theta = 0; theta <= max_angle_; theta += angle_resolution_theta) {
-        for (double phi = 0; phi < 2 * M_PI; phi += 4 * angle_resolution_phi) {
-          // ROS_ERROR_STREAM("r: " << r << " phi: " << phi << " theta: " << theta);
+      for (double theta = 0; theta <= max_angle; theta += angle_resolution_theta) {
+        for (double phi = 0; phi < 2 * M_PI; phi += angle_resolution_phi) {
+          ROS_ERROR_STREAM("r: " << r << " phi: " << phi << " theta: " << theta);
+
+            tilt = theta * sin(phi);
+            pan = - theta * cos(phi);
+            quat_point.setRPY(0, tilt, pan);
+            point.orientation = msg_conversions::tf2_quat_to_ros_quat(quat_point);
+
+
+
           if ((target_distance + r < max_distance) && r != 0) {   // avoid publishing twice on zero
             // Insert point
-            point.position.x = (target_distance + r) * sin(theta) * cos(phi);
-            point.position.y = (target_distance + r) * sin(theta) * sin(phi);
-            point.position.z = (target_distance + r) * cos(theta);
-            pitch = theta * cos(phi);
-            roll =  M_PI - theta * sin(phi);
-            quat_point.setRPY(roll, pitch, yaw);
-            point.orientation = msg_conversions::tf2_quat_to_ros_quat(quat_point);
+            point.position.x = -(target_distance + r) * cos(theta);
+            point.position.y = (target_distance + r) * sin(theta) * cos(phi);
+            point.position.z = (target_distance + r) * sin(theta) * sin(phi);
             points.poses.push_back(point);
           }
           if (target_distance - r > min_distance) {
             // Insert point
-            point.position.x = (target_distance - r) * sin(theta) * cos(phi);
-            point.position.y = (target_distance - r) * sin(theta) * sin(phi);
-            point.position.z = (target_distance - r) * cos(theta);
-            pitch = theta * cos(phi);
-            roll =  M_PI - theta * sin(phi);
-            quat_point.setRPY(roll, pitch, yaw);
-            point.orientation = msg_conversions::tf2_quat_to_ros_quat(quat_point);
+            point.position.x = -(target_distance - r) * cos(theta);
+            point.position.y = (target_distance - r) * sin(theta) * cos(phi);
+            point.position.z = (target_distance - r) * sin(theta) * sin(phi);
+            // tilt = (M_PI - theta) * cos(phi);
+            // pan =  (M_PI - theta) * sin(phi);
+            // quat_point.setRPY(0, tilt, pan);
+            // point.orientation = msg_conversions::tf2_quat_to_ros_quat(quat_point);
             points.poses.push_back(point);
           }
           if (theta == 0)

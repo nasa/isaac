@@ -150,6 +150,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // [3]
     fsm_.Add(STATE::VISUAL_INSPECTION,
       MOTION_SUCCESS, [this](FSM::Event const& event) -> FSM::State {
+        ROS_ERROR_STREAM("MOTION_SUCCESS Image inspect");
         ImageInspect();
         return STATE::MOVING_TO_APPROACH_POSE;
       });
@@ -364,6 +365,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // Result of a move action
   void MResultCallback(ff_util::FreeFlyerActionState::Enum result_code,
     ff_msgs::MotionResultConstPtr const& result) {
+      ROS_ERROR_STREAM("MResultCallback");
+      ROS_ERROR_STREAM("MResultCallback " << result_code);
     // Check for invalid results
     if (result == nullptr) {
       ROS_ERROR_STREAM("Invalid result received Motion");
@@ -373,6 +376,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // If successful, return Success
     switch (result_code) {
       case ff_util::FreeFlyerActionState::SUCCESS:
+        ROS_ERROR_STREAM("success");
         motion_retry_number_ = 0;
         return fsm_.Update(MOTION_SUCCESS);
     }
@@ -387,6 +391,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
       {
         // Try to find an alternate inspection position
+        ROS_ERROR_STREAM("Removing inspection pose");
         if (inspection_->RemoveInspectionPose()) {
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
           return;
@@ -395,11 +400,13 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         }
         break;
       }
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION_ENDPOINT:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_ATTITUDE:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
       {  // If it fails because of a motion error, retry
+        ROS_ERROR_STREAM("retry?");
         if (motion_retry_number_ < cfg_.Get<int>("max_motion_retry_number")) {
           motion_retry_number_++;
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
@@ -451,6 +458,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
   // IMG ANALYSIS
   void Flashlight(double level) {
+    ROS_ERROR_STREAM("Flashlight toggle " << level);
     // Toggle flashlight
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
@@ -477,6 +485,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
 
   void SendPicture(double focus_distance) {
+    ROS_ERROR_STREAM("Send picture");
     // Take picture
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
@@ -516,7 +525,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
     focus_distance_calculated_ = inspection_->GetDistanceToTarget();
-    ROS_DEBUG_STREAM("Distance to target: " << focus_distance_calculated_);
+    ROS_ERROR_STREAM("Distance to target: " << focus_distance_calculated_);
     focus_distance_current_ = focus_distance_calculated_;
     flashlight_intensity_current_ = 0.0;
 
@@ -532,22 +541,29 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
 
   void SciCamInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg) {
+    ROS_ERROR_STREAM("Got scicam");
     // The sci cam image was received
     if (sci_cam_req_ != 0) {
-      ROS_DEBUG_STREAM("Scicam picture acquired " << ros::Time::now());
+      ROS_ERROR_STREAM("Scicam picture acquired " << ros::Time::now());
       // Clear local variables
       sci_cam_timeout_.stop();
       sci_cam_req_ = 0;
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
+      ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
+        ROS_ERROR_STREAM("ANOMALY");
         // If we're iterating flashlight take second picture with it on
         if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
-          Flashlight(cfg_.Get<double>("toggle_flashlight"));
+          ROS_ERROR_STREAM("Turn on flashlight");
+          flashlight_intensity_current_ = cfg_.Get<double>("toggle_flashlight");
+          Flashlight(flashlight_intensity_current_);
         } else {
           // Move on in focus distance iteration
-          Flashlight(0.0);
+          flashlight_intensity_current_ = 0.0;
+          ROS_ERROR_STREAM("Turn off flashlight");
+          Flashlight(flashlight_intensity_current_);
           if (focus_distance_current_ == focus_distance_calculated_) {
             focus_distance_current_ = cfg_.Get<double>("target_distance");
           } else if (focus_distance_current_ <
@@ -565,7 +581,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
             return fsm_.Update(NEXT_INSPECT);
           }
         }
-        sci_cam_req_ = true;
+        ROS_ERROR_STREAM("Sending picture with focus " << focus_distance_current_);
+        sci_cam_req_ = 1;
         SendPicture(focus_distance_current_);
       } else {
         return fsm_.Update(NEXT_INSPECT);
@@ -707,27 +724,27 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     switch (goal_.command) {
     // Vent command
     case isaac_msgs::InspectionGoal::ANOMALY:
-      NODELET_DEBUG("Received Goal Anomaly");
+      NODELET_ERROR("Received Goal Anomaly");
       if (inspection_->GenerateAnomalySurvey(goal_.inspect_poses))
-        return fsm_.Update(GOAL_INSPECT);
+        // return fsm_.Update(GOAL_INSPECT);
       break;
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
-      NODELET_DEBUG("Received Goal Geometry");
+      NODELET_ERROR("Received Goal Geometry");
       if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses))
-        return fsm_.Update(GOAL_INSPECT);
+        // return fsm_.Update(GOAL_INSPECT);
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
-      NODELET_DEBUG("Received Goal Panorama");
+      NODELET_ERROR("Received Goal Panorama");
       if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses))
-        return fsm_.Update(GOAL_INSPECT);
+        // return fsm_.Update(GOAL_INSPECT);
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:
-      NODELET_DEBUG("Received Goal Volumetric");
+      NODELET_ERROR("Received Goal Volumetric");
       if (inspection_->GenerateVolumetricSurvey(goal_.inspect_poses))
-        return fsm_.Update(GOAL_INSPECT);
+        // return fsm_.Update(GOAL_INSPECT);
       break;
     // Invalid command
     default:

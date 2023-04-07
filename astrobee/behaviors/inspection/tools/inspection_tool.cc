@@ -75,7 +75,7 @@ DEFINE_string(camera, "sci_cam", "Camera to use");
 DEFINE_double(target_distance,      0.3,  "Anomaly: desired distance to target (m)");
 DEFINE_double(min_distance,         0.2,  "Anomaly: minimum distance to target (m)");
 DEFINE_double(max_distance,         0.7,  "Anomaly: maximum distance to target (m)");
-DEFINE_double(max_angle,           15.0, "Anomaly: maximum angle to target (deg)");
+DEFINE_double(max_angle,           40.0, "Anomaly: maximum angle to target (deg)");
 DEFINE_double(target_size_x,       0.05, "Anomaly: target size x - width (m)");
 DEFINE_double(target_size_y,       0.05, "Anomaly: target size y - height (m)");
 DEFINE_string(depth_cam,          "haz", "Anomaly: depth cam to be used for distance measurements");
