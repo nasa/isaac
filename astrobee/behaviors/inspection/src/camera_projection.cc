@@ -344,11 +344,7 @@ namespace inspection {
       return false;
     }
 
-    return sqrt((tf_depth_cam_to_cam.transform.translation.x - sum_point.x / points_counter)
-                  * (tf_depth_cam_to_cam.transform.translation.x - sum_point.x / points_counter)
-              + (tf_depth_cam_to_cam.transform.translation.y - sum_point.y / points_counter)
-                  * (tf_depth_cam_to_cam.transform.translation.y - sum_point.y / points_counter)
-              + (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter)
+    return sqrt((tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter)
                   * (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter));
   }
 
