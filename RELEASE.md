@@ -1,5 +1,12 @@
 # Releases
 
+## Release 0.2.6
+
+  * Upgrades on inspection tool
+  * Auto sci cam restart
+  * Ubuntu 20 debian support
+  * Multiple other fixes
+
 ## Release 0.2.5
 
   * Add sci cam plugin to isaac repo
