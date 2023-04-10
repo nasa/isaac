@@ -49,7 +49,7 @@ namespace inspection {
                        (r < target_distance - min_distance); r += dist_resolution) {
       for (double theta = 0; theta <= max_angle; theta += angle_resolution_theta) {
         for (double phi = 0; phi < 2 * M_PI; phi += angle_resolution_phi) {
-          ROS_ERROR_STREAM("r: " << r << " phi: " << phi << " theta: " << theta);
+          // ROS_ERROR_STREAM("r: " << r << " phi: " << phi << " theta: " << theta);
 
             tilt = theta * sin(phi);
             pan = - theta * cos(phi);

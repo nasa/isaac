@@ -326,11 +326,11 @@ namespace inspection {
         }
       }
     }
-    if (points_counter == 0)
+    if (points_counter == 0) {
+      ROS_ERROR("No target points in depth cam image");
       return false;
-    ROS_ERROR_STREAM("ENDDD: ");
-    ROS_ERROR_STREAM("ENDDD: " << sum_point.x << " " << sum_point.y << " " << sum_point.z);
-    ROS_ERROR_STREAM("Sum target using haz cam interception: " << sum_point.x / points_counter << " "
+    }
+    ROS_ERROR_STREAM("Average target using haz cam interception: " << sum_point.x / points_counter << " "
                                                                << sum_point.y / points_counter << " "
                                                                << sum_point.z / points_counter);
 

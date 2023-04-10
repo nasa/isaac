@@ -410,6 +410,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         if (motion_retry_number_ < cfg_.Get<int>("max_motion_retry_number")) {
           motion_retry_number_++;
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
+          return;
         }
       }
     }
