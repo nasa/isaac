@@ -132,8 +132,6 @@ class CameraView {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-
-
 /*
   This class provides the high-level logic that allows the freeflyer to
   define the inspection poses for the different survey types.
