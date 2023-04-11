@@ -569,13 +569,13 @@ bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
 
   // Go through all the panorama center locations
   panorama_relative.poses.clear();
+  panorama_relative.poses.push_back(point);
+  // panorama_relative.poses.resize(1)
   for (const auto& point_panorama : points_panorama.poses) {
     for (const auto& orient : orientations) {
       ROS_DEBUG_STREAM("pan:" << orient.pan * 180 / M_PI << " tilt:" << orient.tilt * 180 / M_PI);
       panorama_rotation.setRPY(0, orient.tilt, orient.pan);
-      // panorama_rotation = panorama_rotation * tf2::Quaternion(0, 0, -1, 0) * target_to_cam_rot_;
-      point.orientation = msg_conversions::tf2_quat_to_ros_quat(panorama_rotation);
-      panorama_relative.poses.push_back(point);
+      panorama_relative.poses[0].orientation = msg_conversions::tf2_quat_to_ros_quat(panorama_rotation);
 
       // Transform the points from the camera reference frame to the robot body
       TransformList(panorama_relative, panorama_transformed,
