@@ -571,7 +571,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
                        cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range") &&
                      focus_distance_current_ >= cfg_.Get<double>("target_distance")) {
             focus_distance_current_ += cfg_.Get<double>("focus_distance_step");
-          } else if (focus_distance_current_ >
+          } else if (focus_distance_current_ >=
                      cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range")) {
             focus_distance_current_ = cfg_.Get<double>("target_distance") - cfg_.Get<double>("focus_distance_step");
           } else if (focus_distance_current_ >

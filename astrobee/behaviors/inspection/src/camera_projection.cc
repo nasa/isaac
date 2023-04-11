@@ -207,7 +207,6 @@ namespace inspection {
                                    geometry_msgs::Point& point) {
     // Convert from u (column / width), v (row/height) to position in array
     // where X,Y,Z data starts
-    ROS_ERROR_STREAM("u:" << u << " v:" << v);
     int arrayPosition = v * pCloud.row_step + u * pCloud.point_step;
 
     // compute position in array where x,y,z data start
@@ -228,7 +227,7 @@ namespace inspection {
             || std::isinf(X) || std::isinf(Y) || std::isinf(Z) ||
             (X == 0.0 && Y == 0.0 && Z == 0.0))
       return false;
-    ROS_ERROR_STREAM("after check ");
+    // ROS_ERROR_STREAM("after check ");
 
     // put data into the point p
     point.x = X;
@@ -315,9 +314,8 @@ namespace inspection {
           depth_cam.GetPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point)) {
           // Veto point somehow
 
-          ROS_ERROR_STREAM(depth_cam_x << "," << depth_cam_y << ": " << new_point.x << " "
-                                << new_point.y << " "
-                                << new_point.z);
+          ROS_ERROR_STREAM("u:" << depth_cam_x << " v:" << depth_cam_y << " " << depth_cam_x << "," << depth_cam_y
+                                << ": " << new_point.x << " " << new_point.y << " " << new_point.z);
 
           points_counter += 1;
           sum_point.x += new_point.x;
