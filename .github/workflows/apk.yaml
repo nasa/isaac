@@ -6,7 +6,7 @@ on: ['push', 'pull_request', 'workflow_dispatch']
 
 jobs:
   install_dependencies:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
     - name: Checkout Astrobee
@@ -36,8 +36,8 @@ jobs:
                               --build-arg PYTHON=''
                               -t isaac/isaac:msgs-ubuntu16.04
 
-    - name: Build image isaac/isaac:latest-msgs-jar-ubuntu16.04
-      run: docker build isaac -f isaac/scripts/docker/build_msgs_jar.Dockerfile
+    - name: Build image isaac/isaac:latest-akp-ubuntu16.04
+      run: docker build isaac -f isaac/scripts/docker/build_apk.Dockerfile
                               --build-arg UBUNTU_VERSION=16.04
                               --build-arg ROS_VERSION=kinetic
                               --build-arg PYTHON=''
