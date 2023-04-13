@@ -447,21 +447,21 @@ bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
 
 
     // Transform the points from the camera reference frame to the robot body
-  ROS_ERROR_STREAM("next pose position x:" << points_[i].poses.front().position.x
-                                  << " y:" << points_[i].poses.front().position.y
-                                  << " z:" << points_[i].poses.front().position.z
-                              << "quat x:" << points_[i].poses.front().orientation.x
-                                  << " y:" << points_[i].poses.front().orientation.y
-                                  << " z:" << points_[i].poses.front().orientation.z
-                                  << " w:" << points_[i].poses.front().orientation.w);
+    ROS_DEBUG_STREAM("next pose position x:" << points_[i].poses.front().position.x
+                                    << " y:" << points_[i].poses.front().position.y
+                                    << " z:" << points_[i].poses.front().position.z
+                                << "quat x:" << points_[i].poses.front().orientation.x
+                                    << " y:" << points_[i].poses.front().orientation.y
+                                    << " z:" << points_[i].poses.front().orientation.z
+                                    << " w:" << points_[i].poses.front().orientation.w);
     TransformList(points_[i], points_[i], anomaly_transform);
-  ROS_ERROR_STREAM("next pose position x:" << points_[i].poses.front().position.x
-                                  << " y:" << points_[i].poses.front().position.y
-                                  << " z:" << points_[i].poses.front().position.z
-                              << "quat x:" << points_[i].poses.front().orientation.x
-                                  << " y:" << points_[i].poses.front().orientation.y
-                                  << " z:" << points_[i].poses.front().orientation.z
-                                  << " w:" << points_[i].poses.front().orientation.w);
+    ROS_DEBUG_STREAM("next pose position x:" << points_[i].poses.front().position.x
+                                   << " y:" << points_[i].poses.front().position.y
+                                    << " z:" << points_[i].poses.front().position.z
+                                << "quat x:" << points_[i].poses.front().orientation.x
+                                   << " y:" << points_[i].poses.front().orientation.y
+                                   << " z:" << points_[i].poses.front().orientation.z
+                                    << " w:" << points_[i].poses.front().orientation.w);
 
 
     DrawPoseMarkers(points_[i], pub_markers_);
@@ -472,21 +472,21 @@ bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
       ROS_ERROR("Visibility Constrains: Did not find a possible inspection point");
       return false;
     }
-    ROS_ERROR_STREAM("Visibility Constrained");
+    ROS_DEBUG_STREAM("Visibility Constrained");
 
     // Check candidate segment agains zones
     if (!ZonesConstraint(points_[i])) {
       ROS_ERROR_STREAM("Zones Constrains: Did not find a possible inspection point");
       return false;
     }
-    ROS_ERROR_STREAM("Zones Constrained");
+    ROS_DEBUG_STREAM("Zones Constrained");
 
     // Check candidate segment against obstacle map
     if (!ObstaclesConstraint(points_[i])) {
       ROS_ERROR_STREAM("Obstacles Constrains: Did not find a possible inspection point");
       return false;
     }
-    ROS_ERROR_STREAM("Obstacles Constrained");
+    ROS_DEBUG_STREAM("Obstacles Constrained");
   }
   return true;
 }

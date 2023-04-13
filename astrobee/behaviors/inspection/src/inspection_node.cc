@@ -542,10 +542,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
 
   void SciCamInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg) {
-    ROS_ERROR_STREAM("Got scicam");
+    ROS_DEBUG_STREAM("Got scicam info");
     // The sci cam image was received
     if (sci_cam_req_ != 0) {
-      ROS_ERROR_STREAM("Scicam picture acquired " << ros::Time::now());
       // Clear local variables
       sci_cam_timeout_.stop();
       sci_cam_req_ = 0;
@@ -554,16 +553,18 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
-        ROS_ERROR_STREAM("ANOMALY");
+        ROS_ERROR_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
+                                                                 << ", Focus distance: " << focus_distance_current_
+                                                                 << ", Flashlight: " << flashlight_intensity_current_);
         // If we're iterating flashlight take second picture with it on
         if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
-          ROS_ERROR_STREAM("Turn on flashlight");
+          ROS_DEBUG_STREAM("Turn on flashlight");
           flashlight_intensity_current_ = cfg_.Get<double>("toggle_flashlight");
           Flashlight(flashlight_intensity_current_);
         } else {
           // Move on in focus distance iteration
           flashlight_intensity_current_ = 0.0;
-          ROS_ERROR_STREAM("Turn off flashlight");
+          ROS_DEBUG_STREAM("Turn off flashlight");
           Flashlight(flashlight_intensity_current_);
           if (focus_distance_current_ == focus_distance_calculated_) {
             focus_distance_current_ = cfg_.Get<double>("target_distance");
@@ -613,11 +614,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     isaac_msgs::ImageInspectionResultConstPtr const& result) {
     ROS_DEBUG_STREAM("IResultCallback()");
     // Fill in the result message with the result
-    // if (result != nullptr)
-    //   result_.anomaly_result.push_back(result->anomaly_result);
-    // else
-    //   ROS_ERROR_STREAM("Invalid result received Image Analysis");
-    // return fsm_.Update(NEXT_INSPECT);
+    if (result != nullptr)
+      result_.anomaly_result.push_back(result->anomaly_result);
+    else
+      ROS_ERROR_STREAM("Invalid result received Image Analysis");
+    return fsm_.Update(NEXT_INSPECT);
   }
 
   // INSPECTION ACTION SERVER
