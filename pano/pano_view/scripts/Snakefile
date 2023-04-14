@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+# Copyright (c) 2017, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The Astrobee platform is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+"""
+Snakemake rules for batch stitching multiple panoramas.
+"""
+
+from dot_dict import DotDict
+
+# When using this Snakefile, use the --directory option to snakemake to set the
+# desired output directory (e.g., "/output").
+
+configfile: "pano_meta.yaml"
+
+rule all:
+    input:
+        "html/tour.json"
+
+# We set up an explicit check if the output pano exists before
+# restitching.  This avoids unwanted restitching of all panos based on
+# irrelevant changes to the Snakefile or configfile. Explicitly delete
+# the output pano.png file if the pano needs to be restitched.
+
+rule stitch:
+    output:
+        protected("stitch/{scene_id}/pano.png")
+    params:
+        scene=lambda wildcards: DotDict(config["scenes"][wildcards.scene_id])
+    shell:
+        ("[ -f {output} ] ||"
+         " rosrun pano_stitch stitch_panorama.py"
+         " --no-lens"
+         " --robot={params.scene.robot}"
+         " --images-dir={params.scene.images_dir}"
+         " {params.scene.bag_path}"
+         " --output-dir=stitch/{wildcards.scene_id}"
+         " {params.scene.extra_stitch_args}")
+
+# Note we have to remove the output directory before running
+# generate.py because Snakemake tries to help by creating it, but
+# generate.py aborts if the directory exists to avoid accidentally
+# overwriting previous output.
+
+# As with stitching, if you want to force rebuild you should
+# explicitly delete the rule's output file (config.json).
+
+rule tile:
+    input:
+        "stitch/{scene_id}/pano.png"
+    output:
+        protected("html/scenes/{scene_id}/config.json")
+    shell:
+        ("[ -f {output} ] ||"
+         " rmdir $(dirname {output}) && "
+         " /opt/pannellum/utils/multires/generate.py"
+         " {input}"
+         " -o html/scenes/{wildcards.scene_id}")
+
+rule prep_source_images:
+    input:
+        expand("stitch/{scene_id}/pano.png", scene_id=config["scenes"].keys())
+    output:
+        touch("html/source_images/completed.txt")
+    shell:
+        "rosrun pano_view prep_source_images.py"
+
+rule tour:
+    input:
+        expand("html/scenes/{scene_id}/config.json", scene_id=config["scenes"].keys()),
+        "html/source_images/completed.txt"
+    output:
+        "html/tour.json"
+    shell:
+        "rosrun pano_view generate_tour.py"

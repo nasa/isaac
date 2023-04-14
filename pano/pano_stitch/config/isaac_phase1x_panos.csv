@@ -1,0 +1,11 @@
+activity,robot,bag_path,images_dir_rel_bag_path
+isaac9,queen,/testsessions/2022-06-08_115/robot_data/SN005/bags/20220608_1401_survey_jem_bay7_std_panorama.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac6,queen,/testsessions/2022-04-07_109/robot_data/SN005/bags/20220407_1601_survey_bay6_panorama.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac9,queen,/testsessions/2022-06-08_115/robot_data/SN005/bags/20220608_1336_survey_jem_bay5_std_panorama.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac9,queen,/testsessions/2022-06-08_115/robot_data/SN005/bags/20220608_1309_survey_jem_bay4_std_panorama.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac9,bumble,/testsessions/2022-06-08_115/robot_data/SN003/bags/20220608_1305_survey_jem_bay2_std_panorama.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac10,queen,/testsessions/2022-06-17_118/robot_data/SN005/bags/20220617_1554_survey_nod2_bay2_std_panorama.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac11,queen,/testsessions/2022-07-11_122/robot_data/SN005/bags/20220711_1433_survey_usl_bay1_std_panorama_run1.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac11,bumble,/testsessions/2022-07-11_122/robot_data/SN003/bags/20220711_1426_survey_usl_bay4_std_panorama_run_1.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac11,bumble,/testsessions/2022-07-11_122/robot_data/SN003/bags/20220711_1255_survey_usl_bay5_std_panorama_run_1.bag,../user_data/isaac_sci_cam_image_delayed/
+isaac11,bumble,/testsessions/2022-07-11_122/robot_data/SN003/bags/20220711_1238_survey_usl_bay6_std_panorama_run1.bag,../user_data/isaac_sci_cam_image_delayed/

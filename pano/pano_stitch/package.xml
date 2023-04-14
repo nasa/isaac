@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>pano_stitch</name>
+  <version>0.0.0</version>
+  <description>The pano_stitch package</description>
+  <license>
+    Apache License, Version 2.0
+  </license>
+  <author email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </author>
+  <maintainer email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rosbag</build_depend>
+  <exec_depend>rosbag</exec_depend>
+</package>

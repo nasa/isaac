@@ -17,6 +17,7 @@
 *.app
 
 # Emacs temporary
+*~
 
 # ViM swap files
 *.swp

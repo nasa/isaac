@@ -1,0 +1,2 @@
+
+- `isaac_phase1x_panos.csv`: Summary of ISAAC Phase 1X panorama data selected to include in the first panoramic tour. The `/testsessions` path used here can be found at `hivemind.ndc.nasa.gov:/home/p-astrobee/webdir/testsessions` (or corresponding web URLs). Used by `scripts/collect_pano_inputs.py`.
