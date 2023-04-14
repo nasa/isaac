@@ -554,8 +554,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
         ROS_ERROR_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
-                                                                 << ", Focus distance: " << focus_distance_current_
-                                                                 << ", Flashlight: " << flashlight_intensity_current_);
+                      << ", Focus distance (m): " << focus_distance_current_
+                      << ", Focal distance : " << 1.6 * std::pow(focus_distance_current_, -1.41)
+                      << ", Flashlight: " << flashlight_intensity_current_);
         // If we're iterating flashlight take second picture with it on
         if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
           ROS_DEBUG_STREAM("Turn on flashlight");
