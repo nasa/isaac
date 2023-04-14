@@ -59,6 +59,8 @@
 
 typedef actionlib::SimpleActionServer<isaac_msgs::InspectionAction> Server;
 
+#define EPS 1e-5
+
 /**
  * \ingroup beh
  */
@@ -459,7 +461,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
   // IMG ANALYSIS
   void Flashlight(double level) {
-    ROS_ERROR_STREAM("Flashlight toggle " << level);
+    ROS_DEBUG_STREAM("Flashlight toggle " << level);
     // Toggle flashlight
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
@@ -486,7 +488,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
 
   void SendPicture(double focus_distance) {
-    ROS_ERROR_STREAM("Send picture");
+    ROS_DEBUG_STREAM("Send picture");
     // Take picture
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
@@ -526,7 +528,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
     focus_distance_calculated_ = inspection_->GetDistanceToTarget();
-    ROS_ERROR_STREAM("Distance to target: " << focus_distance_calculated_);
+    ROS_DEBUG_STREAM("Distance to target: " << focus_distance_calculated_);
     focus_distance_current_ = focus_distance_calculated_;
     flashlight_intensity_current_ = 0.0;
 
@@ -559,32 +561,22 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
                       << ", Flashlight: " << flashlight_intensity_current_);
         // If we're iterating flashlight take second picture with it on
         if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
-          ROS_DEBUG_STREAM("Turn on flashlight");
           flashlight_intensity_current_ = cfg_.Get<double>("toggle_flashlight");
           Flashlight(flashlight_intensity_current_);
         } else {
           // Move on in focus distance iteration
           flashlight_intensity_current_ = 0.0;
-          ROS_DEBUG_STREAM("Turn off flashlight");
           Flashlight(flashlight_intensity_current_);
           if (focus_distance_current_ == focus_distance_calculated_) {
-            focus_distance_current_ = cfg_.Get<double>("target_distance");
+            focus_distance_current_ = cfg_.Get<double>("target_distance") - cfg_.Get<double>("focus_distance_range");
           } else if (focus_distance_current_ <
-                       cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range") &&
-                     focus_distance_current_ >= cfg_.Get<double>("target_distance")) {
+                       cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range") - EPS) {
             focus_distance_current_ += cfg_.Get<double>("focus_distance_step");
-          } else if (focus_distance_current_ >=
-                     cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range")) {
-            focus_distance_current_ = cfg_.Get<double>("target_distance") - cfg_.Get<double>("focus_distance_step");
-          } else if (focus_distance_current_ >
-                     cfg_.Get<double>("target_distance") - cfg_.Get<double>("focus_distance_range")) {
-            focus_distance_current_ -= cfg_.Get<double>("focus_distance_step");
           } else {
             // Finish inspection
             return fsm_.Update(NEXT_INSPECT);
           }
         }
-        ROS_ERROR_STREAM("Sending picture with focus " << focus_distance_current_);
         sci_cam_req_ = 1;
         SendPicture(focus_distance_current_);
       } else {
