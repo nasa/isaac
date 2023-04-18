@@ -152,7 +152,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // [3]
     fsm_.Add(STATE::VISUAL_INSPECTION,
       MOTION_SUCCESS, [this](FSM::Event const& event) -> FSM::State {
-        ROS_ERROR_STREAM("MOTION_SUCCESS Image inspect");
         ImageInspect();
         return STATE::MOVING_TO_APPROACH_POSE;
       });
@@ -367,8 +366,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   // Result of a move action
   void MResultCallback(ff_util::FreeFlyerActionState::Enum result_code,
     ff_msgs::MotionResultConstPtr const& result) {
-      ROS_ERROR_STREAM("MResultCallback");
-      ROS_ERROR_STREAM("MResultCallback " << result_code);
     // Check for invalid results
     if (result == nullptr) {
       ROS_ERROR_STREAM("Invalid result received Motion");
@@ -378,7 +375,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // If successful, return Success
     switch (result_code) {
       case ff_util::FreeFlyerActionState::SUCCESS:
-        ROS_ERROR_STREAM("success");
         motion_retry_number_ = 0;
         return fsm_.Update(MOTION_SUCCESS);
     }
@@ -393,7 +389,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
       {
         // Try to find an alternate inspection position
-        ROS_ERROR_STREAM("Removing inspection pose");
+        ROS_DEBUG_STREAM("Removing inspection pose");
         if (inspection_->RemoveInspectionPose()) {
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
           return;
@@ -408,7 +404,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
       {  // If it fails because of a motion error, retry
-        ROS_ERROR_STREAM("retry?");
+        ROS_DEBUG_STREAM("retry?");
         if (motion_retry_number_ < cfg_.Get<int>("max_motion_retry_number")) {
           motion_retry_number_++;
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
@@ -416,8 +412,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         }
       }
     }
-
-    ROS_ERROR_STREAM("Motion failed result error: " << result->response);
+    ROS_DEBUG_STREAM("Motion failed result error: " << result->response);
 
     return fsm_.Update(MOTION_FAILED);
   }
@@ -556,7 +551,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
-        ROS_ERROR_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
+        ROS_DEBUG_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
                       << ", Focus distance (m): " << focus_distance_current_
                       << ", Focal distance : " << 1.6 * std::pow(focus_distance_current_, -1.41)
                       << ", Flashlight: " << flashlight_intensity_current_);
