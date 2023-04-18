@@ -227,7 +227,6 @@ namespace inspection {
             || std::isinf(X) || std::isinf(Y) || std::isinf(Z) ||
             (X == 0.0 && Y == 0.0 && Z == 0.0))
       return false;
-    // ROS_ERROR_STREAM("after check ");
 
     // put data into the point p
     point.x = X;
@@ -269,26 +268,26 @@ namespace inspection {
     std::vector<int> vert_x{0, 0, 0, 0}, vert_y{0, 0, 0, 0};
     p1 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, size_y, 0));
     if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p1).position, vert_x[0], vert_y[0])) {
-      ROS_ERROR_STREAM("Point p1 outside depth cam view");
+      ROS_WARN_STREAM("Point p1 outside depth cam view");
     }
     p2 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(size_x, -size_y, 0));
     if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p2).position, vert_x[1], vert_y[1])) {
-      ROS_ERROR_STREAM("Point p2 outside depth cam view");
+      ROS_WARN_STREAM("Point p2 outside depth cam view");
     }
     p3 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, size_y, 0));
     if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p3).position, vert_x[2], vert_y[2])) {
-      ROS_ERROR_STREAM("Point p3 outside depth cam view");
+      ROS_WARN_STREAM("Point p3 outside depth cam view");
     }
     p4 = target_transform * tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(-size_x, -size_y, 0));
     if (!depth_cam.GetCamXYFromPoint(msg_conversions::tf2_transform_to_ros_pose(p4).position, vert_x[3], vert_y[3])) {
-      ROS_ERROR_STREAM("Point p4 outside depth cam view");
+      ROS_WARN_STREAM("Point p4 outside depth cam view");
     }
 
     // Debug messages
-    ROS_ERROR_STREAM("target p1 " << p1.getOrigin().x() << " " << p1.getOrigin().y() << " " << p1.getOrigin().z());
-    ROS_ERROR_STREAM("target p2 " << p2.getOrigin().x() << " " << p2.getOrigin().y() << " " << p2.getOrigin().z());
-    ROS_ERROR_STREAM("target p3 " << p3.getOrigin().x() << " " << p3.getOrigin().y() << " " << p3.getOrigin().z());
-    ROS_ERROR_STREAM("target p4 " << p4.getOrigin().x() << " " << p4.getOrigin().y() << " " << p4.getOrigin().z());
+    ROS_DEBUG_STREAM("target p1 " << p1.getOrigin().x() << " " << p1.getOrigin().y() << " " << p1.getOrigin().z());
+    ROS_DEBUG_STREAM("target p2 " << p2.getOrigin().x() << " " << p2.getOrigin().y() << " " << p2.getOrigin().z());
+    ROS_DEBUG_STREAM("target p3 " << p3.getOrigin().x() << " " << p3.getOrigin().y() << " " << p3.getOrigin().z());
+    ROS_DEBUG_STREAM("target p4 " << p4.getOrigin().x() << " " << p4.getOrigin().y() << " " << p4.getOrigin().z());
 
     // Get most recent depth message
     std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
@@ -307,14 +306,14 @@ namespace inspection {
     geometry_msgs::Point new_point;
     geometry_msgs::Point sum_point;
     int points_counter = 0;
-    ROS_ERROR_STREAM("width:" << msg->width << " height:" << msg->height);
+    ROS_DEBUG_STREAM("width:" << msg->width << " height:" << msg->height);
     for (int depth_cam_x = 0; depth_cam_x < msg->width; ++depth_cam_x) {
       for (int depth_cam_y = 0; depth_cam_y < msg->height; ++depth_cam_y) {
         if (InsideTarget(vert_x, vert_y, depth_cam_x, depth_cam_y) &&
           depth_cam.GetPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point)) {
           // Veto point somehow
 
-          ROS_ERROR_STREAM("u:" << depth_cam_x << " v:" << depth_cam_y << " " << depth_cam_x << "," << depth_cam_y
+          ROS_DEBUG_STREAM("u:" << depth_cam_x << " v:" << depth_cam_y << " " << depth_cam_x << "," << depth_cam_y
                                 << ": " << new_point.x << " " << new_point.y << " " << new_point.z);
 
           points_counter += 1;
@@ -328,7 +327,7 @@ namespace inspection {
       ROS_ERROR("No target points in depth cam image");
       return false;
     }
-    ROS_ERROR_STREAM("Average target using haz cam interception: " << sum_point.x / points_counter << " "
+    ROS_DEBUG_STREAM("Average target using haz cam interception: " << sum_point.x / points_counter << " "
                                                                << sum_point.y / points_counter << " "
                                                                << sum_point.z / points_counter);
 
