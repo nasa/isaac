@@ -376,50 +376,50 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
 
     // If successful, return Success
-    // switch (result_code) {
-    //   case ff_util::FreeFlyerActionState::SUCCESS:
-    //     ROS_ERROR_STREAM("success");
+    switch (result_code) {
+      case ff_util::FreeFlyerActionState::SUCCESS:
+        ROS_ERROR_STREAM("success");
         motion_retry_number_ = 0;
         return fsm_.Update(MOTION_SUCCESS);
-    // }
-    // switch (result->response) {
-    //   case ff_msgs::MotionResult::PLAN_FAILED:
-    //   case ff_msgs::MotionResult::VALIDATE_FAILED:
-    //   case ff_msgs::MotionResult::OBSTACLE_DETECTED:
-    //   case ff_msgs::MotionResult::REPLAN_NOT_ENOUGH_TIME:
-    //   case ff_msgs::MotionResult::REPLAN_FAILED:
-    //   case ff_msgs::MotionResult::REVALIDATE_FAILED:
-    //   case ff_msgs::MotionResult::VIOLATES_KEEP_OUT:
-    //   case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
-    //   {
-    //     // Try to find an alternate inspection position
-    //     ROS_ERROR_STREAM("Removing inspection pose");
-    //     if (inspection_->RemoveInspectionPose()) {
-    //       MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
-    //       return;
-    //     } else {
-    //       ROS_ERROR_STREAM("No alternative inspection pose possible for current station");
-    //     }
-    //     break;
-    //   }
-    //   case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION_ENDPOINT:
-    //   case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION:
-    //   case ff_msgs::MotionResult::TOLERANCE_VIOLATION_ATTITUDE:
-    //   case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
-    //   case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
-    //   {  // If it fails because of a motion error, retry
-    //     ROS_ERROR_STREAM("retry?");
-    //     if (motion_retry_number_ < cfg_.Get<int>("max_motion_retry_number")) {
-    //       motion_retry_number_++;
-    //       MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
-    //       return;
-    //     }
-    //   }
-    // }
+    }
+    switch (result->response) {
+      case ff_msgs::MotionResult::PLAN_FAILED:
+      case ff_msgs::MotionResult::VALIDATE_FAILED:
+      case ff_msgs::MotionResult::OBSTACLE_DETECTED:
+      case ff_msgs::MotionResult::REPLAN_NOT_ENOUGH_TIME:
+      case ff_msgs::MotionResult::REPLAN_FAILED:
+      case ff_msgs::MotionResult::REVALIDATE_FAILED:
+      case ff_msgs::MotionResult::VIOLATES_KEEP_OUT:
+      case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
+      {
+        // Try to find an alternate inspection position
+        ROS_ERROR_STREAM("Removing inspection pose");
+        if (inspection_->RemoveInspectionPose()) {
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
+          return;
+        } else {
+          ROS_ERROR_STREAM("No alternative inspection pose possible for current station");
+        }
+        break;
+      }
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION_ENDPOINT:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_ATTITUDE:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
+      {  // If it fails because of a motion error, retry
+        ROS_ERROR_STREAM("retry?");
+        if (motion_retry_number_ < cfg_.Get<int>("max_motion_retry_number")) {
+          motion_retry_number_++;
+          MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
+          return;
+        }
+      }
+    }
 
-    // ROS_ERROR_STREAM("Motion failed result error: " << result->response);
+    ROS_ERROR_STREAM("Motion failed result error: " << result->response);
 
-    // return fsm_.Update(MOTION_FAILED);
+    return fsm_.Update(MOTION_FAILED);
   }
 
   // Dock ACTION CLIENT
@@ -590,7 +590,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // The sci cam image was not received
     if (sci_cam_req_ < cfg_.Get<int>("sci_cam_max_trials")) {
       ROS_WARN_STREAM("Scicam didn't repond, resending it again");
-      ImageInspect();
+      // Send the command
+      SendPicture(focus_distance_current_);
       return;
     } else {
       return fsm_.Update(INSPECT_FAILED);
