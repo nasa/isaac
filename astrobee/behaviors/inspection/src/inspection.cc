@@ -149,7 +149,7 @@ bool Inspection::NextInspectionPose() {
 // Redo pose
 bool Inspection::RedoInspectionPose() {
   ROS_ERROR_STREAM("RedoInspectionPose " << inspection_counter_);
-  if (inspection_counter_ - 1 >= 0) {
+  if (inspection_counter_ >= 0) {
     inspection_counter_ -= 1;
     return true;
   } else {
