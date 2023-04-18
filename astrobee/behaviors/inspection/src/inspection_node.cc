@@ -59,6 +59,8 @@
 
 typedef actionlib::SimpleActionServer<isaac_msgs::InspectionAction> Server;
 
+#define EPS 1e-5
+
 /**
  * \ingroup beh
  */
@@ -281,10 +283,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       &InspectionNode::CancelCallback, this));
     server_.Create(nh, ACTION_BEHAVIORS_INSPECTION);
 
-    // Read maximum number of retryals for a motion action
-    max_motion_retry_number_= cfg_.Get<int>("max_motion_retry_number");
-
-
     // Timer for the sci cam camera
     sci_cam_timeout_ = nh_->createTimer(ros::Duration(cfg_.Get<double>("sci_cam_timeout")),
                                         &InspectionNode::SciCamTimeout, this, false, false);
@@ -391,6 +389,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       case ff_msgs::MotionResult::VIOLATES_KEEP_IN:
       {
         // Try to find an alternate inspection position
+        ROS_DEBUG_STREAM("Removing inspection pose");
         if (inspection_->RemoveInspectionPose()) {
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
           return;
@@ -399,19 +398,21 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         }
         break;
       }
+      case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION_ENDPOINT:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_POSITION:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_ATTITUDE:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_VELOCITY:
       case ff_msgs::MotionResult::TOLERANCE_VIOLATION_OMEGA:
       {  // If it fails because of a motion error, retry
-        if (motion_retry_number_ < max_motion_retry_number_) {
+        ROS_DEBUG_STREAM("retry?");
+        if (motion_retry_number_ < cfg_.Get<int>("max_motion_retry_number")) {
           motion_retry_number_++;
           MoveInspect(ff_msgs::MotionGoal::NOMINAL, inspection_->GetCurrentInspectionPose());
+          return;
         }
       }
     }
-
-    ROS_ERROR_STREAM("Motion failed result error: " << result->response);
+    ROS_DEBUG_STREAM("Motion failed result error: " << result->response);
 
     return fsm_.Update(MOTION_FAILED);
   }
@@ -454,25 +455,35 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
 
   // IMG ANALYSIS
+  void Flashlight(double level) {
+    ROS_DEBUG_STREAM("Flashlight toggle " << level);
+    // Toggle flashlight
+    ff_msgs::CommandArg arg;
+    std::vector<ff_msgs::CommandArg> cmd_args;
 
-  // Send a move command
-  bool ImageInspect() {
-    // Activate image anomaly detector if there are gound communications
-    if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
-      // Send goal
-      isaac_msgs::ImageInspectionGoal goal;
-      goal.type = isaac_msgs::ImageInspectionGoal::VENT;
-      client_i_.SendGoal(goal);
-    }
+    // The command sends two strings. The first has the flshlight name,
+    // and the second the intensity, encoded as json.
+    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
+    arg.s = "Front";
+    cmd_args.push_back(arg);
 
-    // Allow image to stabilize
-    ros::Duration(cfg_.Get<double>("station_time")).sleep();
-    double focus_distance = inspection_->GetDistanceToTarget();
-    ROS_DEBUG_STREAM("DISTANCE TO TARGET: " << focus_distance);
+    arg.data_type = ff_msgs::CommandArg::DATA_TYPE_FLOAT;
+    arg.f = level;
+    cmd_args.push_back(arg);
 
-    // Signal an imminent sci cam image
-    sci_cam_req_ = sci_cam_req_ + 1;
+    ff_msgs::CommandStamped cmd;
+    cmd.header.stamp = ros::Time::now();
+    cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_SET_FLASHLIGHT_BRIGHTNESS;
+    cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
+    cmd.cmd_src = "isaac fsw";
+    cmd.cmd_origin = "isaac fsw";
+    cmd.args = cmd_args;
 
+    pub_guest_sci_.publish(cmd);
+  }
+
+  void SendPicture(double focus_distance) {
+    ROS_DEBUG_STREAM("Send picture");
     // Take picture
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
@@ -492,35 +503,81 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd.header.stamp = ros::Time::now();
     cmd.cmd_name = ff_msgs::CommandConstants::CMD_NAME_CUSTOM_GUEST_SCIENCE;
     cmd.cmd_id = "inspection" + std::to_string(ros::Time::now().toSec());
-    cmd.cmd_src = "guest science";
-    cmd.cmd_origin = "guest science";
+    cmd.cmd_src = "isaac fsw";
+    cmd.cmd_origin = "isaac fsw";
     cmd.args = cmd_args;
-
 
     pub_guest_sci_.publish(cmd);
 
-
     // Timer for the sci cam camera
     sci_cam_timeout_.start();
+  }
+
+  // Send a move command
+  bool ImageInspect() {
+    // Activate image anomaly detector if there are gound communications
+    if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
+      // Send goal
+      isaac_msgs::ImageInspectionGoal goal;
+      goal.type = isaac_msgs::ImageInspectionGoal::VENT;
+      client_i_.SendGoal(goal);
+    }
+
+    // Allow image to stabilize
+    ros::Duration(cfg_.Get<double>("station_time")).sleep();
+    focus_distance_calculated_ = inspection_->GetDistanceToTarget();
+    ROS_DEBUG_STREAM("Distance to target: " << focus_distance_calculated_);
+    focus_distance_current_ = focus_distance_calculated_;
+    flashlight_intensity_current_ = 0.0;
+
+    // Signal an imminent sci cam image
+    sci_cam_req_ = sci_cam_req_ + 1;
+
+    // Send the command
+    SendPicture(focus_distance_calculated_);
 
     return 0;
   }
 
   void SciCamInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg) {
+    ROS_DEBUG_STREAM("Got scicam info");
     // The sci cam image was received
     if (sci_cam_req_ != 0) {
-      ROS_DEBUG_STREAM("Scicam picture acquired " << ros::Time::now());
       // Clear local variables
       sci_cam_timeout_.stop();
       sci_cam_req_ = 0;
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
+      ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
-      if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY && ground_active_) {
-        ROS_DEBUG_STREAM("wait for anomaly detection node result()");
-        return;
+      if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
+        ROS_DEBUG_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
+                      << ", Focus distance (m): " << focus_distance_current_
+                      << ", Focal distance : " << 1.6 * std::pow(focus_distance_current_, -1.41)
+                      << ", Flashlight: " << flashlight_intensity_current_);
+        // If we're iterating flashlight take second picture with it on
+        if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
+          flashlight_intensity_current_ = cfg_.Get<double>("toggle_flashlight");
+          Flashlight(flashlight_intensity_current_);
+        } else {
+          // Move on in focus distance iteration
+          flashlight_intensity_current_ = 0.0;
+          Flashlight(flashlight_intensity_current_);
+          if (focus_distance_current_ == focus_distance_calculated_) {
+            focus_distance_current_ = cfg_.Get<double>("target_distance") - cfg_.Get<double>("focus_distance_range");
+          } else if (focus_distance_current_ <
+                       cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range") - EPS) {
+            focus_distance_current_ += cfg_.Get<double>("focus_distance_step");
+          } else {
+            // Finish inspection
+            return fsm_.Update(NEXT_INSPECT);
+          }
+        }
+        sci_cam_req_ = 1;
+        SendPicture(focus_distance_current_);
+      } else {
+        return fsm_.Update(NEXT_INSPECT);
       }
-      return fsm_.Update(NEXT_INSPECT);
     }
     return;
   }
@@ -529,7 +586,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // The sci cam image was not received
     if (sci_cam_req_ < cfg_.Get<int>("sci_cam_max_trials")) {
       ROS_WARN_STREAM("Scicam didn't repond, resending it again");
-      ImageInspect();
+      // Send the command
+      SendPicture(focus_distance_current_);
       return;
     } else {
       return fsm_.Update(INSPECT_FAILED);
@@ -824,7 +882,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   std::string i_fsm_substate_;
   isaac_msgs::InspectionResult result_;
   int motion_retry_number_= 0;
-  int max_motion_retry_number_ = 0;
   // Flag to wait for sci camera
   int sci_cam_req_ = 0;
   bool ground_active_ = false;
@@ -832,6 +889,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
   // Inspection library
   Inspection* inspection_;
+
+  // Picture counters
+  double focus_distance_calculated_;
+  double focus_distance_current_;
+  double flashlight_intensity_current_;
 
  public:
   // This fixes the Eigen aligment issue

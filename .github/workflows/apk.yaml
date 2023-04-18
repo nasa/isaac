@@ -6,7 +6,7 @@ on: ['push', 'pull_request', 'workflow_dispatch']
 
 jobs:
   install_dependencies:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
     - name: Checkout Astrobee
@@ -36,37 +36,9 @@ jobs:
                               --build-arg PYTHON=''
                               -t isaac/isaac:msgs-ubuntu16.04
 
-    - name: Build image isaac/isaac:latest-msgs-jar-ubuntu16.04
-      run: docker build isaac -f isaac/scripts/docker/build_msgs_jar.Dockerfile
+    - name: Build image isaac/isaac:latest-akp-ubuntu16.04
+      run: docker build isaac -f isaac/scripts/docker/build_apk.Dockerfile
                               --build-arg UBUNTU_VERSION=16.04
                               --build-arg ROS_VERSION=kinetic
                               --build-arg PYTHON=''
-                              -t isaac/isaac:latest-msgs-jar-ubuntu16.04
-
-    - name: Copy jar files
-      run: |
-        docker cp $(docker create --rm isaac/isaac:latest-msgs-jar-ubuntu16.04):/src/msgs/devel/share/maven/ .
-        rm isaac/apks/isaac_gs_ros_bridge/app/libs/*msgs*
-        find maven -name *.jar -print0 | xargs -0 cp -t isaac/apks/isaac_gs_ros_bridge/app/libs
-
-    - name: Install APK dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libc6-dev-i386 lib32z1 openjdk-8-jdk
-        mkdir $HOME/android-sdk
-        cd $HOME/android-sdk
-        wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip
-        java -version
-        unzip tools_r25.2.3-linux.zip
-        tools/bin/sdkmanager --update
-        yes | tools/bin/sdkmanager "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository"
-        wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip
-        unzip android-ndk-r22b-linux-x86_64.zip
-        mv android-ndk-r22b ndk-bundle
-        cd  ~/android-sdk/ndk-bundle/toolchains
-        ln -s aarch64-linux-android-4.9 mips64el-linux-android
-        ln -s arm-linux-androideabi-4.9 mipsel-linux-android
-    - name: Build APK
-      run: |
-        cd isaac/apks/isaac_gs_ros_bridge
-        ANDROID_HOME=$HOME/android-sdk ANDROID_NDK_HOME=$HOME/android-sdk/ndk-bundle ./gradlew build
+                              -t isaac/isaac:latest-apk-ubuntu16.04

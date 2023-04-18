@@ -99,7 +99,7 @@ class CameraView {
   bool GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &x, int &y);
   bool GetCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
 
-  bool GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y, geometry_msgs::Point &point);
+  bool GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int u, const int v, geometry_msgs::Point &point);
 
   double GetDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
                                 double size_x, double size_y);
@@ -125,9 +125,12 @@ class CameraView {
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   geometry_msgs::TransformStamped tf_body_to_cam_;
+
+ public:
+  // This fixes the Eigen aligment issue
+  // http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-
-
 
 /*
   This class provides the high-level logic that allows the freeflyer to
@@ -219,12 +222,6 @@ class Inspection {
   ff_util::ConfigServer *cfg_;
 
   // Inspection parameters
-  double target_distance_;
-  double dist_resolution_;
-  double angle_resolution_;
-  double max_angle_;
-  double max_distance_;
-  double min_distance_;
   double horizontal_fov_;
   double aspect_ratio_;
   double target_size_x_;
@@ -244,6 +241,7 @@ class Inspection {
 
   // Publish Markers
   ros::Publisher pub_targets_;
+  ros::Publisher pub_markers_;
   ros::Publisher pub_cam_;
 
  public:

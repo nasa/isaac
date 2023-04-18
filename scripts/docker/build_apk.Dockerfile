@@ -37,3 +37,32 @@ RUN ["/bin/bash", "-c", "cd /src/msgs \
   && catkin build \
   && . devel/setup.bash \
   && genjava_message_artifacts --verbose -p ff_msgs ff_hw_msgs isaac_msgs isaac_hw_msgs"]
+
+# Copy over the isaac apks
+COPY apks /src/isaac/apks
+
+# Replace compiles messages with new ones
+RUN rm /src/isaac/apks/isaac_gs_ros_bridge/app/libs/*msgs* \
+  && cd /src/msgs/devel/share/maven \
+  && find . -name *.jar -print0 | xargs -0 cp -t /src/isaac/apks/isaac_gs_ros_bridge/app/libs
+
+# Install APK dependencies
+RUN sudo apt-get update \
+  && apt-get install -y libc6-dev-i386 lib32z1 openjdk-8-jdk \
+  && mkdir $HOME/android-sdk \
+  && cd $HOME/android-sdk \
+  && wget https://dl.google.com/android/repository/tools_r25.2.3-linux.zip \
+  && java -version \
+  && unzip tools_r25.2.3-linux.zip \
+  && tools/bin/sdkmanager --update \
+  && yes | tools/bin/sdkmanager "platforms;android-25" "build-tools;25.0.2" "extras;google;m2repository" "extras;android;m2repository" \
+  && wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip \
+  && unzip android-ndk-r22b-linux-x86_64.zip \
+  && mv android-ndk-r22b ndk-bundle \
+  && cd  ~/android-sdk/ndk-bundle/toolchains \
+  && ln -s aarch64-linux-android-4.9 mips64el-linux-android \
+  && ln -s arm-linux-androideabi-4.9 mipsel-linux-android
+
+# Build APK
+RUN cd /src/isaac/apks/isaac_gs_ros_bridge \
+  && ANDROID_HOME=$HOME/android-sdk ANDROID_NDK_HOME=$HOME/android-sdk/ndk-bundle ./gradlew build
