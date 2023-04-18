@@ -108,7 +108,7 @@ void Inspection::CheckMapTimeoutCallback() {
 
 // In case move failed, remove this point
 bool Inspection::RemoveInspectionPose() {
-  ROS_ERROR_STREAM("Counter " << inspection_counter_);
+  ROS_DEBUG_STREAM("Counter " << inspection_counter_);
   points_[inspection_counter_].poses.erase(points_[inspection_counter_].poses.begin());
   if (points_[inspection_counter_].poses.empty())
     return false;
@@ -138,7 +138,7 @@ geometry_msgs::PoseArray Inspection::GetCurrentInspectionPose() {
 
 // Skip pose
 bool Inspection::NextInspectionPose() {
-  ROS_ERROR_STREAM("NextInspectionPose " << inspection_counter_);
+  ROS_DEBUG_STREAM("NextInspectionPose " << inspection_counter_);
   if (inspection_counter_ + 1 < points_.size()) {
     inspection_counter_ += 1;
     return true;
@@ -148,7 +148,7 @@ bool Inspection::NextInspectionPose() {
 }
 // Redo pose
 bool Inspection::RedoInspectionPose() {
-  ROS_ERROR_STREAM("RedoInspectionPose " << inspection_counter_);
+  ROS_DEBUG_STREAM("RedoInspectionPose " << inspection_counter_);
   if (inspection_counter_ >= 0) {
     inspection_counter_ -= 1;
     return true;
@@ -158,7 +158,7 @@ bool Inspection::RedoInspectionPose() {
 }
 // Get poses
 geometry_msgs::PoseArray Inspection::GetInspectionPoses() {
-  ROS_ERROR_STREAM("GetInspectionPoses " << inspection_counter_);
+  ROS_DEBUG_STREAM("GetInspectionPoses " << inspection_counter_);
   geometry_msgs::PoseArray result;
   result.header = points_.front().header;
   for (int i = inspection_counter_ + 1; i < points_.size(); ++i) {
@@ -168,7 +168,7 @@ geometry_msgs::PoseArray Inspection::GetInspectionPoses() {
 }
 
 double Inspection::GetDistanceToTarget() {
-  ROS_ERROR_STREAM("GetDistanceToTarget " << inspection_counter_);
+  ROS_DEBUG_STREAM("GetDistanceToTarget " << inspection_counter_);
   if (mode_ == "anomaly") {
     if (cameras_.find(curr_camera_) != cameras_.end()) {
       return cameras_.find(curr_camera_)->second.GetDistanceFromTarget(goal_.poses[inspection_counter_],
