@@ -513,6 +513,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd.args = cmd_args;
 
     pub_guest_sci_.publish(cmd);
+
+    // Timer for the sci cam camera
+    sci_cam_timeout_.start();
   }
 
   // Send a move command
@@ -537,8 +540,6 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
 
     // Send the command
     SendPicture(focus_distance_calculated_);
-    // Timer for the sci cam camera
-    sci_cam_timeout_.start();
 
     return 0;
   }
