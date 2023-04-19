@@ -9,7 +9,14 @@ This tool is used to initiate inspection actions. To run the tool:
 	
 	rosrun inspection inspection_tool -$ACTION [OPTIONS]
 
-As of now, the actions available are:
+General parameters
+| Parameter            | Default value         | Description                                              |
+| -------------------- | --------------------- | -------------------------------------------------------- |
+| camera               | "sci_cam"             | Camera to use"                                           |
+| pos                  | ""                    | Desired position in cartesian format 'X Y Z' (meters)    |
+| att                  | ""                    | Desired attitude in RPY format 'roll pitch yaw' (degrees)|
+
+Once you launch the command, the actions available are:
 
 Inspection coordination:
 
@@ -28,16 +35,62 @@ Inspection coordination:
 Inspection modes:
 
 
-*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. Target reference frames are defined as the z-axis pointing outwards to where the camera would be, x-axis is along the picture width and the y-axis is along the picture height, like so:
+*anomaly*: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. To specify the anomaly location, the position of the anomaly is needed and the attitude in which the robot should view it. The following figure shows an example of the target marker specified and how the robot positioned itself to view it:
 
 ![Target reference frame](/doc/images/ref_frame_anomaly.png)
+
+An example command for this type of anomaly would be:
+
+    rosrun inspection inspection_tool -anomaly -anomaly_poses /resources/inspection_iss.txt
+
+Relevant parameters:
+| Parameter            | Default value         | Description                                             |
+| -------------------- | --------------------- | ------------------------------------------------------- |
+| target_distance      | 0.3,                  | Anomaly: desired distance to target (m)                 |
+| min_distance         | 0.2,                  | Anomaly: minimum distance to target (m)                 |
+| max_distance         | 0.7,                  | Anomaly: maximum distance to target (m)                 |
+| max_angle            | 40.0,                 | Anomaly: maximum angle to target (deg)                  |
+| target_size_x        | 0.05,                 | Anomaly: target size x - width (m)                      |
+| target_size_y        | 0.05,                 | Anomaly: target size y - height (m)                     |
+| depth_cam            | "haz",                | Anomaly: depth cam to be used for distance measurements |
+| toggle_flashlight    | 0.0 (no toggle)       | Anomaly: Toggle flashlight 0=OFF 1=MAX                  |
+| focus_distance_step  | 0.05                  | Anomaly: Step to iterate focus distances (m)            |
+| focus_distance_range | 0.0, (no focus range) | Anomaly: Range when iterating focus distances (m)       |
+
 
 
 *geometry*: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.
 
-*panorama*: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page \subpage pano_coverage.
+An example command for this type of anomaly would be:
+
+    rosrun inspection inspection_tool -geometry -geometry_poses /resources/geometry_iss.txt
+
+
+*panorama*: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page: \subpage pano_coverage.
+
+An example command for this type of anomaly would be:
+
+    rosrun inspection inspection_tool -panorama -panorama_poses /resources/panorama_iss.txt
+
+Relevant parameters:
+| Parameter            | Default value         | Description                                                    |
+| -------------------- | --------------------- | --------------------------------------------------------       |
+| panorama_mode        | ""                    | Panorama configuration pre-set (from pano_test_cases.cvs)      |
+| pan_min              | -180.0                | Panorama: minimum pan                                          |
+| pan_max              | 180.0                 | Panorama: maximum pan                                          |
+| tilt_min             | -90.0                 | Panorama: minimum tilt                                         |
+| tilt_max             | 90.0                  | Panorama: maximum tilt                                         |
+| h_fov                | -1.0                  | Panorama: camera horizontal fov, default -1 uses camera matrix |
+| v_fov                | -1.0                  | Panorama: camera vertical fov, default -1 uses camera matrix   |
+| overlap              | 0.5                   | Panorama: overlap between images                               |
+| att_tol              | 5.0                   | Panorama: attitude tolerance due to mobility                   |
+
 
 *volumetric*: This will perform a volumetric survey
+
+An example command for this type of anomaly would be:
+
+    rosrun inspection inspection_tool -volumetric -volumetric_poses /resources/volumetric_iss.txt
 
 ### Using sci_cam_tool
 

@@ -19,16 +19,16 @@
 <launch>
 
   <!-- Additional options -->
-  <arg name="drivers"/>                          <!-- Should we launch drivers? -->
-  <arg name="spurn" default=""/>                 <!-- PRevent a specific node   -->
-  <arg name="nodes" default=""/>                 <!-- Launch specific nodes     -->
-  <arg name="extra" default=""/>                 <!-- Inject an additional node -->
-  <arg name="debug" default=""/>                 <!-- Debug a node set          -->
-  <arg name="output" default="log"/>             <!-- Where to log              -->
-  <arg name="sim_mode" default="false" />        <!-- If in sim mode            -->
-  <arg name="wifi" default="false" />            <!-- Enable Wifi               -->
+  <arg name="drivers"/>                          <!-- Should we launch drivers?   -->
+  <arg name="spurn" default=""/>                 <!-- PRevent a specific node     -->
+  <arg name="nodes" default=""/>                 <!-- Launch specific nodes       -->
+  <arg name="extra" default=""/>                 <!-- Inject an additional node   -->
+  <arg name="debug" default=""/>                 <!-- Debug a node set            -->
+  <arg name="output" default="log"/>             <!-- Where to log                -->
+  <arg name="sim_mode" default="false" />        <!-- If in sim mode              -->
+  <arg name="wifi" default="false" />            <!-- Enable Wifi                 -->
   <arg name="streaming_mapper" default="false" /><!-- Enable the streaming mapper -->
-  <arg name="acoustics_cam" default="false" />   <!-- Enable the acoustics cam -->
+  <arg name="acoustics_cam" default="false" />   <!-- Enable the acoustics cam    -->
 
   <!-- Launch all nodelet managers -->
   <group if="$(eval optenv('ASTROBEE_NODEGRAPH','')=='')">
@@ -90,7 +90,7 @@
       <arg name="nodes" value="$(arg nodes)" />
       <arg name="extra" value="$(arg extra)" />
       <arg name="debug" value="$(arg debug)" />
-      <arg name="default" value="true" />
+      <arg name="default" value="false" />
     </include>
 
     <!-- Wifi -->

@@ -22,6 +22,7 @@
 // TODO(mgouveia): look into this, seems like FrustumPlanes does not have the s parameter
 // #include <mapper/linear_algebra.h>
 
+#include <math.h>
 #include <cmath>
 
 /**
@@ -202,11 +203,11 @@ namespace inspection {
   }
 
   // Get 3D point from camera pixel location and point cloud
-  bool CameraView::GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int x, const int y,
+  bool CameraView::GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int u, const int v,
                                    geometry_msgs::Point& point) {
     // Convert from u (column / width), v (row/height) to position in array
     // where X,Y,Z data starts
-    int arrayPosition = x*pCloud.row_step + y*pCloud.point_step;
+    int arrayPosition = v * pCloud.row_step + u * pCloud.point_step;
 
     // compute position in array where x,y,z data start
     int arrayPosX = arrayPosition + pCloud.fields[0].offset;  // X has an offset of 0
@@ -220,6 +221,12 @@ namespace inspection {
     memcpy(&X, &pCloud.data[arrayPosX], sizeof(float));
     memcpy(&Y, &pCloud.data[arrayPosY], sizeof(float));
     memcpy(&Z, &pCloud.data[arrayPosZ], sizeof(float));
+
+    // make sure output is valid
+    if (std::isnan(X) || std::isnan(Y) || std::isnan(Z)
+            || std::isinf(X) || std::isinf(Y) || std::isinf(Z) ||
+            (X == 0.0 && Y == 0.0 && Z == 0.0))
+      return false;
 
     // put data into the point p
     point.x = X;
@@ -299,10 +306,16 @@ namespace inspection {
     geometry_msgs::Point new_point;
     geometry_msgs::Point sum_point;
     int points_counter = 0;
-    for (int depth_cam_x = 0; depth_cam_x < W_; ++depth_cam_x) {
-      for (int depth_cam_y = 0; depth_cam_y < H_; ++depth_cam_y) {
-        if (InsideTarget(vert_x, vert_y, depth_cam_x, depth_cam_y)) {
-          depth_cam.GetPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point);
+    ROS_DEBUG_STREAM("width:" << msg->width << " height:" << msg->height);
+    for (int depth_cam_x = 0; depth_cam_x < msg->width; ++depth_cam_x) {
+      for (int depth_cam_y = 0; depth_cam_y < msg->height; ++depth_cam_y) {
+        if (InsideTarget(vert_x, vert_y, depth_cam_x, depth_cam_y) &&
+          depth_cam.GetPointFromXYD(*msg, depth_cam_x, depth_cam_y, new_point)) {
+          // Veto point somehow
+
+          ROS_DEBUG_STREAM("u:" << depth_cam_x << " v:" << depth_cam_y << " " << depth_cam_x << "," << depth_cam_y
+                                << ": " << new_point.x << " " << new_point.y << " " << new_point.z);
+
           points_counter += 1;
           sum_point.x += new_point.x;
           sum_point.y += new_point.y;
@@ -310,9 +323,13 @@ namespace inspection {
         }
       }
     }
-    ROS_DEBUG_STREAM("Sum target using haz cam interception: " << sum_point.x / points_counter << " "
+    if (points_counter == 0) {
+      ROS_ERROR("No target points in depth cam image");
+      return false;
+    }
+    ROS_DEBUG_STREAM("Average target using haz cam interception: " << sum_point.x / points_counter << " "
                                                                << sum_point.y / points_counter << " "
-                                                               << sum_point.x / points_counter);
+                                                               << sum_point.z / points_counter);
 
     // Calculate distance between estimated target and camera
     geometry_msgs::TransformStamped tf_depth_cam_to_cam;
@@ -324,11 +341,7 @@ namespace inspection {
       return false;
     }
 
-    return sqrt((tf_depth_cam_to_cam.transform.translation.x - sum_point.x / points_counter)
-                  * (tf_depth_cam_to_cam.transform.translation.x - sum_point.x / points_counter)
-              + (tf_depth_cam_to_cam.transform.translation.y - sum_point.y / points_counter)
-                  * (tf_depth_cam_to_cam.transform.translation.y - sum_point.y / points_counter)
-              + (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter)
+    return sqrt((tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter)
                   * (tf_depth_cam_to_cam.transform.translation.z - sum_point.z / points_counter));
   }
 

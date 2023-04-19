@@ -72,13 +72,16 @@ DEFINE_string(camera, "sci_cam", "Camera to use");
 
 
 // Configurable Parameters anomaly
-DEFINE_double(target_distance, 0.3,  "Anomaly: desired distance to target");
-DEFINE_double(min_distance,    0.2,  "Anomaly: minimum distance to target");
-DEFINE_double(max_distance,    0.7,  "Anomaly: maximum distance to target");
-DEFINE_double(max_angle,       15.0, "Anomaly: maximum angle (deg) to target");
-DEFINE_double(target_size_x,   0.05, "Anomaly: target size x - width");
-DEFINE_double(target_size_y,   0.05, "Anomaly: target size y - height");
-DEFINE_string(depth_cam,  "haz", "Anomaly: depth cam to be used for distance measurements");
+DEFINE_double(target_distance,      0.3, "Anomaly: desired distance to target (m)");
+DEFINE_double(min_distance,         0.2, "Anomaly: minimum distance to target (m)");
+DEFINE_double(max_distance,         0.7, "Anomaly: maximum distance to target (m)");
+DEFINE_double(max_angle,           40.0, "Anomaly: maximum angle to target (deg)");
+DEFINE_double(target_size_x,       0.05, "Anomaly: target size x - width (m)");
+DEFINE_double(target_size_y,       0.05, "Anomaly: target size y - height (m)");
+DEFINE_string(depth_cam,          "haz", "Anomaly: depth cam to be used for distance measurements");
+DEFINE_double(toggle_flashlight,    0.0, "Anomaly: Toggle flashlight 0=OFF 1=MAX");
+DEFINE_double(focus_distance_step, 0.05, "Anomaly: Step to iterate focus distances (m)");
+DEFINE_double(focus_distance_range, 0.0, "Anomaly: Range when iterating focus distances (m)");
 
 // Configurable Parameters panorama
 DEFINE_string(panorama_mode, "", "Panorama configuration pre-set");
@@ -443,6 +446,9 @@ int main(int argc, char *argv[]) {
     cfg.Set<double>("target_size_x", FLAGS_target_size_x);
     cfg.Set<double>("target_size_y", FLAGS_target_size_y);
     cfg.Set<std::string>("depth_cam", FLAGS_depth_cam);
+    cfg.Set<double>("toggle_flashlight", FLAGS_toggle_flashlight);
+    cfg.Set<double>("focus_distance_step", FLAGS_focus_distance_step);
+    cfg.Set<double>("focus_distance_range", FLAGS_focus_distance_range);
     if (!cfg.Reconfigure()) {
       std::cout << "Could not reconfigure the inspection node " << std::endl;
       ros::shutdown();
