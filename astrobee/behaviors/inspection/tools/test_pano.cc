@@ -28,8 +28,7 @@
 
 typedef decltype(&inspection::GeneratePanoOrientations) orientations_func_t;
 
-class TestCase {
- public:
+struct TestCase {
   std::string label;
   double pan_radius_degrees, tilt_radius_degrees;
   double h_fov_degrees, v_fov_degrees;
