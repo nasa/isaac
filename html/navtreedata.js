@@ -38,14 +38,14 @@ var NAVTREE =
       [ "Dependencies", "md_INSTALL.html#autotoc_md7", null ],
       [ "Configuring the build", "md_INSTALL.html#autotoc_md8", null ],
       [ "Building the code", "md_INSTALL.html#autotoc_md9", null ],
-      [ "Cross-compiling isaac", "md_INSTALL.html#autotoc_md10", null ],
-      [ "Build ISAAC debian", "md_INSTALL.html#autotoc_md11", null ]
+      [ "Cross-compiling isaac (NASA only)", "md_INSTALL.html#autotoc_md10", null ],
+      [ "Install the code on the robot (NASA only)", "md_INSTALL.html#autotoc_md11", null ],
+      [ "Build ISAAC debian (NASA only)", "md_INSTALL.html#autotoc_md12", null ]
     ] ],
     [ "Docker Install", "docker.html", null ],
     [ "Subsystems", "subsystems.html", "subsystems" ],
     [ "Tutorials", "md_isaac_Tutorials.html", "md_isaac_Tutorials" ],
     [ "Ros To Guest Science Bridge", "ros_gs_bridge.html", null ],
-    [ "Panoramas", "panoramas.html", null ],
     [ "Class Index", "classes.html", null ]
   ] ]
 ];

@@ -29,7 +29,7 @@
  <tr style="height: 70px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">ISAAC
-   &#160;<span id="projectnumber">0.2.5</span>
+   &#160;<span id="projectnumber">0.2.6</span>
    </div>
    <div id="projectbrief">Flight software for the ISAAC project, adding functionality to the Astrobee robot, operating inside the International Space Station.</div>
   </td>
@@ -90,40 +90,40 @@ $(document).ready(function(){initNavTree('docker.html',''); initResizable(); });
 <div class="title">Docker Install </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h2><a class="anchor" id="autotoc_md12"></a>
+<div class="textblock"><h2><a class="anchor" id="autotoc_md13"></a>
 Install dependencies</h2>
 <p>Install docker tools: <a href="https://docs.docker.com/engine/install/ubuntu/">https://docs.docker.com/engine/install/ubuntu/</a></p>
 <p>Install nvidia-docker (optional, to use GPU): <a href="https://github.com/NVIDIA/nvidia-docker">https://github.com/NVIDIA/nvidia-docker</a>.</p>
-<h2><a class="anchor" id="autotoc_md13"></a>
+<h2><a class="anchor" id="autotoc_md14"></a>
 Building the docker images</h2>
 <p>To run the demos, you can use the remote pre-built images hosted on Github and skip this section. If you want to build the docker images locally instead of pulling from the remote repository, use: </p><pre class="fragment">./build.sh [OPTIONS]
 </pre><p><b>Before</b> running this script, please check the available options and defaults with: </p><pre class="fragment">./build --help
 </pre><p>The build script will automatically detect the current Ubuntu OS version and define the docker files variables <code>UBUNTU_VERSION</code>, <code>ROS_VERSION</code>, and <code>PYTHON</code> accordingly. If a specific version is desired, the option &ndash;xenial, &ndash;bionic, and &ndash;focal is used for ubuntu 16.04, 18.04, and 20.04 docker images, respectively.</p>
 <p>If you don't want to run mast or don't have access to it (not a public repository), the use the option &ndash;no-mast.</p>
-<h2><a class="anchor" id="autotoc_md14"></a>
+<h2><a class="anchor" id="autotoc_md15"></a>
 Run the docker containers</h2>
 <p>To run the docker containers: </p><pre class="fragment">./run.sh [OPTIONS]
 </pre><p><b>Before</b> running this script, please check the available options and defaults with: </p><pre class="fragment">./run --help
 </pre><p>Make sure the default paths are correct, if not configure those options. Read through the different optional modules to understand if it fits your purpose.</p>
 <p>It will automatically detect the current Ubuntu OS version. If a specific version is desired, the option &ndash;xenial, &ndash;bionic, and &ndash;focal is used for ubuntu 16.04, 18.04, and 20.04 docker images, respectively.</p>
 <p>Once the command is executed the host location of the modules launched will be printed. Open those paths on your favorite browser.</p>
-<h2><a class="anchor" id="autotoc_md15"></a>
+<h2><a class="anchor" id="autotoc_md16"></a>
 Shutdown docker containers</h2>
 <p>To stop all of the containers, use: </p><pre class="fragment">scripts/docker/shutdown.sh
-</pre><h2><a class="anchor" id="autotoc_md16"></a>
+</pre><h2><a class="anchor" id="autotoc_md17"></a>
 Docker Demos</h2>
 <p>There are currently 3 demos available to showcase some aspects of the ISAAC functionality.</p>
 <p>Open <code><a href="http://127.0.0.1:8080">http://127.0.0.1:8080</a></code> in a web browser to see what is happening. Use <code>docker ps</code> to see the docker containers and use <code>docker exec -it container_name /bin/bash</code> to get a shell in one.</p>
 <p>Cancel with Ctrl+c and then run <code>scripts/docker/shutdown.sh</code> to stop the demo.</p>
-<h3><a class="anchor" id="autotoc_md17"></a>
+<h3><a class="anchor" id="autotoc_md18"></a>
 Trigger anomaly (with MAST Only)</h3>
 <pre class="fragment">./demos/trigger_anomaly.sh
 </pre><p>This demo will trigger a C02 anomaly, the levels of C02 will start to increase. The mast detects the anomaly and sends astrobee to inspect a vent. Astrobee will undock, calculate the optimal inspection pose to observe the target and move towards that pose, replanning if any obstacle is found. When the robot has the vent of interest in sight, it will take a picture and run it through a trained CNN, identifying whether the vent is obstructed, free or inconclusive result. After inspection Astrobee will dock autonomously.</p>
-<h3><a class="anchor" id="autotoc_md18"></a>
+<h3><a class="anchor" id="autotoc_md19"></a>
 Trigger geometric mapping</h3>
 <pre class="fragment">./demos/trigger_geometric_mapping.sh
 </pre><p>This demo will trigger a geometric mapping inspection event. The geometric mapper collects pictures from several poses and creates a 3d mesh of the ISS. The robot will undock, follow a trajectory taking pictures at the specified waypoints and dock again. For the geometric mapper, the trajectory followed is defined in astrobee/behaviors/inspection/resources/geometry_iss.txt. The geometric mapper will map a section of the jem containing bay 5.</p>
-<h3><a class="anchor" id="autotoc_md19"></a>
+<h3><a class="anchor" id="autotoc_md20"></a>
 Trigger wifi mapping</h3>
 <pre class="fragment">./demos/trigger_wifi_mapping.sh
 </pre><p>This demo will trigger a volumetric mapping inspection event. The volumetric mapper collects information from an onboard sensor of Astrobee and interpolates the data in a specified area. The robot will undock, follow a trajectory and dock again. For the wifi mapper, the trajectory followed is defined in astrobee/behaviors/inspection/resources/volumetric_iss.txt. </p>

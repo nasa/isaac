@@ -29,7 +29,7 @@
  <tr style="height: 70px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">ISAAC
-   &#160;<span id="projectnumber">0.2.5</span>
+   &#160;<span id="projectnumber">0.2.6</span>
    </div>
    <div id="projectbrief">Flight software for the ISAAC project, adding functionality to the Astrobee robot, operating inside the International Space Station.</div>
   </td>
@@ -91,10 +91,18 @@ $(document).ready(function(){initNavTree('inspection.html',''); initResizable();
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>This directory provides two tools: inspection_tool and sci_cam_tool.</p>
-<h3><a class="anchor" id="autotoc_md60"></a>
+<h3><a class="anchor" id="autotoc_md61"></a>
 Using the inspection tool</h3>
 <p>This tool is used to initiate inspection actions. To run the tool: </p><pre class="fragment">rosrun inspection inspection_tool -$ACTION [OPTIONS]
-</pre><p>As of now, the actions available are:</p>
+</pre><p>General parameters </p><table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone">Parameter  </th><th class="markdownTableHeadNone">Default value  </th><th class="markdownTableHeadNone">Description   </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">camera  </td><td class="markdownTableBodyNone">"sci_cam"  </td><td class="markdownTableBodyNone">Camera to use"\ilinebr &lt;/td&gt;  &lt;/tr&gt;
+&lt;tr class="markdownTableRowEven"&gt;    &lt;td class="markdownTableBodyNone"&gt; pos\ilinebr &lt;/td&gt;    &lt;td class="markdownTableBodyNone"&gt; ""\ilinebr &lt;/td&gt;    &lt;td class="markdownTableBodyNone"&gt; Desired position in cartesian format 'X Y Z' (meters)\ilinebr &lt;/td&gt;  &lt;/tr&gt;
+&lt;tr class="markdownTableRowOdd"&gt;    &lt;td class="markdownTableBodyNone"&gt; att\ilinebr &lt;/td&gt;    &lt;td class="markdownTableBodyNone"&gt; ""\ilinebr &lt;/td&gt;    &lt;td class="markdownTableBodyNone"&gt; Desired attitude in RPY format 'roll pitch yaw' (degrees)   </td></tr>
+</table>
+<p>Once you launch the command, the actions available are:</p>
 <p>Inspection coordination:</p>
 <p><em>pause</em>: Pauses the current action being performed, the goal is kept, so a resume command will resume the action.</p>
 <p><em>resume</em>: Resumes a paused or failed action (in the case where there is a motion fail or picture fail). It will restart on the "move to inspection pose" step.</p>
@@ -102,12 +110,62 @@ Using the inspection tool</h3>
 <p><em>skip</em>: Skips the surrent inspection pose, useful if a certain pose is unreachable.</p>
 <p><em>save</em>: Saves the current goal, in the case flight software needs to be restarted. The current survey is saved in resources/current.txt. It can be loaded afterwards using</p>
 <p>Inspection modes:</p>
-<p><em>anomaly</em>: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. Target reference frames are defined as the z-axis pointing outwards to where the camera would be, x-axis is along the picture width and the y-axis is along the picture height, like so:</p>
+<p><em>anomaly</em>: Starts an anomaly inspection action. The robot will come up to a target, take a picture and run the picture through the image anomaly detector to classify it. To specify the anomaly location, the position of the anomaly is needed and the attitude in which the robot should view it. The following figure shows an example of the target marker specified and how the robot positioned itself to view it:</p>
 <p><img src="ref_frame_anomaly.png" alt="" class="inline" title="Target reference frame"/>   </p>
+<p>An example command for this type of anomaly would be: </p><pre class="fragment">rosrun inspection inspection_tool -anomaly -anomaly_poses /resources/inspection_iss.txt
+</pre><p>Relevant parameters: </p><table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone">Parameter  </th><th class="markdownTableHeadNone">Default value  </th><th class="markdownTableHeadNone">Description   </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">target_distance  </td><td class="markdownTableBodyNone">0.3,  </td><td class="markdownTableBodyNone">Anomaly: desired distance to target (m)   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">min_distance  </td><td class="markdownTableBodyNone">0.2,  </td><td class="markdownTableBodyNone">Anomaly: minimum distance to target (m)   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">max_distance  </td><td class="markdownTableBodyNone">0.7,  </td><td class="markdownTableBodyNone">Anomaly: maximum distance to target (m)   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">max_angle  </td><td class="markdownTableBodyNone">40.0,  </td><td class="markdownTableBodyNone">Anomaly: maximum angle to target (deg)   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">target_size_x  </td><td class="markdownTableBodyNone">0.05,  </td><td class="markdownTableBodyNone">Anomaly: target size x - width (m)   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">target_size_y  </td><td class="markdownTableBodyNone">0.05,  </td><td class="markdownTableBodyNone">Anomaly: target size y - height (m)   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">depth_cam  </td><td class="markdownTableBodyNone">"haz",  </td><td class="markdownTableBodyNone">Anomaly: depth cam to be used for distance measurements   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">toggle_flashlight  </td><td class="markdownTableBodyNone">0.0 (no toggle)  </td><td class="markdownTableBodyNone">Anomaly: Toggle flashlight 0=OFF 1=MAX   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">focus_distance_step  </td><td class="markdownTableBodyNone">0.05  </td><td class="markdownTableBodyNone">Anomaly: Step to iterate focus distances (m)   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">focus_distance_range  </td><td class="markdownTableBodyNone">0.0, (no focus range)  </td><td class="markdownTableBodyNone">Anomaly: Range when iterating focus distances (m)   </td></tr>
+</table>
 <p><em>geometry</em>: Starts a geometry inspection, meaning that it will go to the commanded poses and take pictures to be processed by the geometry mapper.</p>
-<p><em>panorama</em>: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page <a class="el" href="pano_coverage.html">Panorama coverage planning</a>.</p>
+<p>An example command for this type of anomaly would be: </p><pre class="fragment">rosrun inspection inspection_tool -geometry -geometry_poses /resources/geometry_iss.txt
+</pre><p><em>panorama</em>: it will do a panorama survey of all points specified. For more information on how these surveys are generated, see page: <a class="el" href="pano_coverage.html">Panorama coverage planning</a>.</p>
+<p>An example command for this type of anomaly would be: </p><pre class="fragment">rosrun inspection inspection_tool -panorama -panorama_poses /resources/panorama_iss.txt
+</pre><p>Relevant parameters: </p><table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone">Parameter  </th><th class="markdownTableHeadNone">Default value  </th><th class="markdownTableHeadNone">Description   </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">panorama_mode  </td><td class="markdownTableBodyNone">""  </td><td class="markdownTableBodyNone">Panorama configuration pre-set (from pano_test_cases.cvs)   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">pan_min  </td><td class="markdownTableBodyNone">-180.0  </td><td class="markdownTableBodyNone">Panorama: minimum pan   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">pan_max  </td><td class="markdownTableBodyNone">180.0  </td><td class="markdownTableBodyNone">Panorama: maximum pan   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">tilt_min  </td><td class="markdownTableBodyNone">-90.0  </td><td class="markdownTableBodyNone">Panorama: minimum tilt   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">tilt_max  </td><td class="markdownTableBodyNone">90.0  </td><td class="markdownTableBodyNone">Panorama: maximum tilt   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">h_fov  </td><td class="markdownTableBodyNone">-1.0  </td><td class="markdownTableBodyNone">Panorama: camera horizontal fov, default -1 uses camera matrix   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">v_fov  </td><td class="markdownTableBodyNone">-1.0  </td><td class="markdownTableBodyNone">Panorama: camera vertical fov, default -1 uses camera matrix   </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">overlap  </td><td class="markdownTableBodyNone">0.5  </td><td class="markdownTableBodyNone">Panorama: overlap between images   </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">att_tol  </td><td class="markdownTableBodyNone">5.0  </td><td class="markdownTableBodyNone">Panorama: attitude tolerance due to mobility   </td></tr>
+</table>
 <p><em>volumetric</em>: This will perform a volumetric survey</p>
-<h3><a class="anchor" id="autotoc_md61"></a>
+<p>An example command for this type of anomaly would be: </p><pre class="fragment">rosrun inspection inspection_tool -volumetric -volumetric_poses /resources/volumetric_iss.txt
+</pre><h3><a class="anchor" id="autotoc_md62"></a>
 Using sci_cam_tool</h3>
 <p>This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:</p>
 <p>Start the simulator, for example as: </p><pre class="fragment">roslaunch astrobee sim.launch
@@ -119,7 +177,7 @@ Using sci_cam_tool</h3>
 <p>The pictures will be published on the topic </p><pre class="fragment">/hw/cam_sci/compressed
 </pre><p>They will also show up in the sci cam window in RVIZ.</p>
 <p>If requests to take a single picture come at a high rate, some of them will be dropped.</p>
-<h3><a class="anchor" id="autotoc_md62"></a>
+<h3><a class="anchor" id="autotoc_md63"></a>
 Using export panorama tool</h3>
 <p>This tool was created to allow for panorama surveys to be created and exported. This is useful to make panorama plans beforehand to ensure reproduceability.</p>
 <p>To export the panorama file: </p><pre class="fragment">rosrun inspection export_panorama -panorama_poses $PANORAMA_POSES -panorama_out $OUTPUL_PLAN
