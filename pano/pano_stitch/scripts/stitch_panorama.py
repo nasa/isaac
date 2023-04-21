@@ -41,7 +41,7 @@ import rosbag
 from tf.transformations import euler_from_quaternion
 
 RAD2DEG = 180 / math.pi
-IMAGE_TOPIC = "/hw/cam_sci/compressed"
+IMAGE_TOPIC = "/hw/cam_sci_info"
 POSE_TOPIC = "/loc/pose"
 UNDISTORT_ENV_VARS = [
     "ASTROBEE_RESOURCE_DIR",
@@ -111,7 +111,7 @@ def parse_args():
     parser.add_argument(
         "inbag",
         type=str,
-        help="Input bagfile containing SciCam images and pose messages.",
+        help="Input bagfile containing SciCam config and pose messages.",
     )
     parser.add_argument(
         "--output-dir",

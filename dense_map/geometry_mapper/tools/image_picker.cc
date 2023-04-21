@@ -74,7 +74,7 @@ DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points",
               "The depth point cloud topic in the bag file.");
 DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
               "The depth camera intensity topic in the bag file.");
-DEFINE_string(sci_cam_topic, "/hw/cam_sci/compressed", "The sci cam topic in the bag file.");
+DEFINE_string(sci_cam_topic, "/hw/cam_sci_info", "The sci cam topic in the bag file.");
 
 DEFINE_double(max_dist_between_images, -1,
               "Select additional nav cam images to make the distance between any two "
@@ -132,6 +132,12 @@ void getMessageTimestamps(std::string name, dense_map::RosBagHandle& cam_handle,
     sensor_msgs::CompressedImage::ConstPtr comp_image_msg = cam_msgs[it].instantiate<sensor_msgs::CompressedImage>();
     if (comp_image_msg) {
       double cam_time = comp_image_msg->header.stamp.toSec();
+      all_cam_timestamps.push_back(cam_time);
+    }
+     // Can be info topic too
+    sensor_msgs::CameraInfo::ConstPtr info_image_msg = cam_msgs[it].instantiate<sensor_msgs::CameraInfo>();
+    if (info_image_msg) {
+      double cam_time = info_image_msg->header.stamp.toSec();
       all_cam_timestamps.push_back(cam_time);
     }
   }

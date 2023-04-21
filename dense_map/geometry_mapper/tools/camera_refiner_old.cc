@@ -90,6 +90,8 @@ DEFINE_string(sparse_map, "",
               "A registered SURF sparse map made with some of the ROS bag data, "
               "and including nav cam images closely bracketing the sci cam images.");
 
+DEFINE_string(image_dir, "", "Folder to read images from if only cam info.");
+
 DEFINE_string(output_map, "", "Output file containing the updated map.");
 
 DEFINE_string(nav_cam_topic, "/hw/cam_nav", "The nav cam topic in the bag file.");
@@ -99,7 +101,7 @@ DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points", "The depth point clo
 DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
               "The depth camera intensity topic in the bag file.");
 
-DEFINE_string(sci_cam_topic, "/hw/cam_sci/compressed", "The sci cam topic in the bag file.");
+DEFINE_string(sci_cam_topic, "/hw/cam_sci_info", "The sci cam topic in the bag file.");
 
 DEFINE_double(start, 0.0, "How many seconds into the bag to start processing the data.");
 
@@ -1456,7 +1458,7 @@ void calc_median_residuals(std::vector<double> const& residuals,
         cv::Mat local_img;
         if (!dense_map::lookupImage(sci_cam_timestamps.back(), sci_cam_handle.bag_msgs,
                                     save_grayscale, local_img,
-                                    sci_cam_pos, found_time))
+                                    sci_cam_pos, found_time, FLAGS_image_dir))
           LOG(FATAL) << "Cannot look up sci cam image at given time.";
         adjustImageSize(sci_cam_params, local_img);
         local_img.copyTo(images.back());
