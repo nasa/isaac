@@ -292,10 +292,12 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
       prev_image_time = found_time;
 
       if (found_time >= desired_time) {
-        std::string file_name = image_dir + "/" + std::to_string(info_image_msg->header.stamp.sec)
-                + "."
-                + std::to_string(std::floor(info_image_msg->header.stamp.nsec * 0.000001))
-                + ".jpg";
+        std::string file_name;
+        std::stringstream stream;
+        stream << image_dir << "/" << info_image_msg->header.stamp.sec << "." << std::fixed << std::setw(3)
+               << std::setfill('0') << std::setprecision(0) << std::floor(info_image_msg->header.stamp.nsec * 0.000001)
+               << ".jpg";
+        file_name = stream.str();
         try {
           if (!save_grayscale) {
             image = cv::imread(file_name, cv::IMREAD_COLOR);
