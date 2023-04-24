@@ -146,6 +146,15 @@ void indexMessages(rosbag::View& view,  // view can't be made const
       continue;
     }
 
+    // Check for info image message
+    sensor_msgs::CameraInfo::ConstPtr info_image_msg =
+      m.instantiate<sensor_msgs::CameraInfo>();
+    if (info_image_msg) {
+      double  curr_time = info_image_msg->header.stamp.toSec();
+      local_map[m.getTopic()].insert(std::make_pair(curr_time, m));
+      continue;
+    }
+
     // Check for cloud
     sensor_msgs::PointCloud2::ConstPtr pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
     if (pc_msg) {
@@ -190,7 +199,7 @@ void readExifFromBag(std::vector<rosbag::MessageInstance> const& bag_msgs,
 // forward in time, and we keep track of where we are in the bag using
 // the variable bag_pos that we update as we go.
 bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs,
-                   bool save_grayscale, cv::Mat& image, int& bag_pos, double& found_time) {
+                   bool save_grayscale, cv::Mat& image, int& bag_pos, double& found_time, std::string image_dir) {
   found_time = -1.0;  // Record the time at which the image was found
   int num_msgs = bag_msgs.size();
   double prev_image_time = -1.0;
@@ -256,6 +265,51 @@ bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const
             image = cv::imdecode(cv::Mat(comp_image_msg->data), cv::IMREAD_COLOR);
           } else {
             cv::Mat tmp_image = cv::imdecode(cv::Mat(comp_image_msg->data), cv::IMREAD_COLOR);
+            cv::cvtColor(tmp_image, image, cv::COLOR_BGR2GRAY);
+          }
+        } catch (cv_bridge::Exception const& e) {
+          ROS_ERROR_STREAM("Unable to convert compressed image to bgr8.");
+          return false;
+        }
+        return true;
+      }
+    }
+
+    // Check for compressed images
+    sensor_msgs::CameraInfo::ConstPtr info_image_msg =
+      bag_msgs[local_pos].instantiate<sensor_msgs::CameraInfo>();
+    if (info_image_msg) {
+      ros::Time stamp = info_image_msg->header.stamp;
+      found_time = stamp.toSec();
+
+      // Sanity check: We must always travel forward in time
+      if (found_time < prev_image_time) {
+        LOG(ERROR) << "Found images in a bag not in chronological order. Caution advised.\n"
+                   << std::fixed << std::setprecision(17)
+                   << "Times in wrong order: " << prev_image_time << ' ' << found_time << ".\n";
+        continue;
+      }
+      prev_image_time = found_time;
+
+      if (found_time >= desired_time) {
+        std::string file_name;
+        std::stringstream stream;
+        stream << image_dir << "/" << info_image_msg->header.stamp.sec << "." << std::fixed << std::setw(3)
+               << std::setfill('0') << std::setprecision(0) << std::floor(info_image_msg->header.stamp.nsec * 0.000001)
+               << ".jpg";
+        file_name = stream.str();
+        try {
+          if (!save_grayscale) {
+            image = cv::imread(file_name, cv::IMREAD_COLOR);
+            if (image.empty()) {
+              LOG(ERROR) << "Could not read the image: " << file_name << ".\n";
+              return 1;
+            }
+          } else {
+            cv::Mat tmp_image = cv::imread(file_name, cv::IMREAD_COLOR);
+            if (tmp_image.empty()) {
+              LOG(ERROR) << "Could not read the image: " << file_name << ".\n";
+            }
             cv::cvtColor(tmp_image, image, cv::COLOR_BGR2GRAY);
           }
         } catch (cv_bridge::Exception const& e) {

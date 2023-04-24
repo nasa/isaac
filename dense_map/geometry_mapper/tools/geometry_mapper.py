@@ -59,6 +59,12 @@ def process_args(args):
         help="A registered sparse map made with some of the ROS bag data.",
     )
     parser.add_argument(
+        "--images_dir",
+        dest="images_dir",
+        default="",
+        help="The directory where to read images from in case of camera config topic.",
+    )
+    parser.add_argument(
         "--output_dir",
         dest="output_dir",
         default="",
@@ -73,7 +79,7 @@ def process_args(args):
     parser.add_argument(
         "--camera_topics",
         dest="camera_topics",
-        default="/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int",
+        default="/hw/cam_sci_info /mgt/img_sampler/nav_cam/image_record /hw/depth_haz/extended/amplitude_int",
         help="Specify the bag topics for the cameras to texture (in the same order as in "
         + "--camera_types). Use a list in quotes.",
     )
@@ -490,6 +496,8 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         geometry_mapper_path,
         "--ros_bag",
         args.ros_bag,
+        "--images_dir",
+        args.images_dir,
         "--output_dir",
         args.output_dir,
         "--camera_topics",

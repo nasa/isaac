@@ -143,6 +143,8 @@ DEFINE_string(sparse_map, "",
               "A registered SURF sparse map made with some of the ROS bag data, "
               "including nav cam images closely bracketing the sci cam images.");
 
+DEFINE_string(image_dir, "", "Folder to read images from if only cam info.");
+
 DEFINE_string(output_map, "", "Output file containing the updated map.");
 
 DEFINE_string(nav_cam_topic, "/mgt/img_sampler/nav_cam/image_record",
@@ -154,7 +156,7 @@ DEFINE_string(haz_cam_points_topic, "/hw/depth_haz/points",
 DEFINE_string(haz_cam_intensity_topic, "/hw/depth_haz/extended/amplitude_int",
               "The depth camera intensity topic in the bag file.");
 
-DEFINE_string(sci_cam_topic, "/hw/cam_sci/compressed", "The sci cam topic in the bag file.");
+DEFINE_string(sci_cam_topic, "/hw/cam_sci_info", "The sci cam topic in the bag file.");
 
 DEFINE_int32(num_overlaps, 10, "How many images (of all camera types) close and forward in "
              "time to match to given image.");
@@ -1137,7 +1139,7 @@ void lookupImagesAndBrackets(  // Inputs
                                     save_grayscale,
                                     // outputs
                                     cam.image, image_start_positions[cam_type],  // care here
-                                    found_time))
+                                    found_time, FLAGS_image_dir))
           LOG(FATAL) << std::fixed << std::setprecision(17)
                      << "Cannot look up camera at time " << cam.timestamp << ".\n";
 
@@ -1186,7 +1188,7 @@ void lookupImagesAndBrackets(  // Inputs
                                       // outputs
                                       image,
                                       start_pos,  // care here
-                                      found_time))
+                                      found_time, FLAGS_image_dir))
             break;  // Need not succeed, but then there's no need to go on are we are at the end
 
           double curr_dist = std::abs(found_time - mid_timestamp);
