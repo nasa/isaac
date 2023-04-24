@@ -46,7 +46,7 @@ services:
     # This service serves the static content that represents
     # the frontend ISAAC data interface.
     #
-    image: ${REMOTE}iui_frontend
+    image: ${REMOTE}/iui_frontend
     hostname: iui_frontend
     container_name: iui_frontend
     ports:
@@ -65,7 +65,7 @@ services:
     # This service serves the front-end by providing it with
     # historical telemetry that it retrieves from ROS bridge.
     #
-    image: ${REMOTE}iui_backend
+    image: ${REMOTE}/iui_backend
     hostname: iui_backend
     container_name: iui_backend
     command: python /main.py
@@ -106,7 +106,7 @@ services:
     # For more info, see:
     # http://wiki.ros.org/rosbridge_suite
     #
-    image: ${REMOTE}iui_rosbridge
+    image: ${REMOTE}/iui_rosbridge
     hostname: rosbridge
     container_name: rosbridge
     entrypoint: '/ros_entrypoint.sh'

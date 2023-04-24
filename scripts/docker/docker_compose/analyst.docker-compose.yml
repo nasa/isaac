@@ -5,15 +5,15 @@ services:
   analyst_notebook:
     # Launches analyst notebook
     #
-    image: isaac_analyst_notebook
+    image: ${REMOTE}/isaac_analyst_notebook
     command: "/ros_entrypoint.sh"
     hostname: isaac_notebook
-    container_name: ${REMOTE}isaac_notebook
+    container_name: isaac_analyst_notebook
     build: 
       context: '..'
       dockerfile: 'analyst.Dockerfile'
       args:
-        REMOTE: ${REMOTE:-isaac}
+        REMOTE: ${REMOTE:-isaac/}
     ports:
       - "8888:8888"
     environment:

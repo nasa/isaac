@@ -9,7 +9,7 @@
 For the Analyst notebook to be functional, it needs to start side-by-side with the database and the IUI (ISAAC user interface).
 To do so, the recommended method is to use the remote docker images, as:
 
-	$ISAAC_SRC/scripts/docker/run.sh --no-mast -analyst --no-sim -remote
+	$ISAAC_SRC/scripts/docker/run.sh -analyst --no-sim --remote
  
 The ISAAC UI is hosted in: http://localhost:8080
 The ArangoDB database is hosted in: http://localhost:8529

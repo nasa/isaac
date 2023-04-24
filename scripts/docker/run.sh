@@ -80,7 +80,7 @@ while [ "$1" != "" ]; do
                                       ;;
         -f | --focal )                os="focal"
                                       ;;
-        -r | --remote )               export REMOTE="ghcr.io/nasa/"
+        -r | --remote )               export REMOTE="ghcr.io/nasa"
                                       ;;
         -a | --astrobee-source-dir )  shift
                                       astrobee_source=$1
@@ -213,11 +213,11 @@ fi
 if [ $ground -eq 1 ]; then
   echo "GROUND SW ONLY (for HIL)"
   robot=${robot:-bumble}
-  cmd=roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait
+  cmd="roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait"
 
 elif  [ $no_sim -eq 1 ]; then
   echo "NO SIM"
-  cmd=roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen robot:=${robot} rviz:=true --wait
+  cmd="roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen robot:=${robot} rviz:=true --wait"
 
 fi
 

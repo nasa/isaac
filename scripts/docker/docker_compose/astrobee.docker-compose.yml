@@ -1,7 +1,7 @@
 version: "3.9"
 services:
   isaac:
-    image: ${REMOTE}$tag
+    image: ${REMOTE}/$tag
     entrypoint: "/ros_entrypoint.sh"
     command: roslaunch isaac sim.launch dds:=false robot:=sim_pub
     hostname: isaac
