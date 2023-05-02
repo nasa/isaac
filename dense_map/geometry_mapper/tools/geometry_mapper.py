@@ -355,6 +355,13 @@ def process_args(args):
         + "textures for each image and camera. Does not work with simulated cameras. For debugging.",
     )
 
+    parser.add_argument(
+        "--histogram_equalization",
+        dest="histogram_equalization",
+        action="store_true",
+        help="If provided surf map uses histogram equalization, set it to true such that it matches",
+    )
+
     args = parser.parse_args()
 
     # Parse the crop windows
@@ -555,6 +562,9 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
             "--nav_cam_to_sci_cam_offset_override_value",
             args.nav_cam_to_sci_cam_offset_override_value,
         ]
+
+    if args.histogram_equalization:
+        cmd += ["--histogram_equalization"]
 
     log_file = os.path.join(args.output_dir, "geometry_mapper_log.txt")
     print(
