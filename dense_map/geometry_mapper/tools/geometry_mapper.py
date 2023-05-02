@@ -358,7 +358,7 @@ def process_args(args):
     parser.add_argument(
         "--histogram_equalization",
         dest="histogram_equalization",
-        default="false",
+        action="store_true",
         help="If provided surf map uses histogram equalization, set it to true such that it matches",
     )
 
@@ -541,8 +541,6 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.voxel_size,
         "--median_filters",
         args.median_filters,
-        "--histogram_equalization",
-        args.histogram_equalization,
     ] + args.localization_options.split(" ")
 
     if args.sci_cam_timestamps != "":
@@ -564,6 +562,9 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
             "--nav_cam_to_sci_cam_offset_override_value",
             args.nav_cam_to_sci_cam_offset_override_value,
         ]
+
+    if args.histogram_equalization:
+        cmd += ["--histogram_equalization"]
 
     log_file = os.path.join(args.output_dir, "geometry_mapper_log.txt")
     print(
