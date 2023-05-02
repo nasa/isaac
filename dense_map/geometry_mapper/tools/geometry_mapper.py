@@ -355,6 +355,13 @@ def process_args(args):
         + "textures for each image and camera. Does not work with simulated cameras. For debugging.",
     )
 
+    parser.add_argument(
+        "--histogram_equalization",
+        dest="histogram_equalization",
+        default="false",
+        help="If provided surf map uses histogram equalization, set it to true such that it matches",
+    )
+
     args = parser.parse_args()
 
     # Parse the crop windows
@@ -534,6 +541,8 @@ def compute_poses_and_clouds(geometry_mapper_path, args):
         args.voxel_size,
         "--median_filters",
         args.median_filters,
+        "--histogram_equalization",
+        args.histogram_equalization,
     ] + args.localization_options.split(" ")
 
     if args.sci_cam_timestamps != "":
