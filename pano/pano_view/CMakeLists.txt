@@ -20,9 +20,57 @@
 # dont do this if we are cross-compiling, as there is no need for it. We must
 # also make sure the media is copied in a native install to a simulator.
 
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.0)
 project(pano_view)
 
-find_package(catkin REQUIRED COMPONENTS)
+## Compile as C++14, supported in ROS Kinetic and newer
+add_compile_options(-std=c++14)
 
-catkin_package()
+
+## Find catkin macros and libraries
+SET(catkin2_DIR "${CMAKE_SOURCE_DIR}/../../../cmake")
+find_package(catkin2 REQUIRED COMPONENTS
+    roscpp
+    rosbag
+    ff_msgs
+	inspection
+	)
+
+###################################
+## catkin specific configuration ##
+###################################
+catkin_package(
+  CATKIN_DEPENDS
+    roscpp
+    rosbag
+    ff_msgs
+	inspection
+)
+
+
+###########
+## Build ##
+###########
+
+# Specify additional locations of header files
+# Your package locations should be listed before other locations
+include_directories(
+	include
+  ${catkin_INCLUDE_DIRS}
+)
+
+
+# Declare C++ libraries
+add_library(mesh_intersect
+  src/mesh_intersect.cc
+)
+add_dependencies(mesh_intersect ${catkin_EXPORTED_TARGETS})
+target_link_libraries(mesh_intersect ${catkin_LIBRARIES})
+
+
+
+## Declare a C++ executable: find_point_coordinate 
+add_executable(find_point_coordinate tools/find_point_coordinate.cc)
+add_dependencies(find_point_coordinate ${catkin_EXPORTED_TARGETS})
+target_link_libraries(find_point_coordinate mesh_intersect
+gflags jsoncpp ${catkin_LIBRARIES})

@@ -40,6 +40,7 @@
 #include <config_reader/config_reader.h>
 #include <ff_util/ff_flight.h>
 #include <isaac_util/isaac_names.h>
+#include <inspection/camera_projection.h>
 
 // Point Cloud
 #include <sensor_msgs/PointCloud.h>
@@ -74,63 +75,6 @@
  * \ingroup beh
  */
 namespace inspection {
-
-/*
-  This class provides camera functionality that allows us
-  to project the 3D point into the camera frame and the
-  other way around. It automatically reads the camera
-  parameters from the config files based on the camera
-  name, such that no setup is necessary.
-*/
-class CameraView {
- public:
-  // Constructor
-  explicit CameraView(std::string cam_name, float f = 1.0, float n = 0.19);
-
-  Eigen::Matrix4d GetProjectionMatrix();
-  double GetHFOV();
-  double GetVFOV();
-
-  double GetH();
-  double GetW();
-
-  // Gets the points x y where the point is in the image. If outside the image, then it will return false
-  // If the robot pose is not specified, it's considered to be the current one
-  bool GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &x, int &y);
-  bool GetCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
-
-  bool GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int u, const int v, geometry_msgs::Point &point);
-
-  double GetDistanceFromTarget(const geometry_msgs::Pose point, std::string depth_cam_name,
-                                double size_x, double size_y);
-
-  void DrawCameraFrustum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher);
-
-  bool debug_ = false;
-  float f_;
-  float n_;
-
- protected:
-  bool SetProjectionMatrix(Eigen::Matrix3d cam_mat);
-  bool InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, int test_x, int test_y);
-
- private:
-  std::string cam_name_;
-  config_reader::ConfigReader cfg_cam_;
-  int W_, H_;
-  float fx_, fy_;
-  Eigen::Matrix4d P_;
-
-  tf2_ros::Buffer tf_buffer_;
-  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-
-  geometry_msgs::TransformStamped tf_body_to_cam_;
-
- public:
-  // This fixes the Eigen aligment issue
-  // http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
 
 /*
   This class provides the high-level logic that allows the freeflyer to

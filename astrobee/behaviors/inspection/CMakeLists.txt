@@ -41,8 +41,8 @@ find_package(catkin2 REQUIRED COMPONENTS
 ###################################
 
 catkin_package(
-#  INCLUDE_DIRS include
-  LIBRARIES vent_inspection
+  INCLUDE_DIRS include
+  LIBRARIES inspection
   CATKIN_DEPENDS roscpp std_msgs nodelet ff_util isaac_util isaac_msgs
 )
 
@@ -58,15 +58,22 @@ include_directories(
 )
 
 # Declare C++ libraries
+add_library(pano_survey
+  src/panorama_survey.cc
+)
+add_dependencies(pano_survey ${catkin_EXPORTED_TARGETS})
+target_link_libraries(pano_survey ${catkin_LIBRARIES})
+
+
+# Declare C++ libraries
 add_library(inspection
   src/inspection_node.cc
   src/inspection.cc
   src/anomaly_survey.cc
-  src/panorama_survey.cc
   src/camera_projection.cc
 )
 add_dependencies(inspection ${catkin_EXPORTED_TARGETS})
-target_link_libraries(inspection ${catkin_LIBRARIES})
+target_link_libraries(inspection pano_survey ${catkin_LIBRARIES})
 
 
 ## Declare a C++ executable: inspection_tool

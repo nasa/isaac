@@ -18,7 +18,7 @@
  */
 
 // Include inspection library header
-#include <inspection/inspection.h>
+#include <inspection/camera_projection.h>
 // TODO(mgouveia): look into this, seems like FrustumPlanes does not have the s parameter
 // #include <mapper/linear_algebra.h>
 
@@ -106,16 +106,7 @@ namespace inspection {
     return W_;
   }
 
-  //
-  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
-                                     int& y) {
-    // Initialize x,y
-    x = 0; y = 0;
-    Eigen::Vector4d p;
-    p << point.x,
-         point.y,
-         point.z,
-         1;
+  bool CameraView::BuildViewMatrix(const geometry_msgs::Pose robot_pose, Eigen::Matrix4d V) {
     tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
                                  msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_.transform);
 
@@ -127,10 +118,48 @@ namespace inspection {
     Eigen::Vector3d T(camera_pose.getOrigin().x(),
                       camera_pose.getOrigin().y(),
                       camera_pose.getOrigin().z());           // Translation Vector
-    Eigen::Matrix4d V;                                        // Transformation Matrix
     V.setIdentity();                                          // Identity to make bottom row 0,0,0,1
     V.block<3, 3>(0, 0) = R.normalized().toRotationMatrix();;
     V.block<3, 1>(0, 3) = T;
+
+    if (debug_) {
+      ROS_DEBUG_STREAM("VisibilityConstraint T pos" << camera_pose.getOrigin().x() << " "
+                                  << camera_pose.getOrigin().y() << " " << camera_pose.getOrigin().z());
+      ROS_DEBUG_STREAM("VisibilityConstraint T quat"
+                       << camera_pose.getRotation().w() << " " << camera_pose.getRotation().x() << " "
+                       << camera_pose.getRotation().y() << " " << camera_pose.getRotation().z());
+    }
+  }
+
+  bool CameraView::GetPointFromCamXY(const geometry_msgs::Pose robot_pose, const int x, const int y,
+                                     geometry_msgs::Point point) {
+    // Define point that intersects the desired view angle
+    Eigen::Vector4d q;
+    q << x * 2 / W_ - 1,
+         y * 2 / H_ - 1,
+         1,
+         1;
+
+    Eigen::Matrix4d V;
+    BuildViewMatrix(robot_pose, V);
+    Eigen::Vector4d p = V * P_.inverse() * q;
+  }
+
+  //
+  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
+                                     int& y) {
+    // Initialize x,y
+    x = 0; y = 0;
+    Eigen::Vector4d p;
+    p << point.x,
+         point.y,
+         point.z,
+         1;
+
+    Eigen::Matrix4d V;
+    BuildViewMatrix(robot_pose, V);
+
+
     // Transform point
     Eigen::Vector4d q = P_ * V.inverse() * p;
 
@@ -146,12 +175,7 @@ namespace inspection {
         q(2) / q(3) >  1) {   // the point lies beyond the far plane of the camera,
                               //     i.e., the point is too far away for the camera to see
       if (debug_) {
-        ROS_DEBUG_STREAM(V.inverse() * p);
-        ROS_DEBUG_STREAM("VisibilityConstraint T pos" << camera_pose.getOrigin().x() << " "
-                                    << camera_pose.getOrigin().y() << " " << camera_pose.getOrigin().z());
-        ROS_DEBUG_STREAM("VisibilityConstraint T quat"
-                         << camera_pose.getRotation().w() << " " << camera_pose.getRotation().x() << " "
-                         << camera_pose.getRotation().y() << " " << camera_pose.getRotation().z());
+      ROS_DEBUG_STREAM(V.inverse() * p);
         ROS_DEBUG_STREAM("VisibilityConstraint p " << point.x << " " << point.y << " " << point.z);
         ROS_DEBUG_STREAM("VisibilityConstraint q " << q(0) / q(3) << " " << q(1) / q(3) << " " << q(2) / q(3));
 
