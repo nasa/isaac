@@ -69,43 +69,81 @@ Source your astrobee build environment, for example as:
 
     source $ASTROBEE_WS/devel/setup.bash
 
-Build with catkin build.
+The configure script prepares your build directory for compiling the code. Note
+that `configure.sh` is simply a wrapper around CMake that provides an easy way
+of turning on and off options. To see which options are supported, simply run
+`configure.sh -h`.
 
-    cd $ISAAC_WS
-    catkin init
+    pushd $ASTROBEE_WS
+    ./src/scripts/configure.sh -l
+    source ~/.bashrc
+    popd
+
+The configure script modifies your ``.bashrc`` to source ``setup.bash`` for 
+the current ROS distribution and to set CMAKE_PREFIX_PATH. It is suggested
+to examine it and see if all changes were made correctly.
+
+If you want to explicitly specify the workspace and/or install directories, use
+instead:
+
+    ./scripts/configure.sh -l -p $INSTALL_PATH -w $WORKSPACE_PATH
+
+*Note: If a workspace is specified but not an explicit install distectory,
+install location will be $WORKSPACE_PATH/install.*
+
+To build, run `catkin build` in the `$WORKSPACE_PATH`. Note that depending on your host
+machine, this might take in the order of tens of minutes to complete the first
+time round. Future builds will be faster, as only changes to the code are
+rebuilt, and not the entire code base.
+
+    pushd $ASTROBEE_WS
     catkin build
-    source devel/setup.bash
-
-The command 'source devel/setup.bash' is very important to make sure that everything is correctly linked! Everytime some major change in package is made, a full build should be done as:
-
-    catkin clean
-    catkin build
-    source devel/setup.bash
+    popd
 
 If you are working in simulation only, then you're all done!
 The next steps are only for running ISAAC onboard Astrobee.
 
-Cross-compiling isaac
+
+Cross-compiling isaac (NASA only)
 ---------
 
+To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that `ASTROBEE_WS` must be defined!!!
 
-To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that ASTROBEE_WS must be defined.
 
-A new catkin profile should be made to retain the configurations and easily switch between normal build.
-    
-    catkin profile add cross
-    catkin profile set cross
-    catkin config --extend $ASTROBEE_WS/armhf/opt/astrobee \
-                  --build-space armhf/build \
-                  --install-space armhf/opt/isaac \
-                  --devel-space armhf/devel \
-                  --log-space armhf/logs \
-                  --whitelist isaac_astrobee_description isaac_util isaac_msgs inspection cargo isaac_hw_msgs wifi isaac gs_action_helper \
-                  --install \
-                  --cmake-args -DCMAKE_TOOLCHAIN_FILE=$ISAAC_WS/src/scripts/build/isaac_cross.cmake \
-                    -DARMHF_CHROOT_DIR=$ARMHF_CHROOT_DIR
+Cross compiling for the robot follows the same process, except the configure
+script takes a `-a` flag instead of `-l`.
 
-Build ISAAC debian
+    pushd $ISAAC_WS
+    ./src/scripts/configure.sh -a
+    popd
+
+Or with explicit build and install paths:
+
+    ./scripts/configure.sh -a -p $INSTALL_PATH -w $WORKSPACE_PATH
+
+*Warning: `$INSTALL_PATH` and `$WORKSPACE_PATH` used for cross compiling HAVE to be
+different than the paths for native build! See above for the default values 
+for these.*
+
+ Once the code has been built, it also installs the code to
+a singular location. CMake remembers what `$INSTALL_PATH` you specified, and
+will copy all products into this directory.
+
+Install the code on the robot (NASA only)
+---------
+
+Once the installation has completed, copy the install directory to the robot.
+This script assumes that you are connected to the Astrobee network, as it uses
+rsync to copy the install directory to `~/armhf` on the two processors. It 
+takes the robot name as an argument. Here we use `p4d`.
+
+    pushd $ISAAC_WS
+    ./src/scripts/install_to_astrobee.sh $INSTALL_PATH p4d
+    popd
+
+Here, p4d is the name of the robot, which may be different in your case.
+
+Build ISAAC debian (NASA only)
 ---------
 
 To build a debian you must first confirm that cross-compiling is functional. Once it is:

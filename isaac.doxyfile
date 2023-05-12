@@ -38,7 +38,7 @@ PROJECT_NAME           = "ISAAC"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 0.2.5
+PROJECT_NUMBER         = 0.2.6
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
@@ -836,13 +836,15 @@ WARN_LOGFILE           =
 
 INPUT                  = README.md \
                          INSTALL.md \
+                         doc \
                          scripts \
                          isaac \
+                         analyst \
+                         anomaly \
                          astrobee \
+                         communications \
                          dense_map \
                          description \
-                         img_analysis \
-                         hardware \
                          isaac_msgs \
                          shared \
                          simulation
@@ -950,7 +952,7 @@ EXAMPLE_RECURSIVE      = NO
 # that contain images that are to be included in the documentation (see the
 # \image command).
 
-IMAGE_PATH             =
+IMAGE_PATH             = doc/images
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should
 # invoke to filter for each input file. Doxygen will invoke the filter program

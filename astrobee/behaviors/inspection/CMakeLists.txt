@@ -61,6 +61,9 @@ include_directories(
 add_library(inspection
   src/inspection_node.cc
   src/inspection.cc
+  src/anomaly_survey.cc
+  src/panorama_survey.cc
+  src/camera_projection.cc
 )
 add_dependencies(inspection ${catkin_EXPORTED_TARGETS})
 target_link_libraries(inspection ${catkin_LIBRARIES})
@@ -82,6 +85,12 @@ target_link_libraries(sci_cam_tool
 add_executable(export_panorama tools/export_panorama.cc)
 add_dependencies(export_panorama ${catkin_EXPORTED_TARGETS})
 target_link_libraries(export_panorama
+  inspection gflags ${catkin_LIBRARIES})
+
+## Declare a C++ executable: test_pano
+add_executable(test_pano tools/test_pano.cc)
+add_dependencies(test_pano ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_pano
   inspection gflags ${catkin_LIBRARIES})
 
 #############
@@ -121,4 +130,6 @@ install(FILES nodelet_plugins.xml
 install(TARGETS inspection_tool
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(TARGETS sci_cam_tool
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(TARGETS test_pano
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

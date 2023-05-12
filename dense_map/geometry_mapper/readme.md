@@ -176,7 +176,7 @@ To compile Voxblox, clone
 
     https://github.com/oleg-alexandrov/voxblox/
 
-(branch master). This fork differs from the main repository at
+(branch isaac, comitt 9098a0f). This fork differs from the main repository at
 https://github.com/ethz-asl/voxblox by the introduction of a small
 tool named batch_tsdf.cc that reads the clouds to fuse and the
 transforms from disk and writes the output mesh back to disk, instead
@@ -193,14 +193,28 @@ This should end up creating the program:
 
 ### Compiling CGAL
 
-Compile the CGAL tools following the instructions at:
+Compile the CGAL tools using the commands:
 
-    https://github.com/oleg-alexandrov/cgal_tools
+    mkdir -p $HOME/projects
+    cd $HOME/projects
+    git clone https://github.com/oleg-alexandrov/cgal_tools
+    cd cgal_tools
+    git checkout d3467a9 
+    wget https://github.com/CGAL/cgal/releases/download/v5.3/CGAL-5.3.tar.xz
+    tar xfv CGAL-5.3.tar.xz
+    cmake . -DCMAKE_BUILD_TYPE=Release \
+      -DCGAL_DIR:PATH=CGAL-5.3
+    make -j 10
 
-This should create some programs in:
+CGAL will fail to build with cmake version 3.10 installed with Ubuntu
+18. It is suggested to fetch cmake version 3.15 or later.
+
+The outcome will be that some programs will be installed in:
 
     $HOME/projects/cgal_tools
  
+which will be later looked up by the geometry mapper.
+
 ### CGAL license    
 
 CGAL is released under the GPL. Care must be taken to not include it
@@ -663,7 +677,7 @@ To extract the sci cam data, if necessary, do:
     $ASTROBEE_WS/devel/lib/localization_node/extract_image_bag \
      mydata.bag -image_topic /hw/cam_sci/compressed            \
      -output_directory sci_data -use_timestamp_as_image_name
-
+ca
 To extract the depth clouds, which may be useful for debugging purposes,
 do:
 
@@ -848,6 +862,8 @@ Parameters:
       with missing parts. The default is 10.
     --edge_keep_ratio: Simply the mesh keeping only this fraction of
       the original edges. The default is 0.2.
+    --max_texture_size: The maximum size (in pixels) of each texture
+      file created for the produced textured mesh. The default is 2048.
     --output_dir: The directory where to write the processed data.
     --simulated_data: If specified, use data recorded in simulation. 
       Then haz and sci camera poses and intrinsics should be recorded in the 
@@ -1378,7 +1394,7 @@ have about 4/5 overlap with images from other pairs.
 If necessary, add more intermediate images by re-running this tool
 with:
 
-    --max_time_between_images <val>
+    --max_dist_between_images <val>
 
 It is good to not allow too many images or excessive overlap, but, if
 removing excessive images, ensure that each sci cam image is still
@@ -1387,12 +1403,21 @@ the images in pairs of very similar ones. That is good even if there's
 no sci cam images between some pairs, as it is likely haz cam images
 are found later in that bracket.
 
-One could start by running this tool with a smaller value of the
---max_time_between_images option, wiping many redundant images while
+One could start by running this tool with the
+--max_dist_between_images option, wiping many redundant images while
 ensuring there is good overlap among them and keeping pairs of similar
-images, then running this tool one more time with a very large value
-of this option to ensure the bracketing images for each sci cam image
+images, then running this tool one more time without this option
+to ensure the bracketing images for each sci cam image
 are added back.
+
+The option --left_bracket_only will generate the left brackets only,
+this might be useful if you want to minimize images in the map-making
+process, but be sure to merge the remaining images in a later stage.
+
+To save a log file with with a specific name containing the generated
+pictures path use:
+
+    --logfile <str>
 
 ### Map building and registration
 

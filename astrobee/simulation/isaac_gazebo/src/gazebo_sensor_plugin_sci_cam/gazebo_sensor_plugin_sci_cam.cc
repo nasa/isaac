@@ -113,7 +113,7 @@ class GazeboSensorPluginSciCam : public FreeFlyerSensorPlugin {
       boost::bind(&GazeboSensorPluginSciCam::ToggleCallback, this),
       boost::bind(&GazeboSensorPluginSciCam::ToggleCallback, this));
     pub_sci_cam_pose_ = nh->advertise<geometry_msgs::PoseStamped>(TOPIC_SCI_CAM_SIM_POSE, 10);
-    pub_sci_cam_info_ = nh->advertise<sensor_msgs::CameraInfo>(TOPIC_SCI_CAM_SIM_INFO, 10);
+    pub_sci_cam_info_ = nh->advertise<sensor_msgs::CameraInfo>("/hw/cam_sci_info", 10);
 
     // Read configuration
     config_reader::ConfigReader config;
@@ -274,16 +274,16 @@ class GazeboSensorPluginSciCam : public FreeFlyerSensorPlugin {
     sci_cam_pose_msg_.pose.orientation.z = q.z();
     pub_sci_cam_pose_.publish(sci_cam_pose_msg_);
 
+    // Do not publish unless specifically told to
+    if (!continuousPictureTaking_ && !takeSinglePicture_) {
+      return;
+    }
+
     // Publish the sci cam intrinsics
     sci_cam_info_msg_.header.frame_id = GetFrame();
     sci_cam_info_msg_.header.stamp = curr_time;  // it is very important to get the time right
     FillCameraInfo(sensor_->Camera(), sci_cam_info_msg_);  // fill in from the camera pointer
     pub_sci_cam_info_.publish(sci_cam_info_msg_);
-
-    // Do not publish unless specifically told to
-    if (!continuousPictureTaking_ && !takeSinglePicture_) {
-      return;
-    }
 
     // Make sci cam image topic
     // Record not the current time, but the time when the image was acquired

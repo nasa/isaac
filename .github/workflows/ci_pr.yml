@@ -3,23 +3,24 @@ name: Build and Test CI for Pull Requests
 on:
   pull_request:
     branches: [ 'master', 'develop' ]
+  workflow_dispatch:
 
 jobs:
 
   build-xenial:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
 
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/
@@ -53,18 +54,18 @@ jobs:
                           -t isaac/isaac:msgs-ubuntu16.04
   build-bionic:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
 
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/
@@ -104,13 +105,13 @@ jobs:
     steps:
 
     - name: Checkout Astrobee
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: nasa/astrobee
         path: astrobee/
 
     - name: Checkout ISAAC
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: recursive
         path: isaac/

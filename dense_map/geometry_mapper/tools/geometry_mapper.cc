@@ -31,6 +31,7 @@
 #include <rosbag/view.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CompressedImage.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
@@ -47,7 +48,7 @@
 #include <Eigen/Core>
 
 #include <ff_common/utils.h>
-#include <ff_util/ff_names.h>
+#include <ff_common/ff_names.h>
 #include <sparse_mapping/sparse_map.h>
 
 #include <dense_map_ros_utils.h>
@@ -1084,7 +1085,7 @@ void saveCameraPoses(
   std::vector<rosbag::MessageInstance> const& haz_cam_points_msgs,
   std::vector<double> const& nav_cam_bag_timestamps,
   std::map<double, std::vector<double>> const& sci_cam_exif, std::string const& output_dir,
-  std::string const& desired_cam_dir, double start, double duration,
+  std::string const& image_dir, std::string const& desired_cam_dir, double start, double duration,
   double sampling_spacing_seconds, double dist_between_processed_cams,
   double angle_between_processed_cams,
   std::set<double> const& sci_cam_timestamps, double max_iso_times_exposure,
@@ -1127,7 +1128,7 @@ void saveCameraPoses(
   int sparse_map_id = 0, nav_cam_bag_id = 0;
 
   // These are used to track time as the bag is traversed
-  double beg_time = -1.0, prev_time = -1.0;
+  double bag_time = -1.0, prev_time = -1.0;
 
   // This is used to ensure cameras are not too close
   Eigen::Vector3d prev_cam_ctr(std::numeric_limits<double>::quiet_NaN(), 0, 0);
@@ -1135,11 +1136,11 @@ void saveCameraPoses(
 
   // Compute the starting bag time as the timestamp of the first cloud
   for (auto& m : haz_cam_points_msgs) {
-    if (beg_time < 0) {
+    if (bag_time < 0) {
       sensor_msgs::PointCloud2::ConstPtr pc_msg;
       pc_msg = m.instantiate<sensor_msgs::PointCloud2>();
       if (pc_msg) {
-        beg_time = pc_msg->header.stamp.toSec();
+        bag_time = pc_msg->header.stamp.toSec();
         break;
       }
     }
@@ -1173,7 +1174,14 @@ void saveCameraPoses(
           curr_time = comp_image_msg->header.stamp.toSec();
         } else {
           // Not an image or compressed image topic
+          sensor_msgs::CameraInfo::ConstPtr info_image_msg
+          = m.instantiate<sensor_msgs::CameraInfo>();
+          if (info_image_msg) {
+            curr_time = info_image_msg->header.stamp.toSec();
+          } else {
+          // Not an image or compressed image topic
           continue;
+          }
         }
       }
     }
@@ -1186,9 +1194,9 @@ void saveCameraPoses(
       if (curr_time > max_map_timestamp) break;
     }
 
-    if (curr_time - beg_time < start) continue;  // did not yet reach the desired starting time
+    if (curr_time - bag_time < start) continue;  // did not yet reach the desired starting time
 
-    if (duration > 0 && curr_time - beg_time > start + duration)
+    if (duration > 0 && curr_time - bag_time > start + duration)
       break;  // past the desired ending time
 
     // The pose we will solve for
@@ -1234,7 +1242,7 @@ void saveCameraPoses(
     // Success localizing. Update the time at which it took place for next time.
     prev_time = curr_time;
 
-    std::cout << "Time elapsed since the bag started: " << curr_time - beg_time << " seconds.\n";
+    std::cout << "Time elapsed since the bag started: " << curr_time - bag_time << " seconds.\n";
 
     // See if to skip some images if the robot did not move much
     Eigen::Affine3d curr_trans;
@@ -1267,7 +1275,7 @@ void saveCameraPoses(
     double found_time = -1.0;
     if (cam_type != "haz_cam" || do_haz_cam_image) {
       if (!dense_map::lookupImage(curr_time, desired_cam_msgs, save_grayscale, desired_image,
-                                  desired_cam_pos, found_time))
+                                  desired_cam_pos, found_time, image_dir))
         continue;  // the expected image could not be found
     } else {
       // We have cam_type == haz_cam but no haz_cam image texturing
@@ -1377,11 +1385,12 @@ void save_nav_cam_poses_and_images(boost::shared_ptr<sparse_mapping::SparseMap> 
 
 DEFINE_string(ros_bag, "", "A ROS bag with recorded nav_cam, haz_cam, and sci_cam data.");
 DEFINE_string(sparse_map, "", "A registered sparse map made with some of the ROS bag data.");
+DEFINE_string(images_dir, "", "Folder to read images from if only cam info.");
 DEFINE_string(output_dir, "", "The full path to a directory where to write the processed data.");
 DEFINE_string(sci_cam_exif_topic, "/hw/sci_cam_exif", "The sci cam exif metadata topic the output bag.");
 DEFINE_string(camera_types, "sci_cam nav_cam haz_cam",
               "Specify the cameras to use for the textures, as a list in quotes.");
-DEFINE_string(camera_topics, "/hw/cam_sci/compressed /mgt/img_sampler/nav_cam/image_record "
+DEFINE_string(camera_topics, "/hw/cam_sci_info /mgt/img_sampler/nav_cam/image_record "
               "/hw/depth_haz/extended/amplitude_int",
               "Specify the bag topics for the cameras to texture (in the same order as in "
               "--camera_types). Use a list in quotes.");
@@ -1668,6 +1677,7 @@ int main(int argc, char** argv) {
                     *nav_cam_msgs_ptr,                 // nav msgs                     // NOLINT
                     haz_cam_points_handle.bag_msgs, nav_cam_bag_timestamps,            // NOLINT
                     sci_cam_exif, FLAGS_output_dir,                                    // NOLINT
+                    FLAGS_images_dir,                                                  // NOLINT
                     cam_dirs[cam_type], FLAGS_start, FLAGS_duration,                   // NOLINT
                     FLAGS_sampling_spacing_seconds, FLAGS_dist_between_processed_cams, // NOLINT
                     FLAGS_angle_between_processed_cams,                                // NOLINT

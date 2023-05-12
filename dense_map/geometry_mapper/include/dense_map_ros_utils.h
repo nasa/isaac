@@ -71,7 +71,7 @@ void readExifFromBag(std::vector<rosbag::MessageInstance> const& bag_msgs, std::
 // forward in time, and we keep track of where we are in the bag using
 // the variable bag_pos that we update as we go.
 bool lookupImage(double desired_time, std::vector<rosbag::MessageInstance> const& bag_msgs, bool save_grayscale,
-                 cv::Mat& image, int& bag_pos, double& found_time);
+                 cv::Mat& image, int& bag_pos, double& found_time, std::string image_dir = "");
 
 // Find the closest depth cloud to given timestamp. Return an empty
 // cloud if one cannot be found closer in time than max_time_diff.

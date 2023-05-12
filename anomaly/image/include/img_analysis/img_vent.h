@@ -31,7 +31,7 @@
 
 // FSW includes
 #include <config_reader/config_reader.h>
-#include <ff_util/ff_names.h>
+#include <ff_common/ff_names.h>
 #include <ff_msgs/AckStamped.h>
 #include <ff_msgs/CommandConstants.h>
 #include <ff_msgs/CommandStamped.h>
