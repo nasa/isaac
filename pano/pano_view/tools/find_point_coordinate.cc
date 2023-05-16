@@ -68,6 +68,11 @@ DEFINE_string(bag_name, "", "Bagname where image can be found. Make sure it has 
 DEFINE_string(mesh_name, "", "Meshfile path.");
 DEFINE_string(json_config, "", "json file with configure data.");
 
+// Bagfile topics
+DEFINE_string(image_info_topic,   "/hw/cam_sci_info",     "Camera info topic name.");
+DEFINE_string(depth_cam_topic,    "/hw/depth_haz/points", "Point Cloud topic name.");
+DEFINE_string(ground_truth_topic, "/gnc/ekf",             "Robot pose topic name.");
+
 void extractTopicsBag(const std::string bagname, const double timestamp, const std::string image_info_topic,
                       const std::string depth_cam_topic, const std::string ground_truth_topic,
                       sensor_msgs::CameraInfo& camera_info_out, sensor_msgs::PointCloud2& depth_cam_out,
@@ -203,9 +208,9 @@ int main(int argc, char** argv) {
   inspection::CameraView camera(camera_name, 2.0, 0.19, msg_pointer);
 
   // Extract topics from bagfile
-  std::string image_info_topic = "/hw/cam_sci_info";
-  std::string depth_cam_topic = "/hw/depth_haz/points";
-  std::string ground_truth_topic = "/gnc/ekf";
+  std::string image_info_topic = FLAGS_image_info_topic;
+  std::string depth_cam_topic = FLAGS_depth_cam_topic;
+  std::string ground_truth_topic = FLAGS_ground_truth_topic;
   sensor_msgs::CameraInfo image_info;
   sensor_msgs::PointCloud2 depth_cam, point_cloud_world;
   geometry_msgs::Pose ground_truth;
