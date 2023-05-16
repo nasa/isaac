@@ -76,6 +76,9 @@ class CameraView {
   double GetH();
   double GetW();
 
+  bool SetH(const double H);
+  bool SetW(const double W);
+
   bool BuildViewMatrix(const geometry_msgs::Pose robot_pose, Eigen::Matrix4d &V);
   bool GetVectorFromCamXY(const geometry_msgs::Pose robot_pose, const int x, const int y,
                                      Eigen::Vector3d &vector);
