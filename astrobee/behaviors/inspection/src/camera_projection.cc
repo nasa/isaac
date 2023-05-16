@@ -105,7 +105,28 @@ CameraView::CameraView(const std::string cam_name, const float f, const float n,
     return W_;
   }
 
-  bool CameraView::BuildViewMatrix(const geometry_msgs::Pose robot_pose, Eigen::Matrix4d &V) {
+  // Set the Horizontal Field of View
+  bool CameraView::SetH(const double H) {
+      H_ = H;
+    return true;
+  }
+
+  // Set the Vertical Field of View
+  bool CameraView::SetW(const double W) {
+      W_ = W;
+    return true;
+  }
+
+  //
+  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
+                                     int& y) {
+    // Initialize x,y
+    x = 0; y = 0;
+    Eigen::Vector4d p;
+    p << point.x,
+         point.y,
+         point.z,
+         1;
     tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
                                  msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_);
 
