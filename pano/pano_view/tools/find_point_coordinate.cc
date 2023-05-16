@@ -68,8 +68,9 @@ DEFINE_string(bag_name, "", "Bagname where image can be found. Make sure it has 
 DEFINE_string(mesh_name, "", "Meshfile path.");
 DEFINE_string(json_config, "", "json file with configure data.");
 
-void extractTopicsBag(const std::string bagname, const double timestamp, const std::string depth_cam_topic,
-                      const std::string ground_truth_topic, sensor_msgs::PointCloud2& depth_cam_out,
+void extractTopicsBag(const std::string bagname, const double timestamp, const std::string image_info_topic,
+                      const std::string depth_cam_topic, const std::string ground_truth_topic,
+                      sensor_msgs::CameraInfo& camera_info_out, sensor_msgs::PointCloud2& depth_cam_out,
                       geometry_msgs::Pose& ground_truth_out) {
   // Read ground truth from bag
   rosbag::Bag bag;
@@ -81,10 +82,19 @@ void extractTopicsBag(const std::string bagname, const double timestamp, const s
 
   rosbag::View view(bag, rosbag::TopicQuery(topics));
 
+  double timestamp_dist_camera_info = std::numeric_limits<double>::max();
   double timestamp_dist_depth_cam = std::numeric_limits<double>::max();
   double timestamp_dist_ground_truth = std::numeric_limits<double>::max();
   BOOST_FOREACH(rosbag::MessageInstance const m, view) {
-    // Read all depth cam images
+    // Read camera info
+    if (m.getTopic() == image_info_topic || ("/" + m.getTopic() == image_info_topic)) {
+      sensor_msgs::CameraInfo::ConstPtr camera_info = m.instantiate<sensor_msgs::CameraInfo>();
+      if (camera_info != NULL && abs(camera_info->header.stamp.toSec() - timestamp) < timestamp_dist_depth_cam) {
+        camera_info_out = *camera_info;
+        timestamp_dist_camera_info = abs(camera_info->header.stamp.toSec() - timestamp);
+      }
+    }
+    // Read depth cam points
     if (m.getTopic() == depth_cam_topic || ("/" + m.getTopic() == depth_cam_topic)) {
       sensor_msgs::PointCloud2::ConstPtr depth_cam = m.instantiate<sensor_msgs::PointCloud2>();
       if (depth_cam != NULL && abs(depth_cam->header.stamp.toSec() - timestamp) < timestamp_dist_depth_cam) {
@@ -92,7 +102,7 @@ void extractTopicsBag(const std::string bagname, const double timestamp, const s
         timestamp_dist_depth_cam = abs(depth_cam->header.stamp.toSec() - timestamp);
       }
     }
-    // Read all ground truth data
+    // Read ground truth data
     if (m.getTopic() == ground_truth_topic || ("/" + m.getTopic() == ground_truth_topic)) {
       ff_msgs::EkfState::ConstPtr ground_truth = m.instantiate<ff_msgs::EkfState>();
       if (ground_truth != NULL  && abs(ground_truth->header.stamp.toSec() - timestamp) < timestamp_dist_ground_truth) {
@@ -101,7 +111,8 @@ void extractTopicsBag(const std::string bagname, const double timestamp, const s
       }
     }
   }
-  std::cout << "Closest timestamp depth: " << timestamp_dist_depth_cam
+  std::cout << "Closest timestamp camera info : " << timestamp_dist_camera_info
+            << "Closest timestamp depth: " << timestamp_dist_depth_cam
             << " Closest timestamp pose: " << timestamp_dist_ground_truth << std::endl;
   bag.close();
 }
@@ -192,12 +203,16 @@ int main(int argc, char** argv) {
   inspection::CameraView camera(camera_name, 2.0, 0.19, msg_pointer);
 
   // Extract topics from bagfile
-  std::string depth_cam_topic = "/hw/depth_haz/points";
   std::string image_info_topic = "/hw/cam_sci_info";
+  std::string depth_cam_topic = "/hw/depth_haz/points";
   std::string ground_truth_topic = "/gnc/ekf";
-  sensor_msgs::PointCloud2 point_cloud_depth, point_cloud_world;
+  sensor_msgs::CameraInfo image_info;
+  sensor_msgs::PointCloud2 depth_cam, point_cloud_world;
   geometry_msgs::Pose ground_truth;
-  extractTopicsBag(FLAGS_bag_name, timestamp, depth_cam_topic, ground_truth_topic, point_cloud_depth, ground_truth);
+  extractTopicsBag(FLAGS_bag_name, timestamp, image_info_topic, depth_cam_topic, ground_truth_topic, image_info,
+                   depth_cam, ground_truth);
+  camera.SetH(image_info.height);
+  camera.SetW(image_info.width);
 
   // Figure out the vector to the target based on camera parameters
   Eigen::Vector3d vector;
@@ -208,7 +223,7 @@ int main(int argc, char** argv) {
     msg_conversions::ros_pose_to_eigen_transform(ground_truth) * transform_body_to_nav * transform_nav_to_depth;
 
   pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-  pcl::fromROSMsg(point_cloud_depth, pcl_cloud);
+  pcl::fromROSMsg(depth_cam, pcl_cloud);
   for (auto& pcl_point : pcl_cloud.points) {
     Eigen::Vector3d X(pcl_point.x, pcl_point.y, pcl_point.z);
     X = transform_world_to_depth * haz_cam_depth_to_image_trans * X;
