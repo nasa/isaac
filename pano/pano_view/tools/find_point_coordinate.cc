@@ -32,8 +32,6 @@
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
 // Import messages
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CameraInfo.h>
 #include <ff_msgs/EkfState.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/TransformStamped.h>
@@ -56,26 +54,28 @@
 #include <jsoncpp/json/reader.h>
 #include <jsoncpp/json/value.h>
 
+#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 
+#define MAX_TOPIC_DELAY 2.0
+
 // Parameters
 DEFINE_string(camera, "sci_cam", "Camera name.");
 DEFINE_string(depth, "haz", "Depth camera name.");
+
+DEFINE_string(json_config, "", "json file with configure data.");
 DEFINE_string(bag_name, "", "Bagname where image can be found. Make sure it has haz cam and ground truth");
 DEFINE_string(mesh_name, "", "Meshfile path.");
-DEFINE_string(json_config, "", "json file with configure data.");
 
 // Bagfile topics
-DEFINE_string(image_info_topic,   "/hw/cam_sci_info",     "Camera info topic name.");
 DEFINE_string(depth_cam_topic,    "/hw/depth_haz/points", "Point Cloud topic name.");
 DEFINE_string(ground_truth_topic, "/gnc/ekf",             "Robot pose topic name.");
 
-void extractTopicsBag(const std::string bagname, const double timestamp, const std::string image_info_topic,
-                      const std::string depth_cam_topic, const std::string ground_truth_topic,
-                      sensor_msgs::CameraInfo& camera_info_out, sensor_msgs::PointCloud2& depth_cam_out,
+bool extractTopicsBag(const std::string bagname, const double timestamp, const std::string depth_cam_topic,
+                      const std::string ground_truth_topic, sensor_msgs::PointCloud2& depth_cam_out,
                       geometry_msgs::Pose& ground_truth_out) {
   // Read ground truth from bag
   rosbag::Bag bag;
@@ -87,18 +87,9 @@ void extractTopicsBag(const std::string bagname, const double timestamp, const s
 
   rosbag::View view(bag, rosbag::TopicQuery(topics));
 
-  double timestamp_dist_camera_info = std::numeric_limits<double>::max();
   double timestamp_dist_depth_cam = std::numeric_limits<double>::max();
   double timestamp_dist_ground_truth = std::numeric_limits<double>::max();
   BOOST_FOREACH(rosbag::MessageInstance const m, view) {
-    // Read camera info
-    if (m.getTopic() == image_info_topic || ("/" + m.getTopic() == image_info_topic)) {
-      sensor_msgs::CameraInfo::ConstPtr camera_info = m.instantiate<sensor_msgs::CameraInfo>();
-      if (camera_info != NULL && abs(camera_info->header.stamp.toSec() - timestamp) < timestamp_dist_depth_cam) {
-        camera_info_out = *camera_info;
-        timestamp_dist_camera_info = abs(camera_info->header.stamp.toSec() - timestamp);
-      }
-    }
     // Read depth cam points
     if (m.getTopic() == depth_cam_topic || ("/" + m.getTopic() == depth_cam_topic)) {
       sensor_msgs::PointCloud2::ConstPtr depth_cam = m.instantiate<sensor_msgs::PointCloud2>();
@@ -116,10 +107,15 @@ void extractTopicsBag(const std::string bagname, const double timestamp, const s
       }
     }
   }
-  std::cout << "Closest timestamp camera info : " << timestamp_dist_camera_info
-            << "Closest timestamp depth: " << timestamp_dist_depth_cam
-            << " Closest timestamp pose: " << timestamp_dist_ground_truth << std::endl;
+  std::cout << "Closest timestamp depth: " << timestamp_dist_depth_cam
+            << "; Closest timestamp pose: " << timestamp_dist_ground_truth << std::endl;
+
+  if (timestamp_dist_ground_truth > MAX_TOPIC_DELAY) {
+    std::cerr << "Failed to find pose within acceotable timestamp" << std::endl;
+    return false;
+  }
   bag.close();
+  return true;
 }
 
 int main(int argc, char** argv) {
@@ -147,6 +143,8 @@ int main(int argc, char** argv) {
   std::string camera_name = json["camera"].asString();
   int coord_x = json["coord"]["x"].asInt();
   int coord_y = json["coord"]["y"].asInt();
+  int height = json["height"].asInt();
+  int width = json["width"].asInt();
 
   // Read transforms
   config_reader::ConfigReader config;
@@ -206,46 +204,53 @@ int main(int argc, char** argv) {
   geometry_msgs::Transform::ConstPtr msg_pointer(
     new geometry_msgs::Transform(msg_conversions::eigen_transform_to_ros_transform(transform_body_to_cam)));
   inspection::CameraView camera(camera_name, 2.0, 0.19, msg_pointer);
+  camera.SetH(height);
+  camera.SetW(width);
 
   // Extract topics from bagfile
-  std::string image_info_topic = FLAGS_image_info_topic;
   std::string depth_cam_topic = FLAGS_depth_cam_topic;
   std::string ground_truth_topic = FLAGS_ground_truth_topic;
-  sensor_msgs::CameraInfo image_info;
   sensor_msgs::PointCloud2 depth_cam, point_cloud_world;
   geometry_msgs::Pose ground_truth;
-  extractTopicsBag(FLAGS_bag_name, timestamp, image_info_topic, depth_cam_topic, ground_truth_topic, image_info,
-                   depth_cam, ground_truth);
-  camera.SetH(image_info.height);
-  camera.SetW(image_info.width);
+  if (!extractTopicsBag(FLAGS_bag_name, timestamp, depth_cam_topic, ground_truth_topic,
+                   depth_cam, ground_truth)) {
+    return 1;
+  }
 
   // Figure out the vector to the target based on camera parameters
   Eigen::Vector3d vector;
   camera.GetVectorFromCamXY(ground_truth, coord_x, coord_y, vector);
 
-  // Transform Point Cloud to world reference frame + fix scaling
-  Eigen::Affine3d transform_world_to_depth =
-    msg_conversions::ros_pose_to_eigen_transform(ground_truth) * transform_body_to_nav * transform_nav_to_depth;
-
-  pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
-  pcl::fromROSMsg(depth_cam, pcl_cloud);
-  for (auto& pcl_point : pcl_cloud.points) {
-    Eigen::Vector3d X(pcl_point.x, pcl_point.y, pcl_point.z);
-    X = transform_world_to_depth * haz_cam_depth_to_image_trans * X;
-    pcl_point.x = X[0];
-    pcl_point.y = X[1];
-    pcl_point.z = X[2];
-  }
+  // Calculate pitch and yaw
+  double pitch = std::atan2(vector[2], std::sqrt(vector[0] * vector[0] + vector[1] * vector[1])) * 180 / M_PI;
+  double yaw = std::atan2(vector[1], vector[0]) * 180 / M_PI;
 
   // Target position based on haz cam measurements
   Eigen::Vector3d intersection_pcl;
-  if (pano_view::intersectRayPointCloud(pcl_cloud,
-                                        msg_conversions::ros_pose_to_eigen_transform(ground_truth).translation(),
-                                        vector, intersection_pcl)) {
-    std::cout << "Intersection point pcl: (" << intersection_pcl.x() << ", " << intersection_pcl.y() << ", "
-              << intersection_pcl.z() << ")" << std::endl;
+  if (abs(depth_cam.header.stamp.toSec() - timestamp) > MAX_TOPIC_DELAY) {
+    std::cerr << "Failed to find point cloud within acceptable timestamp, skipping that estimate" << std::endl;
   } else {
-    std::cout << "No pcl intersection found." << std::endl;
+    // Transform Point Cloud to world reference frame + fix scaling
+    Eigen::Affine3d transform_world_to_depth =
+      msg_conversions::ros_pose_to_eigen_transform(ground_truth) * transform_body_to_nav * transform_nav_to_depth;
+    pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+    pcl::fromROSMsg(depth_cam, pcl_cloud);
+    for (auto& pcl_point : pcl_cloud.points) {
+      Eigen::Vector3d X(pcl_point.x, pcl_point.y, pcl_point.z);
+      X = transform_world_to_depth * haz_cam_depth_to_image_trans * X;
+      pcl_point.x = X[0];
+      pcl_point.y = X[1];
+      pcl_point.z = X[2];
+    }
+
+    if (pano_view::intersectRayPointCloud(pcl_cloud,
+                                          msg_conversions::ros_pose_to_eigen_transform(ground_truth).translation(),
+                                          vector, intersection_pcl)) {
+      std::cout << "Intersection point pcl: (" << intersection_pcl.x() << ", " << intersection_pcl.y() << ", "
+                << intersection_pcl.z() << ")(0," << pitch << "," << yaw << ")" << std::endl;
+    } else {
+      std::cout << "No pcl intersection found." << std::endl;
+    }
   }
 
   // Target position based on 3D mesh model
@@ -255,7 +260,7 @@ int main(int argc, char** argv) {
                                     msg_conversions::ros_pose_to_eigen_transform(ground_truth).translation(), vector,
                                     intersection_mesh)) {
       std::cout << "Intersection point pcl: (" << intersection_mesh.x() << ", " << intersection_mesh.y() << ", "
-                << intersection_mesh.z() << ")" << std::endl;
+                << intersection_mesh.z() << ")(0," << pitch << "," << yaw << ")" << std::endl;
     } else {
       std::cout << "No mesh intersection found." << std::endl;
     }
