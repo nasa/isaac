@@ -33,6 +33,8 @@ struct Face {
   int v1, v2, v3;
 };
 
+bool ReadOBJ(const std::string filename, std::vector<Eigen::Vector3d> &vertices, std::vector<Face> &faces);
+
 bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Eigen::Vector3d> vertices,
                const std::vector<Face> faces, Eigen::Vector3d &intersection);
 bool intersectRayMesh(const std::string filename, const Eigen::Vector3d origin, const Eigen::Vector3d dir,

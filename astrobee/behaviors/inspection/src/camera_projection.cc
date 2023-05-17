@@ -30,16 +30,9 @@
  */
 namespace inspection {
 /*
-  This class provides the high-level logic that allows the freeflyer to
-  define the optimal inspection pose. It evaluates:
-
-  * Visibility constraints
-  * Keepout and Keepin zones
-  * Obstacle map
-
-  It returns a vector of possible inspection poses that can be updated
-  in case the move action fails due to planning or unmapped obstacle.
-  It also constains functions that allow inspection visualization.
+  This class provides camera functionality that allows us to project the 3D point into
+  the camera frame and the other way around. It automatically reads the camera parameters
+  from the config files based on the camera name, such that no setup is necessary.
 */
 CameraView::CameraView(const std::string cam_name, const float f, const float n,
                        const geometry_msgs::Transform::ConstPtr cam_transform)
@@ -95,28 +88,27 @@ CameraView::CameraView(const std::string cam_name, const float f, const float n,
     return 2 * atan(H_ / (2 * fy_));
   }
 
-  // Return the Horizontal Field of View
+  // Return Camera pixel Height
   double  CameraView::GetH() {
     return H_;
   }
 
-  // Return the Vertical Field of View
+  // Return Camera pixel Width
   double  CameraView::GetW() {
     return W_;
   }
 
-  // Return the Horizontal Field of View
-  bool  CameraView::SetH(const double H) {
+  // Set Camera pixel Height
+  void  CameraView::SetH(const double H) {
     H_ = H;
-    return true;
   }
 
-  // Return the Vertical Field of View
-  bool  CameraView::SetW(const double W) {
+  // Set Camera pixel Width
+  void  CameraView::SetW(const double W) {
     W_ = W;
-    return true;
   }
 
+  // Build the View Matrix based on robot pose
   bool CameraView::BuildViewMatrix(const geometry_msgs::Pose robot_pose, Eigen::Matrix4d &V) {
     tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
                                  msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_);
@@ -144,11 +136,15 @@ CameraView::CameraView(const std::string cam_name, const float f, const float n,
     return true;
   }
 
+  // Returns the vector that contains the camera position and the point in the far clip that corresponds
+  // to the pixel index provided
+  // Input: robot pose, x image index, y image index
+  // Output: vector
   bool CameraView::GetVectorFromCamXY(const geometry_msgs::Pose robot_pose, const int x, const int y,
                                      Eigen::Vector3d &vector) {
     if (x > W_ || y > H_) {
       ROS_ERROR("Coordinates provided out of bounds!");
-      return -1;
+      return false;
     }
 
     // Define point that intersects the desired view angle
@@ -168,7 +164,7 @@ CameraView::CameraView(const std::string cam_name, const float f, const float n,
     return true;
   }
 
-  //
+  // Gets the points x y where the point is in the image. If outside the image, then it will return false
   bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
                                      int& y) {
     // Initialize x,y
@@ -234,7 +230,8 @@ CameraView::CameraView(const std::string cam_name, const float f, const float n,
     return true;
   }
 
-
+  // Gets the points x y where the point is in the image. If outside the image, then it will return false
+  // If the robot pose is not specified, it's considered to be the current one
   bool CameraView::GetCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
     // Initialize x,y
     x = 0; y = 0;

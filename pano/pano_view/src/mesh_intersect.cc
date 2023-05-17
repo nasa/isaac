@@ -20,62 +20,13 @@
 #include "pano_view/mesh_intersect.h"
 
 namespace pano_view {
-
-bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Eigen::Vector3d> vertices,
-               const std::vector<Face> faces, Eigen::Vector3d &intersection) {
-  double min_dist = std::numeric_limits<double>::max();
-  bool found = false;
-  for (const Face& face : faces) {
-    // Read vertices in face
-    Eigen::Vector3d v1 = vertices[face.v1 - 1];
-    Eigen::Vector3d v2 = vertices[face.v2 - 1];
-    Eigen::Vector3d v3 = vertices[face.v3 - 1];
-
-    Eigen::Vector3d e1(v2 - v1);
-    Eigen::Vector3d e2(v3 - v1);
-
-    Eigen::Vector3d n = e1.cross(e2);
-    double det = - dir.dot(n);
-    if (fabs(det) < std::numeric_limits<double>::epsilon()) {
-      continue;
-    }
-
-    Eigen::Vector3d ao = origin - v1;
-    Eigen::Vector3d dao = ao.cross(dir);
-
-    double u = e2.dot(dao) / det;
-    if (u < 0.0) {
-      continue;
-    }
-
-    double v = - e1.dot(dao) / det;
-    if (v < 0.0 || u + v > 1.0) {
-      continue;
-    }
-
-    double t = ao.dot(n) / det;
-    if (t < 0.0) {
-      continue;
-    }
-
-    min_dist = t;
-    intersection = origin + dir * t;
-    found = true;
-  }
-  return found;
-}
-
-bool intersectRayMesh(const std::string filename, const Eigen::Vector3d origin, const Eigen::Vector3d dir,
-                      Eigen::Vector3d &intersection) {
+bool ReadOBJ(const std::string filename, std::vector<Eigen::Vector3d> &vertices, std::vector<Face> &faces) {
   // Open mesh file
-  std::ifstream file(filename);
+  std::ifstream file(filename.c_str());
   if (!file.is_open()) {
     std::cerr << "Could not open file." << std::endl;
     return false;
   }
-  // Initialize the vertices and mesh vectors
-  std::vector<Eigen::Vector3d> vertices;
-  std::vector<Face> faces;
   // Read the file
   std::string line;
   while (getline(file, line)) {
@@ -96,6 +47,70 @@ bool intersectRayMesh(const std::string filename, const Eigen::Vector3d origin, 
     }
   }
   file.close();
+  return true;
+}
+
+bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Eigen::Vector3d> vertices,
+               const std::vector<Face> faces, Eigen::Vector3d &intersection) {
+  double min_dist = std::numeric_limits<double>::max();
+  bool found = false;
+  for (const Face& face : faces) {
+    // Read vertices in face
+    Eigen::Vector3d v1 = vertices[face.v1 - 1];
+    Eigen::Vector3d v2 = vertices[face.v2 - 1];
+    Eigen::Vector3d v3 = vertices[face.v3 - 1];
+
+    // Calculate the triangle edges
+    Eigen::Vector3d e1(v2 - v1);
+    Eigen::Vector3d e2(v3 - v1);
+
+    // Normal vector the triangle
+    Eigen::Vector3d n = e1.cross(e2);
+    // Determinant in the Möller-Trumbore intersection algorithm
+    double det = - dir.dot(n);
+    if (fabs(det) < std::numeric_limits<double>::epsilon()) {
+      continue;
+    }
+
+    Eigen::Vector3d ao = origin - v1;
+    Eigen::Vector3d dao = ao.cross(dir);
+
+    // Barycentric coordinate of the intersection point along e1.
+    double u = e2.dot(dao) / det;
+    if (u < 0.0) {
+      continue;
+    }
+
+    // Barycentric coordinate of the intersection point along e2
+    double v = - e1.dot(dao) / det;
+    if (v < 0.0 || u + v > 1.0) {
+      continue;
+    }
+
+    // t Distance from the origin to the intersection point along dir
+    double t = ao.dot(n) / det;
+    if (t < 0.0) {
+      // This means that there is a line intersection but not a ray intersection
+      continue;
+    }
+
+    if (t < min_dist) {
+      min_dist = t;
+      intersection = origin + dir * t;
+    }
+    found = true;
+  }
+  return found;
+}
+
+bool intersectRayMesh(const std::string filename, const Eigen::Vector3d origin, const Eigen::Vector3d dir,
+                      Eigen::Vector3d &intersection) {
+  // Initialize the vertices and mesh vectors
+  std::vector<Eigen::Vector3d> vertices;
+  std::vector<Face> faces;
+  if (!ReadOBJ(filename, vertices, faces)) {
+    return false;
+  }
 
   // Calculate intersection point
   return intersect(origin, dir, vertices, faces, intersection);
