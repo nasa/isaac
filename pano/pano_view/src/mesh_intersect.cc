@@ -56,7 +56,7 @@ bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const st
                const std::vector<Face> faces, Eigen::Vector3d &intersection) {
   double min_dist = std::numeric_limits<double>::max();
   bool found = false;
-  for (const Face& face : faces) {
+  for (const auto& face : faces) {
     // Read vertices in face
     Eigen::Vector3d v1 = vertices[face.v1 - 1];
     Eigen::Vector3d v2 = vertices[face.v2 - 1];
