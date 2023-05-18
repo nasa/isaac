@@ -20,6 +20,7 @@
 #include "pano_view/mesh_intersect.h"
 
 namespace pano_view {
+
 bool ReadOBJ(const std::string filename, std::vector<Eigen::Vector3d> &vertices, std::vector<Face> &faces) {
   // Open mesh file
   std::ifstream file(filename.c_str());
@@ -36,6 +37,7 @@ bool ReadOBJ(const std::string filename, std::vector<Eigen::Vector3d> &vertices,
       vertices.push_back(vertex);
     } else if (line.substr(0, 2) == "f ") {
       Face face;
+      // Reads face vertex indexes from different formatted obj files, the extra arguments are ignored
       if (sscanf(line.c_str(), "f %d %d %d", &face.v1, &face.v2, &face.v3) != 3) {
         if (sscanf(line.c_str(), "f %d/%*d %d/%*d %d/%*d", &face.v1, &face.v2, &face.v3) != 3) {
           if (sscanf(line.c_str(), "f %d/%*d/%*d %d/%*d/%*d %d/%*d/%*d", &face.v1, &face.v2, &face.v3) != 3) {

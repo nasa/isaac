@@ -34,8 +34,31 @@
 
 namespace pano_view {
 
+// Note: Other approaches are possible. If using the depth image rather than the point cloud, it would
+// possible to interpret the image as a mesh where the triangles are formed from adjacent pixels of
+// the image. Then the same mesh logic used with the OBJ file could be applied.
+
+// Selects closest point Cloud point to a ray defined by an origin and direction, choosing the point
+// where the cross product between the point vector and the direction is minimized
+// Inputs
+//   origin: The origin of the ray.
+//   dir: The direction of the ray.
+//   point_cloud: A Point Cloud that is undistorted obtained by a depth camera.
+// Outputs
+//   intersections: A vector to store the intersection point.
+// Returns the distance between the point and the vector.
 double intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir,
                  const pcl::PointCloud<pcl::PointXYZ> point_cloud, Eigen::Vector3d& intersection);
+
+// Selects closest point Cloud point to a ray defined by an origin and direction, choosing the point
+// where the cross product between the point vector and the direction is minimized
+// Inputs
+//   origin: The origin of the ray.
+//   dir: The direction of the ray.
+//   point_cloud: A Point Cloud that is undistorted obtained by a depth camera.
+// Outputs
+//   intersections: A vector to store the intersection point.
+// Returns True if at least one intersection is found, false otherwise.
 bool intersectRayPointCloud(const pcl::PointCloud<pcl::PointXYZ> point_cloud, const Eigen::Vector3d origin,
                             const Eigen::Vector3d dir, Eigen::Vector3d& intersection);
 

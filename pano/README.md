@@ -172,3 +172,17 @@ General parameters
 | ground_truth_topic   | "/gnc/ekf"            | Robot pose topic name                                                      |
 
 The script will print in the screen the target pose estimates.
+An example of this script would be:
+
+    rosrun pano_view find_point_coordinate -bag_name bag_name.bag -mesh_name mesh_name.obj -json_config test/viewpoint.json
+
+An example output would be:
+
+    Closest timestamp depth: 0.050772; Closest timestamp pose: 0.000275373
+    Point Cloud Point to vector distance: 0.00341976
+    Intersection point pcl: (0.997071, 0.238026, -0.571279)(0,4.71044,-14.8078)
+    Intersection point mesh: (0.993323, 0.237302, -0.5721)(0,4.71044,-14.8078)
+
+Things to look for are that the timestamps are not too large, this would mean that results are unreliable.
+Pay attention to the point cloud point to vector distance to make sure that the point is not too far away from the target vector, meaning that the point cloud does not include the target which is possible due to different field of views between the cameras.
+Lastly the mesh and pcl should not disagree, if they do, some manual analysis is needed. Be aware that the attitude provided is defined by the direction pointing at the target assuming roll zero.

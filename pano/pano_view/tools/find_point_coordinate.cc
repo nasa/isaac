@@ -259,7 +259,7 @@ int main(int argc, char** argv) {
     if (pano_view::intersectRayMesh(FLAGS_mesh_name,
                                     msg_conversions::ros_pose_to_eigen_transform(ground_truth).translation(), vector,
                                     intersection_mesh)) {
-      std::cout << "Intersection point pcl: (" << intersection_mesh.x() << ", " << intersection_mesh.y() << ", "
+      std::cout << "Intersection point mesh: (" << intersection_mesh.x() << ", " << intersection_mesh.y() << ", "
                 << intersection_mesh.z() << ")(0," << pitch << "," << yaw << ")" << std::endl;
     } else {
       std::cout << "No mesh intersection found." << std::endl;
