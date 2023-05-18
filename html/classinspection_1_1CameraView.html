@@ -98,9 +98,9 @@ $(document).ready(function(){initNavTree('classinspection_1_1CameraView.html',''
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a5aa1bd27ddc1797455bfc6896701cb98"><td class="memItemLeft" align="right" valign="top"><a id="a5aa1bd27ddc1797455bfc6896701cb98"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>CameraView</b> (std::string cam_name, float f=1.0, float n=0.19)</td></tr>
-<tr class="separator:a5aa1bd27ddc1797455bfc6896701cb98"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0500d4f1eeba28958e162b71eb4f9b73"><td class="memItemLeft" align="right" valign="top"><a id="a0500d4f1eeba28958e162b71eb4f9b73"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>CameraView</b> (const std::string cam_name, const float f=2.0, const float n=0.19, const geometry_msgs::Transform::ConstPtr cam_transform=NULL)</td></tr>
+<tr class="separator:a0500d4f1eeba28958e162b71eb4f9b73"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a505c75d2add75781f7c8b3515d7ce11b"><td class="memItemLeft" align="right" valign="top"><a id="a505c75d2add75781f7c8b3515d7ce11b"></a>
 Eigen::Matrix4d&#160;</td><td class="memItemRight" valign="bottom"><b>GetProjectionMatrix</b> ()</td></tr>
 <tr class="separator:a505c75d2add75781f7c8b3515d7ce11b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -116,6 +116,18 @@ double&#160;</td><td class="memItemRight" valign="bottom"><b>GetH</b> ()</td></t
 <tr class="memitem:a8fc7577d86093ab0aa305b93e28f4acf"><td class="memItemLeft" align="right" valign="top"><a id="a8fc7577d86093ab0aa305b93e28f4acf"></a>
 double&#160;</td><td class="memItemRight" valign="bottom"><b>GetW</b> ()</td></tr>
 <tr class="separator:a8fc7577d86093ab0aa305b93e28f4acf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a173ebb5c002fb00f88a00abffcf16cab"><td class="memItemLeft" align="right" valign="top"><a id="a173ebb5c002fb00f88a00abffcf16cab"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>SetH</b> (const double H)</td></tr>
+<tr class="separator:a173ebb5c002fb00f88a00abffcf16cab"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a45bd3386b1f1c30943110868c91639a8"><td class="memItemLeft" align="right" valign="top"><a id="a45bd3386b1f1c30943110868c91639a8"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>SetW</b> (const double W)</td></tr>
+<tr class="separator:a45bd3386b1f1c30943110868c91639a8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a33d4337dff7ad292b789fa2fd933a13b"><td class="memItemLeft" align="right" valign="top"><a id="a33d4337dff7ad292b789fa2fd933a13b"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>BuildViewMatrix</b> (const geometry_msgs::Pose robot_pose, Eigen::Matrix4d &amp;V)</td></tr>
+<tr class="separator:a33d4337dff7ad292b789fa2fd933a13b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa6485583850716dcdbbcc91e042cf380"><td class="memItemLeft" align="right" valign="top"><a id="aa6485583850716dcdbbcc91e042cf380"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>GetVectorFromCamXY</b> (const geometry_msgs::Pose robot_pose, const int x, const int y, Eigen::Vector3d &amp;vector)</td></tr>
+<tr class="separator:aa6485583850716dcdbbcc91e042cf380"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a42aeba18ae44585c1468182d0a5ef5e0"><td class="memItemLeft" align="right" valign="top"><a id="a42aeba18ae44585c1468182d0a5ef5e0"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>GetCamXYFromPoint</b> (const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &amp;x, int &amp;y)</td></tr>
 <tr class="separator:a42aeba18ae44585c1468182d0a5ef5e0"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -146,15 +158,15 @@ float&#160;</td><td class="memItemRight" valign="bottom"><b>n_</b></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-methods"></a>
 Protected Member Functions</h2></td></tr>
-<tr class="memitem:af9ca857a6fba0b56574c9a5000b09f28"><td class="memItemLeft" align="right" valign="top"><a id="af9ca857a6fba0b56574c9a5000b09f28"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>SetProjectionMatrix</b> (Eigen::Matrix3d cam_mat)</td></tr>
-<tr class="separator:af9ca857a6fba0b56574c9a5000b09f28"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9c827dc410b1f781fe87bdaa6aaaff97"><td class="memItemLeft" align="right" valign="top"><a id="a9c827dc410b1f781fe87bdaa6aaaff97"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>InsideTarget</b> (std::vector&lt; int &gt; vert_x, std::vector&lt; int &gt; vert_y, int test_x, int test_y)</td></tr>
 <tr class="separator:a9c827dc410b1f781fe87bdaa6aaaff97"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af9ca857a6fba0b56574c9a5000b09f28"><td class="memItemLeft" align="right" valign="top"><a id="af9ca857a6fba0b56574c9a5000b09f28"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>SetProjectionMatrix</b> (Eigen::Matrix3d cam_mat)</td></tr>
+<tr class="separator:af9ca857a6fba0b56574c9a5000b09f28"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>astrobee/behaviors/inspection/include/inspection/<a class="el" href="inspection_8h_source.html">inspection.h</a></li>
+<li>astrobee/behaviors/inspection/include/inspection/<a class="el" href="camera__projection_8h_source.html">camera_projection.h</a></li>
 <li>astrobee/behaviors/inspection/src/camera_projection.cc</li>
 </ul>
 </div><!-- contents -->
