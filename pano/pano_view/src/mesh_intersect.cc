@@ -17,83 +17,105 @@
  * under the License.
  */
 
-
-
 #include "pano_view/mesh_intersect.h"
-
 
 namespace pano_view {
 
-bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Vertex> vertices,
-               const std::vector<Face> faces, Eigen::Vector3d intersection) {
+bool ReadOBJ(const std::string filename, std::vector<Eigen::Vector3d> &vertices, std::vector<Face> &faces) {
+  // Open mesh file
+  std::ifstream file(filename.c_str());
+  if (!file.is_open()) {
+    std::cerr << "Could not open file." << std::endl;
+    return false;
+  }
+  // Read the file
+  std::string line;
+  while (getline(file, line)) {
+    if (line.substr(0, 2) == "v ") {
+      Eigen::Vector3d vertex;
+      sscanf(line.c_str(), "v %lf %lf %lf", &vertex[0], &vertex[1], &vertex[2]);
+      vertices.push_back(vertex);
+    } else if (line.substr(0, 2) == "f ") {
+      Face face;
+      // Reads face vertex indexes from different formatted obj files, the extra arguments are ignored
+      if (sscanf(line.c_str(), "f %d %d %d", &face.v1, &face.v2, &face.v3) != 3) {
+        if (sscanf(line.c_str(), "f %d/%*d %d/%*d %d/%*d", &face.v1, &face.v2, &face.v3) != 3) {
+          if (sscanf(line.c_str(), "f %d/%*d/%*d %d/%*d/%*d %d/%*d/%*d", &face.v1, &face.v2, &face.v3) != 3) {
+            std::cout << "could not read line: " << line << std::endl;
+          }
+        }
+      }
+      faces.push_back(face);
+    }
+  }
+  file.close();
+  return true;
+}
+
+bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Eigen::Vector3d> vertices,
+               const std::vector<Face> faces, Eigen::Vector3d &intersection) {
   double min_dist = std::numeric_limits<double>::max();
   bool found = false;
   for (const auto& face : faces) {
-    const auto& v1 = vertices[face.v1 - 1];
-    const auto& v2 = vertices[face.v2 - 1];
-    const auto& v3 = vertices[face.v3 - 1];
-    Eigen::Vector3d e1(v2.x - v1.x, v2.y - v1.y, v2.z - v1.z);
-    Eigen::Vector3d e2(v3.x - v1.x, v3.y - v1.y, v3.z - v1.z);
-    Eigen::Vector3d p = dir.cross(e2);
-    double det = e1.dot(p);
+    // Read vertices in face
+    Eigen::Vector3d v1 = vertices[face.v1 - 1];
+    Eigen::Vector3d v2 = vertices[face.v2 - 1];
+    Eigen::Vector3d v3 = vertices[face.v3 - 1];
+
+    // Calculate the triangle edges
+    Eigen::Vector3d e1(v2 - v1);
+    Eigen::Vector3d e2(v3 - v1);
+
+    // Normal vector the triangle
+    Eigen::Vector3d n = e1.cross(e2);
+    // Determinant in the Möller-Trumbore intersection algorithm
+    double det = - dir.dot(n);
     if (fabs(det) < std::numeric_limits<double>::epsilon()) {
       continue;
     }
-    Eigen::Vector3d t = origin - Eigen::Vector3d(v1.x, v1.y, v1.z);
-    double u = t.dot(p) / det;
-    if (u < 0.0 || u > 1.0) {
+
+    Eigen::Vector3d ao = origin - v1;
+    Eigen::Vector3d dao = ao.cross(dir);
+
+    // Barycentric coordinate of the intersection point along e1.
+    double u = e2.dot(dao) / det;
+    if (u < 0.0) {
       continue;
     }
-    Eigen::Vector3d q = t.cross(e1);
-    double v = dir.dot(q) / det;
+
+    // Barycentric coordinate of the intersection point along e2
+    double v = - e1.dot(dao) / det;
     if (v < 0.0 || u + v > 1.0) {
       continue;
     }
-    double dist = (t.dot(q)) / det;
-    if (dist < min_dist) {
-      min_dist = dist;
-      intersection = origin + dir * dist;
-      found = true;
+
+    // t Distance from the origin to the intersection point along dir
+    double t = ao.dot(n) / det;
+    if (t < 0.0) {
+      // This means that there is a line intersection but not a ray intersection
+      continue;
     }
+
+    if (t < min_dist) {
+      min_dist = t;
+      intersection = origin + dir * t;
+    }
+    found = true;
   }
   return found;
 }
 
 bool intersectRayMesh(const std::string filename, const Eigen::Vector3d origin, const Eigen::Vector3d dir,
-                      Eigen::Vector3d intersection) {
-  // Open mesh file
-  std::ifstream file(filename);
-  if (!file.is_open()) {
-    std::cerr << "Could not open file." << std::endl;
+                      Eigen::Vector3d &intersection) {
+  // Initialize the vertices and mesh vectors
+  std::vector<Eigen::Vector3d> vertices;
+  std::vector<Face> faces;
+  if (!ReadOBJ(filename, vertices, faces)) {
     return false;
   }
-  // Initialize the vertices and mesh vectors
-  std::vector<Vertex> vertices;
-  std::vector<Face> faces;
-  // Read the file
-  std::string line;
-  while (getline(file, line)) {
-    if (line.substr(0, 2) == "v ") {
-      Vertex vertex;
-      sscanf(line.c_str(), "v %lf %lf %lf", &vertex.x, &vertex.y, &vertex.z);
-      vertices.push_back(vertex);
-    } else if (line.substr(0, 2) == "f ") {
-      Face face;
-      sscanf(line.c_str(), "f %d %d %d", &face.v1, &face.v2, &face.v3);
-      faces.push_back(face);
-    }
-  }
-  file.close();
 
   // Calculate intersection point
-  if (intersect(origin, dir, vertices, faces, intersection)) {
-    std::cout << "Intersection point: (" << intersection.x() << ", " << intersection.y() << ", " << intersection.z()
-              << ")" << std::endl;
-  } else {
-    std::cout << "No intersection found." << std::endl;
-    return false;
-  }
-  return true;
+  return intersect(origin, dir, vertices, faces, intersection);
 }
 
 }  // namespace pano_view

@@ -29,18 +29,42 @@
 
 namespace pano_view {
 
-struct Vertex {
-  double x, y, z;
-};
-
 struct Face {
   int v1, v2, v3;
 };
 
-bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Vertex> vertices,
-               const std::vector<Face> faces, Eigen::Vector3d intersection);
+// Reads an OBJ file and extracts the vertex and face information.
+// Inputs
+//   filename: The input file name of the OBJ file.
+// Outputs
+//   vertices: A vector to store the vertex information.
+//   faces: A vector to store the vertice indexes that forme a face.
+// Returns True if the OBJ file is successfully read, false otherwise.
+bool ReadOBJ(const std::string filename, std::vector<Eigen::Vector3d> &vertices, std::vector<Face> &faces);
+
+// Intersects a ray defined by an origin and direction with a mesh model represented by a vector of vertices and faces.
+// Inputs
+//   origin: The origin of the ray.
+//   dir: The direction of the ray.
+//   vertices: A vector of vertices representing the mesh model.
+//   faces: A vector to store the vertice indexes that forme a face.
+// Outputs
+//   intersections: A vector to store the intersection point.
+// Returns True if at least one intersection is found, false otherwise.
+bool intersect(const Eigen::Vector3d origin, const Eigen::Vector3d dir, const std::vector<Eigen::Vector3d> vertices,
+               const std::vector<Face> faces, Eigen::Vector3d &intersection);
+
+
+// Reads OBJ file and intersects a ray defined by an origin and direction
+// Inputs
+//   filename: The input file name of the OBJ file.
+//   origin: The origin of the ray.
+//   dir: The direction of the ray.
+// Outputs
+//   intersections: A vector to store the intersection points.
+// Returns True if at least one intersection is found, false otherwise.
 bool intersectRayMesh(const std::string filename, const Eigen::Vector3d origin, const Eigen::Vector3d dir,
-                      Eigen::Vector3d intersection);
+                      Eigen::Vector3d &intersection);
 
 }  // namespace pano_view
 
