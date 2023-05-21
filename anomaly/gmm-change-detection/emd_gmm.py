@@ -54,7 +54,7 @@ class EMDGMM:
             #print(lpSum(allocation[i][j] for i in range(self.n_warehouses)) >= cust_demands[j])
             model += lpSum(allocation[i][j] for i in range(self.n_warehouses)) >=self.cust_demands[j], "Demand Constraints " + str(j)
 
-        model.solve(PULP_CBC_CMD(msg=0))
+        model.solve(GLPK_CMD(msg=0))
         status = LpStatus[model.status]
         #print(status)
 
