@@ -1,12 +1,6 @@
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import GridSearchCV
-import rospy
-#import pcl
-import ros_numpy
-import rosbag
-import sensor_msgs
-#import pcl.pcl_visualization
 import copy
 from preprocess_data import *
 from visualization import *
