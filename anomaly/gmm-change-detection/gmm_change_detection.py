@@ -150,10 +150,6 @@ if ext != '.pk':
     print("Fitting Gamma")
     gmm1_init=GmmMml()
     gmm1_init=gmm1_init.fit(points1, verb=True)
-
-    print("Fitting Theta")
-    gmm2_init=GmmMml()
-    gmm2_init=gmm2_init.fit(points2, verb=True) 
     gmm1_init_bestk = gmm1_init.bestk
     gmm1_init_bestpp = gmm1_init.bestpp
     gmm1_init_bestcov = gmm1_init.bestcov
