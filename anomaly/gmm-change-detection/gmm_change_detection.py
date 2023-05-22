@@ -20,8 +20,10 @@ fake_data = True  # Generate point clouds
 
 # Path to input data (.pk for pickled GMMs, PCL file,
 # or bag files cropped to same positions at different times)
-t_0 = './data/ground_truth/groundtruth_run5.pcd'
-t_1 = './data/ground_truth/groundtruth_run4.pcd'
+#t_0 = './data/ground_truth/groundtruth_run5.pcd'
+#t_1 = './data/ground_truth/groundtruth_run4.pcd'
+t_0 = './saved_models/fake_data_1.pk'
+t_1 = './saved_models/fake_data_2.pk'
 
 # Get file extension
 ext = os.path.splitext(os.path.basename(t_0))[1]
@@ -40,9 +42,9 @@ def get_filename(original_file):
 # Load pre-clustered GMMs if provided
 if ext == '.pk':
     with open(t_0, 'rb') as fi:
-        gmm0_init_bestk, gmm0_init_bestpp, gmm0_init_bestcov, gmm0_init_bestmu = pickle.load(fi)
+        gmm1_init_bestk, gmm1_init_bestpp, gmm1_init_bestcov, gmm1_init_bestmu, predictions1 = pickle.load(fi)
     with open(t_1, 'rb') as fi:
-        gmm1_init_bestk, gmm1_init_bestpp, gmm1_init_bestcov, gmm1_init_bestmu = pickle.load(fi)
+        gmm2_init_bestk, gmm2_init_bestpp, gmm2_init_bestcov, gmm2_init_bestmu, predictions2 = pickle.load(fi)
 else:
     if fake_data:
         filename_1 = 'fake_data_1'
@@ -260,25 +262,19 @@ if ext != '.pk':
     print("Fitting Theta")
     #gmm2_init=GmmMml()
     gmm2_init=gmm2_init.fit(points2, verb=True)
-
-    with open(t0_save_file, 'wb') as fi:
-        pickle.dump([gmm1_init.bestk, gmm1_init.bestpp, gmm1_init.bestcov, gmm1_init.bestmu], fi)    
-    with open(t1_save_file, 'wb') as fi:
-        pickle.dump([gmm2_init.bestk, gmm2_init.bestpp, gmm2_init.bestcov, gmm2_init.bestmu], fi)
     
-    print("Saved to: ")
-    print("    " + str(t0_save_file))
-    print("    " + str(t1_save_file))
-
     gmm1_init_bestk = gmm1_init.bestk
     gmm1_init_bestpp = gmm1_init.bestpp
     gmm1_init_bestcov = gmm1_init.bestcov
     gmm1_init_bestmu = gmm1_init.bestmu
+    predictions1 = gmm1_init.predict(points1)
 
     gmm2_init_bestk = gmm2_init.bestk
     gmm2_init_bestpp = gmm2_init.bestpp
     gmm2_init_bestcov = gmm2_init.bestcov
     gmm2_init_bestmu = gmm2_init.bestmu
+    predictions2 = gmm2_init.predict(points2)
+
  
 #gmm1_init = fit_gmm(points1, low_k, high_k)
 #gmm2_init = fit_gmm(points2, low_k, high_k)
@@ -417,18 +413,27 @@ if visualize:
 
     # GMM 1 (Gamma)
     diag_covs1 = get_diag(gmm1_init_bestcov, gmm1_init_bestk)
-    predictions1 = gmm1_init.predict(points1)
     visualize_3d_gmm(points1, predictions1, gmm1_init_bestpp[0], gmm1_init_bestmu.T, np.sqrt(diag_covs1).T, gmm1_k, ax1)
     #visualize_3d_gmm(points1, predictions1, gmm1_init.best_estimator_.weights_, gmm1_init.best_estimator_.means_.T, np.sqrt(gmm1_init.best_estimator_.covariances_).T, gmm1_k, ax1)
 
     # GMM 2 (Theta)
     diag_covs2 = get_diag(gmm2_init_bestcov, gmm2_init_bestk)
-    predictions2 = gmm2_init.predict(points2)
     visualize_3d_gmm(points2, predictions2, gmm2_init_bestpp[0], gmm2_init_bestmu.T, np.sqrt(diag_covs2).T, gmm2_k, ax2)
     #visualize_3d_gmm(points2, predictions2, gmm2_init.best_estimator_.weights_, gmm2_init.best_estimator_.means_.T, np.sqrt(gmm2_init.best_estimator_.covariances_).T, gmm2_k, ax2)
 
     # Change GMM (Pi), compared to GMM2 original points
     piagonal = get_diag(pi.covariances, pi.weights.shape[0])
     visualize_3d_gmm(points2, predictions2, pi.weights, pi.means.T, np.sqrt(piagonal).T, gmm2_k, ax3)
+
+    # Save model parameters for future use
+    if ext != ".pk":
+        with open(t0_save_file, 'wb') as fi:
+            pickle.dump([gmm1_init.bestk, gmm1_init.bestpp, gmm1_init.bestcov, gmm1_init.bestmu, predictions1], fi)
+        with open(t1_save_file, 'wb') as fi:
+            pickle.dump([gmm2_init.bestk, gmm2_init.bestpp, gmm2_init.bestcov, gmm2_init.bestmu, predictions2], fi)
+
+        print("Saved to: ")
+        print("    " + str(t0_save_file))
+        print("    " + str(t1_save_file))
 
 plt.show()
