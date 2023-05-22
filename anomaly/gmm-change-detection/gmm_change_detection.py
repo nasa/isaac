@@ -11,43 +11,48 @@ from gmm_mml import GmmMml
 np.set_printoptions(threshold=sys.maxsize)
 np.set_printoptions(suppress = True)
 import pickle
-
-###############################
-# Obtain the point cloud data #
-###############################
-
-t_0 = '/home/jcsanto3/bagfile-data/2023-03-13_jamie/bsharp/20230313_1901_survey_no_bag_panorama_precut.bag'
-t_1 = '/home/jcsanto3/bagfile-data/2023-03-13_jamie/bsharp/20230313_1908_survey_bag_panorama_precut.bag'
-t_2 = '/home/jcsanto3/bagfile-data/test.bag'
-t_3 = '/home/jcsanto3/bagfile-data/oleg_pipeline/run4.pcd'
-t_4 = '/home/jcsanto3/bagfile-data/oleg_pipeline/run5.pcd'
-t_5 = '/home/jcsanto3/bagfile-data/groundtruth/run2_precut.bag'
-t_6 = '/home/jcsanto3/bagfile-data/groundtruth/run5_precut.bag'
-t_7 = '/home/jcsanto3/bagfile-data/oleg_pipeline/run2.pcd'
-t_8 = '/home/jcsanto3/bagfile-data//ground_truth/run4_box.bag'
-t_9 = '/home/jcsanto3/bagfile-data//ground_truth/run5_box.bag'
+import os
 
 ############
 # Settings #
 ############
-# Save (pickle) GMMs
-save = False
+fake_data = True  # Generate point clouds
 
-# Load pre-clustered GMMs
-if not save:
-    # Edit paths with desired models (.pk format)
-    file1 = '/home/jcsanto3/gmm-change-detection/saved_models/t_0.pk'
-    file2 = '/home/jcsanto3/gmm-change-detection/saved_models/t_1.pk'
-    with open(file1, 'rb') as fi:
+# Path to input data (.pk for pickled GMMs, PCL file,
+# or bag files cropped to same positions at different times)
+t_0 = './data/ground_truth/groundtruth_run5.pcd'
+t_1 = './data/ground_truth/groundtruth_run4.pcd'
+
+# Get file extension
+ext = os.path.splitext(os.path.basename(t_0))[1]
+
+#############################
+# Set up caching the models #
+#############################
+def get_filename(original_file):
+    counter = 0
+    filename = ""
+    while os.path.isfile('.saved_models/' + filename.format(counter)):
+        counter += 1
+    filename = filename.format(counter)
+    return filename
+
+# Load pre-clustered GMMs if provided
+if ext == '.pk':
+    with open(t_0, 'rb') as fi:
+        gmm0_init_bestk, gmm0_init_bestpp, gmm0_init_bestcov, gmm0_init_bestmu = pickle.load(fi)
+    with open(t_1, 'rb') as fi:
         gmm1_init_bestk, gmm1_init_bestpp, gmm1_init_bestcov, gmm1_init_bestmu = pickle.load(fi)
+else:
+    if fake_data:
+        filename_1 = 'fake_data_1'
+        filename_2 = 'fake_data_2'
+    else:
+        filename_1 = get_filename(os.path.splitext(os.path.basename(t_0))[0])
+        filename_2 = get_filename(os.path.splitext(os.path.basename(t_1))[0])
 
-    with open(file2, 'rb') as fi:
-        gmm1_init_bestk, gmm1_init_bestpp, gmm1_init_bestcov, gmm1_init_bestmu = pickle.load(fi)
-
-# Select data source
-fake_data = False   # Generate point clouds
-pc2 = True          # Bagfiles
-pcd = False         # PCL objects (converted from stereo reconstruction)
+    t0_save_file = './saved_models/' + filename_1 + '.pk'
+    t1_save_file = './saved_models/' + filename_2 + '.pk'
 
 # Select fake data type
 appearance = True   # Appearance vs. disappearance of Gaussians
@@ -69,9 +74,6 @@ visualize = True
 ###################
 
 if fake_data:
-    file1 = './saved_models/fake_data_1.pk'
-    file2 = './saved_models/fake_data_2.pk'
-
     #Generate 3D data with 4 clusters
     # set gaussian ceters and covariances in 3D
     means = np.array([[1, 0.0, 0.0],
@@ -127,20 +129,16 @@ if fake_data:
 
         points2 = np.concatenate(points_b)
 
-elif pc2:
-    file1 = './saved_models/t_9.pk'
-    file2 = './saved_models/t_8.pk'
+elif ext == '.bag':       # sensor_msgs::PointCloud2 data from bagfile
+    points1 = read_pc2_msgs(t_0)
+    points2 = read_pc2_msgs(t_1)
 
-    # Get the point clouds from bagfiles
-    points1 = read_pc2_msgs(t_9)
-    points2 = read_pc2_msgs(t_8)
+elif ext == '.pcd':       # PCL formatted file (e.g. from reconstructed map)
+    points1 = read_pcd(t_0)
+    points2 = read_pcd(t_1)
 else:
-    file1 = './saved_models/t_4.pk'
-    file2 = './saved_models/t_3.pk'
+    sys.exit('Invalid file format')
 
-    # Get the point clouds from pcd files (i.e. after using mapping pipeline)
-    points1 = read_pcd(t_4)
-    points2 = read_pcd(t_3)
 
 # Plot the figures
 fig1 = plt.figure()
@@ -252,7 +250,7 @@ def fit_gmm(points, lower_k, upper_k):
 gmm1_init=GmmMml()
 gmm2_init=GmmMml()
 
-if save:
+if ext != '.pk':
     # Run split-and-merge expectation-maximization algorithm
     # described in "Unsupervised Learning of Finite Mixture Models" by Figueiredo et al.
     print("Fitting Gamma")
@@ -263,14 +261,14 @@ if save:
     #gmm2_init=GmmMml()
     gmm2_init=gmm2_init.fit(points2, verb=True)
 
-    with open(file1, 'wb') as fi:
+    with open(t0_save_file, 'wb') as fi:
         pickle.dump([gmm1_init.bestk, gmm1_init.bestpp, gmm1_init.bestcov, gmm1_init.bestmu], fi)    
-    with open(file2, 'wb') as fi:
+    with open(t1_save_file, 'wb') as fi:
         pickle.dump([gmm2_init.bestk, gmm2_init.bestpp, gmm2_init.bestcov, gmm2_init.bestmu], fi)
     
     print("Saved to: ")
-    print("    " + str(file1))
-    print("    " + str(file2))
+    print("    " + str(t0_save_file))
+    print("    " + str(t1_save_file))
 
     gmm1_init_bestk = gmm1_init.bestk
     gmm1_init_bestpp = gmm1_init.bestpp
@@ -282,12 +280,6 @@ if save:
     gmm2_init_bestcov = gmm2_init.bestcov
     gmm2_init_bestmu = gmm2_init.bestmu
  
-else:
-    with open(file1, 'rb') as fi:
-        [gmm1_init_bestk, gmm1_init_bestpp, gmm1_init_bestcov, gmm1_init_bestmu] = pickle.load(fi)
-    with open(file2, 'rb') as fi:
-        [gmm2_init_bestk, gmm2_init_bestpp, gmm2_init_bestcov, gmm2_init_bestmu] = pickle.load(fi)
-
 #gmm1_init = fit_gmm(points1, low_k, high_k)
 #gmm2_init = fit_gmm(points2, low_k, high_k)
 
