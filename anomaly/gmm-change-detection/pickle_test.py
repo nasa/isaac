@@ -1,4 +1,4 @@
-import pickle 
+import pickle
 
 word_list = ["cat", "hat", "jump", "house", "orange", "brick", "horse", "word"]
 
@@ -6,8 +6,8 @@ word_list = ["cat", "hat", "jump", "house", "orange", "brick", "horse", "word"]
 word_list.append("monty")
 
 # open a pickle file
-filename = 'mypickle.pk'
+filename = "mypickle.pk"
 
-with open(filename, 'wb') as fi:
+with open(filename, "wb") as fi:
     # dump your data into the file
     pickle.dump(word_list, fi)
