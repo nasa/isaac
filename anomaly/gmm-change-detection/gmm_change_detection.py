@@ -15,14 +15,34 @@ np.set_printoptions(suppress = True)
 ############
 # Settings #
 ############
-fake_data = True  # Generate point clouds
+
+# Visualize GMMs
+visualize = True
+
+fake_data = False  # Generate point clouds
 
 # Path to input data (.pk for pickled GMMs, PCL file,
 # or bag files cropped to same positions at different times)
-t_0 = './data/ground_truth/groundtruth_run5.pcd'
-t_1 = './data/ground_truth/groundtruth_run4.pcd'
-#t_0 = './saved_models/fake_data_1.pk'
-#t_1 = './saved_models/fake_data_2.pk'
+#t_0 = './data/ground_truth/ground_truth_run5.pcd'
+#t_1 = './data/ground_truth/ground_truth_run4.pcd'
+
+t_1 = './data/single_frame_bags/20230313_1901_survey_no_bag_panorama_precut.bag'
+t_0 = './data/single_frame_bags/20230313_1908_survey_bag_panorama_precut.bag'
+
+#t_0 = './data/single_frame_bags/run5_astrobee.bag'
+#t_1 = './data/single_frame_bags/run1_astrobee.bag'
+
+#t_0 = './data/image_reconstruction/run5.pcd'
+#t_1 = './data/image_reconstruction/run2.pcd'
+
+#t_0 = './saved_models/fake_data_t0_1.pk'
+#t_1 = './saved_models/fake_data_t1_1.pk'
+
+#t_0 = './saved_models/20230313_1901_survey_no_bag_panorama_precut_1.pk'
+#t_1 = './saved_models/20230313_1908_survey_bag_panorama_precut_1.pk'
+
+#t_0 = 'data/image_reconstruction/run5.pcd'
+#t_1 = 'data/image_reconstruction/run4.pcd'
 
 # Get file extension
 ext = os.path.splitext(os.path.basename(t_0))[1]
@@ -56,95 +76,91 @@ else:
     t0_save_file = './saved_models/' + filename_1 + '.pk'
     t1_save_file = './saved_models/' + filename_2 + '.pk'
 
-# Select fake data type
-appearance = True   # Appearance vs. disappearance of Gaussians
+    # Select fake data type
+    appearance = True   # Appearance vs. disappearance of Gaussians
 
-# Visualize GMMs
-visualize = True
+    ###################
+    # Format the data #
+    ###################
 
-###################
-# Format the data #
-###################
-
-if fake_data:
-    # Generate 3D data with 4 clusters
-    # set Gaussian centers and covariances in 3D
-    means = np.array([[1, 0.0, 0.0],
-              [0.0, 0.0, 0.0],
-                      [-0.5, -0.5, -0.5],
-                      [-0.8, 0.3, 0.4]])
-    covs = np.array([np.diag([0.01, 0.01, 0.03]),
-                     np.diag([0.08, 0.01, 0.01]),
-                     np.diag([0.01, 0.05, 0.01]),
-                     np.diag([0.03, 0.07, 0.01])])
-
-    N = 1000 #Number of points to be generated for each cluster.
-    points_a = []
-    points_b = []
-
-    for i in range(len(means)):
-        x = np.random.multivariate_normal(means[i], covs[i], N )
-        points_a.append(x)
-        points_b.append(x)
-
-    points1 = np.concatenate(points_a)
-
-    if appearance:
-        # Add an extra Gaussian
-        means2 = np.array([[1.5, 1.5, 1.5],
-                          [0.2, 0.2, 0.2],
-                          [0.8, -.03, -0.4]])
-        covs2 = np.array([np.diag([0.01, 0.01, 0.01]),
-                         np.diag([0.02, 0.01, 0.03]),
-                         np.diag([0.03, 0.02, 0.01])])
-
-        for i in range(len(means2)):
-            x = np.random.multivariate_normal(means2[i], covs2[i], N )
-            points_b.append(x)
-
-        points2 = np.concatenate(points_b)
-
-    else:
-        # Remove an extra Gaussian
-        means2 = np.array([[1, 0.0, 0.0],
-                          [0.0, 0.0, 0.0],
-                          [-0.5, -0.5, -0.5]])
-        covs2 = np.array([np.diag([0.01, 0.01, 0.03]),
+    if fake_data:
+        # Generate 3D data with 4 clusters
+        # set Gaussian centers and covariances in 3D
+        means = np.array([[1, 0.0, 0.0],
+                  [0.0, 0.0, 0.0],
+                          [-0.5, -0.5, -0.5],
+                          [-0.8, 0.3, 0.4]])
+        covs = np.array([np.diag([0.01, 0.01, 0.03]),
                          np.diag([0.08, 0.01, 0.01]),
-                         np.diag([0.01, 0.05, 0.01])])
+                         np.diag([0.01, 0.05, 0.01]),
+                         np.diag([0.03, 0.07, 0.01])])
+
+        N = 1000 #Number of points to be generated for each cluster.
+        points_a = []
         points_b = []
 
-        for i in range(len(means2)):
-            x2 = np.random.multivariate_normal(means2[i], covs2[i], N )
-            points_b.append(x2)
+        for i in range(len(means)):
+            x = np.random.multivariate_normal(means[i], covs[i], N )
+            points_a.append(x)
+            points_b.append(x)
 
-        points2 = np.concatenate(points_b)
+        points1 = np.concatenate(points_a)
 
-elif ext == '.bag':       # sensor_msgs::PointCloud2 data from bagfile
-    points1 = read_pc2_msgs(t_0)
-    points2 = read_pc2_msgs(t_1)
+        if appearance:
+            # Add an extra Gaussian
+            means2 = np.array([[1.5, 1.5, 1.5],
+                              [0.2, 0.2, 0.2],
+                              [0.8, -.03, -0.4]])
+            covs2 = np.array([np.diag([0.01, 0.01, 0.01]),
+                             np.diag([0.02, 0.01, 0.03]),
+                             np.diag([0.03, 0.02, 0.01])])
 
-elif ext == '.pcd':       # PCL formatted file (e.g. from reconstructed map)
-    points1 = read_pcd(t_0)
-    points2 = read_pcd(t_1)
-else:
-    sys.exit('Invalid file format')
+            for i in range(len(means2)):
+                x = np.random.multivariate_normal(means2[i], covs2[i], N )
+                points_b.append(x)
+
+            points2 = np.concatenate(points_b)
+
+        else:
+            # Remove an extra Gaussian
+            means2 = np.array([[1, 0.0, 0.0],
+                              [0.0, 0.0, 0.0],
+                              [-0.5, -0.5, -0.5]])
+            covs2 = np.array([np.diag([0.01, 0.01, 0.03]),
+                             np.diag([0.08, 0.01, 0.01]),
+                             np.diag([0.01, 0.05, 0.01])])
+            points_b = []
+
+            for i in range(len(means2)):
+                x2 = np.random.multivariate_normal(means2[i], covs2[i], N )
+                points_b.append(x2)
+
+            points2 = np.concatenate(points_b)
+
+    elif ext == '.bag':       # sensor_msgs::PointCloud2 data from bagfile
+        points1 = read_pc2_msgs(t_0)
+        points2 = read_pc2_msgs(t_1)
+
+    elif ext == '.pcd':       # PCL formatted file (e.g. from reconstructed map)
+        points1 = read_pcd(t_0)
+        points2 = read_pcd(t_1)
+    else:
+        sys.exit('Invalid file format')
 
 
-# Plot the figures
-fig1 = plt.figure()
-ax1 = fig1.add_subplot(111, projection='3d')
-ax1.scatter(points1[:,0], points1[:,1], points1[:,2], s=0.7, alpha=0.07)
-fig2 = plt.figure()
-ax2 = fig2.add_subplot(111, projection='3d')
-ax2.scatter(points2[:,0], points2[:,1], points2[:,2], s=0.7, alpha=0.07)
-#plt.show()
+    # Plot the figures
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(111, projection='3d')
+    ax1.scatter(points1[:,0], points1[:,1], points1[:,2], s=0.7, alpha=0.07)
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot(111, projection='3d')
+    ax2.scatter(points2[:,0], points2[:,1], points2[:,2], s=0.7, alpha=0.07)
+    #plt.show()
 
-#####################################
-# Cluster the point clouds int GMMs #
-#####################################
+    #####################################
+    # Cluster the point clouds int GMMs #
+    #####################################
 
-if ext != '.pk':
     # Run split-and-merge expectation-maximization algorithm
     # described in "Unsupervised Learning of Finite Mixture Models" by Figueiredo et al.
     print("Fitting Gamma")
@@ -225,6 +241,9 @@ def change_detection(gamma, theta):
     dGMM, new_theta, best_gauss = greedy_select_gmm(gamma, theta, dGMM_old)
 
     for i in range(new_theta.n_gaussians):
+        if best_gauss.n_gaussians == 0:
+            break
+
         # Update Pi with new Gaussian
         pi.add_gaussian(best_gauss)
 
@@ -235,16 +254,6 @@ def change_detection(gamma, theta):
         else:
             break
 
-    # Output change Gaussian information
-    print()
-    print("CHANGE GAUSSIANS")
-    print("################################")
-    print("Number detected: " + str(pi.n_gaussians))
-    print("Means: ")
-    print(pi.means)
-    print("Covariances: ")
-    print(pi.covariances)
-
     # Map the change Gaussians back to the original Theta GMM
     theta_changes = []
     for gauss in range(pi.n_gaussians):
@@ -252,10 +261,19 @@ def change_detection(gamma, theta):
         theta_changes.append(change_gauss)
 
     # Readjust the Pi covariance shape back to [3,3,K]
-    pi.covariances = pi.covariances.reshape(pi.n_gaussians,3,3).T
+    if pi.n_gaussians != 0:
+        pi.covariances = pi.covariances.reshape(pi.n_gaussians,3,3).T
     return pi
 
-pi = change_detection(gamma_t0, theta_t1)
+pi_appearances = change_detection(gamma_t0, theta_t1)
+pi_disappearances = change_detection(theta_t1, gamma_t0)
+
+# Output change Gaussian information
+print()
+print("CHANGE GAUSSIANS")
+print("################################")
+print("Clusters associated with appearances: " + str(pi_appearances.n_gaussians))
+print("Clusters associated with disappearances: " + str(pi_disappearances.n_gaussians))
 
 def get_diag(covs, k):
     '''Get diagonal covariance from full covariance
@@ -276,18 +294,26 @@ if visualize:
     gmm1_k = gmm1_init_bestk
     gmm2_k = gmm2_init_bestk
 
-    fig = plt.figure(figsize=(9, 3))
-    ax1 = fig.add_subplot(131, projection='3d')
+    fig = plt.figure(figsize=(12, 4))
+    ax1 = fig.add_subplot(141, projection='3d')
     ax1.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax1.view_init(elev=-75, azim=-90)
     ax1.title.set_text('Gamma (Before)')
 
-    ax2 = fig.add_subplot(132, projection='3d')
+    ax2 = fig.add_subplot(142, projection='3d')
     ax2.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax2.view_init(elev=-75, azim=-90)
     ax2.title.set_text('Theta (After)')
 
-    ax3 = fig.add_subplot(133, projection='3d')
+    ax3 = fig.add_subplot(143, projection='3d')
     ax3.set(xlabel="X", ylabel="Y", zlabel="Z")
-    ax3.title.set_text('Delta (Changes)')
+    ax3.view_init(elev=-75, azim=-90)
+    ax3.title.set_text('Pi (Appearances)')
+
+    ax4 = fig.add_subplot(144, projection='3d')
+    ax4.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax4.view_init(elev=-75, azim=-90)
+    ax4.title.set_text('Pi (Disappearances)')
 
     # GMM 1 (Gamma)
     diag_covs1 = get_diag(gmm1_init_bestcov, gmm1_init_bestk)
@@ -297,16 +323,20 @@ if visualize:
     diag_covs2 = get_diag(gmm2_init_bestcov, gmm2_init_bestk)
     visualize_3d_gmm(points2, predictions2, gmm2_init_bestpp[0], gmm2_init_bestmu.T, np.sqrt(diag_covs2).T, gmm2_k, ax2)
 
-    # Change GMM (Pi), compared to GMM2 original points
-    piagonal = get_diag(pi.covariances, pi.weights.shape[0])
-    visualize_3d_gmm(points2, predictions2, pi.weights, pi.means.T, np.sqrt(piagonal).T, gmm2_k, ax3)
+    # Appearance GMM (Pi 1), compared to GMM2 original points
+    piagonal = get_diag(pi_appearances.covariances, pi_appearances.weights.shape[0])
+    visualize_3d_gmm(points2, predictions2, pi_appearances.weights, pi_appearances.means.T, np.sqrt(piagonal).T, gmm2_k, ax3)
+
+    # Disappearance GMM (Pi 2), compared to GMM2 original points
+    piagonal_dis = get_diag(pi_disappearances.covariances, pi_disappearances.weights.shape[0])
+    visualize_3d_gmm(points2, predictions2, pi_disappearances.weights, pi_disappearances.means.T, np.sqrt(piagonal_dis).T, gmm2_k, ax4)
 
     # Save model parameters for future use
     if ext != ".pk":
         with open(t0_save_file, 'wb') as fi:
-            pickle.dump([gmm1_init.bestk, gmm1_init.bestpp, gmm1_init.bestcov, gmm1_init.bestmu, predictions1], fi)
+            pickle.dump([gmm1_init.bestk, gmm1_init.bestpp, gmm1_init.bestcov, gmm1_init.bestmu, predictions1, points1], fi)
         with open(t1_save_file, 'wb') as fi:
-            pickle.dump([gmm2_init.bestk, gmm2_init.bestpp, gmm2_init.bestcov, gmm2_init.bestmu, predictions2], fi)
+            pickle.dump([gmm2_init.bestk, gmm2_init.bestpp, gmm2_init.bestcov, gmm2_init.bestmu, predictions2, points2], fi)
 
         print("Saved to: ")
         print("    " + str(t0_save_file))
