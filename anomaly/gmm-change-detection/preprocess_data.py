@@ -86,22 +86,19 @@ def concat_ground_truth_msgs(bagfile):
 
 # Process data from bagfile
 def read_pc2_msgs(bagfile):
-    count = 0;
     for topic, msg, t in rosbag.Bag(bagfile).read_messages():
         if topic == "/hw/depth_haz/extended/amplitude_int":
             np_im = ros_numpy.image.image_to_numpy(msg)
             data = Image.fromarray(np_im)
-            data.show()
-            data.save("image.png")
 
-        if topic == "/hw/depth_haz/points":
+        if topic == "/hw/depth_haz/points" or topic == "/hw/depth_haz/points/ground_truth":
             p = convert_pc2_pcl(msg)
             np_arr = filter_pcl(p)
 
-	    # Count number of frames to process
-            if count == 7:
-                break
-            count+=1
+            if 'data' in locals():
+                data.show()
+                data.save("image.png")
+                return np_arr
     return np_arr
 
 # Process PCD point cloud directly
