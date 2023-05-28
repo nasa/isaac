@@ -1,16 +1,17 @@
-import numpy as np
 import copy
-from preprocess_data import *
-from visualization import *
+import os
+import pickle
+import sys
+
+import numpy as np
 from emd_gmm import *
 from gmm import *
-import sys
 from gmm_mml import GmmMml
-import pickle
-import os
+from preprocess_data import *
+from visualization import *
 
 np.set_printoptions(threshold=sys.maxsize)
-np.set_printoptions(suppress = True)
+np.set_printoptions(suppress=True)
 
 ############
 # Settings #
@@ -23,6 +24,7 @@ fake_data = False  # Generate point clouds
 
 # Path to input data (.pk for pickled GMMs, PCL file,
 # or bag files cropped to same positions at different times)
+
 #t_0 = './data/ground_truth/ground_truth_run5.pcd'
 #t_1 = './data/ground_truth/ground_truth_run4.pcd'
 
@@ -51,30 +53,43 @@ ext = os.path.splitext(os.path.basename(t_0))[1]
 # Set up caching the models #
 #############################
 def get_filename(original_file):
-    '''Make sure the filename is unique'''
+    """Make sure the filename is unique"""
     counter = 1
     filename = original_file + "_{}"
-    while os.path.isfile('.saved_models/' + filename.format(counter)):
+    while os.path.isfile(".saved_models/" + filename.format(counter)):
         counter += 1
     filename = filename.format(counter)
     return filename
 
+
 # Load pre-clustered GMMs if provided
-if ext == '.pk':
-    with open(t_0, 'rb') as fi:
-        gmm1_init_bestk, gmm1_init_bestpp, gmm1_init_bestcov, gmm1_init_bestmu, predictions1 = pickle.load(fi)
-    with open(t_1, 'rb') as fi:
-        gmm2_init_bestk, gmm2_init_bestpp, gmm2_init_bestcov, gmm2_init_bestmu, predictions2 = pickle.load(fi)
+if ext == ".pk":
+    with open(t_0, "rb") as fi:
+        (
+            gmm1_init_bestk,
+            gmm1_init_bestpp,
+            gmm1_init_bestcov,
+            gmm1_init_bestmu,
+            predictions1,
+        ) = pickle.load(fi)
+    with open(t_1, "rb") as fi:
+        (
+            gmm2_init_bestk,
+            gmm2_init_bestpp,
+            gmm2_init_bestcov,
+            gmm2_init_bestmu,
+            predictions2,
+        ) = pickle.load(fi)
 else:
     if fake_data:
-        filename_1 = get_filename('fake_data_t0')
-        filename_2 = get_filename('fake_data_t1')
+        filename_1 = get_filename("fake_data_t0")
+        filename_2 = get_filename("fake_data_t1")
     else:
         filename_1 = get_filename(os.path.splitext(os.path.basename(t_0))[0])
         filename_2 = get_filename(os.path.splitext(os.path.basename(t_1))[0])
 
-    t0_save_file = './saved_models/' + filename_1 + '.pk'
-    t1_save_file = './saved_models/' + filename_2 + '.pk'
+    t0_save_file = "./saved_models/" + filename_1 + ".pk"
+    t1_save_file = "./saved_models/" + filename_2 + ".pk"
 
     # Select fake data type
     appearance = True   # Appearance vs. disappearance of Gaussians
@@ -164,8 +179,8 @@ else:
     # Run split-and-merge expectation-maximization algorithm
     # described in "Unsupervised Learning of Finite Mixture Models" by Figueiredo et al.
     print("Fitting Gamma")
-    gmm1_init=GmmMml()
-    gmm1_init=gmm1_init.fit(points1, verb=True)
+    gmm1_init = GmmMml()
+    gmm1_init = gmm1_init.fit(points1, verb=True)
     gmm1_init_bestk = gmm1_init.bestk
     gmm1_init_bestpp = gmm1_init.bestpp
     gmm1_init_bestcov = gmm1_init.bestcov
@@ -173,53 +188,56 @@ else:
     predictions1 = gmm1_init.predict(points1)
 
     print("Fitting Theta")
-    gmm2_init=GmmMml()
-    gmm2_init=gmm2_init.fit(points2, verb=True)
+    gmm2_init = GmmMml()
+    gmm2_init = gmm2_init.fit(points2, verb=True)
     gmm2_init_bestk = gmm2_init.bestk
     gmm2_init_bestpp = gmm2_init.bestpp
     gmm2_init_bestcov = gmm2_init.bestcov
     gmm2_init_bestmu = gmm2_init.bestmu
     predictions2 = gmm2_init.predict(points2)
 
- 
+
 print("Gamma number of Gaussians: " + str(gmm1_init_bestk))
 print("Theta number of Gaussians: " + str(gmm2_init_bestk))
 
 # Move the GMMs to a new data structure to be able to remove
 # Gaussians from GMMs for change detection
-gamma_t0 = GMM(gmm1_init_bestpp[0,:], gmm1_init_bestmu, gmm1_init_bestcov)
-theta_t1 = GMM(gmm2_init_bestpp[0,:], gmm2_init_bestmu, gmm2_init_bestcov)
+gamma_t0 = GMM(gmm1_init_bestpp[0, :], gmm1_init_bestmu, gmm1_init_bestcov)
+theta_t1 = GMM(gmm2_init_bestpp[0, :], gmm2_init_bestmu, gmm2_init_bestcov)
 
 ######################################
 # Generate GMM with Detected Changes #
 ######################################
 
+
 def find_emd(gmm1, gmm2):
-    '''Find the Earth Mover's Distance between two GMMs
-    '''
+    """Find the Earth Mover's Distance between two GMMs"""
     emdgmm = EMDGMM(gmm1.weights, gmm2.weights)
     emdgmm.get_distance(gmm1.means, gmm2.means)
     emdgmm.calculate_emd()
     return emdgmm.emd
 
+
 def greedy_select_gmm(gamma, theta, start_emd):
-    ''' Find the Gaussian in Theta that contributes the
+    """Find the Gaussian in Theta that contributes the
     highest degree of positive change (i.e., removal results
     in the lowest EMD) and return "best" Theta GMM from which such
     Gaussian has been removed
-    '''
+    """
 
-    lowest_emd = start_emd # Metric for degree of change 
+    lowest_emd = start_emd  # Metric for degree of change
     best_theta = theta
-    best_gauss = GMM(np.array([]), np.array([]).reshape((0,3)), np.array([]).reshape((0,3))) # GMM w/ k=1
+    best_gauss = GMM(
+        np.array([]), np.array([]).reshape((0, 3)), np.array([]).reshape((0, 3))
+    )  # GMM w/ k=1
 
     # Remove Gaussians one at a time and track which contributes most change
-    for gauss in range(theta.n_gaussians - 1): 
+    for gauss in range(theta.n_gaussians - 1):
         theta_temp = copy.deepcopy(theta)
-        removed_gauss = theta_temp.remove_gaussian(gauss)   # Remove the next Gaussian
+        removed_gauss = theta_temp.remove_gaussian(gauss)  # Remove the next Gaussian
         new_emd = find_emd(gamma, theta_temp)
-        
-        #print("NEW EMD: " + str(new_emd) + " LOWEST: " + str(lowest_emd))
+
+        # print("NEW EMD: " + str(new_emd) + " LOWEST: " + str(lowest_emd))
 
         if new_emd < lowest_emd:
             lowest_emd = new_emd
@@ -228,13 +246,14 @@ def greedy_select_gmm(gamma, theta, start_emd):
 
     return lowest_emd, best_theta, best_gauss
 
+
 def change_detection(gamma, theta):
-    '''Greedily remove Gaussians that contribute the most change
+    """Greedily remove Gaussians that contribute the most change
     and place them into a tertiary "change" GMM
-    '''
+    """
 
     # Initialize empty Pi (change) GMM
-    pi = GMM(np.array([]), np.array([]).reshape((0,3)), None)
+    pi = GMM(np.array([]), np.array([]).reshape((0, 3)), None)
 
     # Iteratively remove Gaussians from "after" GMM until EMD is the same
     dGMM_old = find_emd(gamma, theta)
@@ -276,16 +295,17 @@ print("Clusters associated with appearances: " + str(pi_appearances.n_gaussians)
 print("Clusters associated with disappearances: " + str(pi_disappearances.n_gaussians))
 
 def get_diag(covs, k):
-    '''Get diagonal covariance from full covariance
-    matrix for plotting'''
+    """Get diagonal covariance from full covariance
+    matrix for plotting"""
 
     diag_covs = []
     for i in range(k):
-        cov = covs[:,:,i]
+        cov = covs[:, :, i]
         l = len(cov[0])
         diag = [cov[j][j] for j in range(l)]
         diag_covs.append(diag)
     return np.array(diag_covs)
+
 
 ########################
 # Visualize the Output #
@@ -317,11 +337,27 @@ if visualize:
 
     # GMM 1 (Gamma)
     diag_covs1 = get_diag(gmm1_init_bestcov, gmm1_init_bestk)
-    visualize_3d_gmm(points1, predictions1, gmm1_init_bestpp[0], gmm1_init_bestmu.T, np.sqrt(diag_covs1).T, gmm1_k, ax1)
+    visualize_3d_gmm(
+        points1,
+        predictions1,
+        gmm1_init_bestpp[0],
+        gmm1_init_bestmu.T,
+        np.sqrt(diag_covs1).T,
+        gmm1_k,
+        ax1,
+    )
 
     # GMM 2 (Theta)
     diag_covs2 = get_diag(gmm2_init_bestcov, gmm2_init_bestk)
-    visualize_3d_gmm(points2, predictions2, gmm2_init_bestpp[0], gmm2_init_bestmu.T, np.sqrt(diag_covs2).T, gmm2_k, ax2)
+    visualize_3d_gmm(
+        points2,
+        predictions2,
+        gmm2_init_bestpp[0],
+        gmm2_init_bestmu.T,
+        np.sqrt(diag_covs2).T,
+        gmm2_k,
+        ax2,
+    )
 
     # Appearance GMM (Pi 1), compared to GMM2 original points
     piagonal = get_diag(pi_appearances.covariances, pi_appearances.weights.shape[0])

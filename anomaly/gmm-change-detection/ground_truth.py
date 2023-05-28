@@ -3,16 +3,17 @@
 # Python2 script to convert a series of haz_cam point clouds
 # to a single merged point cloud in the world reference frame
 
+import geometry_msgs
 import numpy as np
-import rospy
 import ros_numpy
 import rosbag
+import rospy
 import sensor_msgs
-import geometry_msgs
-import tf2_ros
 import tf2_py as tf2
+import tf2_ros
 from tf import transformations as ts
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
+
 
 # Transform the pc2 msg camera coordinates from the haz_cam to body:
 def translate_cam_frame(pc2_msg):
@@ -26,7 +27,7 @@ def translate_cam_frame(pc2_msg):
     t.transform.translation.z = -0.133
 
     # In quaternions:
-    t.transform.rotation.x =  0.500
+    t.transform.rotation.x = 0.500
     t.transform.rotation.y = -0.500
     t.transform.rotation.z = 0.500
     t.transform.rotation.w = -0.500
@@ -34,11 +35,12 @@ def translate_cam_frame(pc2_msg):
     body_tf = do_transform_cloud(pc2_msg, t)
     return body_tf
 
+
 # Transform point cloud coordinates to map ground truth (from Marina and Ryan)
 def ground_truth(msg, pc2_msg):
-    # Get transformation info from hazcam pc2 message	
+    # Get transformation info from hazcam pc2 message
     t = geometry_msgs.msg.TransformStamped()
-    #t.header.stamp = rospy.Time.now()
+    # t.header.stamp = rospy.Time.now()
     t.header.stamp = msg.header.stamp
     t.header.frame_id = "body"
     t.child_frame_id = "world"
@@ -55,8 +57,13 @@ def ground_truth(msg, pc2_msg):
     cloud_out = do_transform_cloud(pc2_msg, t)
     return cloud_out
 
+
 def convert_bag(bagfile, output_bag_name, save_all_topics=False):
-    topics =["/gnc/ekf", "/hw/depth_haz/points", "/hw/depth_haz/extended/amplitude_int"] 
+    topics = [
+        "/gnc/ekf",
+        "/hw/depth_haz/points",
+        "/hw/depth_haz/extended/amplitude_int",
+    ]
     output_bag = rosbag.Bag(output_bag_name, "w")
     topics_bag = [] if save_all_topics else topics
 
@@ -76,6 +83,9 @@ def convert_bag(bagfile, output_bag_name, save_all_topics=False):
                 output_bag.write(topic, msg, t)
     output_bag.close()
 
-if __name__ == "__main__":
-    convert_bag('/home/jcsanto3/bagfile-data/ground_truth/groundtruth_20230419_1836_survey_run5.bag', "./groundtruth_run5.bag")
 
+if __name__ == "__main__":
+    convert_bag(
+        "/home/jcsanto3/bagfile-data/ground_truth/groundtruth_20230419_1836_survey_run5.bag",
+        "./groundtruth_run5.bag",
+    )

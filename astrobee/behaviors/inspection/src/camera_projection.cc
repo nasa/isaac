@@ -18,7 +18,7 @@
  */
 
 // Include inspection library header
-#include <inspection/inspection.h>
+#include <inspection/camera_projection.h>
 // TODO(mgouveia): look into this, seems like FrustumPlanes does not have the s parameter
 // #include <mapper/linear_algebra.h>
 
@@ -30,56 +30,48 @@
  */
 namespace inspection {
 /*
-  This class provides the high-level logic that allows the freeflyer to
-  define the optimal inspection pose. It evaluates:
-
-  * Visibility constraints
-  * Keepout and Keepin zones
-  * Obstacle map
-
-  It returns a vector of possible inspection poses that can be updated
-  in case the move action fails due to planning or unmapped obstacle.
-  It also constains functions that allow inspection visualization.
+  This class provides camera functionality that allows us to project the 3D point into
+  the camera frame and the other way around. It automatically reads the camera parameters
+  from the config files based on the camera name, such that no setup is necessary.
 */
-  CameraView::CameraView(std::string cam_name, float f, float n)  : f_(f), n_(n) {
-    cam_name_ = cam_name;
+CameraView::CameraView(const std::string cam_name, const float f, const float n,
+                       const geometry_msgs::Transform::ConstPtr cam_transform)
+    : f_(f), n_(n) {
+  cam_name_ = cam_name;
 
-    cfg_cam_.AddFile("cameras.config");
-    if (!cfg_cam_.ReadFiles())
-      ROS_FATAL("Failed to read config files.");
+  cfg_cam_.AddFile("cameras.config");
+  if (!cfg_cam_.ReadFiles()) ROS_FATAL("Failed to read config files.");
 
-    // Create a transform buffer to listen for transforms
-    tf_listener_ = std::shared_ptr<tf2_ros::TransformListener>(
-      new tf2_ros::TransformListener(tf_buffer_));
+  config_reader::ConfigReader::Table camera(&cfg_cam_, cam_name.c_str());
+  Eigen::Matrix3d cam_mat;
 
-    Eigen::Matrix3d cam_mat;
+  // Read in distorted image size.
+  if (!camera.GetInt("width", &W_)) fprintf(stderr, "Could not read camera width.");
+  if (!camera.GetInt("height", &H_)) fprintf(stderr, "Could not read camera height.");
 
-    config_reader::ConfigReader::Table camera(&cfg_cam_, cam_name.c_str());
-
-    // Read in distorted image size.
-    if (!camera.GetInt("width", &W_))
-      fprintf(stderr, "Could not read camera width.");
-    if (!camera.GetInt("height", &H_))
-      fprintf(stderr, "Could not read camera height.");
-
-    config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
-    for (int i = 0; i < 9; i++) {
-      if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
-        fprintf(stderr, "Failed to read vector intrinsic_matrix.");
-        break;
-      }
-    }
-
-    SetProjectionMatrix(cam_mat);
-
-    // Get relative camera position
-    try {
-      tf_body_to_cam_ = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0));
-    } catch (tf2::TransformException &ex) {
-      ROS_ERROR("Failed getting transform: %s", ex.what());
+  config_reader::ConfigReader::Table vector(&camera, "intrinsic_matrix");
+  for (int i = 0; i < 9; i++) {
+    if (!vector.GetReal((i + 1), &cam_mat(i / 3, i % 3))) {
+      fprintf(stderr, "Failed to read vector intrinsic_matrix.");
+      break;
     }
   }
 
+  SetProjectionMatrix(cam_mat);
+
+  // Get relative camera position
+  if (cam_transform == NULL) {
+    // Create a transform buffer to listen for transforms
+    tf_listener_ = std::shared_ptr<tf2_ros::TransformListener>(new tf2_ros::TransformListener(tf_buffer_));
+    try {
+      tf_body_to_cam_ = tf_buffer_.lookupTransform("body", cam_name_, ros::Time(0), ros::Duration(1.0)).transform;
+    } catch (tf2::TransformException& ex) {
+      ROS_ERROR("Failed getting transform: %s", ex.what());
+    }
+  } else {
+    tf_body_to_cam_ = *cam_transform;
+  }
+}
 
   // Return the Projection Matrix
   Eigen::Matrix4d  CameraView::GetProjectionMatrix() {
@@ -96,28 +88,30 @@ namespace inspection {
     return 2 * atan(H_ / (2 * fy_));
   }
 
-  // Return the Horizontal Field of View
+  // Return Camera pixel Height
   double  CameraView::GetH() {
     return H_;
   }
 
-  // Return the Vertical Field of View
+  // Return Camera pixel Width
   double  CameraView::GetW() {
     return W_;
   }
 
-  //
-  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
-                                     int& y) {
-    // Initialize x,y
-    x = 0; y = 0;
-    Eigen::Vector4d p;
-    p << point.x,
-         point.y,
-         point.z,
-         1;
+  // Set Camera pixel Height
+  void  CameraView::SetH(const double H) {
+    H_ = H;
+  }
+
+  // Set Camera pixel Width
+  void  CameraView::SetW(const double W) {
+    W_ = W;
+  }
+
+  // Build the View Matrix based on robot pose
+  bool CameraView::BuildViewMatrix(const geometry_msgs::Pose robot_pose, Eigen::Matrix4d &V) {
     tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
-                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_.transform);
+                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_);
 
     // Build the View matrix
     Eigen::Quaterniond R(camera_pose.getRotation().w(),
@@ -127,10 +121,64 @@ namespace inspection {
     Eigen::Vector3d T(camera_pose.getOrigin().x(),
                       camera_pose.getOrigin().y(),
                       camera_pose.getOrigin().z());           // Translation Vector
-    Eigen::Matrix4d V;                                        // Transformation Matrix
     V.setIdentity();                                          // Identity to make bottom row 0,0,0,1
     V.block<3, 3>(0, 0) = R.normalized().toRotationMatrix();;
     V.block<3, 1>(0, 3) = T;
+
+    if (debug_) {
+      ROS_ERROR_STREAM("VisibilityConstraint T pos" << camera_pose.getOrigin().x() << " "
+                                  << camera_pose.getOrigin().y() << " " << camera_pose.getOrigin().z());
+      ROS_ERROR_STREAM("VisibilityConstraint T quat"
+                       << camera_pose.getRotation().w() << " " << camera_pose.getRotation().x() << " "
+                       << camera_pose.getRotation().y() << " " << camera_pose.getRotation().z());
+      ROS_ERROR_STREAM("V" << V);
+      }
+    return true;
+  }
+
+  // Returns the vector that contains the camera position and the point in the far clip that corresponds
+  // to the pixel index provided
+  // Input: robot pose, x image index, y image index
+  // Output: vector
+  bool CameraView::GetVectorFromCamXY(const geometry_msgs::Pose robot_pose, const int x, const int y,
+                                     Eigen::Vector3d &vector) {
+    if (x > W_ || y > H_) {
+      ROS_ERROR("Coordinates provided out of bounds!");
+      return false;
+    }
+
+    // Define point that intersects the desired view angle
+    Eigen::Vector4d q;
+    q << static_cast<double>(x) * 2 / static_cast<double>(W_) - 1,
+         static_cast<double>(y) * 2 / static_cast<double>(H_) - 1,
+         1,
+         1;
+
+    Eigen::Matrix4d V;
+    BuildViewMatrix(robot_pose, V);
+    Eigen::Vector4d p = V * P_.inverse() * q;
+    vector << p(0) / p(3) - robot_pose.position.x,
+              p(1) / p(3) - robot_pose.position.y,
+              p(2) / p(3) - robot_pose.position.z;
+
+    return true;
+  }
+
+  // Gets the points x y where the point is in the image. If outside the image, then it will return false
+  bool CameraView::GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int& x,
+                                     int& y) {
+    // Initialize x,y
+    x = 0; y = 0;
+    Eigen::Vector4d p;
+    p << point.x,
+         point.y,
+         point.z,
+         1;
+
+    Eigen::Matrix4d V;
+    BuildViewMatrix(robot_pose, V);
+
+
     // Transform point
     Eigen::Vector4d q = P_ * V.inverse() * p;
 
@@ -146,12 +194,7 @@ namespace inspection {
         q(2) / q(3) >  1) {   // the point lies beyond the far plane of the camera,
                               //     i.e., the point is too far away for the camera to see
       if (debug_) {
-        ROS_DEBUG_STREAM(V.inverse() * p);
-        ROS_DEBUG_STREAM("VisibilityConstraint T pos" << camera_pose.getOrigin().x() << " "
-                                    << camera_pose.getOrigin().y() << " " << camera_pose.getOrigin().z());
-        ROS_DEBUG_STREAM("VisibilityConstraint T quat"
-                         << camera_pose.getRotation().w() << " " << camera_pose.getRotation().x() << " "
-                         << camera_pose.getRotation().y() << " " << camera_pose.getRotation().z());
+      ROS_DEBUG_STREAM(V.inverse() * p);
         ROS_DEBUG_STREAM("VisibilityConstraint p " << point.x << " " << point.y << " " << point.z);
         ROS_DEBUG_STREAM("VisibilityConstraint q " << q(0) / q(3) << " " << q(1) / q(3) << " " << q(2) / q(3));
 
@@ -187,7 +230,8 @@ namespace inspection {
     return true;
   }
 
-
+  // Gets the points x y where the point is in the image. If outside the image, then it will return false
+  // If the robot pose is not specified, it's considered to be the current one
   bool CameraView::GetCamXYFromPoint(const geometry_msgs::Point point, int& x, int& y) {
     // Initialize x,y
     x = 0; y = 0;
@@ -370,7 +414,7 @@ namespace inspection {
   // Draw the camera frustum using a marker array for rviz visualization
   void CameraView::DrawCameraFrustum(const geometry_msgs::Pose robot_pose, ros::Publisher &publisher) {
     tf2::Transform camera_pose = msg_conversions::ros_pose_to_tf2_transform(robot_pose) *
-                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_.transform);
+                                 msg_conversions::ros_tf_to_tf2_transform(tf_body_to_cam_);
 
     // Build the View matrix
     Eigen::Quaterniond R = msg_conversions::ros_to_eigen_quat(

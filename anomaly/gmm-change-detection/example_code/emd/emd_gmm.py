@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def earth_movers_distance(m1, m2):
     """Compute the Earth Movers Distance between two Gaussian mixture models.
 
@@ -20,9 +21,12 @@ def earth_movers_distance(m1, m2):
     covariance_combined = (m1.covariance() + m2.covariance()) / 2
 
     # Compute the Earth Movers Distance between the two Gaussian mixture models.
-    earth_movers_distance = np.linalg.norm(mean_combined - m1.mean()) + np.linalg.norm(mean_combined - m2.mean())
+    earth_movers_distance = np.linalg.norm(mean_combined - m1.mean()) + np.linalg.norm(
+        mean_combined - m2.mean()
+    )
 
     return earth_movers_distance
+
 
 def main():
     m1 = np.random.multivariate_normal(mean=[0, 0, 0], covariance=np.eye(3))
@@ -32,7 +36,11 @@ def main():
     earth_movers_distance = earth_movers_distance(m1, m2)
 
     # Print the Earth Movers Distance.
-    print("The Earth Movers Distance between the two Gaussian mixture models is " + earth_movers_distance)
+    print(
+        "The Earth Movers Distance between the two Gaussian mixture models is "
+        + earth_movers_distance
+    )
+
 
 if __name__ == "__main__":
     main()

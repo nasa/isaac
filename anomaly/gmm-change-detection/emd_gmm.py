@@ -1,11 +1,12 @@
-#https://towardsdatascience.com/linear-programming-using-python-priyansh-22b5ee888fe0
-from pulp import *
+# https://towardsdatascience.com/linear-programming-using-python-priyansh-22b5ee888fe0
 import numpy as np
+from pulp import *
+
 
 class EMDGMM:
     def __init__(self, gmm1_weights, gmm2_weights):
-        self.warehouse_supply = gmm1_weights    # Supply Matrix
-        self.cust_demands = gmm2_weights        # Demand Matrix
+        self.warehouse_supply = gmm1_weights  # Supply Matrix
+        self.cust_demands = gmm2_weights  # Demand Matrix
         self.n_warehouses = gmm1_weights.size
         self.n_customers = gmm2_weights.size
         self.weight_sum1 = np.sum(self.warehouse_supply)
@@ -14,18 +15,18 @@ class EMDGMM:
         self.emd = None
 
     def get_distance(self, means1, means2):
-        '''Given two GMMs, generate a distance matrix between all cluster
-        representatives (means) of GMM1 and GMM2. Output: K1 x K2 matrix'''
+        """Given two GMMs, generate a distance matrix between all cluster
+        representatives (means) of GMM1 and GMM2. Output: K1 x K2 matrix"""
 
-        distances = np.zeros((means1.shape[0],means2.shape[0]))
+        distances = np.zeros((means1.shape[0], means2.shape[0]))
         for i, row1 in enumerate(means1):
             for j, row2 in enumerate(means2):
                 distances[i][j] = np.linalg.norm(row1 - row2)
         self.distances = distances
 
     def calculate_emd(self):
-        '''Optimize the cost-distance (weight-distance) flow between the
-        two GMMs and use the optimized distance as the EMD distance metric.'''
+        """Optimize the cost-distance (weight-distance) flow between the
+        two GMMs and use the optimized distance as the EMD distance metric."""
 
         # Cost Matrix
         cost_matrix = self.distances
@@ -34,38 +35,48 @@ class EMDGMM:
         model = LpProblem("Supply-Demand-Problem", LpMinimize)
 
         # Define Variable Names
-        variable_names = [str(i)+'_'+str(j) for j in range(1, self.n_customers+1) for i in range(1,self.n_warehouses+1)]
+        variable_names = [
+            str(i) + "_" + str(j)
+            for j in range(1, self.n_customers + 1)
+            for i in range(1, self.n_warehouses + 1)
+        ]
         variable_names.sort()
 
         # Decision Variables
-        DV_variables = LpVariable.matrix("X", variable_names, cat = "Continuous", lowBound = 0)
-        allocation = np.array(DV_variables).reshape(self.n_warehouses,self.n_customers)
+        DV_variables = LpVariable.matrix(
+            "X", variable_names, cat="Continuous", lowBound=0
+        )
+        allocation = np.array(DV_variables).reshape(self.n_warehouses, self.n_customers)
 
         # Objective Function
-        obj_func = lpSum(allocation*cost_matrix)
+        obj_func = lpSum(allocation * cost_matrix)
         model += obj_func
 
         # Constraints
         for i in range(self.n_warehouses):
-            #print(lpSum(allocation[i][j] for j in range(self.n_customers)) <= warehouse_supply[i])
-            model += lpSum(allocation[i][j] for j in range(self.n_customers)) <= self.warehouse_supply[i], "Supply Constraints " + str(i)
+            # print(lpSum(allocation[i][j] for j in range(self.n_customers)) <= warehouse_supply[i])
+            model += lpSum(
+                allocation[i][j] for j in range(self.n_customers)
+            ) <= self.warehouse_supply[i], "Supply Constraints " + str(i)
 
-        for j in range (self.n_customers):
-            #print(lpSum(allocation[i][j] for i in range(self.n_warehouses)) >= cust_demands[j])
-            model += lpSum(allocation[i][j] for i in range(self.n_warehouses)) >=self.cust_demands[j], "Demand Constraints " + str(j)
+        for j in range(self.n_customers):
+            # print(lpSum(allocation[i][j] for i in range(self.n_warehouses)) >= cust_demands[j])
+            model += lpSum(
+                allocation[i][j] for i in range(self.n_warehouses)
+            ) >= self.cust_demands[j], "Demand Constraints " + str(j)
 
         model.solve(GLPK_CMD(msg=0))
         status = LpStatus[model.status]
-        #print(status)
+        # print(status)
 
-        #print("Total Cost:", model.objective.value())
-        #for v in model.variables():
+        # print("Total Cost:", model.objective.value())
+        # for v in model.variables():
         #    try:
         #        print(v.name, "=", v.value())
         #    except:
         #        print("error couldn't find value")
 
-        #for i in range(self.n_warehouses):
+        # for i in range(self.n_warehouses):
         #    print("Warehouse ", str(i+1))
         #    print(lpSum(allocation[i][j].value() for j in range(self.n_customers)))
 

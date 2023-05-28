@@ -1,5 +1,6 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 def emd(m1, m2):
     """Computes the Earth Movers Distance between two 3D Gaussian mixture models.
@@ -19,6 +20,7 @@ def emd(m1, m2):
 
     return EMD
 
+
 def wasserstein(m1, m2):
     """Computes the Wasserstein Distance between two 3D Gaussian mixture models.
 
@@ -30,17 +32,18 @@ def wasserstein(m1, m2):
         numpy.ndarray: The Wasserstein Distance between the two models.
     """
     # Compute the optimal transport matrix.
-    T = np.argmin(np.sum(m1 ** 2) + np.sum(m2 ** 2) - 2 * np.dot(m1, m2))
+    T = np.argmin(np.sum(m1**2) + np.sum(m2**2) - 2 * np.dot(m1, m2))
 
     # Compute the Wasserstein Distance.
     Wasserstein = np.sum(np.dot(m1, T) * d)
 
     return Wasserstein
 
+
 # Generate two 3D Gaussian mixture models.
 m1 = np.random.multivariate_normal(mean=np.array([0, 0, 0]), cov=np.eye(3), size=100)
 m2 = np.random.multivariate_normal(mean=np.array([1, 1, 1]), cov=np.eye(3), size=100)
 
 # Compute the Earth Movers Distance and Wasserstein Distance.
-#EMD = emd(m1, m2)
+# EMD = emd(m1, m2)
 Wasserstein = wasserstein(m1, m2)

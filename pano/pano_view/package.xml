@@ -14,4 +14,19 @@
   </maintainer>
 
   <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rosbag</build_depend>
+  <build_depend>ff_msgs</build_depend>
+  <build_depend>camera</build_depend>
+  <build_depend>inspection</build_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>rosbag</build_export_depend>
+  <build_export_depend>ff_msgs</build_export_depend>
+  <build_export_depend>camera</build_export_depend>
+  <build_export_depend>inspection</build_export_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rosbag</exec_depend>
+  <exec_depend>ff_msgs</exec_depend>
+  <exec_depend>camera</exec_depend>
+  <exec_depend>inspection</exec_depend>
 </package>

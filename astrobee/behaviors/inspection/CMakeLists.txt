@@ -41,8 +41,8 @@ find_package(catkin2 REQUIRED COMPONENTS
 ###################################
 
 catkin_package(
-#  INCLUDE_DIRS include
-  LIBRARIES vent_inspection
+  INCLUDE_DIRS include
+  LIBRARIES inspection
   CATKIN_DEPENDS roscpp std_msgs nodelet ff_util isaac_util isaac_msgs
 )
 

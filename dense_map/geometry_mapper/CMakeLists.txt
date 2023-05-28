@@ -92,7 +92,7 @@ set(TEXRECON_DIR ${CMAKE_BINARY_DIR}/texrecon)
 ExternalProject_Add(texrecon	
     PREFIX ${TEXRECON_DIR}
     GIT_REPOSITORY https://github.com/oleg-alexandrov/mvs-texturing.git
-    GIT_TAG 2aa273f
+    GIT_TAG isaac
     CMAKE_ARGS -DCMAKE_VERBOSE_MAKEFILE=TRUE -DCMAKE_CXX_FLAGS=-fPIC
     BUILD_COMMAND $(MAKE)
     # Per: https://cmake.org/pipermail/cmake/2011-April/043772.html,
