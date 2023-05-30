@@ -118,58 +118,6 @@ else:
 
     if fake_data:
         points1, points2 = generate_data(n_start, n_disappearances, n_appearances)
-    #        # Generate 3D data with 4 clusters
-    #         # set Gaussian centers and covariances in 3D
-    #         means = np.array([[1, 0.0, 0.0],
-    #                   [0.0, 0.0, 0.0],
-    #                           [-0.5, -0.5, -0.5],
-    #                           [-0.8, 0.3, 0.4]])
-    #         covs = np.array([np.diag([0.01, 0.01, 0.03]),
-    #                          np.diag([0.08, 0.01, 0.01]),
-    #                          np.diag([0.01, 0.05, 0.01]),
-    #                          np.diag([0.03, 0.07, 0.01])])
-    #
-    #         N = 1000 #Number of points to be generated for each cluster.
-    #         points_a = []
-    #         points_b = []
-    #
-    #         for i in range(len(means)):
-    #             x = np.random.multivariate_normal(means[i], covs[i], N )
-    #             points_a.append(x)
-    #             points_b.append(x)
-    #
-    #         points1 = np.concatenate(points_a)
-    #
-    #         if appearance:
-    #             # Add an extra Gaussian
-    #             means2 = np.array([[1.5, 1.5, 1.5],
-    #                               [0.2, 0.2, 0.2],
-    #                               [0.8, -.03, -0.4]])
-    #             covs2 = np.array([np.diag([0.01, 0.01, 0.01]),
-    #                              np.diag([0.02, 0.01, 0.03]),
-    #                              np.diag([0.03, 0.02, 0.01])])
-    #
-    #             for i in range(len(means2)):
-    #                 x = np.random.multivariate_normal(means2[i], covs2[i], N )
-    #                 points_b.append(x)
-    #
-    #             points2 = np.concatenate(points_b)
-    #
-    #         else:
-    #             # Remove an extra Gaussian
-    #             means2 = np.array([[1, 0.0, 0.0],
-    #                               [0.0, 0.0, 0.0],
-    #                               [-0.5, -0.5, -0.5]])
-    #             covs2 = np.array([np.diag([0.01, 0.01, 0.03]),
-    #                              np.diag([0.08, 0.01, 0.01]),
-    #                              np.diag([0.01, 0.05, 0.01])])
-    #             points_b = []
-    #
-    #             for i in range(len(means2)):
-    #                 x2 = np.random.multivariate_normal(means2[i], covs2[i], N )
-    #                 points_b.append(x2)
-    #
-    #             points2 = np.concatenate(points_b)
 
     elif ext == ".bag":  # sensor_msgs::PointCloud2 data from bagfile
         points1 = read_pc2_msgs(t_0)
