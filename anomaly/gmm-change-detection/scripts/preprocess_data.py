@@ -27,8 +27,6 @@ import geometry_msgs
 import matplotlib.pyplot as plt
 import numpy as np
 import pcl
-import pcl.pcl_visualization
-import ros_numpy
 import rosbag
 import rospy
 import sensor_msgs

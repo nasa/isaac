@@ -109,8 +109,18 @@ else:
         filename_1 = get_filename(os.path.splitext(os.path.basename(t_0))[0])
         filename_2 = get_filename(os.path.splitext(os.path.basename(t_1))[0])
 
-    t0_save_file = "./saved_models/" + filename_1 + ".pk"
-    t1_save_file = "./saved_models/" + filename_2 + ".pk"
+    t0_save_file = (
+        os.path.dirname(os.path.realpath(__file__))
+        + "/saved_models/"
+        + filename_1
+        + ".pk"
+    )
+    t1_save_file = (
+        os.path.dirname(os.path.realpath(__file__))
+        + "/saved_models/"
+        + filename_2
+        + ".pk"
+    )
 
     ###################
     # Format the data #
@@ -255,8 +265,7 @@ pi_appearances = change_detection(gamma_t0, theta_t1)
 pi_disappearances = change_detection(theta_t1, gamma_t0)
 
 # Output change Gaussian information
-print()
-print("CHANGE GAUSSIANS")
+print("\nCHANGE GAUSSIANS")
 print("################################")
 print("Clusters associated with appearances: " + str(pi_appearances.n_gaussians))
 print("Clusters associated with disappearances: " + str(pi_disappearances.n_gaussians))
