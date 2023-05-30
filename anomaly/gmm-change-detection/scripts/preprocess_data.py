@@ -62,7 +62,7 @@ def filter_pcl(pcl_data):
 
     # Conversion from pcl to numpy array
     np_arr = fil.filter().to_array()
-    #np_arr = p.to_array()
+    # np_arr = p.to_array()
     return np_arr
 
 
@@ -96,11 +96,14 @@ def read_pc2_msgs(bagfile):
             np_im = ros_numpy.image.image_to_numpy(msg)
             data = Image.fromarray(np_im)
 
-        if topic == "/hw/depth_haz/points" or topic == "/hw/depth_haz/points/ground_truth":
+        if (
+            topic == "/hw/depth_haz/points"
+            or topic == "/hw/depth_haz/points/ground_truth"
+        ):
             p = convert_pc2_pcl(msg)
             np_arr = filter_pcl(p)
 
-            if 'data' in locals():
+            if "data" in locals():
                 data.show()
                 data.save("image.png")
                 return np_arr

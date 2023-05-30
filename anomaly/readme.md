@@ -8,3 +8,4 @@ Anomaly Detectors
 \subpage semantic_anomaly
 \subpage image_anomaly
 \subpage volumetric_anomaly
+\subpage gmm

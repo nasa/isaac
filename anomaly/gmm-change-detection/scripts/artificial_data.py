@@ -1,16 +1,18 @@
-import numpy as np
 import copy
 
+import numpy as np
+
+
 def generate_data(n_start, n_disappearances, n_appearances):
-    N = 1000 # N points in each cluster
+    N = 1000  # N points in each cluster
     point_set_1 = []
     point_set_2 = []
 
     # Define first set of points
-    means_1 = np.random.uniform(-2,2,(n_start,3)).round(2)
-    covs_1 = np.zeros(shape=(n_start,3,3))
+    means_1 = np.random.uniform(-2, 2, (n_start, 3)).round(2)
+    covs_1 = np.zeros(shape=(n_start, 3, 3))
     for i in range(n_start):
-        covs_1[i] = np.diag(np.random.uniform(-0.1, 0.1,(1,3))[0].round(2))
+        covs_1[i] = np.diag(np.random.uniform(-0.1, 0.1, (1, 3))[0].round(2))
 
     # Remove old clusters in second set of points
     means_2 = copy.deepcopy(means_1)
@@ -21,10 +23,10 @@ def generate_data(n_start, n_disappearances, n_appearances):
         covs_2 = np.delete(covs_2, 0, 0)
 
     # Add new clusters in second set of points
-    means_appearances = np.random.uniform(-2,2,(n_appearances,3)).round(2)
-    covs_appearances = np.zeros(shape=(n_appearances,3,3))
+    means_appearances = np.random.uniform(-2, 2, (n_appearances, 3)).round(2)
+    covs_appearances = np.zeros(shape=(n_appearances, 3, 3))
     for i in range(n_appearances):
-        covs_appearances[i] = np.diag(np.random.uniform(-0.1, 0.1,(1,3))[0].round(2))
+        covs_appearances[i] = np.diag(np.random.uniform(-0.1, 0.1, (1, 3))[0].round(2))
     means_2 = np.vstack((means_2, means_appearances))
     covs_2 = np.vstack((covs_2, covs_appearances))
 
@@ -41,11 +43,12 @@ def generate_data(n_start, n_disappearances, n_appearances):
 
     return points_1, points_2
 
+
 if __name__ == "__main__":
     points_1, points_2 = generate_data(5, 3, 9)
     print(points_1.shape, points_2.shape)
-    
-#if fake_data:
+
+# if fake_data:
 #    # Generate 3D data with 4 clusters
 #    # set Gaussian centers and covariances in 3D
 #    means = np.array([[1, 0.0, 0.0],
