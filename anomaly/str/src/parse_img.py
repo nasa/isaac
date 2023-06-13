@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(1, '/home/astrobee/ros_ws/isaac/src/anomaly/str/parseq')
 sys.path.insert(2, '/home/astrobee/ros_ws/isaac/src/anomaly/str/craft')
+
 from PIL import Image
 
 from strhub.data.module import SceneTextDataModule
@@ -15,8 +16,9 @@ from torch.autograd import Variable
 
 from PIL import Image
 
-import cv2
 from skimage import io
+
+import cv2
 import numpy as np
 import craft_utils
 import imgproc
@@ -26,6 +28,17 @@ import zipfile
 
 from craft import CRAFT
 from collections import OrderedDict
+
+# def get_rect_distance(lower_a, upper_a, lower_b, upper_b):
+#     delta1 = lower_a - upper_b
+#     delta2 = lower_b - upper_a
+#     u = np.max(np.array([np.zeros(len(delta1)), delta1]), axis=0)
+#     v = np.max(np.array([np.zeros(len(delta2)), delta2]), axis=0)
+#     dist = np.linalg.norm(np.concatenate([u, v]))
+#     return dist
+
+def crop_image(img, startx, starty, endx, endy):
+    return img[starty:endy, startx:endx]
 
 def copyStateDict(state_dict):
     if list(state_dict.keys())[0].startswith("module"):
@@ -37,9 +50,6 @@ def copyStateDict(state_dict):
         name = ".".join(k.split(".")[start_idx:])
         new_state_dict[name] = v
     return new_state_dict
-
-def str2bool(v):
-    return v.lower() in ("yes", "y", "true", "t", "1")
 
 def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, refine_net=None):
     t0 = time.time()
@@ -114,15 +124,10 @@ if not os.path.isdir(result_folder):
 
 
 if __name__ == '__main__':
-    # =================== CRAFT ===================
-    print('=================== CRAFT ===================')
+    # ============================ Initialization ============================
 
     # load net
     net = CRAFT()     # initialize
-
-    # Load model and image transforms for parseq
-    parseq = torch.hub.load('baudm/parseq', 'parseq', pretrained=True).eval()
-    img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
 
     print('Loading weights from checkpoint (' + trained_model + ')')
     if cuda:
@@ -153,41 +158,56 @@ if __name__ == '__main__':
         refine_net.eval()
         poly = True
 
+    # Load model and image transforms for parseq
+    parseq = torch.hub.load('baudm/parseq', 'parseq', pretrained=True).eval()
+    img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
+
+    # ============================ Start Processing ============================
+
     t = time.time()
 
     # load data
     image = cv2.imread(test_image)
     
     h, w, _ = image.shape
-    half = w//2
-    half2 = h//2
 
-    image1 = image[:half2, :half]
-    image2 = image[half2:, :half]
-    image3 = image[half2:, half:]
-    image4 = image[:half2, half:]
+    num = 0
+    boundary = 10
+    for x in range(0, w, w//4):
+        for y in range(0, h, h//4):
+            img = crop_image(image, x, y, x+w//4, y+h//4)
+            print("Test image {:d}/{:d}: {:s}".format(num+1, 16, test_image), end='\n')
+            bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
 
-    for num, img in enumerate([image1, image2, image3, image4]):
-        print("Test image {:d}/{:d}: {:s}".format(num+1, 4, test_image), end='\n')
-        bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
+            # save score text
+            mask_file = result_folder + "/res_" + str(num) + '_mask.jpg'
+            cv2.imwrite(mask_file, score_text)
 
-        # save score text
-        mask_file = result_folder + "/res_" + str(num) + '_mask.jpg'
-        cv2.imwrite(mask_file, score_text)
+            file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_folder)
+            num += 1
 
-        file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_folder)
+            # ============== parseq ============== #
+            boxes = open('../result/res_' + str(num-1) + '.txt', 'r')
+            lines = boxes.readlines()
+            for box in lines:
+                print(box)
+                coordinates = [int(num) for num in box.split(',')]
+                x_coordinates = coordinates[::2]
+                y_coordinates = coordinates[1::2]
+                cropped_image = crop_image(img, min(x_coordinates), min(y_coordinates), max(x_coordinates), max(y_coordinates))
 
-    # ============== parseq ==============
-    img = Image.open(test_image).convert('RGB')
-    # Preprocess. Model expects a batch of images with shape: (B, C, H, W)
-    img = img_transform(img).unsqueeze(0)
+                new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
+                new_img = img_transform(new_img).unsqueeze(0)
 
-    logits = parseq(img)
-    logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+                logits = parseq(new_img)
+                logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
 
-    # Greedy decoding
-    pred = logits.softmax(-1)
-    label, confidence = parseq.tokenizer.decode(pred)
-    print('Decoded label = {}\n'.format(label[0]))
+                # Greedy decoding
+                pred = logits.softmax(-1)
+                label, confidence = parseq.tokenizer.decode(pred)
+                print('Decoded label = {}\n'.format(label[0]))
+
+                cv2.imshow('image', cropped_image)
+                cv2.waitKey(0)
 
     print("elapsed time : {}s".format(time.time() - t))
