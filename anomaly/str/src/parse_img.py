@@ -38,6 +38,14 @@ from collections import OrderedDict
 #     return dist
 
 def crop_image(img, startx, starty, endx, endy):
+    h, w, _ = image.shape
+
+    startx = max(0, startx)
+    starty = max(0, starty)
+
+    endx = min(endx, w)
+    endy = min(endy, h)
+    
     return img[starty:endy, startx:endx]
 
 def copyStateDict(state_dict):
@@ -117,7 +125,7 @@ refiner_model = 'weights/craft_refiner_CTW1500.pth'
 trained_model = '../models/craft_mlt_25k.pth'
 
 test_image = '../images/ISS.jpg'
-result_folder = '../result/'
+result_folder = '../result/craft_parseq'
 
 if not os.path.isdir(result_folder):
     os.mkdir(result_folder)
@@ -187,7 +195,7 @@ if __name__ == '__main__':
             num += 1
 
             # ============== parseq ============== #
-            boxes = open('../result/res_' + str(num-1) + '.txt', 'r')
+            boxes = open(result_folder + '/res_' + str(num-1) + '.txt', 'r')
             lines = boxes.readlines()
             for box in lines:
                 print(box)

@@ -27,6 +27,17 @@ import zipfile
 from craft import CRAFT
 from collections import OrderedDict
 
+def crop_image(img, startx, starty, endx, endy):
+    h, w, _ = image.shape
+
+    startx = max(0, startx)
+    starty = max(0, starty)
+
+    endx = min(endx, w)
+    endy = min(endy, h)
+    
+    return img[starty:endy, startx:endx]
+
 def copyStateDict(state_dict):
     if list(state_dict.keys())[0].startswith("module"):
         start_idx = 1
@@ -107,7 +118,7 @@ refiner_model = 'weights/craft_refiner_CTW1500.pth'
 trained_model = '../models/craft_mlt_25k.pth'
 
 test_folder = '../images/'
-result_folder = '../result/'
+result_folder = '../result/trade_study/craft_and_parseq/'
 
 image_list, _, _ = file_utils.get_files(test_folder)
 if not os.path.isdir(result_folder):
@@ -170,16 +181,36 @@ if __name__ == '__main__':
 
         file_utils.saveResult(image_path, image[:,:,::-1], polys, dirname=result_folder)
 
-        img = Image.open(image_path).convert('RGB')
-        # Preprocess. Model expects a batch of images with shape: (B, C, H, W)
-        img = img_transform(img).unsqueeze(0)
+        # ============== parseq ============== #
+        boxes = open(result_folder + 'res_' + filename + '.txt', 'r')
+        lines = boxes.readlines()
+        i = 1
 
-        logits = parseq(img)
-        logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+        image_result_folder = result_folder + filename + '/'
+        if not os.path.isdir(image_result_folder):
+            os.mkdir(image_result_folder)
 
-        # Greedy decoding
-        pred = logits.softmax(-1)
-        label, confidence = parseq.tokenizer.decode(pred)
-        print('Decoded label = {}\n'.format(label[0]))
+        for box in lines:
+            print(box)
+            coordinates = [int(num) for num in box.split(',')]
+            x_coordinates = coordinates[::2]
+            y_coordinates = coordinates[1::2]
+            cropped_image = crop_image(image, min(x_coordinates), min(y_coordinates), max(x_coordinates), max(y_coordinates))
+
+            cv2.imwrite(image_result_folder + str(i) + '.jpg', cropped_image)
+            new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
+            new_img = img_transform(new_img).unsqueeze(0)
+
+            logits = parseq(new_img)
+            logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+
+            # Greedy decoding
+            pred = logits.softmax(-1)
+            label, confidence = parseq.tokenizer.decode(pred)
+            print('Decoded label = {}\n'.format(label[0]))
+
+            cv2.imshow('image', cropped_image)
+            cv2.waitKey(0)
+            i += 1
 
     print("elapsed time : {}s".format(time.time() - t))
