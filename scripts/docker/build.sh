@@ -37,7 +37,7 @@ print_help()
   echo -e "\t\t\t\tdefault=isaac_source/../../isaac_data_interface"
   echo -e "\t-m | --mast-source-dir\t\tSpecify the mast source directory to use"
   echo -e "\t\t\t\tdefault=isaac_source/../../mast/src"
-  echo -e "\t-n | --no-mast\t\t\tBuild without MAST"
+  echo -e "\t-n | --mast\t\t\tBuild without MAST"
   echo -e "\t-v | --vm\t\t\tBuild images compatible with virtual machine only"
   echo
 }
@@ -51,9 +51,9 @@ print_usage()
 
 # Initialize variables
 os=`cat /etc/os-release | grep -oP "(?<=VERSION_CODENAME=).*"`
-mast=1
+mast=0
 vm=0
-REMOTE=isaac
+export REMOTE=""
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -72,9 +72,9 @@ while [ "$1" != "" ]; do
         -m | --mast-source-dir )      shift
                                       mast_source=$1
                                       ;;
-        -n | --no-mast )              mast=0
+        -n | --mast )                 mast=1
                                       ;;
-        -r | --remote )               REMOTE=ghcr.io/nasa
+        -r | --remote )               export REMOTE=ghcr.io/nasa
                                       ;;
         -v | --vm )                   vm=1
                                       ;;
@@ -105,84 +105,42 @@ echo "ISAAC path: "${isaac_source}
 echo "IDI path: "${idi_source}
 echo "Build MAST?:" $mast " MAST path: "${mast_source}
 
-UBUNTU_VERSION=16.04
-ROS_VERSION=kinetic
-PYTHON=''
-
-if [ "$os" = "bionic" ]; then
-  UBUNTU_VERSION=18.04
-  ROS_VERSION=melodic
-  PYTHON=''
-
+if [ "$os" = "xenial" ]; then
+  export UBUNTU_VERSION=16.04
+  export ROS_VERSION=kinetic
+  export PYTHON=''
+elif [ "$os" = "bionic" ]; then
+  export UBUNTU_VERSION=18.04
+  export ROS_VERSION=melodic
+  export PYTHON=''
 elif [ "$os" = "focal" ]; then
-  UBUNTU_VERSION=20.04
-  ROS_VERSION=noetic
-  PYTHON='3'
+  export UBUNTU_VERSION=20.04
+  export ROS_VERSION=noetic
+  export PYTHON='3'
+else
+  echo -e "OS not valid"
+  exit 1
 fi
-
-if [ $vm == 0 ]; then
-# Build Astrobee
-  docker build ${astrobee_source}/ \
-            -f ${astrobee_source}/scripts/docker/astrobee_base.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t astrobee/astrobee:latest-base-ubuntu${UBUNTU_VERSION}
-docker build ${astrobee_source}/ \
-            -f ${astrobee_source}/scripts/docker/astrobee.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t astrobee/astrobee:latest-ubuntu${UBUNTU_VERSION}
-
-# Build ISAAC
-docker build ${isaac_source:-${rootdir}} \
-            -f ${isaac_source:-${rootdir}}/scripts/docker/isaac_astrobee.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t isaac/isaac:latest-astrobee-ubuntu${UBUNTU_VERSION}
-docker build ${isaac_source:-${rootdir}} \
-            -f ${isaac_source:-${rootdir}}/scripts/docker/isaac.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t isaac/isaac:latest-ubuntu${UBUNTU_VERSION}
-fi
-
-# Build messages
-docker build ${astrobee_source:-${rootdir}} \
-            -f ${isaac_source:-${rootdir}}/scripts/docker/astrobee_msgs.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t isaac/isaac:astrobee-msgs-ubuntu${UBUNTU_VERSION}
-docker build ${isaac_source:-${rootdir}} \
-            -f ${isaac_source:-${rootdir}}/scripts/docker/isaac_msgs.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t isaac/isaac:msgs-ubuntu${UBUNTU_VERSION}
-# Build analyst
-docker build ${isaac_source:-${rootdir}} \
-            -f ${isaac_source:-${rootdir}}/scripts/docker/analyst.Dockerfile \
-            --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} \
-            --build-arg ROS_VERSION=${ROS_VERSION} \
-            --build-arg PYTHON=${PYTHON} \
-            -t isaac_analyst_notebook:latest
 
 # Build IDI and MAST
+export ASTROBEE_PATH=${astrobee_source}
+export ISAAC_PATH=${isaac_source}
 export IDI_PATH=${idi_source}
 export MAST_PATH=${mast_source}
-export UBUNTU_VERSION=${UBUNTU_VERSION}
-export ROS_VERSION=${ROS_VERSION}
-export PYTHON=${PYTHON}
-export REMOTE=${REMOTE}
 
-cd ${IDI_PATH}
-pwd
+######################################################################
+# Set up files
+######################################################################
+
+files=" -f ${thisdir}/docker_compose/ros.docker-compose.yml"
+
+files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.build.yml"
+files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.yml"
+
+# files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
+# files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
 if [ $mast == 1 ]; then
-	docker-compose -f docker-compose.yml -f plugins/ros.docker-compose.yml -f plugins/isaac.docker-compose.yml -f ${thisdir}/docker_compose/mast.docker_compose.yml build
-else
-	docker-compose -f docker-compose.yml -f plugins/ros.docker-compose.yml -f plugins/isaac.docker-compose.yml build
+	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
 fi
+
+docker compose ${files} build
