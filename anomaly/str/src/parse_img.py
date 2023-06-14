@@ -38,7 +38,7 @@ from collections import OrderedDict
 #     return dist
 
 def crop_image(img, startx, starty, endx, endy):
-    h, w, _ = image.shape
+    h, w, _ = img.shape
 
     startx = max(0, startx)
     starty = max(0, starty)
@@ -111,27 +111,22 @@ def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, r
 
     return boxes, polys, ret_score_text
 
-cuda = False
-refine = False
-poly = False
-show_time = False
+def decode_img(image_folder, result_folder):
+    cuda = False
+    refine = False
+    poly = False
+    show_time = False
 
-text_threshold = 0.7
-low_text = 0.4
-link_threshold = 0.4
-mag_ratio = 1.5
+    text_threshold = 0.7
+    low_text = 0.4
+    link_threshold = 0.4
+    mag_ratio = 1.5
 
-refiner_model = 'weights/craft_refiner_CTW1500.pth'
-trained_model = '../models/craft_mlt_25k.pth'
+    refiner_model = 'weights/craft_refiner_CTW1500.pth'
+    trained_model = '../models/craft_mlt_25k.pth'
 
-test_image = '../images/ISS.jpg'
-result_folder = '../result/craft_parseq'
-
-if not os.path.isdir(result_folder):
-    os.mkdir(result_folder)
-
-
-if __name__ == '__main__':
+    if not os.path.isdir(result_folder):
+        os.mkdir(result_folder)
     # ============================ Initialization ============================
 
     # load net
@@ -173,49 +168,81 @@ if __name__ == '__main__':
     # ============================ Start Processing ============================
 
     t = time.time()
+    image_list, _, _ = file_utils.get_files(test_folder)
 
-    # load data
-    image = cv2.imread(test_image)
-    
-    h, w, _ = image.shape
+    for k, image_path in enumerate(image_list):
+        filename, file_ext = os.path.splitext(os.path.basename(image_path))
+        result_path = result_folder + filename + '/'
+        if not os.path.isdir(result_folder):
+                os.mkdir(result_folder)
 
-    num = 0
-    boundary = 10
-    for x in range(0, w, w//4):
-        for y in range(0, h, h//4):
-            img = crop_image(image, x, y, x+w//4, y+h//4)
-            print("Test image {:d}/{:d}: {:s}".format(num+1, 16, test_image), end='\n')
-            bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
+        print("Test image {:d}/{:d}: {:s} {:s}\n".format(k+1, len(image_list), image_path, result_path), end='\r')
+        # load data
+        image = cv2.imread(image_path)
+        
+        h, w, _ = image.shape
+        # print(w, h, '\n')
 
-            # save score text
-            mask_file = result_folder + "/res_" + str(num) + '_mask.jpg'
-            cv2.imwrite(mask_file, score_text)
+        crop_w = 1200
+        crop_h = 1200
+        # print(crop_w, crop_h, '\n')
+        offset_w = 500
+        offset_h = 500
+        # print(offset_w, offset_h, '\n')
 
-            file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_folder)
-            num += 1
+        edge_border = 15
 
-            # ============== parseq ============== #
-            boxes = open(result_folder + '/res_' + str(num-1) + '.txt', 'r')
-            lines = boxes.readlines()
-            for box in lines:
-                print(box)
-                coordinates = [int(num) for num in box.split(',')]
-                x_coordinates = coordinates[::2]
-                y_coordinates = coordinates[1::2]
-                cropped_image = crop_image(img, min(x_coordinates), min(y_coordinates), max(x_coordinates), max(y_coordinates))
+        total = int((w-crop_w+offset_w)/offset_w * (h-crop_h+offset_h)/offset_h)
+        num = 0
+        boundary = 10
+        for x in range(0, w-crop_w+offset_w, offset_w):
+            for y in range(0, h-crop_h+offset_h, offset_h):
+                img = crop_image(image, x, y, x+crop_w, y+crop_h)
+                print("Test part {:d}/{:d}".format(num+1, total), end='\r')
+                bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
 
-                new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
-                new_img = img_transform(new_img).unsqueeze(0)
+                # save score text
+                mask_file = result_path + "res_" + str(num) + '_mask.jpg'
+                cv2.imwrite(mask_file, score_text)
 
-                logits = parseq(new_img)
-                logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+                file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_path)
+                num += 1
 
-                # Greedy decoding
-                pred = logits.softmax(-1)
-                label, confidence = parseq.tokenizer.decode(pred)
-                print('Decoded label = {}\n'.format(label[0]))
+                # # ============== parseq ============== #
+                boxes = open(result_path + 'res_' + str(num-1) + '.txt', 'r')
+                lines = boxes.readlines()
+                decode_file = result_path + 'decode_' + str(num-1) + '.txt'
+                with open(decode_file, 'w') as f:
+                    for box in lines:
+                        coordinates = [int(num) for num in box.split(',')]
+                        x_coordinates = coordinates[::2]
+                        y_coordinates = coordinates[1::2]
+                        cropped_image = crop_image(img, min(x_coordinates), min(y_coordinates), max(x_coordinates), max(y_coordinates))
+                        if (min(x_coordinates) < edge_border or max(x_coordinates) > crop_w-edge_border
+                                or min(y_coordinates) < edge_border or max(y_coordinates) > crop_h-edge_border):
+                            continue
+                        new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
+                        new_img = img_transform(new_img).unsqueeze(0)
 
-                cv2.imshow('image', cropped_image)
-                cv2.waitKey(0)
+                        logits = parseq(new_img)
+                        logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
 
-    print("elapsed time : {}s".format(time.time() - t))
+                        # Greedy decoding
+                        pred = logits.softmax(-1)
+                        label, confidence = parseq.tokenizer.decode(pred)
+
+                        strResult = box + ' ' + label[0] + '\r\n'
+                        f.write(strResult)
+
+                        # print('Decoded label = {}\n'.format(label[0]))
+
+                        # cv2.imshow('image', cropped_image)
+                        # cv2.waitKey(0)
+
+        print("elapsed time : {}s".format(time.time() - t))
+
+if __name__ == '__main__':
+    test_folder = '../images/'
+    result_folder = '../result/craft_parseq/'
+
+    decode_img(test_folder, result_folder)
