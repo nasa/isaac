@@ -1,30 +1,5 @@
 version: "2.1"
 services:
-
-  astrobee-msgs:
-    image: ${REMOTE:-isaac}/isaac:astrobee-msgs-ubuntu${UBUNTU_VERSION}
-    build:
-      context: ${ASTROBEE_PATH}
-      dockerfile: ${ISAAC_PATH}/scripts/docker/astrobee_msgs.Dockerfile
-      args:
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-20.04}
-        REMOTE: ${REMOTE:-isaac}
-        ROS_VERSION: ${ROS_VERSION:-noetic}
-        PYTHON: ${PYTHON:-3}
-
-  isaac-msgs:
-    image: ${REMOTE:-isaac}/isaac:msgs-ubuntu${UBUNTU_VERSION}
-    build:
-      context: ${ISAAC_PATH}
-      dockerfile: ${ISAAC_PATH}/scripts/docker/isaac_msgs.Dockerfile
-      args:
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-20.04}
-        REMOTE: ${REMOTE:-isaac}
-        ROS_VERSION: ${ROS_VERSION:-noetic}
-        PYTHON: ${PYTHON:-3}
-    links:
-      - astrobee-msgs
-
   analyst_notebook:
       links:
-        - isaac-msgs
+        - isaac
