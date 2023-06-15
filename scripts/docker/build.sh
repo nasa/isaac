@@ -134,11 +134,14 @@ export MAST_PATH=${mast_source}
 
 files=" -f ${thisdir}/docker_compose/ros.docker-compose.yml"
 
-files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.build.yml"
+if [ $REMOTE == "" ]; then
+  files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.build.yml"
+fi
 files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.yml"
 
-# files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
-# files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
+files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
+files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
+
 if [ $mast == 1 ]; then
 	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
 fi
