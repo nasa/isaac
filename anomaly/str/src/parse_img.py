@@ -190,13 +190,17 @@ def decode_img(image_folder, result_folder):
         offset_h = 500
         # print(offset_w, offset_h, '\n')
 
+        end_w = max(w-crop_w+offset_w, offset_w)
+        end_h = max(h-crop_h+offset_h, offset_h)
+
         edge_border = 15
 
         total = int((w-crop_w+offset_w)/offset_w * (h-crop_h+offset_h)/offset_h)
         num = 0
         boundary = 10
-        for x in range(0, w-crop_w+offset_w, offset_w):
-            for y in range(0, h-crop_h+offset_h, offset_h):
+
+        for x in range(0, end_w, offset_w):
+            for y in range(0, end_h, offset_h):
                 img = crop_image(image, x, y, x+crop_w, y+crop_h)
                 print("Test part {:d}/{:d}".format(num+1, total), end='\r')
                 bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
