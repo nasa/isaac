@@ -1,9 +1,17 @@
 version: "3.9"
 services:
   isaac:
-    image: ${REMOTE}/$tag
+    image: ${REMOTE:-isaac}/isaac:latest-ubuntu${UBUNTU_VERSION}
+    build:
+      context: ${ISAAC_PATH}
+      dockerfile: ${ISAAC_PATH}/scripts/docker/isaac.Dockerfile
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-20.04}
+        REMOTE: ${REMOTE:-isaac}
+        ROS_VERSION: ${ROS_VERSION:-noetic}
+        PYTHON: ${PYTHON:-3}
     entrypoint: "/ros_entrypoint.sh"
-    command: roslaunch isaac sim.launch dds:=false robot:=sim_pub
+    command: ${cmd}
     hostname: isaac
     container_name: isaac
     expose:

@@ -36,8 +36,8 @@ print_help()
   echo -e "\t\t\t\tdefault=isaac_source/../../mast/src"
   echo -e "\t--mast\t\t\tRun MAST"
   echo -e "\t-vm\t\t\t\tRun the simulation locally - compatible with VM setup"
-  echo -e "\t-remote\t\t\t\tRun the remote images (bypass building docker images locally)"
-  echo -e "\t-analyst\t\t\tRun analyst notebook"
+  echo -e "\t--remote\t\t\t\tRun the remote images (bypass building docker images locally)"
+  echo -e "\t--analyst\t\t\tRun analyst notebook"
   echo -e "\t--no-sim\t\t\tDon't run the simulation"
   echo -e "\t-g | --ground-only\t\tRun only the isaac ground software (hardware in the loop only)"
   echo -e "\t-robot\t\t\t\tSpecify robot name (hardware in the loop only)"
@@ -67,7 +67,7 @@ analyst=0
 mount="false"
 robot=bumble
 no_sim=0
-REMOTE="isaac"
+export REMOTE="isaac"
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -93,7 +93,7 @@ while [ "$1" != "" ]; do
                                       ;;
         --mast )                      mast=1
                                       ;;
-        -analyst )                    analyst=1
+        --analyst )                   analyst=1
                                       ;;
         -n | --no-display )           display="false"
                                       ;;
@@ -121,10 +121,27 @@ done
 # collect remaining non-option arguments
 cmd="$*"
 if [ -z "$cmd" ]; then
-    cmd="roslaunch isaac sim.launch $sim_args"
+    export cmd="roslaunch isaac sim.launch dds:=false robot:=sim_pub $sim_args"
 fi
 
 # echo "cmd: $cmd"
+
+if [ "$os" == "xenial" ]; then
+  export UBUNTU_VERSION=16.04
+  export ROS_VERSION=kinetic
+  export PYTHON=''
+elif [ "$os" == "bionic" ]; then
+  export UBUNTU_VERSION=18.04
+  export ROS_VERSION=melodic
+  export PYTHON=''
+elif [ "$os" == "focal" ]; then
+  export UBUNTU_VERSION=20.04
+  export ROS_VERSION=noetic
+  export PYTHON='3'
+else
+  echo -e "OS not valid"
+  exit 1
+fi
 
 ######################################################################
 # Resolve paths
@@ -147,23 +164,11 @@ echo -e "mast path: \t "${MAST_PATH} " \t build mast?:" $mast
 echo -e ======================================================================
 
 ######################################################################
-# Set up tag
-######################################################################
-
-if [ "$os" = "xenial" ]; then
-  export tag=isaac:latest-ubuntu16.04
-elif [ "$os" = "bionic" ]; then
-  export tag=isaac:latest-ubuntu18.04
-elif [ "$os" = "focal" ]; then
-  export tag=isaac:latest-ubuntu20.04
-fi
-
-######################################################################
 # Set up docker compose
 ######################################################################
 
 # Launch the rosmaster container + isaac network + IDI
-files="-f ${script_dir}/docker_compose/ros.docker-compose.yml -f ${script_dir}/docker_compose/iui.docker-compose.yml -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+files="-f ${script_dir}/docker_compose/ros.docker-compose.yml -f ${script_dir}/docker_compose/iui.docker-compose.yml"
 echo -e "isaac ui hosted in: \t http://localhost:8080"
 echo -e "database hosted in: \t http://localhost:8529"
 
@@ -184,49 +189,70 @@ if [ $analyst -eq 1 ]; then
   echo -e "analyst notebook hosted in: \t http://localhost:8888/lab?token=isaac"
 fi
 
-# Set up astrobee display
+
+# Start ground nodes if needed
 ######################################################################
-
-display_args=""
-if [ "$display" = "true" ]; then
-    # setup XServer for Docker
-    export XSOCK=/tmp/.X11-unix
-    export XAUTH=/tmp/.docker.xauth
-    touch $XAUTH
-    xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
-
-    files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.display.yml"
-
-    if [ "$gpu" = "true" ]; then
-        files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.gpu.yml"
-    fi
-fi
-
-# Set up astrobee mount
-######################################################################
-
-mount_args=""
-if [ "$mount" = "true" ]; then
-    files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.mount.yml"
-fi
-
 if [ $ground -eq 1 ]; then
   echo "GROUND SW ONLY (for HIL)"
+  # Start native astrobee nodes and connect to socket network
+  export ROS_IP=`ip -4 addr show docker0 | grep -oP "(?<=inet ).*(?=/)"`
+  export ROS_MASTER_URI=http://172.19.0.5:11311
   robot=${robot:-bumble}
-  cmd="roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait"
+  roslaunch isaac isaac_astrobee.launch llp:=disabled mlp:=disabled ilp:=disabled streaming_mapper:=true output:=screen robot:=${robot} --wait &
+
+elif  [ $local_sim -eq 1 ]; then
+  echo "LOCAL SIM"
+  # Start native astrobee nodes and connect to socket network
+  export ROS_IP=`ip -4 addr show docker0 | grep -oP "(?<=inet ).*(?=/)"`
+  export ROS_MASTER_URI=http://172.19.0.5:11311
+  robot=${robot:-bumble}
+  ${cmd} --wait &
 
 elif  [ $no_sim -eq 1 ]; then
   echo "NO SIM"
-  cmd="roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen robot:=${robot} rviz:=true --wait"
+  files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+  export cmd="roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen rviz:=true --wait"
 
+else
+# Start isaac robot software on docker container if needed
+######################################################################
+  files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+
+  # Set up astrobee display
+  ######################################################################
+
+  display_args=""
+  if [ "$display" = "true" ]; then
+      # setup XServer for Docker
+      export XSOCK=/tmp/.X11-unix
+      export XAUTH=/tmp/.docker.xauth
+      touch $XAUTH
+      xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
+
+      files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.display.yml"
+
+      if [ "$gpu" = "true" ]; then
+          files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.gpu.yml"
+      fi
+  fi
+
+  # Set up astrobee mount
+  ######################################################################
+  mount_args=""
+  if [ "$mount" = "true" ]; then
+      files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.mount.yml"
+  fi
 fi
 
+echo "${files}"
+echo "${cmd}"
 # Up compose
 ######################################################################
 
 echo -e ======================================================================
 docker compose ${files} up -d
 
+# eval $cmd
 
 echo -e "Started containers, press 'q' to down container and exit"
 

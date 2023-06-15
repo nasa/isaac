@@ -21,7 +21,7 @@
 
 
 ARG REMOTE=isaac
-FROM ${REMOTE}/isaac:msgs-ubuntu20.04
+FROM ${REMOTE}/isaac:latest-ubuntu20.04
 
 RUN apt-get update \
   && apt-get install -y \
@@ -32,7 +32,7 @@ RUN apt-get update \
 
 RUN pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
-    && pip3 install matplotlib opencv-python \
+    && pip3 install matplotlib opencv-python numpy-quaternion \
     && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
 EXPOSE 8888
