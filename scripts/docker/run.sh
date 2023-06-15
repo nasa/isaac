@@ -126,15 +126,15 @@ fi
 
 # echo "cmd: $cmd"
 
-if [ "$os" = "xenial" ]; then
+if [ "$os" == "xenial" ]; then
   export UBUNTU_VERSION=16.04
   export ROS_VERSION=kinetic
   export PYTHON=''
-elif [ "$os" = "bionic" ]; then
+elif [ "$os" == "bionic" ]; then
   export UBUNTU_VERSION=18.04
   export ROS_VERSION=melodic
   export PYTHON=''
-elif [ "$os" = "focal" ]; then
+elif [ "$os" == "focal" ]; then
   export UBUNTU_VERSION=20.04
   export ROS_VERSION=noetic
   export PYTHON='3'

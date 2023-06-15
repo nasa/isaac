@@ -95,7 +95,8 @@ rootdir=$(realpath ${thisdir}/../..)
 astrobee_source=$(realpath ${astrobee_source:-${rootdir}/../../astrobee/src})
 isaac_source=${rootdir}
 idi_source=$(realpath ${idi_source:-${rootdir}/../../isaac_user_interface})
-if $mast; then
+
+if [ $mast == 1 ]; then
 	mast_source=$(realpath ${mast_source:-${rootdir}/../../mast/src})
 fi
 
@@ -105,15 +106,15 @@ echo "ISAAC path: "${isaac_source}
 echo "IDI path: "${idi_source}
 echo "Build MAST?:" $mast " MAST path: "${mast_source}
 
-if [ "$os" = "xenial" ]; then
+if [ "$os" == "xenial" ]; then
   export UBUNTU_VERSION=16.04
   export ROS_VERSION=kinetic
   export PYTHON=''
-elif [ "$os" = "bionic" ]; then
+elif [ "$os" == "bionic" ]; then
   export UBUNTU_VERSION=18.04
   export ROS_VERSION=melodic
   export PYTHON=''
-elif [ "$os" = "focal" ]; then
+elif [ "$os" == "focal" ]; then
   export UBUNTU_VERSION=20.04
   export ROS_VERSION=noetic
   export PYTHON='3'
@@ -139,8 +140,10 @@ if [ $REMOTE == "" ]; then
 fi
 files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.yml"
 
-files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
-files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
+if [ "$os" == "focal" ]; then
+  files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
+  files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
+fi
 
 if [ $mast == 1 ]; then
 	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
