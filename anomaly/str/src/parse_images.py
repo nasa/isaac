@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(1, '/home/astrobee/ros_ws/isaac/src/anomaly/str/parseq')
 sys.path.insert(2, '/home/astrobee/ros_ws/isaac/src/anomaly/str/craft')
+
 from PIL import Image
 
 from strhub.data.module import SceneTextDataModule
@@ -15,8 +16,9 @@ from torch.autograd import Variable
 
 from PIL import Image
 
-import cv2
 from skimage import io
+
+import cv2
 import numpy as np
 import craft_utils
 import imgproc
@@ -26,9 +28,20 @@ import zipfile
 
 from craft import CRAFT
 from collections import OrderedDict
+import pandas as pd
+import IPython
+import jellyfish
+
+# def get_rect_distance(lower_a, upper_a, lower_b, upper_b):
+#     delta1 = lower_a - upper_b
+#     delta2 = lower_b - upper_a
+#     u = np.max(np.array([np.zeros(len(delta1)), delta1]), axis=0)
+#     v = np.max(np.array([np.zeros(len(delta2)), delta2]), axis=0)
+#     dist = np.linalg.norm(np.concatenate([u, v]))
+#     return dist
 
 def crop_image(img, startx, starty, endx, endy):
-    h, w, _ = image.shape
+    h, w, _ = img.shape
 
     startx = max(0, startx)
     starty = max(0, starty)
@@ -48,9 +61,6 @@ def copyStateDict(state_dict):
         name = ".".join(k.split(".")[start_idx:])
         new_state_dict[name] = v
     return new_state_dict
-
-def str2bool(v):
-    return v.lower() in ("yes", "y", "true", "t", "1")
 
 def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, refine_net=None):
     t0 = time.time()
@@ -104,37 +114,45 @@ def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, r
 
     return boxes, polys, ret_score_text
 
-cuda = False
-refine = False
-poly = False
-show_time = False
+def overlap(rect1, rect2):
+    # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
+    # representing the upper left and lower right points of each rectangle
 
-text_threshold = 0.7
-low_text = 0.4
-link_threshold = 0.4
-mag_ratio = 1.5
+    upper1, lower1 = rect1
+    upper2, lower2 = rect2
+    
+    return lower1[0] >= upper2[0] and upper1[0] <= lower2[0] and lower1[1] >= upper2[1] and upper1[1] <= lower2[1]  
 
-refiner_model = 'weights/craft_refiner_CTW1500.pth'
-trained_model = '../models/craft_mlt_25k.pth'
+def get_bounding_box(rect1, rect2):
+    # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
+    # representing the upper left and lower right points of each rectangle
 
-test_folder = '../images/'
-result_folder = '../result/trade_study/craft_and_parseq/'
+    upper_left = (min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1]))
+    lower_right = (max(rect1[1][0], rect2[1][0]), min(rect1[1][1], rect2[1][1]))
 
-image_list, _, _ = file_utils.get_files(test_folder)
-if not os.path.isdir(result_folder):
-    os.mkdir(result_folder)
+    return (upper_left, lower_right)
 
+    
+def decode_images(image_folder, result_folder):
+    cuda = False
+    refine = False
+    poly = False
+    show_time = False
 
-if __name__ == '__main__':
-    # =================== CRAFT ===================
-    print('=================== CRAFT ===================')
+    text_threshold = 0.7
+    low_text = 0.4
+    link_threshold = 0.4
+    mag_ratio = 1.5
+
+    refiner_model = 'weights/craft_refiner_CTW1500.pth'
+    trained_model = '../models/craft_mlt_25k.pth'
+
+    if not os.path.isdir(result_folder):
+        os.mkdir(result_folder)
+    # ============================ Initialization ============================
 
     # load net
     net = CRAFT()     # initialize
-
-    # Load model and image transforms for parseq
-    parseq = torch.hub.load('baudm/parseq', 'parseq', pretrained=True).eval()
-    img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
 
     print('Loading weights from checkpoint (' + trained_model + ')')
     if cuda:
@@ -165,52 +183,122 @@ if __name__ == '__main__':
         refine_net.eval()
         poly = True
 
+    # Load model and image transforms for parseq
+    parseq = torch.hub.load('baudm/parseq', 'parseq', pretrained=True).eval()
+    img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
+
+    df = pd.DataFrame(columns=['label', 'location'])
+    # ============================ Start Processing ============================
+
     t = time.time()
+    image_list, _, _ = file_utils.get_files(test_folder)
 
-    # load data
     for k, image_path in enumerate(image_list):
-        print("Test image {:d}/{:d}: {:s}\n".format(k+1, len(image_list), image_path), end='\r')
-        image = imgproc.loadImage(image_path)
-
-        bboxes, polys, score_text = test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
-
-        # save score text
         filename, file_ext = os.path.splitext(os.path.basename(image_path))
-        mask_file = result_folder + "/res_" + filename + '_mask.jpg'
-        cv2.imwrite(mask_file, score_text)
+        result_path = result_folder + filename + '/'
+        if not os.path.isdir(result_folder):
+                os.mkdir(result_folder)
 
-        file_utils.saveResult(image_path, image[:,:,::-1], polys, dirname=result_folder)
+        print("Test image {:d}/{:d}: {:s} {:s}\n".format(k+1, len(image_list), image_path, result_path), end='\r')
+        # load data
+        image = cv2.imread(image_path)
+        
+        h, w, _ = image.shape
+        # print(w, h, '\n')
 
-        # ============== parseq ============== #
-        boxes = open(result_folder + 'res_' + filename + '.txt', 'r')
-        lines = boxes.readlines()
-        i = 1
+        crop_w = 1200
+        crop_h = 1200
+        # print(crop_w, crop_h, '\n')
+        offset_w = 800
+        offset_h = 800
+        # print(offset_w, offset_h, '\n')
 
-        image_result_folder = result_folder + filename + '/'
-        if not os.path.isdir(image_result_folder):
-            os.mkdir(image_result_folder)
+        end_w = max(w-crop_w+offset_w, offset_w)
+        end_h = max(h-crop_h+offset_h, offset_h)
 
-        for box in lines:
-            print(box)
-            coordinates = [int(num) for num in box.split(',')]
-            x_coordinates = coordinates[::2]
-            y_coordinates = coordinates[1::2]
-            cropped_image = crop_image(image, min(x_coordinates), min(y_coordinates), max(x_coordinates), max(y_coordinates))
+        edge_border = 15
+        total = int(end_w/offset_w * end_h/offset_h)
+        num = 0
+        boundary = 10
 
-            cv2.imwrite(image_result_folder + str(i) + '.jpg', cropped_image)
-            new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
-            new_img = img_transform(new_img).unsqueeze(0)
+        for x in range(0, end_w, offset_w):
+            for y in range(0, end_h, offset_h):
+                img = crop_image(image, x, y, x+crop_w, y+crop_h)
+                print("Test part {:d}/{:d}".format(num+1, total), end='\r')
+                bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
 
-            logits = parseq(new_img)
-            logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+                # save score text
+                mask_file = result_path + "res_" + str(num) + '_mask.jpg'
+                cv2.imwrite(mask_file, score_text)
 
-            # Greedy decoding
-            pred = logits.softmax(-1)
-            label, confidence = parseq.tokenizer.decode(pred)
-            print('Decoded label = {}\n'.format(label[0]))
+                file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_path)
+                num += 1
 
-            cv2.imshow('image', cropped_image)
-            cv2.waitKey(0)
-            i += 1
+                # # ============== parseq ============== #
+                boxes = open(result_path + 'res_' + str(num-1) + '.txt', 'r')
+                lines = boxes.readlines()
+                decode_file = result_path + 'decode_' + str(num-1) + '.txt'
+                with open(decode_file, 'w') as f:
+                    for box in lines:
+                        # Box in form upper left -> upper right -> lower right -> lower left, (x, y)
+                        coordinates = [int(num) for num in box.split(',')]
+                        x_coordinates = coordinates[::2]
+                        y_coordinates = coordinates[1::2]
+                        upper_left = (min(x_coordinates), min(y_coordinates))
+                        lower_right = (max(x_coordinates), max(y_coordinates))
+                        cropped_image = crop_image(img, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
+                        if (min(x_coordinates) < edge_border or max(x_coordinates) > crop_w-edge_border
+                                or min(y_coordinates) < edge_border or max(y_coordinates) > crop_h-edge_border):
+                            continue
+                        new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
+                        new_img = img_transform(new_img).unsqueeze(0)
 
-    print("elapsed time : {}s".format(time.time() - t))
+                        logits = parseq(new_img)
+                        logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+
+                        # Greedy decoding
+                        pred = logits.softmax(-1)
+                        label, confidence = parseq.tokenizer.decode(pred)
+
+                        strResult = box + ' ' + label[0] + '\r\n'
+                        f.write(strResult)
+
+                        # Convert to location on original image
+                        upper_left = (upper_left[0] + x, upper_left[1] + y)
+                        lower_right = (lower_right[0] + x, lower_right[1] + y)
+                        new_location = (upper_left, lower_right)
+                        overlap_result = df.loc[df['location'].apply(overlap, args=(new_location,  ))]
+
+                        if overlap_result.empty:
+                            df.loc[len(df)] = [label[0], (upper_left, lower_right)]
+                        else:
+                            index = overlap_result.index[0]
+                            old_label = df.at[index, 'label']
+                            old_location = df.at[index, 'location']
+                            new_label = old_label if len(old_label) >= len(label[0]) else label[0]
+                            new_location = get_bounding_box(old_location, new_location)
+                            new_row = np.array([new_label, new_location], dtype=object)
+                            df.iloc[index] = new_row
+
+                        # print('Decoded label = {}\n'.format(label[0]))
+
+                        # cv2.imshow('image', cropped_image)
+                        # cv2.waitKey(0)
+        print("elapsed time : {}s".format(time.time() - t))
+    return df
+
+def find(database, label):
+    def compare(label, input_label):
+        return jellyfish.jaro_distance(label.upper(), input_label.upper()) > 0.8
+    return database.loc[database['label'].apply(compare, args=(label, ))]
+
+if __name__ == '__main__':
+    test_folder = '../test_images/'
+    result_folder = '../result/craft_parseq/'
+
+    database = decode_images(test_folder, result_folder)
+    print(database)
+    print(find(database, 'Lab'))
+
+    IPython.embed()
+

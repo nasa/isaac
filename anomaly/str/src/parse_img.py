@@ -28,6 +28,9 @@ import zipfile
 
 from craft import CRAFT
 from collections import OrderedDict
+import pandas as pd
+import IPython
+import jellyfish
 
 # def get_rect_distance(lower_a, upper_a, lower_b, upper_b):
 #     delta1 = lower_a - upper_b
@@ -111,7 +114,26 @@ def test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, r
 
     return boxes, polys, ret_score_text
 
-def decode_img(image_folder, result_folder):
+def overlap(rect1, rect2):
+    # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
+    # representing the upper left and lower right points of each rectangle
+
+    upper1, lower1 = rect1
+    upper2, lower2 = rect2
+    
+    return lower1[0] >= upper2[0] and upper1[0] <= lower2[0] and lower1[1] >= upper2[1] and upper1[1] <= lower2[1]  
+
+def get_bounding_box(rect1, rect2):
+    # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
+    # representing the upper left and lower right points of each rectangle
+
+    upper_left = (min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1]))
+    lower_right = (max(rect1[1][0], rect2[1][0]), min(rect1[1][1], rect2[1][1]))
+
+    return (upper_left, lower_right)
+
+    
+def decode_images(image_path, result_folder):
     cuda = False
     refine = False
     poly = False
@@ -165,88 +187,122 @@ def decode_img(image_folder, result_folder):
     parseq = torch.hub.load('baudm/parseq', 'parseq', pretrained=True).eval()
     img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
 
+    df = pd.DataFrame(columns=['label', 'location'])
     # ============================ Start Processing ============================
 
     t = time.time()
-    image_list, _, _ = file_utils.get_files(test_folder)
 
-    for k, image_path in enumerate(image_list):
-        filename, file_ext = os.path.splitext(os.path.basename(image_path))
-        result_path = result_folder + filename + '/'
-        if not os.path.isdir(result_folder):
-                os.mkdir(result_folder)
+    filename, file_ext = os.path.splitext(os.path.basename(image_path))
+    result_path = result_folder + filename + '/'
+    if not os.path.isdir(result_folder):
+            os.mkdir(result_folder)
 
-        print("Test image {:d}/{:d}: {:s} {:s}\n".format(k+1, len(image_list), image_path, result_path), end='\r')
-        # load data
-        image = cv2.imread(image_path)
-        
-        h, w, _ = image.shape
-        # print(w, h, '\n')
+    # load data
+    image = cv2.imread(image_path)
+    
+    h, w, _ = image.shape
+    # print(w, h, '\n')
 
-        crop_w = 1200
-        crop_h = 1200
-        # print(crop_w, crop_h, '\n')
-        offset_w = 500
-        offset_h = 500
-        # print(offset_w, offset_h, '\n')
+    crop_w = 1200
+    crop_h = 1200
+    # print(crop_w, crop_h, '\n')
+    offset_w = 800
+    offset_h = 800
+    # print(offset_w, offset_h, '\n')
 
-        end_w = max(w-crop_w+offset_w, offset_w)
-        end_h = max(h-crop_h+offset_h, offset_h)
+    end_w = max(w-crop_w+offset_w, offset_w)
+    end_h = max(h-crop_h+offset_h, offset_h)
 
-        edge_border = 15
+    edge_border = 15
+    total = int(end_w/offset_w * end_h/offset_h)
+    num = 0
+    boundary = 10
 
-        total = int((w-crop_w+offset_w)/offset_w * (h-crop_h+offset_h)/offset_h)
-        num = 0
-        boundary = 10
+    for x in range(0, end_w, offset_w):
+        for y in range(0, end_h, offset_h):
+            img = crop_image(image, x, y, x+crop_w, y+crop_h)
+            print("Test part {:d}/{:d}".format(num+1, total), end='\r')
+            bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
 
-        for x in range(0, end_w, offset_w):
-            for y in range(0, end_h, offset_h):
-                img = crop_image(image, x, y, x+crop_w, y+crop_h)
-                print("Test part {:d}/{:d}".format(num+1, total), end='\r')
-                bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
+            # save score text
+            mask_file = result_path + "res_" + str(num) + '_mask.jpg'
+            cv2.imwrite(mask_file, score_text)
 
-                # save score text
-                mask_file = result_path + "res_" + str(num) + '_mask.jpg'
-                cv2.imwrite(mask_file, score_text)
+            file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_path)
+            num += 1
 
-                file_utils.saveResult(str(num), img[:,:,::-1], polys, dirname=result_path)
-                num += 1
+            # # ============== parseq ============== #
+            boxes = open(result_path + 'res_' + str(num-1) + '.txt', 'r')
+            lines = boxes.readlines()
+            decode_file = result_path + 'decode_' + str(num-1) + '.txt'
+            with open(decode_file, 'w') as f:
+                for box in lines:
+                    # Box in form upper left -> upper right -> lower right -> lower left, (x, y)
+                    coordinates = [int(num) for num in box.split(',')]
+                    x_coordinates = coordinates[::2]
+                    y_coordinates = coordinates[1::2]
+                    upper_left = (min(x_coordinates), min(y_coordinates))
+                    lower_right = (max(x_coordinates), max(y_coordinates))
+                    cropped_image = crop_image(img, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
+                    if (min(x_coordinates) < edge_border or max(x_coordinates) > crop_w-edge_border
+                            or min(y_coordinates) < edge_border or max(y_coordinates) > crop_h-edge_border):
+                        continue
+                    new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
+                    new_img = img_transform(new_img).unsqueeze(0)
 
-                # # ============== parseq ============== #
-                boxes = open(result_path + 'res_' + str(num-1) + '.txt', 'r')
-                lines = boxes.readlines()
-                decode_file = result_path + 'decode_' + str(num-1) + '.txt'
-                with open(decode_file, 'w') as f:
-                    for box in lines:
-                        coordinates = [int(num) for num in box.split(',')]
-                        x_coordinates = coordinates[::2]
-                        y_coordinates = coordinates[1::2]
-                        cropped_image = crop_image(img, min(x_coordinates), min(y_coordinates), max(x_coordinates), max(y_coordinates))
-                        if (min(x_coordinates) < edge_border or max(x_coordinates) > crop_w-edge_border
-                                or min(y_coordinates) < edge_border or max(y_coordinates) > crop_h-edge_border):
-                            continue
-                        new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
-                        new_img = img_transform(new_img).unsqueeze(0)
+                    logits = parseq(new_img)
+                    logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
 
-                        logits = parseq(new_img)
-                        logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
+                    # Greedy decoding
+                    pred = logits.softmax(-1)
+                    label, confidence = parseq.tokenizer.decode(pred)
 
-                        # Greedy decoding
-                        pred = logits.softmax(-1)
-                        label, confidence = parseq.tokenizer.decode(pred)
+                    strResult = box + ' ' + label[0] + '\r\n'
+                    f.write(strResult)
 
-                        strResult = box + ' ' + label[0] + '\r\n'
-                        f.write(strResult)
+                    # Convert to location on original image
+                    upper_left = (upper_left[0] + x, upper_left[1] + y)
+                    lower_right = (lower_right[0] + x, lower_right[1] + y)
+                    new_location = (upper_left, lower_right)
+                    overlap_result = df.loc[df['location'].apply(overlap, args=(new_location,  ))]
 
-                        # print('Decoded label = {}\n'.format(label[0]))
+                    if overlap_result.empty:
+                        df.loc[len(df)] = [label[0], (upper_left, lower_right)]
+                    else:
+                        index = overlap_result.index[0]
+                        old_label = df.at[index, 'label']
+                        old_location = df.at[index, 'location']
+                        new_label = old_label if len(old_label) >= len(label[0]) else label[0]
+                        new_location = get_bounding_box(old_location, new_location)
+                        new_row = np.array([new_label, new_location], dtype=object)
+                        df.iloc[index] = new_row
 
-                        # cv2.imshow('image', cropped_image)
-                        # cv2.waitKey(0)
+                    # print('Decoded label = {}\n'.format(label[0]))
 
-        print("elapsed time : {}s".format(time.time() - t))
+                    # cv2.imshow('image', cropped_image)
+                    # cv2.waitKey(0)
+    print("elapsed time : {}s".format(time.time() - t))
+    return df, image
+
+def find(image, database, label):
+    def compare(label, input_label):
+        return jellyfish.jaro_distance(label.upper(), input_label.upper()) > 0.8
+    result = database.loc[database['label'].apply(compare, args=(label, ))]
+    print(result)
+    rectangles = result['location'].tolist()
+
+    for rect in rectangles:
+        image = cv2.rectangle(image, rect[0], rect[1], (255, 0, 0), 2)
+    cv2.imshow('Image', image)
+    cv2.resizeWindow('Image', 500, 500)
+    cv2.waitKey(0)
 
 if __name__ == '__main__':
-    test_folder = '../images/'
+    test_folder = '../images/ISS.jpg'
     result_folder = '../result/craft_parseq/'
 
-    decode_img(test_folder, result_folder)
+    database, image = decode_images(test_folder, result_folder)
+    print(database)    
+
+    IPython.embed()
+
