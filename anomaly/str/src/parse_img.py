@@ -41,6 +41,14 @@ import jellyfish
 #     return dist
 
 def crop_image(img, startx, starty, endx, endy):
+    """
+    @param img array of image
+    @param startx
+    @param starty
+    @param endx 
+    @param endy
+    @returns a cropped image of img[startx:endx, starty:endy] 
+    """
     h, w, _ = img.shape
 
     startx = max(0, startx)
@@ -128,12 +136,12 @@ def get_bounding_box(rect1, rect2):
     # representing the upper left and lower right points of each rectangle
 
     upper_left = (min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1]))
-    lower_right = (max(rect1[1][0], rect2[1][0]), min(rect1[1][1], rect2[1][1]))
+    lower_right = (max(rect1[1][0], rect2[1][0]), max(rect1[1][1], rect2[1][1]))
 
     return (upper_left, lower_right)
 
     
-def decode_images(image_path, result_folder):
+def decode_image(image_path, result_folder):
     cuda = False
     refine = False
     poly = False
@@ -214,7 +222,7 @@ def decode_images(image_path, result_folder):
     end_h = max(h-crop_h+offset_h, offset_h)
 
     edge_border = 15
-    total = int(end_w/offset_w * end_h/offset_h)
+    total = round((end_w/offset_w+1) * (end_h/offset_h+1))
     num = 0
     boundary = 10
 
@@ -286,23 +294,25 @@ def decode_images(image_path, result_folder):
 
 def find(image, database, label):
     def compare(label, input_label):
+
         return jellyfish.jaro_distance(label.upper(), input_label.upper()) > 0.8
     result = database.loc[database['label'].apply(compare, args=(label, ))]
     print(result)
     rectangles = result['location'].tolist()
-
+    new_image = image
     for rect in rectangles:
-        image = cv2.rectangle(image, rect[0], rect[1], (255, 0, 0), 2)
-    cv2.imshow('Image', image)
-    cv2.resizeWindow('Image', 500, 500)
+        new_image = cv2.rectangle(new_image, rect[0], rect[1], (255, 0, 0), 10)
+    cv2.namedWindow("Image", 0)
+    cv2.resizeWindow('Image', 1000, 1000)
+    cv2.imshow('Image', new_image)
     cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    test_folder = '../images/ISS.jpg'
+    test_image = '../images/ISS.jpg'
     result_folder = '../result/craft_parseq/'
 
-    database, image = decode_images(test_folder, result_folder)
+    database, image = decode_image(test_image, result_folder)
     print(database)    
 
     IPython.embed()
-
