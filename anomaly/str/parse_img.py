@@ -30,13 +30,37 @@ import pandas as pd
 import IPython
 import jellyfish
 
-# def get_rect_distance(lower_a, upper_a, lower_b, upper_b):
-#     delta1 = lower_a - upper_b
-#     delta2 = lower_b - upper_a
-#     u = np.max(np.array([np.zeros(len(delta1)), delta1]), axis=0)
-#     v = np.max(np.array([np.zeros(len(delta2)), delta2]), axis=0)
-#     dist = np.linalg.norm(np.concatenate([u, v]))
-#     return dist
+def get_euclidean_distance(p1, p2):
+    return np.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
+
+def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
+    x1, y1 = upper_a
+    x1b, y1b = lower_a
+    x2, y2 = upper_b
+    x2b, y2b = lower_b
+
+    left = x2b < x1
+    right = x1b < x2
+    bottom = y2b < y1
+    top = y1b < y2
+    if top and left:
+        return get_euclidean_distance((x1, y1b), (x2b, y2))
+    elif left and bottom:
+        return get_euclidean_distance((x1, y1), (x2b, y2b))
+    elif bottom and right:
+        return get_euclidean_distance((x1b, y1), (x2, y2b))
+    elif right and top:
+        return get_euclidean_distance((x1b, y1b), (x2, y2))
+    elif left:
+        return x1 - x2b
+    elif right:
+        return x2 - x1b
+    elif bottom:
+        return y1 - y2b
+    elif top:
+        return y2 - y1b
+    else:             # rectangles intersect
+        return 0.
 
 def crop_image(img, startx, starty, endx, endy):
     """
@@ -147,7 +171,7 @@ def decode_image(image_path, result_folder):
 
     text_threshold = 0.7
     low_text = 0.4
-    link_threshold = 0.4
+    link_threshold = 0.1
     mag_ratio = 1.5
 
     refiner_model = 'weights/craft_refiner_CTW1500.pth'
@@ -220,7 +244,7 @@ def decode_image(image_path, result_folder):
     end_h = max(h-crop_h+offset_h, offset_h)
 
     edge_border = 15
-    total = round((end_w/offset_w+1) * (end_h/offset_h+1))
+    total = round((end_w/offset_w) * (end_h/offset_h))
     num = 0
     boundary = 10
 
@@ -267,9 +291,9 @@ def decode_image(image_path, result_folder):
                     f.write(strResult)
 
                     # Convert to location on original image
-                    upper_left = (upper_left[0] + x, upper_left[1] + y)
-                    lower_right = (lower_right[0] + x, lower_right[1] + y)
-                    new_location = (upper_left, lower_right)
+                    upper_left = np.array((upper_left[0] + x, upper_left[1] + y))
+                    lower_right = np.array((lower_right[0] + x, lower_right[1] + y))
+                    new_location = np.array((upper_left, lower_right))
                     overlap_result = df.loc[df['location'].apply(overlap, args=(new_location,  ))]
 
                     if overlap_result.empty:
@@ -290,14 +314,39 @@ def decode_image(image_path, result_folder):
     print("elapsed time : {}s".format(time.time() - t))
     return df, image
 
+def get_closest_rect(rect, rectangles, distance):
+    for r in rectangles:
+        d = get_rect_distance(rect[0], rect[1], r[0], r[1])
+        if d < distance:
+            return r
+    return rect
+
 def find(image, database, label):
     def compare(label, input_label):
+        return  jellyfish.jaro_distance(label.upper(), input_label.upper()) > 0.8
+    
+    words = label.split()
+    results = {}
+    for l in words:
+        l_result = database.loc[database['label'].apply(compare, args=(l, ))]
+        results[l] = l_result['location'].tolist()
 
-        return jellyfish.jaro_distance(label.upper(), input_label.upper()) > 0.8
-    result = database.loc[database['label'].apply(compare, args=(label, ))]
-    print(result)
-    rectangles = result['location'].tolist()
-    new_image = image
+    rectangles = np.array(results[words[0]])
+    print(results)
+    for word in words[1:]:
+        new_rects = []
+        other_rects = results[word]
+        for rect in rectangles:
+            # letter_width = round((rect[1][0] - rect[0][0])/len(word))
+            word_height = rect[1][1] - rect[0][1]
+            print(rect, other_rects)
+            closest_rect = get_closest_rect(rect, other_rects, word_height)
+            new_rects.append(get_bounding_box(rect, closest_rect))
+        rectangles = new_rects
+
+    # result = database.loc[database['label'].apply(compare, args=(label, ))]
+    # rectangles = result['location'].tolist()
+    new_image = np.array(image)
     for rect in rectangles:
         new_image = cv2.rectangle(new_image, rect[0], rect[1], (255, 0, 0), 10)
     cv2.namedWindow("Image", 0)
