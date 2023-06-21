@@ -339,7 +339,7 @@ def find(image, database, label):
         for rect in rectangles:
             # letter_width = round((rect[1][0] - rect[0][0])/len(word))
             word_height = rect[1][1] - rect[0][1]
-            print(rect, other_rects)
+            # print(rect, other_rects)
             closest_rect = get_closest_rect(rect, other_rects, word_height)
             new_rects.append(get_bounding_box(rect, closest_rect))
         rectangles = new_rects

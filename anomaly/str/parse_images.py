@@ -1,10 +1,8 @@
 import sys
-sys.path.insert(1, '/home/astrobee/ros_ws/isaac/src/anomaly/str/parseq')
-sys.path.insert(2, '/home/astrobee/ros_ws/isaac/src/anomaly/str/craft')
+
+from parseq.strhub.data.module import SceneTextDataModule
 
 from PIL import Image
-
-from strhub.data.module import SceneTextDataModule
 
 import os
 import time
@@ -20,13 +18,13 @@ from skimage import io
 
 import cv2
 import numpy as np
-import craft_utils
-import imgproc
-import file_utils
+import craft.craft_utils as craft_utils
+import craft.imgproc as imgproc
+import craft.file_utils as file_utils
 import json
 import zipfile
 
-from craft import CRAFT
+from craft.craft import CRAFT
 from collections import OrderedDict
 import pandas as pd
 import IPython
