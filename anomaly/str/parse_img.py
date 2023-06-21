@@ -6,6 +6,7 @@ from PIL import Image
 
 import os
 import time
+import utils
 
 import torch
 import torch.nn as nn
@@ -29,57 +30,6 @@ from collections import OrderedDict
 import pandas as pd
 import IPython
 import jellyfish
-
-def get_euclidean_distance(p1, p2):
-    return np.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
-
-def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
-    x1, y1 = upper_a
-    x1b, y1b = lower_a
-    x2, y2 = upper_b
-    x2b, y2b = lower_b
-
-    left = x2b < x1
-    right = x1b < x2
-    bottom = y2b < y1
-    top = y1b < y2
-    if top and left:
-        return get_euclidean_distance((x1, y1b), (x2b, y2))
-    elif left and bottom:
-        return get_euclidean_distance((x1, y1), (x2b, y2b))
-    elif bottom and right:
-        return get_euclidean_distance((x1b, y1), (x2, y2b))
-    elif right and top:
-        return get_euclidean_distance((x1b, y1b), (x2, y2))
-    elif left:
-        return x1 - x2b
-    elif right:
-        return x2 - x1b
-    elif bottom:
-        return y1 - y2b
-    elif top:
-        return y2 - y1b
-    else:             # rectangles intersect
-        return 0.
-
-def crop_image(img, startx, starty, endx, endy):
-    """
-    @param img array of image
-    @param startx
-    @param starty
-    @param endx 
-    @param endy
-    @returns a cropped image of img[startx:endx, starty:endy] 
-    """
-    h, w, _ = img.shape
-
-    startx = max(0, startx)
-    starty = max(0, starty)
-
-    endx = min(endx, w)
-    endy = min(endy, h)
-    
-    return img[starty:endy, startx:endx]
 
 def copyStateDict(state_dict):
     if list(state_dict.keys())[0].startswith("module"):
@@ -157,10 +107,10 @@ def get_bounding_box(rect1, rect2):
     # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
     # representing the upper left and lower right points of each rectangle
 
-    upper_left = (min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1]))
-    lower_right = (max(rect1[1][0], rect2[1][0]), max(rect1[1][1], rect2[1][1]))
+    upper_left = np.array((min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1])))
+    lower_right = np.array((max(rect1[1][0], rect2[1][0]), max(rect1[1][1], rect2[1][1])))
 
-    return (upper_left, lower_right)
+    return np.array((upper_left, lower_right))
 
     
 def decode_image(image_path, result_folder):
@@ -250,7 +200,7 @@ def decode_image(image_path, result_folder):
 
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
-            img = crop_image(image, x, y, x+crop_w, y+crop_h)
+            img = utils.crop_image(image, x, y, x+crop_w, y+crop_h)
             print("Test part {:d}/{:d}".format(num+1, total), end='\r')
             bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
 
@@ -273,7 +223,7 @@ def decode_image(image_path, result_folder):
                     y_coordinates = coordinates[1::2]
                     upper_left = (min(x_coordinates), min(y_coordinates))
                     lower_right = (max(x_coordinates), max(y_coordinates))
-                    cropped_image = crop_image(img, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
+                    cropped_image = utils.crop_image(img, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
                     if (min(x_coordinates) < edge_border or max(x_coordinates) > crop_w-edge_border
                             or min(y_coordinates) < edge_border or max(y_coordinates) > crop_h-edge_border):
                         continue
@@ -316,10 +266,10 @@ def decode_image(image_path, result_folder):
 
 def get_closest_rect(rect, rectangles, distance):
     for r in rectangles:
-        d = get_rect_distance(rect[0], rect[1], r[0], r[1])
+        d = utils.get_rect_distance(rect[0], rect[1], r[0], r[1])
         if d < distance:
             return r
-    return rect
+    return None
 
 def find(image, database, label):
     def compare(label, input_label):
@@ -341,6 +291,8 @@ def find(image, database, label):
             word_height = rect[1][1] - rect[0][1]
             # print(rect, other_rects)
             closest_rect = get_closest_rect(rect, other_rects, word_height)
+            if closest_rect is None:
+                continue
             new_rects.append(get_bounding_box(rect, closest_rect))
         rectangles = new_rects
 

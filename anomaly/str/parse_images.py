@@ -6,6 +6,7 @@ from PIL import Image
 
 import os
 import time
+import utils
 
 import torch
 import torch.nn as nn
@@ -29,25 +30,6 @@ from collections import OrderedDict
 import pandas as pd
 import IPython
 import jellyfish
-
-# def get_rect_distance(lower_a, upper_a, lower_b, upper_b):
-#     delta1 = lower_a - upper_b
-#     delta2 = lower_b - upper_a
-#     u = np.max(np.array([np.zeros(len(delta1)), delta1]), axis=0)
-#     v = np.max(np.array([np.zeros(len(delta2)), delta2]), axis=0)
-#     dist = np.linalg.norm(np.concatenate([u, v]))
-#     return dist
-
-def crop_image(img, startx, starty, endx, endy):
-    h, w, _ = img.shape
-
-    startx = max(0, startx)
-    starty = max(0, starty)
-
-    endx = min(endx, w)
-    endy = min(endy, h)
-    
-    return img[starty:endy, startx:endx]
 
 def copyStateDict(state_dict):
     if list(state_dict.keys())[0].startswith("module"):
@@ -221,7 +203,7 @@ def decode_images(image_folder, result_folder):
 
         for x in range(0, end_w, offset_w):
             for y in range(0, end_h, offset_h):
-                img = crop_image(image, x, y, x+crop_w, y+crop_h)
+                img = utils.crop_image(image, x, y, x+crop_w, y+crop_h)
                 print("Test part {:d}/{:d}".format(num+1, total), end='\r')
                 bboxes, polys, score_text = test_net(net, img, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
 
@@ -244,7 +226,7 @@ def decode_images(image_folder, result_folder):
                         y_coordinates = coordinates[1::2]
                         upper_left = (min(x_coordinates), min(y_coordinates))
                         lower_right = (max(x_coordinates), max(y_coordinates))
-                        cropped_image = crop_image(img, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
+                        cropped_image = utils.crop_image(img, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
                         if (min(x_coordinates) < edge_border or max(x_coordinates) > crop_w-edge_border
                                 or min(y_coordinates) < edge_border or max(y_coordinates) > crop_h-edge_border):
                             continue
