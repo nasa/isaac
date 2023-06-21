@@ -1,9 +1,9 @@
 [submodule "isaac_msgs"]
 	path = communications/isaac_msgs
 	url = https://github.com/nasa/isaac_msgs.git
-[submodule "anomaly/parseq"]
-	path = anomaly/parseq
+[submodule "parseq"]
+	path = anomaly/str/parseq
 	url = git@github.com:baudm/parseq.git
-[submodule "anomaly/CRAFT-pytorch"]
-	path = anomaly/CRAFT-pytorch
+[submodule "craft"]
+	path = anomaly/str/craft
 	url = git@github.com:clovaai/CRAFT-pytorch.git
