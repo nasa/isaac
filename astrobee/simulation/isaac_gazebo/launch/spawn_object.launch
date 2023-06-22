@@ -21,26 +21,11 @@
   <arg name="spawn"    default=""/>             <!-- Object to spawn         -->
   <arg name="name"     default="object"/>      <!-- Name of object          -->
   <arg name="pose"     default="0 0 0 0 0 0 1"/>
-
-  <!-- <arg if="$(eval arg('position')=='vent')"
-       name="pose"
-       default="10.1069 -3.16958 4.90421 0.707 0.0 0.0 0.707" />  -->    <!-- obstructing vent 1 default="9.942 -4.21 3.9105 0 0.335 0 0.942" -->
-<!--   <arg if="$(eval arg('position')=='other1')"
-       name="pose"
-       default="2 0 5.1 0 0 0 1" />  -->               <!-- other 1                 -->
- <!--  <arg if="$(eval arg('position')=='other2')"
-       name="pose"
-       default="0 0 5.1 0 0 0 1" />    -->             <!-- other 2                 -->
-
-
-  <!-- Spawn Sock into Gazebo -->
-  <group if="$(eval arg('spawn')=='sock')" ns="object">
-    <param name="sock_description" command='$(find xacro)/xacro --inorder $(find isaac_description)/urdf/socks.urdf.xacro' />
-    <node name="sock" pkg="astrobee_gazebo" type="spawn_model" args="-param sock_description -urdf -model $(arg name) -pose $(arg pose) "/>
-  </group>
-  <group if="$(eval arg('spawn')=='cargo')" ns="object">
-    <param name="cargo_description" command='$(find xacro)/xacro --inorder $(find isaac_description)/urdf/cargo_bag.urdf.xacro' />
-    <node name="cargo" pkg="astrobee_gazebo" type="spawn_model" args="-param cargo_description -urdf -model $(arg name) -pose $(arg pose) "/>
+  
+  <!-- Spawn object into Gazebo -->
+  <group ns="$(arg name)">
+    <param name="$(arg spawn)_description" command='$(find xacro)/xacro --inorder $(find isaac_description)/urdf/$(arg spawn).urdf.xacro' />
+    <node name="$(arg name)" pkg="astrobee_gazebo" type="spawn_model" args="-param $(arg spawn)_description -urdf -model $(arg name) -pose $(arg pose) "/>
   </group>
 
  </launch>
