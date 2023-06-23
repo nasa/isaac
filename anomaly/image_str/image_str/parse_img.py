@@ -1,12 +1,10 @@
-import sys
-
-from parseq.strhub.data.module import SceneTextDataModule
+from image_str.parseq.strhub.data.module import SceneTextDataModule
 
 from PIL import Image
 
 import os
 import time
-import utils
+import image_str.utils as utils
 
 import torch
 import torch.nn as nn
@@ -15,21 +13,18 @@ from torch.autograd import Variable
 
 from PIL import Image
 
-from skimage import io
-
 import cv2
 import numpy as np
-import craft.craft_utils as craft_utils
-import craft.imgproc as imgproc
-import craft.file_utils as file_utils
-import json
-import zipfile
+import image_str.craft.craft_utils as craft_utils
+import image_str.craft.imgproc as imgproc
+import image_str.craft.file_utils as file_utils
 
-from craft.craft import CRAFT
+from image_str.craft.craft import CRAFT
 from collections import OrderedDict
 import pandas as pd
 import IPython
 import jellyfish
+
 
 def copyStateDict(state_dict):
     if list(state_dict.keys())[0].startswith("module"):
@@ -113,19 +108,18 @@ def get_bounding_box(rect1, rect2):
     return np.array((upper_left, lower_right))
 
     
-def decode_image(image_path, result_folder):
+def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.pth'):
     cuda = False
     refine = False
     poly = False
-    show_time = False
-
+    # show_time = False
     text_threshold = 0.7
     low_text = 0.4
     link_threshold = 0.1
-    mag_ratio = 1.5
+    # mag_ratio = 1.5
 
     refiner_model = 'weights/craft_refiner_CTW1500.pth'
-    trained_model = 'models/craft_mlt_25k.pth'
+    # trained_model = 'models/craft_mlt_25k.pth'
 
     if not os.path.isdir(result_folder):
         os.mkdir(result_folder)
@@ -146,22 +140,7 @@ def decode_image(image_path, result_folder):
         cudnn.benchmark = False
 
     net.eval()
-
-    # LinkRefiner
     refine_net = None
-    if refine:
-        from refinenet import RefineNet
-        refine_net = RefineNet()
-        print('Loading weights of refiner from checkpoint (' + refiner_model + ')')
-        if cuda:
-            refine_net.load_state_dict(copyStateDict(torch.load(refiner_model)))
-            refine_net = refine_net.cuda()
-            refine_net = torch.nn.DataParallel(refine_net)
-        else:
-            refine_net.load_state_dict(copyStateDict(torch.load(refiner_model, map_location='cpu')))
-
-        refine_net.eval()
-        poly = True
 
     # Load model and image transforms for parseq
     parseq = torch.hub.load('baudm/parseq', 'parseq', pretrained=True).eval()
@@ -315,4 +294,3 @@ if __name__ == '__main__':
     print(database)    
 
     IPython.embed()
-

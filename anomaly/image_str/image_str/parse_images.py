@@ -1,12 +1,10 @@
-import sys
-
 from image_str.parseq.strhub.data.module import SceneTextDataModule
 
 from PIL import Image
 
 import os
 import time
-import utils
+import image_str.utils as utils
 
 import torch
 import torch.nn as nn

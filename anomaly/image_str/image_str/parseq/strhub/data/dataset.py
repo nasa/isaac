@@ -23,7 +23,7 @@ import lmdb
 from PIL import Image
 from torch.utils.data import Dataset, ConcatDataset
 
-from parseq.strhub.data.utils import CharsetAdapter
+from image_str.parseq.strhub.data.utils import CharsetAdapter
 
 log = logging.getLogger(__name__)
 
