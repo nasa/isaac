@@ -40,30 +40,30 @@ for i in $pkg_files; do
   pkgs="$pkgs $(<"$i")"
 done
 
-# if this file exists, we are using the astrobee repository
-# need to set up tunnel through m (NASA users only)
-if [ -e $arssrc ];
-then
-  username=${NDC_USERNAME:+${NDC_USERNAME}@}
+# # if this file exists, we are using the astrobee repository
+# # need to set up tunnel through m (NASA users only)
+# if [ -e $arssrc ];
+# then
+#   username=${NDC_USERNAME:+${NDC_USERNAME}@}
 
-  # Add these packages to the apt sources (we remove them later, so apt update succeeds)
+#   # Add these packages to the apt sources (we remove them later, so apt update succeeds)
 
-  NO_TUNNEL=${NO_TUNNEL:-0} # Override this with 1 before invoking if the tunnel is not desired
+#   NO_TUNNEL=${NO_TUNNEL:-0} # Override this with 1 before invoking if the tunnel is not desired
  
-  if [ "${NO_TUNNEL}" -eq 1 ]; then
-      echo "Getting the custom Debian without tunnel"
-      sudo /bin/bash -c "echo \"deb [arch=amd64] http://astrobee.ndc.nasa.gov/software_new ${DIST} main\" > $arssrc" || exit 1
-      sudo /bin/bash -c "echo \"deb-src http://astrobee.ndc.nasa.gov/software_new ${DIST} main\" >> $arssrc" || exit 1
-  else
-      echo "Tunnelling to get the custom Debian"
-      sudo /bin/bash -c "echo \"deb [arch=amd64] http://127.0.0.1:8765/software_new ${DIST} main\" > $arssrc" || exit 1
-      sudo /bin/bash -c "echo \"deb-src http://127.0.0.1:8765/software_new ${DIST} main\" >> $arssrc" || exit 1
-      ssh -N -L 8765:astrobee.ndc.nasa.gov:80 ${username}m.ndc.nasa.gov &
-  fi
+#   if [ "${NO_TUNNEL}" -eq 1 ]; then
+#       echo "Getting the custom Debian without tunnel"
+#       sudo /bin/bash -c "echo \"deb [arch=amd64] http://astrobee.ndc.nasa.gov/software_new ${DIST} main\" > $arssrc" || exit 1
+#       sudo /bin/bash -c "echo \"deb-src http://astrobee.ndc.nasa.gov/software_new ${DIST} main\" >> $arssrc" || exit 1
+#   else
+#       echo "Tunnelling to get the custom Debian"
+#       sudo /bin/bash -c "echo \"deb [arch=amd64] http://127.0.0.1:8765/software_new ${DIST} main\" > $arssrc" || exit 1
+#       sudo /bin/bash -c "echo \"deb-src http://127.0.0.1:8765/software_new ${DIST} main\" >> $arssrc" || exit 1
+#       ssh -N -L 8765:astrobee.ndc.nasa.gov:80 ${username}m.ndc.nasa.gov &
+#   fi
   
-  trap "kill $! 2> /dev/null; sudo truncate -s 0 $arssrc; wait $!" 0 HUP QUIT ILL ABRT FPE SEGV PIPE TERM INT
-  sleep 1
-fi
+#   trap "kill $! 2> /dev/null; sudo truncate -s 0 $arssrc; wait $!" 0 HUP QUIT ILL ABRT FPE SEGV PIPE TERM INT
+#   sleep 1
+# fi
 
 sudo apt-get update || exit 1
 

@@ -29,6 +29,8 @@
   <arg name="nodes" default=""/>                 <!-- Launch specific nodes       -->
   <arg name="extra" default=""/>                 <!-- Inject additional node      -->
   <arg name="debug" default=""/>                 <!-- Debug node group            -->
+  <!-- Physics engine options: ode (gazebo default), bullet, simbody, dart   -->
+  <arg name="physics" default="ode"/>
   <arg name="sim" default="local" />             <!-- SIM IP address              -->
   <arg name="llp" default="local" />             <!-- LLP IP address              -->
   <arg name="mlp" default="local" />             <!-- MLP IP address              -->
@@ -166,6 +168,7 @@
           <arg name="vmware" value="$(arg vmware)" />
           <arg name="speed" value="$(arg speed)" />
           <arg name="debug" value="$(arg sdebug)" />
+          <arg name="physics" value="$(arg physics)" />
         </include>
       </group>
       <group if="$(arg r2)">
@@ -175,6 +178,7 @@
           <arg name="vmware" value="$(arg vmware)" />
           <arg name="speed" value="$(arg speed)" />
           <arg name="debug" value="$(arg sdebug)" />
+          <arg name="physics" value="$(arg physics)" />
         </include>
       </group>
     </group>
