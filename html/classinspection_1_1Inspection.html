@@ -145,9 +145,12 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>CheckZonesTimeoutCall
 <tr class="memitem:a537c97fa12d4385fef57331bb78036bf"><td class="memItemLeft" align="right" valign="top"><a id="a537c97fa12d4385fef57331bb78036bf"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>CheckMapTimeoutCallback</b> ()</td></tr>
 <tr class="separator:a537c97fa12d4385fef57331bb78036bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2e855b6eb174a1ad51e23e3448d83d96"><td class="memItemLeft" align="right" valign="top"><a id="a2e855b6eb174a1ad51e23e3448d83d96"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>VisibilityConstraint</b> (geometry_msgs::PoseArray &amp;points, tf2::Transform target_transform)</td></tr>
-<tr class="separator:a2e855b6eb174a1ad51e23e3448d83d96"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3d809b676daf1239120c6292874c0c49"><td class="memItemLeft" align="right" valign="top"><a id="a3d809b676daf1239120c6292874c0c49"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>TransformList</b> (geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &amp;points_out, Eigen::Affine3d target_transform)</td></tr>
+<tr class="separator:a3d809b676daf1239120c6292874c0c49"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a73806639e01b9243a8f31748ca445011"><td class="memItemLeft" align="right" valign="top"><a id="a73806639e01b9243a8f31748ca445011"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>VisibilityConstraint</b> (geometry_msgs::PoseArray &amp;points, Eigen::Affine3d target_transform)</td></tr>
+<tr class="separator:a73806639e01b9243a8f31748ca445011"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6e7de0c9111c699dcdefb6c86c0162f7"><td class="memItemLeft" align="right" valign="top"><a id="a6e7de0c9111c699dcdefb6c86c0162f7"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>PointInsideCuboid</b> (geometry_msgs::Point const &amp;x, geometry_msgs::Vector3 const &amp;cubemin, geometry_msgs::Vector3 const &amp;cubemax)</td></tr>
 <tr class="separator:a6e7de0c9111c699dcdefb6c86c0162f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -157,9 +160,6 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>ZonesConstraint</b> (
 <tr class="memitem:a1a42d66c6f926ad85d90c708c89a2ef9"><td class="memItemLeft" align="right" valign="top"><a id="a1a42d66c6f926ad85d90c708c89a2ef9"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>ObstaclesConstraint</b> (geometry_msgs::PoseArray &amp;points)</td></tr>
 <tr class="separator:a1a42d66c6f926ad85d90c708c89a2ef9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a67b8a830ea3b6a01eeea16fb7141858b"><td class="memItemLeft" align="right" valign="top"><a id="a67b8a830ea3b6a01eeea16fb7141858b"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>TransformList</b> (geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &amp;points_out, tf2::Transform target_transform)</td></tr>
-<tr class="separator:a67b8a830ea3b6a01eeea16fb7141858b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a69ec49ba59b4f31d594fabf02dd2028b"><td class="memItemLeft" align="right" valign="top"><a id="a69ec49ba59b4f31d594fabf02dd2028b"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>DrawPoseMarkers</b> (geometry_msgs::PoseArray &amp;points, ros::Publisher &amp;publisher)</td></tr>
 <tr class="separator:a69ec49ba59b4f31d594fabf02dd2028b"><td class="memSeparator" colspan="2">&#160;</td></tr>
