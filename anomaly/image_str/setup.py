@@ -1,21 +1,9 @@
-from setuptools import setup
+from distutils.core import setup
 
-setup(
-    name='image_str',
-    version='0.0.0',
-    install_requires=[
+from catkin_pkg.python_setup import generate_distutils_setup
 
-    ],
-    author='Rachel Lu',
-    author_email='rachel.lu@nasa.gov',
-    description='OCR Image Processing for Label Detection and Localization',
-    packages=['image_str'],
-    url='https://github.com/rachlu/isaac',
-    keywords=[],
-    classifiers=[
-        'Development Status :: 1 - Alpha',
-        'License :: Apache License',
-        'Programming Language :: Python :: 3',
-        'Operating System :: OS Independent',
-    ],
+d = generate_distutils_setup(
+    packages=["image_str"], package_dir={"": "scripts"}
 )
+
+setup(**d)
