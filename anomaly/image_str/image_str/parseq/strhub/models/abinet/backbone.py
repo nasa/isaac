@@ -1,17 +1,30 @@
 import torch.nn as nn
-from torch.nn import TransformerEncoderLayer, TransformerEncoder
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 from .resnet import resnet45
 from .transformer import PositionalEncoding
 
 
 class ResTranformer(nn.Module):
-    def __init__(self, d_model=512, nhead=8, d_inner=2048, dropout=0.1, activation='relu', backbone_ln=2):
+    def __init__(
+        self,
+        d_model=512,
+        nhead=8,
+        d_inner=2048,
+        dropout=0.1,
+        activation="relu",
+        backbone_ln=2,
+    ):
         super().__init__()
         self.resnet = resnet45()
         self.pos_encoder = PositionalEncoding(d_model, max_len=8 * 32)
-        encoder_layer = TransformerEncoderLayer(d_model=d_model, nhead=nhead,
-                                                dim_feedforward=d_inner, dropout=dropout, activation=activation)
+        encoder_layer = TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=d_inner,
+            dropout=dropout,
+            activation=activation,
+        )
         self.transformer = TransformerEncoder(encoder_layer, backbone_ln)
 
     def forward(self, images):

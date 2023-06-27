@@ -20,22 +20,18 @@ import os
 import shutil
 from pathlib import Path
 
-from omegaconf import DictConfig, open_dict
 import hydra
-from hydra.core.hydra_config import HydraConfig
-
 import numpy as np
-
-from pytorch_lightning import Trainer, LightningModule
+from hydra.core.hydra_config import HydraConfig
+from omegaconf import DictConfig, open_dict
+from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
-
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
 from ray.tune.ray_trial_executor import RayTrialExecutor
 from ray.tune.schedulers import MedianStoppingRule
 from ray.tune.suggest.ax import AxSearch
-
 from strhub.data.module import SceneTextDataModule
 from strhub.models.base import BaseSystem
 
@@ -58,16 +54,16 @@ class MetricTracker(tune.Stopper):
         self.buffer = 2 * (len(self.kernel) // 2) + 2
 
     @staticmethod
-    def gaussian_pdf(x, sigma=1.):
-        return np.exp(-(x / sigma)**2 / 2) / (sigma * np.sqrt(2 * np.pi))
+    def gaussian_pdf(x, sigma=1.0):
+        return np.exp(-((x / sigma) ** 2) / 2) / (sigma * np.sqrt(2 * np.pi))
 
     @staticmethod
     def moving_average(x, k):
-        return np.convolve(x, k, 'valid') / k.sum()
+        return np.convolve(x, k, "valid") / k.sum()
 
     def __call__(self, trial_id, result):
-        self.training_iteration = result['training_iteration']
-        if np.isnan(result['loss']) or self.training_iteration >= self.max_t:
+        self.training_iteration = result["training_iteration"]
+        if np.isnan(result["loss"]) or self.training_iteration >= self.max_t:
             try:
                 del self.trial_history[trial_id]
             except KeyError:
@@ -75,13 +71,17 @@ class MetricTracker(tune.Stopper):
             return True
         history = self.trial_history.get(trial_id, [])
         # FIFO queue of metric values.
-        history = history[-(self.patience + self.buffer - 1):] + [result[self.metric]]
+        history = history[-(self.patience + self.buffer - 1) :] + [result[self.metric]]
         # Only start checking once we have enough data. At least one non-zero sample is required.
         if len(history) == self.patience + self.buffer and sum(history) > 0:
-            smooth_grad = np.gradient(self.moving_average(history, self.kernel))[1:-1]  # discard edge values.
+            smooth_grad = np.gradient(self.moving_average(history, self.kernel))[
+                1:-1
+            ]  # discard edge values.
             # Check if trend is downward or stagnant
             if (smooth_grad < self.eps).all():
-                log.info(f'Stopping trial = {trial_id}, hist = {history}, grad = {smooth_grad}')
+                log.info(
+                    f"Stopping trial = {trial_id}, hist = {history}, grad = {smooth_grad}"
+                )
                 try:
                     del self.trial_history[trial_id]
                 except KeyError:
@@ -95,97 +95,115 @@ class MetricTracker(tune.Stopper):
 
 
 class TuneReportCheckpointPruneCallback(TuneReportCheckpointCallback):
-
     def _handle(self, trainer: Trainer, pl_module: LightningModule):
         self._checkpoint._handle(trainer, pl_module)
         # Prune older checkpoints
-        for old in sorted(Path(tune.get_trial_dir()).glob('checkpoint_epoch=*-step=*'), key=os.path.getmtime)[:-1]:
-            log.info(f'Deleting old checkpoint: {old}')
+        for old in sorted(
+            Path(tune.get_trial_dir()).glob("checkpoint_epoch=*-step=*"),
+            key=os.path.getmtime,
+        )[:-1]:
+            log.info(f"Deleting old checkpoint: {old}")
             shutil.rmtree(old)
         self._report._handle(trainer, pl_module)
 
 
 def train(hparams, config, checkpoint_dir=None):
     with open_dict(config):
-        config.model.lr = hparams['lr']
+        config.model.lr = hparams["lr"]
         # config.model.weight_decay = hparams['wd']
 
     model: BaseSystem = hydra.utils.instantiate(config.model)
     datamodule: SceneTextDataModule = hydra.utils.instantiate(config.data)
 
-    tune_callback = TuneReportCheckpointPruneCallback({
-        'loss': 'val_loss',
-        'NED': 'val_NED',
-        'accuracy': 'val_accuracy'
-    })
-    ckpt_path = None if checkpoint_dir is None else os.path.join(checkpoint_dir, 'checkpoint')
-    trainer: Trainer = hydra.utils.instantiate(config.trainer, enable_progress_bar=False, enable_checkpointing=False,
-                                               logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name='',
-                                                                        version='.'),
-                                               callbacks=[tune_callback])
+    tune_callback = TuneReportCheckpointPruneCallback(
+        {"loss": "val_loss", "NED": "val_NED", "accuracy": "val_accuracy"}
+    )
+    ckpt_path = (
+        None if checkpoint_dir is None else os.path.join(checkpoint_dir, "checkpoint")
+    )
+    trainer: Trainer = hydra.utils.instantiate(
+        config.trainer,
+        enable_progress_bar=False,
+        enable_checkpointing=False,
+        logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
+        callbacks=[tune_callback],
+    )
     trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 
-@hydra.main(config_path='configs', config_name='tune', version_base='1.2')
+@hydra.main(config_path="configs", config_name="tune", version_base="1.2")
 def main(config: DictConfig):
     # Special handling for PARseq
-    if config.model.get('perm_mirrored', False):
-        assert config.model.perm_num % 2 == 0, 'perm_num should be even if perm_mirrored = True'
+    if config.model.get("perm_mirrored", False):
+        assert (
+            config.model.perm_num % 2 == 0
+        ), "perm_num should be even if perm_mirrored = True"
     # Modify config
     with open_dict(config):
         # Use mixed-precision training
-        if config.trainer.get('gpus', 0):
+        if config.trainer.get("gpus", 0):
             config.trainer.precision = 16
         # Resolve absolute path to data.root_dir
         config.data.root_dir = hydra.utils.to_absolute_path(config.data.root_dir)
 
     hparams = {
-        'lr': tune.loguniform(config.tune.lr.min, config.tune.lr.max),
+        "lr": tune.loguniform(config.tune.lr.min, config.tune.lr.max),
         # 'wd': tune.loguniform(config.tune.wd.min, config.tune.wd.max),
     }
 
     steps_per_epoch = len(hydra.utils.instantiate(config.data).train_dataloader())
-    val_steps = steps_per_epoch * config.trainer.max_epochs / config.trainer.val_check_interval
+    val_steps = (
+        steps_per_epoch * config.trainer.max_epochs / config.trainer.val_check_interval
+    )
     max_t = round(0.75 * val_steps)
     warmup_t = round(config.model.warmup_pct * val_steps)
-    scheduler = MedianStoppingRule(time_attr='training_iteration', grace_period=warmup_t)
+    scheduler = MedianStoppingRule(
+        time_attr="training_iteration", grace_period=warmup_t
+    )
 
     # Always start by evenly diving the range in log scale.
-    lr = hparams['lr']
+    lr = hparams["lr"]
     start = np.log10(lr.lower)
     stop = np.log10(lr.upper)
     num = math.ceil(stop - start) + 1
-    initial_points = [{'lr': np.clip(x, lr.lower, lr.upper).item()} for x in reversed(np.logspace(start, stop, num))]
+    initial_points = [
+        {"lr": np.clip(x, lr.lower, lr.upper).item()}
+        for x in reversed(np.logspace(start, stop, num))
+    ]
     search_alg = AxSearch(points_to_evaluate=initial_points)
 
     reporter = CLIReporter(
-        parameter_columns=['lr'],
-        metric_columns=['loss', 'accuracy', 'training_iteration'])
+        parameter_columns=["lr"],
+        metric_columns=["loss", "accuracy", "training_iteration"],
+    )
 
-    out_dir = Path(HydraConfig.get().runtime.output_dir if config.tune.resume_dir is None else config.tune.resume_dir)
+    out_dir = Path(
+        HydraConfig.get().runtime.output_dir
+        if config.tune.resume_dir is None
+        else config.tune.resume_dir
+    )
 
     analysis = tune.run(
         tune.with_parameters(train, config=config),
         name=out_dir.name,
-        metric='NED',
-        mode='max',
-        stop=MetricTracker('NED', max_t),
+        metric="NED",
+        mode="max",
+        stop=MetricTracker("NED", max_t),
         config=hparams,
-        resources_per_trial={
-            'cpu': 1,
-            'gpu': config.tune.gpus_per_trial
-        },
+        resources_per_trial={"cpu": 1, "gpu": config.tune.gpus_per_trial},
         num_samples=config.tune.num_samples,
         local_dir=str(out_dir.parent.absolute()),
         search_alg=search_alg,
         scheduler=scheduler,
         progress_reporter=reporter,
         resume=config.tune.resume_dir is not None,
-        trial_executor=RayTrialExecutor(result_buffer_length=0)  # disable result buffering
+        trial_executor=RayTrialExecutor(
+            result_buffer_length=0
+        ),  # disable result buffering
     )
 
-    print('Best hyperparameters found were: ', analysis.best_config)
+    print("Best hyperparameters found were: ", analysis.best_config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

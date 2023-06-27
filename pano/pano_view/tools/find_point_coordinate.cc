@@ -199,14 +199,6 @@ int main(int argc, char** argv) {
   }
   haz_cam_depth_to_image_trans.matrix() = M;
 
-  // Initialize camera view
-  Eigen::Affine3d transform_body_to_cam = transform_body_to_nav * transform_nav_to_cam;
-  geometry_msgs::Transform::ConstPtr msg_pointer(
-    new geometry_msgs::Transform(msg_conversions::eigen_transform_to_ros_transform(transform_body_to_cam)));
-  inspection::CameraView camera(camera_name, 2.0, 0.19, msg_pointer);
-  camera.SetH(height);
-  camera.SetW(width);
-
   // Extract topics from bagfile
   std::string depth_cam_topic = FLAGS_depth_cam_topic;
   std::string ground_truth_topic = FLAGS_ground_truth_topic;
@@ -217,9 +209,28 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Initialize camera view
+  Eigen::Affine3d transform_body_to_cam = transform_body_to_nav * transform_nav_to_cam;
+  geometry_msgs::Transform::ConstPtr msg_pointer(
+    new geometry_msgs::Transform(msg_conversions::eigen_transform_to_ros_transform(transform_body_to_cam)));
+
+  camera::CameraParameters cam_params(&config, camera_name.c_str());
+  inspection::CameraView camera(cam_params, 2.0, 0.19, msg_pointer);
+  camera.SetTransform((msg_conversions::ros_pose_to_eigen_transform(ground_truth) * transform_body_to_cam).inverse());
+
+
   // Figure out the vector to the target based on camera parameters
   Eigen::Vector3d vector;
-  camera.GetVectorFromCamXY(ground_truth, coord_x, coord_y, vector);
+
+  // Transform Point Cloud to world reference frame + fix scaling
+  Eigen::Affine3d transform_world_to_depth =
+    msg_conversions::ros_pose_to_eigen_transform(ground_truth) * transform_body_to_nav * transform_nav_to_depth;
+
+  Eigen::Vector2d cam_size = (cam_params.GetDistortedSize()).cast<double>();
+  vector =
+    camera.Ray(coord_x * cam_size[0] / width - cam_size[0] / 2.0, coord_y * cam_size[1] / height - cam_size[1] / 2);
+  std::cout << "vector: (" << vector[0] << ", " << vector[1] << ", "
+                << vector[2] << ")" << std::endl;
 
   // Calculate pitch and yaw
   double pitch = std::atan2(vector[2], std::sqrt(vector[0] * vector[0] + vector[1] * vector[1])) * 180 / M_PI;
@@ -230,9 +241,6 @@ int main(int argc, char** argv) {
   if (abs(depth_cam.header.stamp.toSec() - timestamp) > MAX_TOPIC_DELAY) {
     std::cerr << "Failed to find point cloud within acceptable timestamp, skipping that estimate" << std::endl;
   } else {
-    // Transform Point Cloud to world reference frame + fix scaling
-    Eigen::Affine3d transform_world_to_depth =
-      msg_conversions::ros_pose_to_eigen_transform(ground_truth) * transform_body_to_nav * transform_nav_to_depth;
     pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     pcl::fromROSMsg(depth_cam, pcl_cloud);
     for (auto& pcl_point : pcl_cloud.points) {

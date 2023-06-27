@@ -17,9 +17,7 @@
 import argparse
 
 import torch
-
 from PIL import Image
-
 from strhub.data.module import SceneTextDataModule
 from strhub.models.utils import load_from_checkpoint, parse_model_args
 
@@ -27,25 +25,27 @@ from strhub.models.utils import load_from_checkpoint, parse_model_args
 @torch.inference_mode()
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('checkpoint', help="Model checkpoint (or 'pretrained=<model_id>')")
-    parser.add_argument('--images', nargs='+', help='Images to read')
-    parser.add_argument('--device', default='cuda')
+    parser.add_argument(
+        "checkpoint", help="Model checkpoint (or 'pretrained=<model_id>')"
+    )
+    parser.add_argument("--images", nargs="+", help="Images to read")
+    parser.add_argument("--device", default="cuda")
     args, unknown = parser.parse_known_args()
     kwargs = parse_model_args(unknown)
-    print(f'Additional keyword arguments: {kwargs}')
+    print(f"Additional keyword arguments: {kwargs}")
 
     model = load_from_checkpoint(args.checkpoint, **kwargs).eval().to(args.device)
     img_transform = SceneTextDataModule.get_transform(model.hparams.img_size)
 
     for fname in args.images:
         # Load image and prepare for input
-        image = Image.open(fname).convert('RGB')
+        image = Image.open(fname).convert("RGB")
         image = img_transform(image).unsqueeze(0).to(args.device)
 
         p = model(image).softmax(-1)
         pred, p = model.tokenizer.decode(p)
-        print(f'{fname}: {pred[0]}')
+        print(f"{fname}: {pred[0]}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,7 +1,9 @@
 import numpy as np
 
+
 def get_euclidean_distance(p1, p2):
-    return np.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
+    return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+
 
 def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
     x1, y1 = upper_a
@@ -29,17 +31,18 @@ def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
         return y1 - y2b
     elif top:
         return y2 - y1b
-    else:             # rectangles intersect
-        return 0.
+    else:  # rectangles intersect
+        return 0.0
+
 
 def crop_image(img, startx, starty, endx, endy):
     """
     @param img array of image
     @param startx
     @param starty
-    @param endx 
+    @param endx
     @param endy
-    @returns a cropped image of img[startx:endx, starty:endy] 
+    @returns a cropped image of img[startx:endx, starty:endy]
     """
     h, w, _ = img.shape
 
@@ -48,5 +51,5 @@ def crop_image(img, startx, starty, endx, endy):
 
     endx = min(endx, w)
     endy = min(endy, h)
-    
+
     return img[starty:endy, startx:endx]

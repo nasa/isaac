@@ -1,6 +1,5 @@
-import matplotlib.pyplot as plt
-
 import keras_ocr
+import matplotlib.pyplot as plt
 
 # keras-ocr will automatically download pretrained
 # weights for the detector and recognizer.
@@ -8,10 +7,11 @@ pipeline = keras_ocr.pipeline.Pipeline()
 
 # Get a set of three example images
 images = [
-    keras_ocr.tools.read(url) for url in [
-        'https://upload.wikimedia.org/wikipedia/commons/b/bd/Army_Reserves_Recruitment_Banner_MOD_45156284.jpg',
-        'https://upload.wikimedia.org/wikipedia/commons/e/e8/FseeG2QeLXo.jpg',
-        'https://upload.wikimedia.org/wikipedia/commons/b/b4/EUBanana-500x112.jpg'
+    keras_ocr.tools.read(url)
+    for url in [
+        "https://upload.wikimedia.org/wikipedia/commons/b/bd/Army_Reserves_Recruitment_Banner_MOD_45156284.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e8/FseeG2QeLXo.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/b/b4/EUBanana-500x112.jpg",
     ]
 ]
 

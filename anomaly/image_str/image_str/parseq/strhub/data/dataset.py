@@ -20,28 +20,27 @@ from pathlib import Path, PurePath
 from typing import Callable, Optional, Union
 
 import lmdb
-from PIL import Image
-from torch.utils.data import Dataset, ConcatDataset
-
 from image_str.parseq.strhub.data.utils import CharsetAdapter
+from PIL import Image
+from torch.utils.data import ConcatDataset, Dataset
 
 log = logging.getLogger(__name__)
 
 
 def build_tree_dataset(root: Union[PurePath, str], *args, **kwargs):
     try:
-        kwargs.pop('root')  # prevent 'root' from being passed via kwargs
+        kwargs.pop("root")  # prevent 'root' from being passed via kwargs
     except KeyError:
         pass
     root = Path(root).absolute()
-    log.info(f'dataset root:\t{root}')
+    log.info(f"dataset root:\t{root}")
     datasets = []
-    for mdb in glob.glob(str(root / '**/data.mdb'), recursive=True):
+    for mdb in glob.glob(str(root / "**/data.mdb"), recursive=True):
         mdb = Path(mdb)
         ds_name = str(mdb.parent.relative_to(root))
         ds_root = str(mdb.parent.absolute())
         dataset = LmdbDataset(ds_root, *args, **kwargs)
-        log.info(f'\tlmdb:\t{ds_name}\tnum samples: {len(dataset)}')
+        log.info(f"\tlmdb:\t{ds_name}\tnum samples: {len(dataset)}")
         datasets.append(dataset)
     return ConcatDataset(datasets)
 
@@ -54,17 +53,26 @@ class LmdbDataset(Dataset):
     Labels are transformed according to the charset.
     """
 
-    def __init__(self, root: str, charset: str, max_label_len: int, min_image_dim: int = 0,
-                 remove_whitespace: bool = True, normalize_unicode: bool = True,
-                 unlabelled: bool = False, transform: Optional[Callable] = None):
+    def __init__(
+        self,
+        root: str,
+        charset: str,
+        max_label_len: int,
+        min_image_dim: int = 0,
+        remove_whitespace: bool = True,
+        normalize_unicode: bool = True,
+        unlabelled: bool = False,
+        transform: Optional[Callable] = None,
+    ):
         self._env = None
         self.root = root
         self.unlabelled = unlabelled
         self.transform = transform
         self.labels = []
         self.filtered_index_list = []
-        self.num_samples = self._preprocess_labels(charset, remove_whitespace, normalize_unicode,
-                                                   max_label_len, min_image_dim)
+        self.num_samples = self._preprocess_labels(
+            charset, remove_whitespace, normalize_unicode, max_label_len, min_image_dim
+        )
 
     def __del__(self):
         if self._env is not None:
@@ -72,8 +80,15 @@ class LmdbDataset(Dataset):
             self._env = None
 
     def _create_env(self):
-        return lmdb.open(self.root, max_readers=1, readonly=True, create=False,
-                         readahead=False, meminit=False, lock=False)
+        return lmdb.open(
+            self.root,
+            max_readers=1,
+            readonly=True,
+            create=False,
+            readahead=False,
+            meminit=False,
+            lock=False,
+        )
 
     @property
     def env(self):
@@ -81,22 +96,33 @@ class LmdbDataset(Dataset):
             self._env = self._create_env()
         return self._env
 
-    def _preprocess_labels(self, charset, remove_whitespace, normalize_unicode, max_label_len, min_image_dim):
+    def _preprocess_labels(
+        self,
+        charset,
+        remove_whitespace,
+        normalize_unicode,
+        max_label_len,
+        min_image_dim,
+    ):
         charset_adapter = CharsetAdapter(charset)
         with self._create_env() as env, env.begin() as txn:
-            num_samples = int(txn.get('num-samples'.encode()))
+            num_samples = int(txn.get("num-samples".encode()))
             if self.unlabelled:
                 return num_samples
             for index in range(num_samples):
                 index += 1  # lmdb starts with 1
-                label_key = f'label-{index:09d}'.encode()
+                label_key = f"label-{index:09d}".encode()
                 label = txn.get(label_key).decode()
                 # Normally, whitespace is removed from the labels.
                 if remove_whitespace:
-                    label = ''.join(label.split())
+                    label = "".join(label.split())
                 # Normalize unicode composites (if any) and convert to compatible ASCII characters
                 if normalize_unicode:
-                    label = unicodedata.normalize('NFKD', label).encode('ascii', 'ignore').decode()
+                    label = (
+                        unicodedata.normalize("NFKD", label)
+                        .encode("ascii", "ignore")
+                        .decode()
+                    )
                 # Filter by length before removing unsupported characters. The original label might be too long.
                 if len(label) > max_label_len:
                     continue
@@ -106,7 +132,7 @@ class LmdbDataset(Dataset):
                     continue
                 # Filter images that are too small.
                 if min_image_dim > 0:
-                    img_key = f'image-{index:09d}'.encode()
+                    img_key = f"image-{index:09d}".encode()
                     buf = io.BytesIO(txn.get(img_key))
                     w, h = Image.open(buf).size
                     if w < self.min_image_dim or h < self.min_image_dim:
@@ -125,11 +151,11 @@ class LmdbDataset(Dataset):
             label = self.labels[index]
             index = self.filtered_index_list[index]
 
-        img_key = f'image-{index:09d}'.encode()
+        img_key = f"image-{index:09d}".encode()
         with self.env.begin() as txn:
             imgbuf = txn.get(img_key)
         buf = io.BytesIO(imgbuf)
-        img = Image.open(buf).convert('RGB')
+        img = Image.open(buf).convert("RGB")
 
         if self.transform is not None:
             img = self.transform(img)

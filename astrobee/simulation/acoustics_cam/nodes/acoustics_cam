@@ -766,23 +766,23 @@ class SoundMapNode():
             self.setup_sound_map(config_file, data_path, debug_mode)
 
             # Subscribe to the bot pose. From there the camera pose will be inferred.
-            rospy.Subscriber('/loc/truth/pose', geometry_msgs.msg.PoseStamped,
+            rospy.Subscriber(TOPIC_LOCALIZATION_TRUTH, geometry_msgs.msg.PoseStamped,
                              self.acoustics_cam_event)
 
             # Subscribe to guest science commands
-            rospy.Subscriber('/comm/dds/command', CommandStamped,
+            rospy.Subscriber(TOPIC_COMMUNICATIONS_DDS_COMMAND, CommandStamped,
                              self.dds_cmd_callback)
 
             # Publish the acoustic images
-            self.image_publisher = rospy.Publisher('/hw/cam_acoustics',
+            self.image_publisher = rospy.Publisher('TOPIC_HARDWARE_ACOUSTICS_CAM',
                                                    Image, queue_size = 2)
 
             # Publish the camera intrinsics
-            self.info_publisher = rospy.Publisher('/sim/acoustics_cam/info',
+            self.info_publisher = rospy.Publisher('TOPIC_HARDWARE_ACOUSTICS_CAM_INFO',
                                                   CameraInfo, queue_size = 2)
 
             # Publish the camera pose. 
-            self.pose_publisher = rospy.Publisher('/sim/acoustics_cam/pose',
+            self.pose_publisher = rospy.Publisher('/',
                                                   geometry_msgs.msg.PoseStamped,
                                                   queue_size = 2)
 
