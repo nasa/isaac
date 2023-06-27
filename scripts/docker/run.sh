@@ -67,6 +67,8 @@ analyst=0
 mount="false"
 robot=bumble
 no_sim=0
+local_sim=0
+no_iui=0
 export REMOTE="isaac"
 
 while [ "$1" != "" ]; do
@@ -103,6 +105,10 @@ while [ "$1" != "" ]; do
         --mount )                     mount="true"
                                       ;;
         --no-sim )                    no_sim=1
+                                      ;;
+        --local_sim )                 local_sim=1
+                                      ;;
+        --no-iui )                    no_iui=1
                                       ;;
         -g | --ground-only )          ground=1
                                       ;;
