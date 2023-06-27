@@ -56,13 +56,13 @@ def read_bag(bag_file, topics):
     db = conn["isaac"]
 
     # access bag
-    print("Reading bag file ", bag_file)
     bag = rosbag.Bag(bag_file)
+    print("Reading bag file ", bag_file)
     topic_count = {}
-    # if topics_list == []:
-    messages_total = bag.get_message_count()
-    # else:
-    #     messages_total = bag.get_message_count(topics_list)
+    if topics == []:
+        messages_total = bag.get_message_count()
+    else:
+        messages_total = bag.get_message_count(topics)
     message_count = 0
     # Go through all the messages in a topic
     for topic, msg, t in bag.read_messages():
@@ -72,11 +72,11 @@ def read_bag(bag_file, topics):
             print("Reading ", message_count, "/", messages_total, " ", end="\r")
 
         # Delete data field to make loading faster
-        # if hasattr(msg, 'data'):
-        #     setattr(msg, 'data', '')
-        # elif hasattr(msg, 'raw'):
-        #     if hasattr(msg.raw, 'data'):
-        #         setattr(msg.raw, 'data', '')
+        if hasattr(msg, 'data'):
+            setattr(msg, 'data', '')
+        elif hasattr(msg, 'raw'):
+            if hasattr(msg.raw, 'data'):
+                setattr(msg.raw, 'data', '')
 
         # Fix topic name
         topic = topic[1:].replace("/", "_")
@@ -89,11 +89,11 @@ def read_bag(bag_file, topics):
 
         # Create topic collection if it doesn't exist already
         # Can't create 2 collections at the same time
-        with lock:
-            if topic not in db.collections:
-                collection = db.createCollection(name=topic)
-            else:
-                collection = db[topic]
+        # with lock:
+        if topic not in db.collections:
+            collection = db.createCollection(name=topic)
+        else:
+            collection = db[topic]
 
         # Convert message to yaml
         # self.profiler1.enable()
