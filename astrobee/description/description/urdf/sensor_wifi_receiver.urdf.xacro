@@ -21,16 +21,17 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <gazebo reference="${prefix}body">
     <sensor name="wifi_receiver" type="wireless_receiver">
-      <always_on>1</always_on>
+      <pose>0 0 0 0 0 0</pose>
+      <always_on>true</always_on>
       <update_rate>62.5</update_rate>
       <visualize>true</visualize>
-      <transceiver>
+<!--       <transceiver>
         <min_frequency>2412.0</min_frequency>
         <max_frequency>2484.0</max_frequency>
         <power>14.5</power>
         <gain>2.5</gain>
         <sensitivity>-90.0</sensitivity>
-      </transceiver>
+      </transceiver> -->
       <plugin name="wifi_pub" filename="libgazebo_sensor_plugin_wifi_receiver.so">
          <namespace>/${ns}/</namespace>
          <scan_type>${wifi}</scan_type>

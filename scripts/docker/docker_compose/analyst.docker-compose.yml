@@ -23,6 +23,18 @@ services:
       isaac:
         ipv4_address: 172.19.0.12
     volumes:
-      - ${ISAAC_PATH:-.}/analyst/workspace:/home/analyst/
-      - ${DATA_PATH:-$HOME/data}:/home/analyst/data
-      - ${BAGS_PATH:-$HOME/data/bags}:/home/analyst/data/bags
+      - type: bind
+        source: ${ASTROBEE_PATH}
+        target: /src/astrobee/src
+      - type: bind
+        source: ${ISAAC_PATH}
+        target: /src/isaac/src
+      - type: bind
+        source: ${ISAAC_PATH:-.}/analyst/workspace
+        target: /home/analyst/
+      - type: bind
+        source: ${DATA_PATH:-$HOME/data}
+        target: /home/analyst/data
+      - type: bind
+        source: ${BAGS_PATH:-$HOME/data/bags}
+        target: /home/analyst/data/bags

@@ -99,10 +99,18 @@
 
 #define TOPIC_HARDWARE_AIR_QUALITY                  "hw/air_quality"
 
+#define TOPIC_SCI_CAM_SIM_POSE                      "sim/sci_cam/pose"
+#define TOPIC_HARDWARE_SCI_CAM_SIM_INFO             "sim/sci_cam/info"
+#define TOPIC_HARDWARE_SCI_CAM_INFO                 "hw/cam_sci_info"
+#define TOPIC_HARDWARE_CAM_SUFFIX_COMPRESSED        "/compressed"
+
 #define SERVICE_HARDWARE_HWDUMMY_SRVNAME            "hw/hwdummy/srvname"
 
 #define TOPIC_HARDWARE_HEAT_CAM                     "hw/cam_heat"
+
+#define TOPIC_ACOUSTICS_CAM_SIM_POSE                "sim/acoustics_cam/pose"
 #define TOPIC_HARDWARE_ACOUSTICS_CAM                "hw/cam_acoustics"
+#define TOPIC_HARDWARE_ACOUSTICS_CAM_INFO           "hw/cam_acoustics/info"
 
 ///////////////////
 // Guest Science //
