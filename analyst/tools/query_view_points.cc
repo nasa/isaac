@@ -101,81 +101,66 @@ int main(int argc, char** argv) {
 
   // Extract the input list from the command-line argument
   std::string input_json = argv[1];
-  std::stringstream ss(input_json);
-  std::string token;
 
-
-  // Convert the output list to JSON
-  std::stringstream outputJson;
-  outputJson << '[';
-
-  while (std::getline(ss, token, '}')) {
-    if (token.empty())
-      continue;
-
-    token += '}';
-    std::stringstream elementStream(token);
-
-    std::string elementToken;
-    // std::getline(elementStream, elementToken, '{'); // Skip the opening brace
-
-    // // Extract the values for point1
-    // std::getline(elementStream, elementToken, ',');
-    // std::stringstream point1Stream(elementToken);
-    // std::getline(point1Stream, elementToken, ',');
-    // element.point1.x = std::stof(elementToken);
-    // std::getline(point1Stream, elementToken, ',');
-    // element.point1.y = std::stof(elementToken);
-    // std::getline(point1Stream, elementToken, ',');
-    // element.point1.z = std::stof(elementToken);
-
-    // // Extract the values for point2
-    // std::getline(elementStream, elementToken, ',');
-    // std::stringstream point2Stream(elementToken);
-    // std::getline(point2Stream, elementToken, ',');
-    // element.point2.x = std::stof(elementToken);
-    // std::getline(point2Stream, elementToken, ',');
-    // element.point2.y = std::stof(elementToken);
-    // std::getline(point2Stream, elementToken, ',');
-    // element.point2.z = std::stof(elementToken);
-
-    // camera.SetTransform((msg_conversions::ros_pose_to_eigen_transform(ground_truth) *
-    // transform_body_to_cam).inverse());
-
-    // if (camera.GetCamXYFromPoint()) {
-
-    // }
-
-    // // Convert the values of point1 to a JSON string
-    // std::stringstream point1Json;
-    // point1Json << "{\"x\":" << element.point1.x << ",\"y\":" << element.point1.y << ",\"z\":" << element.point1.z <<
-    // "}";
-
-    // // Convert the values of point2 to a JSON string
-    // std::stringstream point2Json;
-    // point2Json << "{\"x\":" << element.point2.x << ",\"y\":" << element.point2.y << ",\"z\":" << element.point2.z <<
-    // "}";
-
-    // // Convert the values of attitude to a JSON string
-    // std::stringstream attitudeJson;
-    // attitudeJson << "{\"w\":" << element.attitude.w << ",\"x\":" << element.attitude.x << ",\"y\":" <<
-    // element.attitude.y << ",\"z\":" << element.attitude.z << "}";
-
-    // // Combine the JSON strings of point1, point2, and attitude into a single JSON string for the current element
-    // outputJson << "{\"point1\":" << point1Json.str() << ",\"point2\":" << point2Json.str() << ",\"attitude\":" <<
-    // attitudeJson.str() << "}";
-
-    // if (i != outputList.size() - 1) {
-    //     outputJson << ',';
-    // }
+  Json::Reader reader;
+  Json::Value json;
+  if (!reader.parse(input_json, json)) {
+      std::cerr << "Failed to parse the input JSON string." << std::endl;
+      return 1;
   }
-  outputJson << ']';
+  // Check if the root element is an array
+  if (!json.isArray()) {
+      std::cerr << "Input JSON does not represent an array." << std::endl;
+      return 1;
+  }
+  std::stringstream output_json;
+  // Process each list element
+  for (const auto& element : json) {
+    // Assuming each list element has two dictionaries
+    if (element.size() != 2 || !element[0].isObject() || !element[1].isArray()) {
+      std::cerr << "Invalid list element encountered." << std::endl;
+      continue;
+    }
+
+    // // Extract values from the first dictionary
+    // const Json::Value& dict1 = element[0];
+    // // Access the values using the desired keys
+    // int seq = dict1["seq"].asInt();
+    // int secs = dict1["stamp"]["secs"].asInt();
+    // int nsecs = dict1["stamp"]["nsecs"].asInt();
+    // std::string frame_id = dict1["frame_id"].asString();
+
+    // Extract values from the second dictionary (assuming it contains 7 float values)
+    const Json::Value& dict = element[1];
+    std::vector<float> floatValues;
+    for (const auto& value : dict) {
+      if (value.isConvertibleTo(Json::realValue))
+        floatValues.push_back(value.asFloat());
+    }
+
+    Eigen::Vector3d target;
+    target[0] = element[1][0].asFloat();
+    target[1] = element[1][1].asFloat();
+    target[2] = element[1][2].asFloat();
+    geometry_msgs::Pose ground_truth;
+    ground_truth.position.x = element[1][3].asFloat();
+    ground_truth.position.y = element[1][4].asFloat();
+    ground_truth.position.z = element[1][5].asFloat();
+    ground_truth.orientation.x = element[1][6].asFloat();
+    ground_truth.orientation.y = element[1][7].asFloat();
+    ground_truth.orientation.z = element[1][8].asFloat();
+    ground_truth.orientation.w = element[1][9].asFloat();
+
+    int x, y;
+
+    if (camera.GetCamXYFromPoint((msg_conversions::ros_pose_to_eigen_transform(ground_truth) *
+    transform_body_to_cam).inverse(), target, x, y)) {
+    output_json << element;
+    }
+  }
 
   // Print the output JSON
-  std::cout << outputJson.str() << std::endl;
-
-
-
+  std::cout << output_json.str() << std::endl;
 
   // Finish commandline flags
   google::ShutDownCommandLineFlags();
