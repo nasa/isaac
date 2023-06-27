@@ -249,7 +249,7 @@ def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.
                             new_label = old_label if len(old_label) >= len(label[0]) else label[0]
                             new_location = utils.get_bounding_box(old_location, new_location)
                             new_row = np.array([new_label, new_location], dtype=object)
-                        df.iloc[index] = new_row
+                            df.iloc[index] = new_row
 
     display_all(image, df, result_path)
     print("elapsed time : {}s".format(time.time() - t))

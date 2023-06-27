@@ -33,7 +33,8 @@ RUN apt-get update \
 RUN pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
     && pip3 install matplotlib opencv-python numpy-quaternion pandas \
-    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
+    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu \
+    && pip3 install scikit-image jellyfish pytorch_lightning lmdb numpy==1.24.4
 
 EXPOSE 8888
 
