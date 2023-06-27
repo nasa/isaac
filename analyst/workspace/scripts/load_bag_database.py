@@ -72,11 +72,11 @@ def read_bag(bag_file, topics):
             print("Reading ", message_count, "/", messages_total, " ", end="\r")
 
         # Delete data field to make loading faster
-        if hasattr(msg, 'data'):
-            setattr(msg, 'data', '')
-        elif hasattr(msg, 'raw'):
-            if hasattr(msg.raw, 'data'):
-                setattr(msg.raw, 'data', '')
+        if hasattr(msg, "data"):
+            setattr(msg, "data", "")
+        elif hasattr(msg, "raw"):
+            if hasattr(msg.raw, "data"):
+                setattr(msg.raw, "data", "")
 
         # Fix topic name
         topic = topic[1:].replace("/", "_")
