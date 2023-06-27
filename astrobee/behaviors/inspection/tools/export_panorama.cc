@@ -52,11 +52,15 @@ DEFINE_string(ns, "", "Robot namespace");
 
 // Configurable Parameters
 DEFINE_string(camera, "sci_cam", "Camera to use");
-DEFINE_double(tilt_max, 90.0, "Panorama: maximum tilt");
-DEFINE_double(tilt_min, -90.0, "Panorama: minimum tilt");
+DEFINE_string(panorama_mode, "", "Panorama configuration pre-set");
 DEFINE_double(pan_max, 180.0, "Panorama: maximum pan");
 DEFINE_double(pan_min, -180.0, "Panorama: minimum pan");
+DEFINE_double(tilt_max, 90.0, "Panorama: maximum tilt");
+DEFINE_double(tilt_min, -90.0, "Panorama: minimum tilt");
+DEFINE_double(h_fov, -1.0, "Panorama: camera horizontal fov, default -1 uses camera matrix");
+DEFINE_double(v_fov, -1.0, "Panorama: camera vertical fov, default -1 uses camera matrix");
 DEFINE_double(overlap, 0.5, "Panorama: overlap between images");
+DEFINE_double(att_tol, 5.0, "Panorama: attitude tolerance due to mobility");
 
 // Plan files
 DEFINE_string(panorama_poses, "/resources/scicam_panorama.txt", "Panorama poses list to map");
@@ -69,6 +73,41 @@ bool has_only_whitespace_or_comments(const std::string & str) {
     if (*it != ' ' && *it != '\t' && *it != '\n' && *it != '\r') return false;
   }
   return true;
+}
+
+// Read inspection poses from given files
+bool ReadPanoramaConfig(double* pan_radius_degrees, double* tilt_rad_deg, double* h_fov_deg, double* v_fov_deg,
+                        double* overlap, double* plan_att_tol_deg) {
+  std::ifstream ifs(std::string(ros::package::getPath("inspection") + "/resources/pano_test_cases.csv").c_str());
+
+  // Check if file exists
+  if (!ifs.is_open()) {
+    std::cout << "Could not open file: " << ros::package::getPath("inspection") + "/resources/pano_test_cases.csv"
+              << std::endl;
+    return false;
+  }
+
+  std::string line;
+  std::string label;
+  double test_att_tol_deg;
+  while (getline(ifs, line)) {
+    if (has_only_whitespace_or_comments(line)) continue;
+    std::replace(line.begin(), line.end(), ',', ' ');
+    line.erase(std::remove(line.begin(), line.end(), '"'), line.end());
+
+    std::istringstream is(line);
+    if ((is >> label >> *pan_radius_degrees >> *tilt_rad_deg >> *h_fov_deg >> *v_fov_deg >> *overlap >>
+         *plan_att_tol_deg >> test_att_tol_deg)) {
+      if (FLAGS_panorama_mode == label) {
+        return true;
+      }
+    } else {
+      std::cout << "Ignoring invalid line: " << line  << std::endl;
+      continue;
+    }
+  }
+  std::cout << "Could not find panorama_mode specified"  << std::endl;
+  return false;
 }
 
 void ReadFile(std::string file, isaac_msgs::InspectionGoal &goal) {
@@ -159,12 +198,33 @@ int main(int argc, char *argv[]) {
   cfg_.Initialize(&nh, "behaviors/inspection.config");
   if (!cfg_.Listen(boost::bind(&ReconfigureCallback, _1)))
     return 0;
-  // Set parameters from cmd line
-  cfg_.Set<double>("pan_min", FLAGS_pan_min);
-  cfg_.Set<double>("pan_max", FLAGS_pan_max);
-  cfg_.Set<double>("tilt_min", FLAGS_tilt_min);
-  cfg_.Set<double>("tilt_max", FLAGS_tilt_max);
-  cfg_.Set<double>("overlap", FLAGS_overlap);
+
+  if (FLAGS_panorama_mode == "") {
+    // Set parameters from cmd line
+    cfg_.Set<double>("h_fov", FLAGS_h_fov);
+    cfg_.Set<double>("v_fov", FLAGS_v_fov);
+
+    cfg_.Set<double>("pan_min", FLAGS_pan_min);
+    cfg_.Set<double>("pan_max", FLAGS_pan_max);
+    cfg_.Set<double>("tilt_min", FLAGS_tilt_min);
+    cfg_.Set<double>("tilt_max", FLAGS_tilt_max);
+    cfg_.Set<double>("overlap", FLAGS_overlap);
+    cfg_.Set<double>("att_tol", FLAGS_att_tol);
+  } else {
+      // Read file panorama config
+      double pan_radius_degrees, tilt_rad_deg, h_fov_deg, v_fov_deg, overlap, plan_att_tol_deg;
+      if (ReadPanoramaConfig(&pan_radius_degrees, &tilt_rad_deg, &h_fov_deg, &v_fov_deg, &overlap, &plan_att_tol_deg)) {
+        cfg_.Set<double>("h_fov", h_fov_deg);
+        cfg_.Set<double>("v_fov", v_fov_deg);
+
+        cfg_.Set<double>("pan_min", -pan_radius_degrees);
+        cfg_.Set<double>("pan_max",  pan_radius_degrees);
+        cfg_.Set<double>("tilt_min", -tilt_rad_deg);
+        cfg_.Set<double>("tilt_max",  tilt_rad_deg);
+        cfg_.Set<double>("overlap", overlap);
+        cfg_.Set<double>("att_tol", plan_att_tol_deg);
+      }
+    }
 
   // Initiate inspection library
   inspection::Inspection inspection_(&nh, &cfg_);

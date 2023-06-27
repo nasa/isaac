@@ -21,6 +21,7 @@
 
 // FSW includes
 #include <config_reader/config_reader.h>
+#include <isaac_util/isaac_names.h>
 
 // JSON includes
 #include <jsoncpp/json/json.h>
@@ -108,12 +109,12 @@ class GazeboSensorPluginSciCam : public FreeFlyerSensorPlugin {
 
     // Create publishers for sci cam image, pose, and camera info
     std::string compressed_topic = TOPIC_HARDWARE_SCI_CAM;
-    compressed_topic += "/compressed";
+    compressed_topic += TOPIC_HARDWARE_CAM_SUFFIX_COMPRESSED;
     pub_sci_cam_image_ = nh->advertise<sensor_msgs::CompressedImage>(compressed_topic, 2,
       boost::bind(&GazeboSensorPluginSciCam::ToggleCallback, this),
       boost::bind(&GazeboSensorPluginSciCam::ToggleCallback, this));
     pub_sci_cam_pose_ = nh->advertise<geometry_msgs::PoseStamped>(TOPIC_SCI_CAM_SIM_POSE, 10);
-    pub_sci_cam_info_ = nh->advertise<sensor_msgs::CameraInfo>("/hw/cam_sci_info", 10);
+    pub_sci_cam_info_ = nh->advertise<sensor_msgs::CameraInfo>(TOPIC_HARDWARE_SCI_CAM_INFO, 10);
 
     // Read configuration
     config_reader::ConfigReader config;

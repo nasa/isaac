@@ -22,6 +22,7 @@
   <arg name="world" default="worlds/empty.world"/>
   <arg name="speed" default="1"/>
   <arg name="debug" default="false"/>
+  <arg name="physics" default="ode"/>
 
   <!-- Use simulation time -->
   <param name="/use_sim_time" value="true" />
@@ -31,12 +32,12 @@
   <group if="$(arg debug)">
     <node name="gazebo" pkg="gazebo_ros" type="debug"
           respawn="false" output="screen"
-          args="$(arg world)" />
+          args="-e $(arg physics) $(arg world)" />
   </group>
   <group unless="$(arg debug)">
     <node name="gazebo" pkg="astrobee_gazebo" type="start_server"
           respawn="false" output="screen"
-          args="$(arg world)" />
+          args="-e $(arg physics) $(arg world)" />
   </group>
 
   <!-- start gazebo client -->

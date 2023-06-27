@@ -122,17 +122,17 @@ class Inspection {
   // Timeout on a map check request
   void CheckMapTimeoutCallback();
 
+  // This function transforms the points from the camera rf to the body rf
+  bool TransformList(geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &points_out,
+                      Eigen::Affine3d target_transform);
   // Checks the given points agains whether the target is visible
   // from a camera picture
-  bool VisibilityConstraint(geometry_msgs::PoseArray &points, tf2::Transform target_transform);
+  bool VisibilityConstraint(geometry_msgs::PoseArray &points, Eigen::Affine3d target_transform);
   bool PointInsideCuboid(geometry_msgs::Point const& x,
                          geometry_msgs::Vector3 const& cubemin,
                          geometry_msgs::Vector3 const& cubemax);
   bool ZonesConstraint(geometry_msgs::PoseArray &points);
   bool ObstaclesConstraint(geometry_msgs::PoseArray &points);
-  // This function transforms the points from the camera rf to the body rf
-  bool TransformList(geometry_msgs::PoseArray points_in, geometry_msgs::PoseArray &points_out,
-                      tf2::Transform target_transform);
 
   // Draws the possible inspection poses
   void DrawPoseMarkers(geometry_msgs::PoseArray &points,
@@ -156,7 +156,7 @@ class Inspection {
 
   geometry_msgs::PoseArray goal_;                 // Vector containing inspection goals
   std::vector<geometry_msgs::PoseArray> points_;  // Vector containing inspection poses
-  tf2::Quaternion target_to_cam_rot_;
+  Eigen::Quaterniond target_to_cam_rot_;
 
   // Camera Projection functions
   std::string curr_camera_;
@@ -164,6 +164,7 @@ class Inspection {
 
   // Parameter clients
   ff_util::ConfigServer *cfg_;
+  config_reader::ConfigReader cfg_cam_;
 
   // Inspection parameters
   double horizontal_fov_;
