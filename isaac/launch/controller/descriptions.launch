@@ -17,13 +17,9 @@
 <!-- permissions and limitations under the License.                          -->
 
 <launch>
-  <group ns="object">
-    <param name="sock_description" command='$(find xacro)/xacro --inorder $(find isaac_description)/urdf/socks.urdf.xacro' />
-  </group>
-  <param name="/r2_iss/robot_description"
-  textfile="$(find astrobee_r2)/urdf/model.urdf" />
-  <group ns="cargo">
-  	<param name="/cargo/robot_description"
-    	textfile="$(find isaac_description)/urdf/cargo_bag.urdf.xacro" />
-  </group>
+  <param name="/sock/sock_description" command='$(find xacro)/xacro --inorder $(find isaac_description)/urdf/sock.urdf.xacro' />
+  <param name="/r2_iss/robot_description" textfile="$(find astrobee_r2)/urdf/model.urdf" />
+  <param name="/cargo/robot_description" textfile="$(find isaac_description)/urdf/cargo.urdf.xacro" />
+  <param name="/cargo_double/robot_description" textfile="$(find isaac_description)/urdf/cargo_double.urdf.xacro" />
+
 </launch>
