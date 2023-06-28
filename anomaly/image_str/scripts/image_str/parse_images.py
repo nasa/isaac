@@ -5,9 +5,9 @@ import zipfile
 from collections import OrderedDict
 
 import cv2
-import image_str.craft.craft_utils as craft_utils
-import image_str.craft.file_utils as file_utils
-import image_str.craft.imgproc as imgproc
+import craft.craft_utils as craft_utils
+import craft.file_utils as file_utils
+import craft.imgproc as imgproc
 import image_str.utils as utils
 import IPython
 import jellyfish
@@ -16,8 +16,8 @@ import pandas as pd
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
-from image_str.craft.craft import CRAFT
-from image_str.parseq.strhub.data.module import SceneTextDataModule
+from craft.craft import CRAFT
+from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from skimage import io
 from torch.autograd import Variable
