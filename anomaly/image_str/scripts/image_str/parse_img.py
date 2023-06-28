@@ -267,8 +267,8 @@ def get_closest_rect(rect, rectangles, distance):
 def display_all(image, database, result_path):
     '''
     @param image    openCV array of image
-    @param database pandas database of columns 'label' and 'location' where 'location' is the
-                    upper left and lower right points of the rectangular bounding box
+    @param database pandas database of columns 'label' and 'location' where 'location' is the upper left 
+                    and lower right points of the rectangular bounding box for the corresponding label
     '''
     display_image = image.copy()
     blue = (255, 0, 0)
@@ -324,18 +324,18 @@ def find(image, database, label):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    test_image = 'images/ISS_KIBO.jpg'
+    test_image = 'images/ISS.jpg'
     result_folder = 'result/final/'
 
     test_folder = 'images/'
     image_list, _, _ = file_utils.get_files(test_folder)
 
-    for k, image_path in enumerate(image_list):
-        print("Test image {:d}/{:d}: {:s}\n".format(k+1, len(image_list), image_path), end='\r')
-        database, image = decode_image(image_path, result_folder)
-        print(database)
+    # for k, image_path in enumerate(image_list):
+    #     print("Test image {:d}/{:d}: {:s}\n".format(k+1, len(image_list), image_path), end='\r')
+    #     database, image = decode_image(image_path, result_folder)
+    #     print(database)
 
-    # database, image = decode_image(test_image, result_folder)
-    # print(database)
+    database, image = decode_image(test_image, result_folder)
+    print(database)
 
     IPython.embed()
