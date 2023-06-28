@@ -47,7 +47,7 @@ def get_iou(rect1, rect2):
 def overlap(rect1, rect2):
     # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
     # representing the upper left and lower right points of each rectangle
-    return get_iou(rect1, rect2) > 0.5 
+    return get_iou(rect1, rect2) > 0.5
             # or (rect1[0][0] >= rect2[0][0] and rect1[0][1] >= rect2[0][1] 
             #                                 and rect1[1][0] <= rect2[1][0] and rect1[1][1] <= rect2[1][1]) or
             #                                 ((rect1[0][0] <= rect2[0][0] and rect1[0][1] <= rect2[0][1] 

@@ -145,11 +145,11 @@ def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.
     h, w, _ = image.shape
     # print(w, h, '\n')
 
-    crop_w = 1200
-    crop_h = 1200
+    crop_w = 1500
+    crop_h = 1500
     # print(crop_w, crop_h, '\n')
-    offset_w = 800
-    offset_h = 800
+    offset_w = 1000
+    offset_h = 1000
     # print(offset_w, offset_h, '\n')
 
     end_w = max(w - crop_w + offset_w, offset_w)
@@ -257,11 +257,12 @@ def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.
 
 
 def get_closest_rect(rect, rectangles, distance):
+    rects = []
     for r in rectangles:
         d = utils.get_rect_distance(rect[0], rect[1], r[0], r[1])
         if d < distance:
-            return r
-    return None
+            rects.append(r)
+    return rects
 
 def display_all(image, database, result_path):
     '''
@@ -287,7 +288,7 @@ def similar(label, input_label):
     # [0, 1] where 0 represents two completely dissimilar strings and 1 represents identical strings
     label = label.upper()
     input_label = input_label.upper()
-    return jellyfish.jaro_winkler_similarity(label, input_label) > 0.8 or input_label in label
+    return jellyfish.jaro_winkler_similarity(label, input_label) > 0.8
 
 
 def find(image, database, label):
@@ -304,12 +305,11 @@ def find(image, database, label):
         other_rects = results[word]
         for rect in rectangles:
             # letter_width = round((rect[1][0] - rect[0][0])/len(word))
-            word_height = rect[1][1] - rect[0][1]
+            limit = 2*(rect[1][1] - rect[0][1])
             # print(rect, other_rects)
-            closest_rect = get_closest_rect(rect, other_rects, word_height)
-            if closest_rect is None:
-                continue
-            new_rects.append(utils.get_bounding_box(rect, closest_rect))
+            closest_rect = get_closest_rect(rect, other_rects, limit)
+            for r in closest_rect:
+                new_rects.append(utils.get_bounding_box(rect, r))
         rectangles = new_rects
 
     # result = database.loc[database['label'].apply(compare, args=(label, ))]
@@ -324,18 +324,18 @@ def find(image, database, label):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    test_image = 'images/ISS_quiet.jpg'
+    test_image = 'images/ISS_KIBO.jpg'
     result_folder = 'result/final/'
 
     test_folder = 'images/'
     image_list, _, _ = file_utils.get_files(test_folder)
 
-    # for k, image_path in enumerate(image_list):
-    #     print("Test image {:d}/{:d}: {:s}\n".format(k+1, len(image_list), image_path), end='\r')
-    #     database, image = decode_image(image_path, result_folder)
-    #     print(database)
+    for k, image_path in enumerate(image_list):
+        print("Test image {:d}/{:d}: {:s}\n".format(k+1, len(image_list), image_path), end='\r')
+        database, image = decode_image(image_path, result_folder)
+        print(database)
 
-    database, image = decode_image(test_image, result_folder)
-    print(database)
+    # database, image = decode_image(test_image, result_folder)
+    # print(database)
 
     IPython.embed()
