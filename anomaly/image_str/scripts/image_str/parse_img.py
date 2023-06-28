@@ -91,7 +91,14 @@ def test_net(
 
     return boxes, polys, ret_score_text
 
-def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.pth'):
+def decode_image(image_path, result_folder, write=True, trained_model='models/craft_mlt_25k.pth'):
+    '''
+    @param image_path
+    @param result_folder
+    @param write
+    @param trained_model
+    @
+    '''
     cuda = False
     refine = False
     poly = False
@@ -143,14 +150,11 @@ def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.
     image = cv2.imread(image_path)
 
     h, w, _ = image.shape
-    # print(w, h, '\n')
 
     crop_w = 1500
     crop_h = 1500
-    # print(crop_w, crop_h, '\n')
     offset_w = 1000
     offset_h = 1000
-    # print(offset_w, offset_h, '\n')
 
     end_w = max(w - crop_w + offset_w, offset_w)
     end_h = max(h - crop_h + offset_h, offset_h)
@@ -158,39 +162,6 @@ def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.
     edge_border = 15
     total = round((end_w / offset_w) * (end_h / offset_h))
     num = 0
-
-    # print('Whole image')
-    # bboxes, polys, score_text = test_net(net, image, text_threshold, link_threshold, low_text, cuda, poly, refine_net)
-
-    # for box in polys:
-    #     box = np.array(box).astype(np.int32)
-    #     x_coordinates = box[:, 0]
-    #     y_coordinates = box[:, 1]
-    #     upper_left = np.array((min(x_coordinates), min(y_coordinates)))
-    #     lower_right = np.array((max(x_coordinates), max(y_coordinates)))
-    #     cropped_image = utils.crop_image(image, upper_left[0], upper_left[1], lower_right[0], lower_right[1])
-    #     new_img = Image.fromarray(np.array(cropped_image)).convert('RGB')
-    #     new_img = img_transform(new_img).unsqueeze(0)
-
-    #     logits = parseq(new_img)
-    #     logits.shape  # torch.Size([1, 26, 95]), 94 characters + [EOS] symbol
-
-    #     # Greedy decoding
-    #     pred = logits.softmax(-1)
-    #     label, confidence = parseq.tokenizer.decode(pred)
-    #     location = np.array([upper_left, lower_right])
-    #     overlap_result = df.loc[df['location'].apply(utils.overlap, args=(location, ))]
-    #     print(label[0])
-    #     if overlap_result.empty:
-    #         df.loc[len(df)] = [label[0], (upper_left, lower_right)]
-    #     else:
-    #         index = overlap_result.index[0]
-    #         old_label = df.at[index, 'label']
-    #         old_location = df.at[index, 'location']
-    #         new_label = old_label if len(old_label) >= len(label[0]) else label[0]
-    #         new_location = utils.get_bounding_box(old_location, location)
-    #         new_row = np.array([new_label, new_location], dtype=object)
-    #         df.iloc[index] = new_row
 
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
@@ -251,7 +222,7 @@ def decode_image(image_path, result_folder, trained_model='models/craft_mlt_25k.
                             new_row = np.array([new_label, new_location], dtype=object)
                             df.iloc[index] = new_row
 
-    display_all(image, df, result_path)
+    image = display_all(image, df, result_path, write)
     print("elapsed time : {}s".format(time.time() - t))
     return df, image
 
@@ -264,11 +235,12 @@ def get_closest_rect(rect, rectangles, distance):
             rects.append(r)
     return rects
 
-def display_all(image, database, result_path):
+def display_all(image, database, result_path, write=True):
     '''
     @param image    openCV array of image
     @param database pandas database of columns 'label' and 'location' where 'location' is the upper left 
                     and lower right points of the rectangular bounding box for the corresponding label
+    @returns array of image with the labels and boundary boxes displayed
     '''
     display_image = image.copy()
     blue = (255, 0, 0)
@@ -280,9 +252,11 @@ def display_all(image, database, result_path):
         rect = row['location']
         display_image = cv2.rectangle(display_image, rect[0], rect[1], blue, 10)
         display_image = cv2.putText(display_image, row['label'], rect[0], font, 1, red, thickness, cv2.LINE_AA)
-    
-    cv2.imwrite(result_path, display_image)
 
+    if write:
+        cv2.imwrite(result_path, display_image)
+
+    return display_image
 
 def similar(label, input_label):
     # [0, 1] where 0 represents two completely dissimilar strings and 1 represents identical strings
