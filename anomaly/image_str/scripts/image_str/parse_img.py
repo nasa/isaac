@@ -91,7 +91,7 @@ def test_net(
 
     return boxes, polys, ret_score_text
 
-def decode_image(image_path, result_folder, write=True, trained_model='models/craft_mlt_25k.pth'):
+def decode_image(image_path, result_folder=None, trained_model='models/craft_mlt_25k.pth'):
     '''
     @param image_path
     @param result_folder
@@ -111,7 +111,7 @@ def decode_image(image_path, result_folder, write=True, trained_model='models/cr
     refiner_model = "weights/craft_refiner_CTW1500.pth"
     # trained_model = 'models/craft_mlt_25k.pth'
 
-    if not os.path.isdir(result_folder):
+    if result_folder is not None and not os.path.isdir(result_folder):
         os.mkdir(result_folder)
     # ============================ Initialization ============================
 
@@ -133,6 +133,7 @@ def decode_image(image_path, result_folder, write=True, trained_model='models/cr
 
     net.eval()
     refine_net = None
+    result_path = None
 
     # Load model and image transforms for parseq
     parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
@@ -144,7 +145,6 @@ def decode_image(image_path, result_folder, write=True, trained_model='models/cr
     t = time.time()
 
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
-    result_path = result_folder + filename + '.jpg'
 
     # load data
     image = cv2.imread(image_path)
@@ -222,9 +222,12 @@ def decode_image(image_path, result_folder, write=True, trained_model='models/cr
                             new_row = np.array([new_label, new_location], dtype=object)
                             df.iloc[index] = new_row
 
-    image = display_all(image, df, result_path, write)
+    if result_folder is not None:
+        result_path = result_folder + filename + '.jpg'
+
+    result_image = display_all(image, df, result_path)
     print("elapsed time : {}s".format(time.time() - t))
-    return df, image
+    return df, result_image, image
 
 
 def get_closest_rect(rect, rectangles, distance):
@@ -235,7 +238,7 @@ def get_closest_rect(rect, rectangles, distance):
             rects.append(r)
     return rects
 
-def display_all(image, database, result_path, write=True):
+def display_all(image, database, result_path=None):
     '''
     @param image    openCV array of image
     @param database pandas database of columns 'label' and 'location' where 'location' is the upper left 
@@ -247,14 +250,17 @@ def display_all(image, database, result_path, write=True):
     red = (0, 0, 255)
     thickness = 2
     font = cv2.FONT_HERSHEY_SIMPLEX
-    
+    result = ''
     for _, row in database.iterrows():
         rect = row['location']
         display_image = cv2.rectangle(display_image, rect[0], rect[1], blue, 10)
         display_image = cv2.putText(display_image, row['label'], rect[0], font, 1, red, thickness, cv2.LINE_AA)
+        result += row['label'] + ' ' + str(row['location']) + '\n'
 
-    if write:
+    if result_path is not None:
         cv2.imwrite(result_path, display_image)
+        with open(result_path.split('.')[0] + '.txt', "w") as text_file:
+            text_file.write(result)
 
     return display_image
 
@@ -273,7 +279,6 @@ def find(image, database, label):
         results[l] = l_result['location'].tolist()
 
     rectangles = np.array(results[words[0]])
-    print(results)
     for word in words[1:]:
         new_rects = []
         other_rects = results[word]
@@ -291,11 +296,11 @@ def find(image, database, label):
     new_image = np.array(image)
     for rect in rectangles:
         new_image = cv2.rectangle(new_image, rect[0], rect[1], (255, 0, 0), 10)
-    cv2.namedWindow("Image", 0)
-    cv2.resizeWindow("Image", 1000, 1000)
-    cv2.imshow("Image", new_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.namedWindow("Image", 0)
+    # cv2.resizeWindow("Image", 1000, 1000)
+    # cv2.imshow("Image", new_image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     return new_image
 
 if __name__ == '__main__':
