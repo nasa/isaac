@@ -334,7 +334,7 @@ def display_all(image, database, result_path=None):
 
     if result_path is not None:
         cv2.imwrite(result_path, display_image)
-        with open(result_path.split(".")[0] + ".txt", "w") as text_file:
+        with open(result_path[:-4] + ".txt", "w") as text_file:
             text_file.write(result)
 
     return display_image
@@ -380,9 +380,9 @@ def find(image, database, label):
 
 if __name__ == "__main__":
     test_image = "images/ISS.jpg"
-    result_folder = "result/final/"
+    result_folder = "result/final/beehive/queen/"
 
-    test_folder = "images/"
+    test_folder = "images/beehive/queen"
     image_list, _, _ = file_utils.get_files(test_folder)
 
     for k, image_path in enumerate(image_list):
@@ -391,7 +391,7 @@ if __name__ == "__main__":
             end="\r",
         )
         database, result, image = decode_image(image_path, result_folder)
-        print(database)
+        # print(database)
 
     # database, result, image = decode_image(test_image, result_folder)
     # print(database)
