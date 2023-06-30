@@ -4,10 +4,10 @@ import time
 import zipfile
 from collections import OrderedDict
 
-import cv2
 import craft.craft_utils as craft_utils
 import craft.file_utils as file_utils
 import craft.imgproc as imgproc
+import cv2
 import image_str.utils as utils
 import IPython
 import jellyfish
@@ -93,6 +93,7 @@ def test_net(
     ret_score_text = imgproc.cvt2HeatmapImg(render_img)
 
     return boxes, polys, ret_score_text
+
 
 def decode_images(image_folder, result_folder):
     cuda = False
@@ -261,16 +262,24 @@ def decode_images(image_folder, result_folder):
                         upper_left = (upper_left[0] + x, upper_left[1] + y)
                         lower_right = (lower_right[0] + x, lower_right[1] + y)
                         new_location = (upper_left, lower_right)
-                        overlap_result = df.loc[df['location'].apply(utils.overlap, args=(new_location,  ))]
+                        overlap_result = df.loc[
+                            df["location"].apply(utils.overlap, args=(new_location,))
+                        ]
 
                         if overlap_result.empty:
                             df.loc[len(df)] = [label[0], (upper_left, lower_right)]
                         else:
                             index = overlap_result.index[0]
-                            old_label = df.at[index, 'label']
-                            old_location = df.at[index, 'location']
-                            new_label = old_label if len(old_label) >= len(label[0]) else label[0]
-                            new_location = utils.get_bounding_box(old_location, new_location)
+                            old_label = df.at[index, "label"]
+                            old_location = df.at[index, "location"]
+                            new_label = (
+                                old_label
+                                if len(old_label) >= len(label[0])
+                                else label[0]
+                            )
+                            new_location = utils.get_bounding_box(
+                                old_location, new_location
+                            )
                             new_row = np.array([new_label, new_location], dtype=object)
                             df.iloc[index] = new_row
 

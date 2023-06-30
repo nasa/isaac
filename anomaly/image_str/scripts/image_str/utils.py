@@ -6,12 +6,12 @@ def get_euclidean_distance(p1, p2):
 
 
 def get_iou(rect1, rect2):
-    '''
+    """
     Calculates the intersection over union given two rectangles
 
     rectangles in the form of [(upper_left, lower_right)] coordinates
 
-    '''
+    """
     x1_ul, y1_ul = rect1[0]
     x1_lr, y1_lr = rect1[1]
     x2_ul, y2_ul = rect2[0]
@@ -43,24 +43,29 @@ def get_iou(rect1, rect2):
     return iou
 
 
-
 def overlap(rect1, rect2):
     # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
     # representing the upper left and lower right points of each rectangle
     return get_iou(rect1, rect2) > 0.5
-            # or (rect1[0][0] >= rect2[0][0] and rect1[0][1] >= rect2[0][1] 
-            #                                 and rect1[1][0] <= rect2[1][0] and rect1[1][1] <= rect2[1][1]) or
-            #                                 ((rect1[0][0] <= rect2[0][0] and rect1[0][1] <= rect2[0][1] 
-            #                                 and rect1[1][0] >= rect2[1][0] and rect1[1][1] >= rect2[1][1])))
+    # or (rect1[0][0] >= rect2[0][0] and rect1[0][1] >= rect2[0][1]
+    #                                 and rect1[1][0] <= rect2[1][0] and rect1[1][1] <= rect2[1][1]) or
+    #                                 ((rect1[0][0] <= rect2[0][0] and rect1[0][1] <= rect2[0][1]
+    #                                 and rect1[1][0] >= rect2[1][0] and rect1[1][1] >= rect2[1][1])))
+
 
 def get_bounding_box(rect1, rect2):
     # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
     # representing the upper left and lower right points of each rectangle
 
-    upper_left = np.array((min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1])))
-    lower_right = np.array((max(rect1[1][0], rect2[1][0]), max(rect1[1][1], rect2[1][1])))
+    upper_left = np.array(
+        (min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1]))
+    )
+    lower_right = np.array(
+        (max(rect1[1][0], rect2[1][0]), max(rect1[1][1], rect2[1][1]))
+    )
 
     return np.array((upper_left, lower_right))
+
 
 def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
     x1, y1 = upper_a
