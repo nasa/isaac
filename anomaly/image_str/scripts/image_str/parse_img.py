@@ -1,4 +1,6 @@
+import json
 import os
+import subprocess
 import time
 from collections import OrderedDict
 
@@ -119,6 +121,19 @@ def decode_image(
         os.mkdir(result_folder)
     # ============================ Initialization ============================
 
+    # Specify the ros command for 3D position
+    bag_name = ""
+    json_file = "data.json"
+    ros_command = [
+        "rosrun",
+        "pano_view",
+        "find_point_coordinate",
+        "--bag_name",
+        bag_name,
+        "--json_config",
+        json_file,
+    ]
+
     # load net
     net = CRAFT()  # initialize
 
@@ -154,6 +169,14 @@ def decode_image(
     image = cv2.imread(image_path)
 
     h, w, _ = image.shape
+
+    data = {
+        "timestamp": float(filename),
+        "camera": "sci_cam",
+        "coord": {"x": 0, "y": 0},
+        "width": w,
+        "height": h,
+    }
 
     crop_w = 1500
     crop_h = 1500
@@ -205,6 +228,10 @@ def decode_image(
         overlap_result = df.loc[
             df["location"].apply(utils.overlap, args=(new_location,))
         ]
+
+        # Find 3D position
+        # execute_command = ['./executable', 'param1', 'param2', 'param3']
+        # subprocess.run(execute_command, check=True)
 
         if overlap_result.empty:
             # print('empty')
@@ -275,9 +302,26 @@ def decode_image(
                 ]
 
                 if overlap_result.empty:
-                    df.loc[len(df)] = [label[0], np.array((upper_left, lower_right))]
+                    new_location = np.array((upper_left, lower_right))
+                    index = len(df)
+                    data["coord"]["x"] = (new_location[1][0] - new_location[0][0]) / 2
+                    data["coord"]["y"] = (new_location[1][1] - new_location[0][1]) / 2
+
+                    with open(json_file, "w") as file:
+                        json.dump(data, file)
+
+                    # Run the ROS command using subprocess
+                    process = subprocess.Popen(
+                        ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
+
+                    # Wait for the process to finish and capture the output
+                    stdout, stderr = process.communicate()
+                    print(stdout)
+
+                    df.loc[index] = [label[0], new_location]
                 else:
-                    for index, row in overlap_result.iterrows():
+                    for i, row in overlap_result.iterrows():
                         # print(label[0], row['label'])
                         old_label = row["label"]
                         old_location = row["location"]
@@ -292,7 +336,29 @@ def decode_image(
                                 old_location, new_location
                             )
                             new_row = np.array([new_label, new_location], dtype=object)
-                            df.iloc[index] = new_row
+
+                            data["coord"]["x"] = (
+                                new_location[1][0] - new_location[0][0]
+                            ) / 2
+                            data["coord"]["y"] = (
+                                new_location[1][1] - new_location[0][1]
+                            ) / 2
+
+                            with open(json_file, "w") as file:
+                                json.dump(data, file)
+
+                            # Run the ROS command using subprocess
+                            process = subprocess.Popen(
+                                ros_command,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                            )
+
+                            # Wait for the process to finish and capture the output
+                            stdout, stderr = process.communicate()
+                            print(stdout)
+
+                            df.iloc[i] = new_row
 
     if result_folder is not None:
         result_path = result_folder + filename + ".jpg"
