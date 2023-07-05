@@ -4,6 +4,9 @@ import subprocess
 import time
 from collections import OrderedDict
 
+import warnings
+import re
+
 import craft.craft_utils as craft_utils
 import craft.file_utils as file_utils
 import craft.imgproc as imgproc
@@ -132,6 +135,22 @@ def get_bag_file(timestamp):
     return None
 
 
+def parse_3D_result(string):
+    print('3D result\n')
+    print(string + '\n')
+    lines = string.split('\n')
+    print(lines)
+    timestamps = re.findall(r"[-+]?\d*\.\d+|\d+", lines[0])
+    distance = re.findall(r"[-+]?\d*\.\d+|\d+", lines[1])
+    pcl = re.findall(r"[-+]?\d*\.\d+|\d+", lines[2])
+    mesh = re.findall(r"[-+]?\d*\.\d+|\d+", lines[3])
+    results = {'Closest Timestamp Depth': float(timestamps[0]), 
+                'Closest Timestamp Pose': float(timestamps[1]),
+                'Point Cloud to Vector Distance': float(distance[0]),
+                'PCL Intersection': {'x': pcl[0], 'y': pcl[1], 'z': pcl[2], 'roll': pcl[3], 'pitch': pcl[4], 'yaw': pcl[5]},
+                'Mesh Intersection': {'x': mesh[0], 'y': mesh[1], 'z': mesh[2], 'pitch': mesh[3], 'yaw': mesh[4]}}
+    return results
+
 def decode_image(
     image_path, result_folder=None, trained_model="models/craft_mlt_25k.pth"
 ):
@@ -160,8 +179,11 @@ def decode_image(
     # ============================ Initialization ============================
 
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
-
     bag_name = get_bag_file(float(filename))
+    if bag_name is not None:
+        bag_name = '/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/' + bag_name
+    else:
+        return None
 
     print(bag_name)
     # Specify the ros command for 3D position
@@ -291,7 +313,7 @@ def decode_image(
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
             img = utils.crop_image(image, x, y, x + crop_w, y + crop_h)
-            print("Test part {:d}/{:d}".format(num + 1, total), end="\r")
+            print("Test part {:d}/{:d}".format(num + 1, total))
             bboxes, polys, score_text = test_net(
                 net,
                 img,
@@ -345,10 +367,10 @@ def decode_image(
                     new_location = np.array((upper_left, lower_right))
                     index = len(df)
                     data["coord"]["x"] = int(
-                        (new_location[1][0] - new_location[0][0]) / 2
+                        (new_location[1][0] + new_location[0][0]) / 2
                     )
                     data["coord"]["y"] = int(
-                        (new_location[1][1] - new_location[0][1]) / 2
+                        (new_location[1][1] + new_location[0][1]) / 2
                     )
 
                     with open(json_file, "w") as file:
@@ -361,8 +383,14 @@ def decode_image(
 
                     # Wait for the process to finish and capture the output
                     stdout, stderr = process.communicate()
-                    print(stdout)
-                    print(stderr)
+                    stdout = stdout.decode()
+                    print('error: ', stderr)
+                    stderr = stderr.decode()
+                    if len(stderr) != 0:
+                        continue
+                    
+                    result_positions = parse_3D_result(stdout)
+                    print(result_positions)
 
                     df.loc[index] = [label[0], new_location]
                 else:
@@ -382,26 +410,31 @@ def decode_image(
                             )
                             new_row = np.array([new_label, new_location], dtype=object)
 
-                            data["coord"]["x"] = (
-                                new_location[1][0] - new_location[0][0]
-                            ) / 2
-                            data["coord"]["y"] = (
-                                new_location[1][1] - new_location[0][1]
-                            ) / 2
+                            data["coord"]["x"] = int(
+                                (new_location[1][0] + new_location[0][0]) / 2
+                            )
+                            data["coord"]["y"] = int(
+                                (new_location[1][1] + new_location[0][1]) / 2
+                            )
 
                             with open(json_file, "w") as file:
                                 json.dump(data, file)
 
                             # Run the ROS command using subprocess
                             process = subprocess.Popen(
-                                ros_command,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
+                                ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
                             )
 
                             # Wait for the process to finish and capture the output
                             stdout, stderr = process.communicate()
-                            print(stdout)
+                            print('error: ', stderr)
+                            stdout = stdout.decode()
+                            stderr = stderr.decode()
+                            if len(stderr) != 0:
+                                continue
+                            
+                            result_positions = parse_3D_result(stdout)
+                            print(result_positions)
 
                             df.iloc[i] = new_row
 
@@ -490,27 +523,31 @@ def find(image, database, label):
 
 
 if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
     os.environ[
         "ASTROBEE_CONFIG_DIR"
-    ] = "/home/astrobee/ros_ws/astrobee/src/astrobee/config"
+    ] = "/home/rlu3/astrobee/src/astrobee/config"
     os.environ[
         "ASTROBEE_RESOURCE_DIR"
-    ] = "/home/astrobee/ros_ws/astrobee/src/astrobee/resource"
-    os.environ["ASTROBEE_ROBOT"] = "bsharp"
+    ] = "/home/rlu3/astrobee/src/astrobee/resource"
+    os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
     test_image = "images/ISS.jpg"
-    result_folder = "result/final/beehive/queen/"
+    result_folder = "result/beehive/queen/"
 
-    test_folder = "images/beehive/queen"
+    test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
     image_list, _, _ = file_utils.get_files(test_folder)
 
     for k, image_path in enumerate(image_list):
         print(
-            "Test image {:d}/{:d}: {:s}\n".format(k + 1, len(image_list), image_path),
-            end="\r",
+            "Test image {:d}/{:d}: {:s}\n".format(k + 1, len(image_list), image_path)
         )
-        database, result, image = decode_image(image_path, result_folder)
+        result = decode_image(image_path, result_folder)
+        if result is None:
+            print('Skipped Image')
+            continue
+        database, result, image = result
         # print(database)
 
     # database, result, image = decode_image(test_image, result_folder)
