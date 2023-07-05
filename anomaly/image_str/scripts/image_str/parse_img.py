@@ -94,6 +94,44 @@ def test_net(
     return boxes, polys, ret_score_text
 
 
+def get_bag_file(timestamp):
+    bag_files = {
+        "20220711_1459_survey_usl_to_jem.bag": (1657551567.745524, 1657552130.3),
+        "20220711_1123_survey_test.bag": (1657538626.193575, 1657538635.45),
+        "20220711_1223_survey_jem_to_usl.bag": (1657542216.747706, 1657544398.74),
+        "20220711_1259_survey_usl_bay3_std_panorama_run1.bag": (
+            1657544400.135549,
+            1657545492.46,
+        ),
+        "20220711_1318_survey_usl_bay2_std_panorama_run1.bag": (
+            1657545494.376898,
+            1657547254.04,
+        ),
+        "20220711_1358_survey_hatch_inspection_usl_fwd_run1.bag": (
+            1657547939.494802,
+            1657548383.24,
+        ),
+        "20220711_1433_survey_usl_bay1_std_panorama_run1.bag": (
+            1657550015.257639,
+            1657550898.37,
+        ),
+        "20220711_1452_survey_hatch_inspection_usl_fwd_close_run_1.bag": (
+            1657551142.474949,
+            1657551422.48,
+        ),
+        "20220711_1407_survey_usl_fwd_stereo_mapping_run_1.bag": (
+            1657548455.916899,
+            1657549490.51,
+        ),
+    }
+
+    for file in bag_files:
+        if bag_files[file][0] <= timestamp and timestamp <= bag_files[file][1]:
+            return file
+
+    return None
+
+
 def decode_image(
     image_path, result_folder=None, trained_model="models/craft_mlt_25k.pth"
 ):
@@ -121,8 +159,12 @@ def decode_image(
         os.mkdir(result_folder)
     # ============================ Initialization ============================
 
+    filename, file_ext = os.path.splitext(os.path.basename(image_path))
+
+    bag_name = get_bag_file(float(filename))
+
+    print(bag_name)
     # Specify the ros command for 3D position
-    bag_name = ""
     json_file = "data.json"
     ros_command = [
         "rosrun",
@@ -162,8 +204,6 @@ def decode_image(
     # ============================ Start Processing ============================
 
     t = time.time()
-
-    filename, file_ext = os.path.splitext(os.path.basename(image_path))
 
     # load data
     image = cv2.imread(image_path)
@@ -304,8 +344,12 @@ def decode_image(
                 if overlap_result.empty:
                     new_location = np.array((upper_left, lower_right))
                     index = len(df)
-                    data["coord"]["x"] = (new_location[1][0] - new_location[0][0]) / 2
-                    data["coord"]["y"] = (new_location[1][1] - new_location[0][1]) / 2
+                    data["coord"]["x"] = int(
+                        (new_location[1][0] - new_location[0][0]) / 2
+                    )
+                    data["coord"]["y"] = int(
+                        (new_location[1][1] - new_location[0][1]) / 2
+                    )
 
                     with open(json_file, "w") as file:
                         json.dump(data, file)
@@ -318,6 +362,7 @@ def decode_image(
                     # Wait for the process to finish and capture the output
                     stdout, stderr = process.communicate()
                     print(stdout)
+                    print(stderr)
 
                     df.loc[index] = [label[0], new_location]
                 else:
@@ -445,6 +490,15 @@ def find(image, database, label):
 
 
 if __name__ == "__main__":
+    os.environ[
+        "ASTROBEE_CONFIG_DIR"
+    ] = "/home/astrobee/ros_ws/astrobee/src/astrobee/config"
+    os.environ[
+        "ASTROBEE_RESOURCE_DIR"
+    ] = "/home/astrobee/ros_ws/astrobee/src/astrobee/resource"
+    os.environ["ASTROBEE_ROBOT"] = "bsharp"
+    os.environ["ASTROBEE_WORLD"] = "iss"
+
     test_image = "images/ISS.jpg"
     result_folder = "result/final/beehive/queen/"
 
