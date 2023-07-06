@@ -136,19 +136,27 @@ def get_bag_file(timestamp):
 
 
 def parse_3D_result(string):
-    print('3D result\n')
-    print(string + '\n')
     lines = string.split('\n')
-    print(lines)
     timestamps = re.findall(r"[-+]?\d*\.\d+|\d+", lines[0])
-    distance = re.findall(r"[-+]?\d*\.\d+|\d+", lines[1])
-    pcl = re.findall(r"[-+]?\d*\.\d+|\d+", lines[2])
-    mesh = re.findall(r"[-+]?\d*\.\d+|\d+", lines[3])
+    vector = re.findall(r"[-+]?\d*\.\d+|\d+", lines[1])
+    distance = re.findall(r"[-+]?\d*\.\d+|\d+", lines[2])
+    pcl = re.findall(r"[-+]?\d*\.\d+|\d+", lines[3])
+    pcl = [float(i) for i in pcl]
+    mesh = re.findall(r"[-+]?\d*\.\d+|\d+", lines[4])
+    mesh = [float(i) for i in mesh]
     results = {'Closest Timestamp Depth': float(timestamps[0]), 
                 'Closest Timestamp Pose': float(timestamps[1]),
+                'Vector': tuple(float(i) for i in vector),
                 'Point Cloud to Vector Distance': float(distance[0]),
-                'PCL Intersection': {'x': pcl[0], 'y': pcl[1], 'z': pcl[2], 'roll': pcl[3], 'pitch': pcl[4], 'yaw': pcl[5]},
-                'Mesh Intersection': {'x': mesh[0], 'y': mesh[1], 'z': mesh[2], 'pitch': mesh[3], 'yaw': mesh[4]}}
+                'PCL Intersection': None,
+                'Mesh Intersection': None}
+
+    if len(pcl) != 0:
+        results['PCL Intersection'] = {'x': pcl[0], 'y': pcl[1], 'z': pcl[2], 'roll': pcl[3], 'pitch': pcl[4], 'yaw': pcl[5]}
+    
+    if len(mesh) != 0:
+        results['Mesh Intersection'] = {'x': mesh[0], 'y': mesh[1], 'z': mesh[2], 'roll': mesh[3], 'pitch': mesh[4], 'yaw': mesh[5]}
+
     return results
 
 def decode_image(
@@ -179,13 +187,13 @@ def decode_image(
     # ============================ Initialization ============================
 
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
+
     bag_name = get_bag_file(float(filename))
     if bag_name is not None:
         bag_name = '/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/' + bag_name
     else:
         return None
 
-    print(bag_name)
     # Specify the ros command for 3D position
     json_file = "data.json"
     ros_command = [
@@ -313,7 +321,7 @@ def decode_image(
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
             img = utils.crop_image(image, x, y, x + crop_w, y + crop_h)
-            print("Test part {:d}/{:d}".format(num + 1, total))
+            print("\rTest part {:d}/{:d}".format(num + 1, total))
             bboxes, polys, score_text = test_net(
                 net,
                 img,
@@ -366,32 +374,6 @@ def decode_image(
                 if overlap_result.empty:
                     new_location = np.array((upper_left, lower_right))
                     index = len(df)
-                    data["coord"]["x"] = int(
-                        (new_location[1][0] + new_location[0][0]) / 2
-                    )
-                    data["coord"]["y"] = int(
-                        (new_location[1][1] + new_location[0][1]) / 2
-                    )
-
-                    with open(json_file, "w") as file:
-                        json.dump(data, file)
-
-                    # Run the ROS command using subprocess
-                    process = subprocess.Popen(
-                        ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
-
-                    # Wait for the process to finish and capture the output
-                    stdout, stderr = process.communicate()
-                    stdout = stdout.decode()
-                    print('error: ', stderr)
-                    stderr = stderr.decode()
-                    if len(stderr) != 0:
-                        continue
-                    
-                    result_positions = parse_3D_result(stdout)
-                    print(result_positions)
-
                     df.loc[index] = [label[0], new_location]
                 else:
                     for i, row in overlap_result.iterrows():
@@ -410,41 +392,58 @@ def decode_image(
                             )
                             new_row = np.array([new_label, new_location], dtype=object)
 
-                            data["coord"]["x"] = int(
-                                (new_location[1][0] + new_location[0][0]) / 2
-                            )
-                            data["coord"]["y"] = int(
-                                (new_location[1][1] + new_location[0][1]) / 2
-                            )
-
-                            with open(json_file, "w") as file:
-                                json.dump(data, file)
-
-                            # Run the ROS command using subprocess
-                            process = subprocess.Popen(
-                                ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                            )
-
-                            # Wait for the process to finish and capture the output
-                            stdout, stderr = process.communicate()
-                            print('error: ', stderr)
-                            stdout = stdout.decode()
-                            stderr = stderr.decode()
-                            if len(stderr) != 0:
-                                continue
-                            
-                            result_positions = parse_3D_result(stdout)
-                            print(result_positions)
-
                             df.iloc[i] = new_row
 
     if result_folder is not None:
         result_path = result_folder + filename + ".jpg"
 
     result_image = display_all(image, df, result_path)
+    locations = get_all_locations(df, data, bag_name, ros_command, result_path)
     print("elapsed time : {}s".format(time.time() - t))
-    return df, result_image, image
+    return df, result_image, image, locations
 
+def get_all_locations(database, data, bag_name, ros_command, result_path):
+    locations = {}
+    total = len(database)
+    with open(result_path[:-4] + '_locations.txt', 'w') as f:
+        for i, row in database.iterrows():
+            print("\rGetting Locations {:d}/{:d}".format(i+1, total))
+            label = row['label']
+            new_location = row['location']
+            data["coord"]["x"] = int(
+                (new_location[1][0] + new_location[0][0]) / 2
+            )
+            data["coord"]["y"] = int(
+                (new_location[1][1] + new_location[0][1]) / 2
+            )
+
+            json_file = ros_command[-1]
+
+            with open(json_file, "w") as file:
+                json.dump(data, file)
+
+            # Run the ROS command using subprocess
+            process = subprocess.Popen(
+                ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+
+            # Wait for the process to finish and capture the output
+            stdout, stderr = process.communicate()
+            print('error: ', stderr)
+            stdout = stdout.decode()
+            stderr = stderr.decode()
+            if len(stderr) != 0:
+                continue
+            
+            result_positions = parse_3D_result(stdout)
+
+            locations[label] = result_positions['PCL Intersection']
+            # print(result_positions)
+            f.write('Label:%s\n' % label)
+            for key, value in result_positions.items(): 
+                f.write('%s:%s\n' % (key, value))
+            f.write('\n')
+    return locations
 
 def get_closest_rect(rect, rectangles, distance):
     rects = []
@@ -496,7 +495,7 @@ def find(image, database, label):
     @param image array representing image
     @param database database of labels (database['labels']) and their corresponding boundary boxes (database['location'])
     @param label text to search for
-    @returns array representing image with label boxed if found
+    @returns array representing image with label boxed if found and a list of all labels cropped from original image
     """
     words = label.split()
     results = {}
@@ -517,10 +516,14 @@ def find(image, database, label):
                 new_rects.append(utils.get_bounding_box(rect, r))
         rectangles = new_rects
     new_image = np.array(image)
+
+    offset = 10
+    cropped_images = []
     for rect in rectangles:
         new_image = cv2.rectangle(new_image, rect[0], rect[1], (255, 0, 0), 10)
-    return new_image
+        cropped_images.append(utils.crop_image(image, rect[0][0] - offset, rect[0][1] - offset, rect[1][0] + offset, rect[1][1] + offset))
 
+    return new_image, cropped_images
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -533,7 +536,7 @@ if __name__ == "__main__":
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
-    test_image = "images/ISS.jpg"
+    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657544476.435.jpg"
     result_folder = "result/beehive/queen/"
 
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
@@ -541,16 +544,16 @@ if __name__ == "__main__":
 
     for k, image_path in enumerate(image_list):
         print(
-            "Test image {:d}/{:d}: {:s}\n".format(k + 1, len(image_list), image_path)
+            "\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path)
         )
         result = decode_image(image_path, result_folder)
         if result is None:
             print('Skipped Image')
             continue
-        database, result, image = result
+        database, result_image, image, locations = result
         # print(database)
-
-    # database, result, image = decode_image(test_image, result_folder)
+    # result = decode_image(test_image, result_folder)
+    # database, result_image, image, locations = result
     # print(database)
 
     IPython.embed()
