@@ -1,11 +1,10 @@
 import json
 import os
+import re
 import subprocess
 import time
-from collections import OrderedDict
-
 import warnings
-import re
+from collections import OrderedDict
 
 import craft.craft_utils as craft_utils
 import craft.file_utils as file_utils
@@ -136,7 +135,7 @@ def get_bag_file(timestamp):
 
 
 def parse_3D_result(string):
-    lines = string.split('\n')
+    lines = string.split("\n")
     timestamps = re.findall(r"[-+]?\d*\.\d+|\d+", lines[0])
     vector = re.findall(r"[-+]?\d*\.\d+|\d+", lines[1])
     distance = re.findall(r"[-+]?\d*\.\d+|\d+", lines[2])
@@ -144,20 +143,37 @@ def parse_3D_result(string):
     pcl = [float(i) for i in pcl]
     mesh = re.findall(r"[-+]?\d*\.\d+|\d+", lines[4])
     mesh = [float(i) for i in mesh]
-    results = {'Closest Timestamp Depth': float(timestamps[0]), 
-                'Closest Timestamp Pose': float(timestamps[1]),
-                'Vector': tuple(float(i) for i in vector),
-                'Point Cloud to Vector Distance': float(distance[0]),
-                'PCL Intersection': None,
-                'Mesh Intersection': None}
+    results = {
+        "Closest Timestamp Depth": float(timestamps[0]),
+        "Closest Timestamp Pose": float(timestamps[1]),
+        "Vector": tuple(float(i) for i in vector),
+        "Point Cloud to Vector Distance": float(distance[0]),
+        "PCL Intersection": None,
+        "Mesh Intersection": None,
+    }
 
     if len(pcl) != 0:
-        results['PCL Intersection'] = {'x': pcl[0], 'y': pcl[1], 'z': pcl[2], 'roll': pcl[3], 'pitch': pcl[4], 'yaw': pcl[5]}
-    
+        results["PCL Intersection"] = {
+            "x": pcl[0],
+            "y": pcl[1],
+            "z": pcl[2],
+            "roll": pcl[3],
+            "pitch": pcl[4],
+            "yaw": pcl[5],
+        }
+
     if len(mesh) != 0:
-        results['Mesh Intersection'] = {'x': mesh[0], 'y': mesh[1], 'z': mesh[2], 'roll': mesh[3], 'pitch': mesh[4], 'yaw': mesh[5]}
+        results["Mesh Intersection"] = {
+            "x": mesh[0],
+            "y": mesh[1],
+            "z": mesh[2],
+            "roll": mesh[3],
+            "pitch": mesh[4],
+            "yaw": mesh[5],
+        }
 
     return results
+
 
 def decode_image(
     image_path, result_folder=None, trained_model="models/craft_mlt_25k.pth"
@@ -190,7 +206,7 @@ def decode_image(
 
     bag_name = get_bag_file(float(filename))
     if bag_name is not None:
-        bag_name = '/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/' + bag_name
+        bag_name = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/" + bag_name
     else:
         return None
 
@@ -402,20 +418,17 @@ def decode_image(
     print("elapsed time : {}s".format(time.time() - t))
     return df, result_image, image, locations
 
+
 def get_all_locations(database, data, bag_name, ros_command, result_path):
     locations = {}
     total = len(database)
-    with open(result_path[:-4] + '_locations.txt', 'w') as f:
+    with open(result_path[:-4] + "_locations.txt", "w") as f:
         for i, row in database.iterrows():
-            print("\rGetting Locations {:d}/{:d}".format(i+1, total))
-            label = row['label']
-            new_location = row['location']
-            data["coord"]["x"] = int(
-                (new_location[1][0] + new_location[0][0]) / 2
-            )
-            data["coord"]["y"] = int(
-                (new_location[1][1] + new_location[0][1]) / 2
-            )
+            print("\rGetting Locations {:d}/{:d}".format(i + 1, total))
+            label = row["label"]
+            new_location = row["location"]
+            data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
+            data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
 
             json_file = ros_command[-1]
 
@@ -429,21 +442,22 @@ def get_all_locations(database, data, bag_name, ros_command, result_path):
 
             # Wait for the process to finish and capture the output
             stdout, stderr = process.communicate()
-            print('error: ', stderr)
+            print("error: ", stderr)
             stdout = stdout.decode()
             stderr = stderr.decode()
             if len(stderr) != 0:
                 continue
-            
+
             result_positions = parse_3D_result(stdout)
 
-            locations[label] = result_positions['PCL Intersection']
+            locations[label] = result_positions["PCL Intersection"]
             # print(result_positions)
-            f.write('Label:%s\n' % label)
-            for key, value in result_positions.items(): 
-                f.write('%s:%s\n' % (key, value))
-            f.write('\n')
+            f.write("Label:%s\n" % label)
+            for key, value in result_positions.items():
+                f.write("%s:%s\n" % (key, value))
+            f.write("\n")
     return locations
+
 
 def get_closest_rect(rect, rectangles, distance):
     rects = []
@@ -521,18 +535,23 @@ def find(image, database, label):
     cropped_images = []
     for rect in rectangles:
         new_image = cv2.rectangle(new_image, rect[0], rect[1], (255, 0, 0), 10)
-        cropped_images.append(utils.crop_image(image, rect[0][0] - offset, rect[0][1] - offset, rect[1][0] + offset, rect[1][1] + offset))
+        cropped_images.append(
+            utils.crop_image(
+                image,
+                rect[0][0] - offset,
+                rect[0][1] - offset,
+                rect[1][0] + offset,
+                rect[1][1] + offset,
+            )
+        )
 
     return new_image, cropped_images
 
+
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    os.environ[
-        "ASTROBEE_CONFIG_DIR"
-    ] = "/home/rlu3/astrobee/src/astrobee/config"
-    os.environ[
-        "ASTROBEE_RESOURCE_DIR"
-    ] = "/home/rlu3/astrobee/src/astrobee/resource"
+    os.environ["ASTROBEE_CONFIG_DIR"] = "/home/rlu3/astrobee/src/astrobee/config"
+    os.environ["ASTROBEE_RESOURCE_DIR"] = "/home/rlu3/astrobee/src/astrobee/resource"
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
@@ -543,12 +562,10 @@ if __name__ == "__main__":
     image_list, _, _ = file_utils.get_files(test_folder)
 
     for k, image_path in enumerate(image_list):
-        print(
-            "\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path)
-        )
+        print("\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path))
         result = decode_image(image_path, result_folder)
         if result is None:
-            print('Skipped Image')
+            print("Skipped Image")
             continue
         database, result_image, image, locations = result
         # print(database)
