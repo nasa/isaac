@@ -35,12 +35,14 @@ def graph(files):
     ax.set_zlabel("Z")
     plt.title("Label Locations on ISS")
 
-    return plt
+    plt.show()
+    # return plt
 
 
 if __name__ == "__main__":
     files = get_all_files(
         "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/"
     )
-    plt = graph(files)
-    plt.show()
+    # plt = graph(files)
+    # plt.show()
+    graph(files)

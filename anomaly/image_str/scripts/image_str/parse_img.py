@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import re
 import subprocess
@@ -13,6 +14,7 @@ import cv2
 import image_str.utils as utils
 import IPython
 import jellyfish
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -176,7 +178,10 @@ def parse_3D_result(string):
 
 
 def decode_image(
-    image_path, result_folder=None, trained_model="models/craft_mlt_25k.pth"
+    image_path,
+    result_folder=None,
+    bag_path=None,
+    trained_model="models/craft_mlt_25k.pth",
 ):
     """
     @param image_path path to image to parse
@@ -203,24 +208,6 @@ def decode_image(
     # ============================ Initialization ============================
 
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
-
-    bag_name = get_bag_file(float(filename))
-    if bag_name is not None:
-        bag_name = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/" + bag_name
-    else:
-        return None
-
-    # Specify the ros command for 3D position
-    json_file = "data.json"
-    ros_command = [
-        "rosrun",
-        "pano_view",
-        "find_point_coordinate",
-        "--bag_name",
-        bag_name,
-        "--json_config",
-        json_file,
-    ]
 
     # load net
     net = CRAFT()  # initialize
@@ -255,14 +242,32 @@ def decode_image(
     image = cv2.imread(image_path)
 
     h, w, _ = image.shape
+    bag_name = None
 
-    data = {
-        "timestamp": float(filename),
-        "camera": "sci_cam",
-        "coord": {"x": 0, "y": 0},
-        "width": w,
-        "height": h,
-    }
+    if bag_path is not None:
+        bag_name = get_bag_file(float(filename))
+        if bag_name is not None:
+            bag_name = bag_path + bag_name
+
+            # Specify the ros command for 3D position
+            json_file = "data.json"
+
+            ros_command = [
+                "rosrun",
+                "pano_view",
+                "find_point_coordinate",
+                "--bag_name",
+                bag_name,
+                "--json_config",
+                json_file,
+            ]
+            data = {
+                "timestamp": float(filename),
+                "camera": "sci_cam",
+                "coord": {"x": 0, "y": 0},
+                "width": w,
+                "height": h,
+            }
 
     crop_w = 1500
     crop_h = 1500
@@ -414,7 +419,9 @@ def decode_image(
         result_path = result_folder + filename + ".jpg"
 
     result_image = display_all(image, df, result_path)
-    locations = get_all_locations(df, data, bag_name, ros_command, result_path)
+    locations = None
+    if bag_name is not None:
+        locations = get_all_locations(df, data, bag_name, ros_command, result_path)
     print("elapsed time : {}s".format(time.time() - t))
     return df, result_image, image, locations
 
@@ -548,6 +555,14 @@ def find(image, database, label):
     return new_image, cropped_images
 
 
+def display_images(images):
+    fig = plt.figure()
+    size = math.ceil(math.sqrt(len(images)))
+    for i, image in enumerate(images):
+        fig.add_subplot(size, size, i + 1)
+        plt.imshow(image)
+
+
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     os.environ["ASTROBEE_CONFIG_DIR"] = "/home/rlu3/astrobee/src/astrobee/config"
@@ -558,12 +573,13 @@ if __name__ == "__main__":
     test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657544476.435.jpg"
     result_folder = "result/beehive/queen/"
 
+    bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
     image_list, _, _ = file_utils.get_files(test_folder)
 
     for k, image_path in enumerate(image_list):
         print("\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path))
-        result = decode_image(image_path, result_folder)
+        result = decode_image(image_path, result_folder, bag_path)
         if result is None:
             print("Skipped Image")
             continue
