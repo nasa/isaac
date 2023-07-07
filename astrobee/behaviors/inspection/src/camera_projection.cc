@@ -59,18 +59,22 @@ bool CameraView::GetCamXYFromPoint(const Eigen::Affine3d robot_pose, const Eigen
   // Initialize x,y
   x = 0; y = 0;
   // Set Camera transform to current position
-  SetTransform(robot_pose * tf_body_to_cam_);
+  SetTransform((robot_pose * tf_body_to_cam_).inverse());
+
+  Eigen::Vector2d undistorted, distorted;
+  undistorted = ImageCoordinates(point);
+  GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED_C>(undistorted, &distorted);
+
+  // Convert back to the 0->size format
+  x = distorted[0] + GetParameters().GetDistortedHalfSize()[0];
+  y = distorted[1] + GetParameters().GetDistortedHalfSize()[1];
+
   // Check if target is in the fov
   if (IsInFov(point)) {
-    Eigen::Vector2d c;
-    GetParameters().Convert<camera::UNDISTORTED, camera::DISTORTED>(ImageCoordinates(point), &c);
-    // Convert back to the 0->size format
-    c = c + (GetParameters().GetUndistortedHalfSize()).cast<double>();
-    x = c[0] ; y = c[1];
+    return true;
   } else {
     return false;
   }
-  return true;
 }
 
 // Gets the points x y where the point is in the image. If outside the image, then it will return false
