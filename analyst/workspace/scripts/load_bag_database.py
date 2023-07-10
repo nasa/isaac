@@ -39,7 +39,7 @@ lock = multiprocessing.Lock()
 def read_bag(bag_file, topics):
     # Connect to database
     conn = Connection(
-        arangoURL="http://iui_arangodb:8529", username="root", password="isaac"
+        arangoURL="http://172.17.0.1:8529", username="root", password="isaac"
     )
 
     # Open the isaac database / create it if it does not exist
@@ -71,22 +71,16 @@ def read_bag(bag_file, topics):
             if hasattr(msg.raw, "data"):
                 setattr(msg.raw, "data", "")
 
-        # Fix topic name
-        topic = topic[1:].replace("/", "_")
-
         # Save topic count for later output
         if topic in topic_count.keys():
             topic_count[topic] = topic_count.get(topic) + 1
         else:
             topic_count[topic] = 1
 
-        # Create topic collection if it doesn't exist already
-        # Can't create 2 collections at the same time
-        # with lock:
-        if topic not in db.collections:
-            collection = db.createCollection(name=topic)
-        else:
-            collection = db[topic]
+        # Get collection
+        # Fix topic name
+        topic = topic[1:].replace("/", "_")
+        collection = db[topic]
 
         # Convert message to yaml
         # self.profiler1.enable()
@@ -114,8 +108,27 @@ class LoadBagDatabase:
         # self.profiler2 = cProfile.Profile()
 
         # Check the folder contents
-        bagfiles = [path + f for f in listdir(path) if f.endswith(".bag")]
-        print(bagfiles)
+        bagfiles = [f for f in listdir(path) if f.endswith(".bag")]
+        bags = [rosbag.Bag(f) for f in bagfiles]
+        # Connect to database
+        conn = Connection(
+            arangoURL="http://172.17.0.1:8529", username="root", password="isaac"
+        )
+        # Open the isaac database / create it if it does not exist
+        if not conn.hasDatabase("isaac"):
+            conn.createDatabase(name="isaac")
+        db = conn["isaac"]
+
+        for bag in bags:
+            bag_topics = bag.get_type_and_topic_info()[1].keys()
+            for topic in bag_topics:
+                # Fix topic name
+                topic = topic[1:].replace("/", "_")
+                # Create topic collection if it doesn't exist already
+                # Can't create 2 collections at the same time
+                # with lock:
+                if topic not in db.collections:
+                    collection = db.createCollection(name=topic)
 
         # Initialize pool
         # num_processes = os.cpu_count()
