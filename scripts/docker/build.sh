@@ -151,4 +151,6 @@ if [ $mast == 1 ]; then
 	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
 fi
 
+echo "${files}"
+
 docker compose ${files} build

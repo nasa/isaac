@@ -429,40 +429,43 @@ def decode_image(
 def get_all_locations(database, data, bag_name, ros_command, result_path):
     locations = {}
     total = len(database)
-    with open(result_path[:-4] + "_locations.txt", "w") as f:
-        for i, row in database.iterrows():
-            print("\rGetting Locations {:d}/{:d}".format(i + 1, total))
-            label = row["label"]
-            new_location = row["location"]
-            data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
-            data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
+    header = "Label, Closest Timestamp Depth, Closest Timestamp Pose, Vector, Point Cloud to Vector Distance, PCL Intersection, Mesh Intersection\n"
+    f = open(result_path[:-4] + "_locations.dat", "wb")
+    np.savetxt(f, [], header=header)
+    for i, row in database.iterrows():
+        print("\rGetting Locations {:d}/{:d}".format(i + 1, total))
+        label = row["label"]
+        new_location = row["location"]
+        data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
+        data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
 
-            json_file = ros_command[-1]
+        json_file = ros_command[-1]
 
-            with open(json_file, "w") as file:
-                json.dump(data, file)
+        with open(json_file, "w") as file:
+            json.dump(data, file)
 
-            # Run the ROS command using subprocess
-            process = subprocess.Popen(
-                ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
+        # Run the ROS command using subprocess
+        process = subprocess.Popen(
+            ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
 
-            # Wait for the process to finish and capture the output
-            stdout, stderr = process.communicate()
-            print("error: ", stderr)
-            stdout = stdout.decode()
-            stderr = stderr.decode()
-            if len(stderr) != 0:
-                continue
+        # Wait for the process to finish and capture the output
+        stdout, stderr = process.communicate()
+        print("error: ", stderr)
+        stdout = stdout.decode()
+        stderr = stderr.decode()
+        if len(stderr) != 0:
+            continue
 
-            result_positions = parse_3D_result(stdout)
+        result_positions = parse_3D_result(stdout)
 
-            locations[label] = result_positions["PCL Intersection"]
-            # print(result_positions)
-            f.write("Label:%s\n" % label)
-            for key, value in result_positions.items():
-                f.write("%s:%s\n" % (key, value))
-            f.write("\n")
+        locations[label] = result_positions["PCL Intersection"]
+        # print(result_positions)
+        line = list(result_positions.values())
+        line.insert(0, label)
+        np.savetxt(f, [str(data) for data in line], fmt="%s")
+
+    f.close()
     return locations
 
 
