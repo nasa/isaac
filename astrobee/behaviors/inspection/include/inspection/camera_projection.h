@@ -33,6 +33,7 @@
 #include <ff_common/ff_names.h>
 #include <msg_conversions/msg_conversions.h>
 #include <config_reader/config_reader.h>
+#include <camera/camera_model.h>
 #include <isaac_util/isaac_names.h>
 
 // Point Cloud
@@ -61,47 +62,21 @@ namespace inspection {
   the camera frame and the other way around. It automatically reads the camera parameters
   from the config files based on the camera name, such that no setup is necessary.
 */
-class CameraView {
+class CameraView : public camera::CameraModel  {
  public:
   // Constructor for Camera View taking in inputs:
   // cam_name: name of the camera that it used to read from config file the parameters
   // f: far clip, maximum camera distance (m)
   // n: near clip, minimum camera distance (m)
   // cam_transform: transform from body->camera, useful for offline applications where tf is not available
-  explicit CameraView(const std::string cam_name, const float f = 2.0, const float n = 0.19,
+  CameraView(const camera::CameraParameters & params, const float f = 2.0, const float n = 0.19,
                       const geometry_msgs::Transform::ConstPtr cam_transform = NULL);
 
-  // Return the Projection Matrix
-  Eigen::Matrix4d GetProjectionMatrix();
-
-  // Return the Horizontal Field of View
-  double GetHFOV();
-  // Return the Vertical Field of View
-  double GetVFOV();
-
-  // Return Camera pixel Height
-  double GetH();
-  // Return Camera pixel Width
-  double GetW();
-
-  // Set Camera pixel Height
-  void SetH(const double H);
-  // Set Camera pixel Width
-  void SetW(const double W);
-
-  // Build the View Matrix based on robot pose
-  bool BuildViewMatrix(const geometry_msgs::Pose robot_pose, Eigen::Matrix4d &V);
-
-
-  // Returns the vector that contains the camera position and the point in the far clip that corresponds
-  // to the pixel index provided
-  bool GetVectorFromCamXY(const geometry_msgs::Pose robot_pose, const int x, const int y,
-                                     Eigen::Vector3d &vector);
 
   // Gets the points x y where the point is in the image. If outside the image, then it will return false
   // If the robot pose is not specified, it's considered to be the current one
-  bool GetCamXYFromPoint(const geometry_msgs::Pose robot_pose, const geometry_msgs::Point point, int &x, int &y);
-  bool GetCamXYFromPoint(const geometry_msgs::Point point, int &x, int &y);
+  bool GetCamXYFromPoint(const Eigen::Affine3d robot_pose, const Eigen::Vector3d point, int &x, int &y);
+  bool GetCamXYFromPoint(const Eigen::Vector3d point, int &x, int &y);
 
   // Get 3D point from camera pixel location and point cloud
   bool GetPointFromXYD(const sensor_msgs::PointCloud2 pCloud, const int u, const int v, geometry_msgs::Point &point);
@@ -121,7 +96,7 @@ class CameraView {
   // Checks if a point is inside a poligon, in this case with 4 sides.
   bool InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, int test_x, int test_y);
   // Define the projection matrix based on camera parameters using the pinhole model
-  bool SetProjectionMatrix(Eigen::Matrix3d cam_mat);
+  // bool SetProjectionMatrix(Eigen::Matrix3d cam_mat);
 
  private:
   std::string cam_name_;
@@ -133,7 +108,7 @@ class CameraView {
   tf2_ros::Buffer tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-  geometry_msgs::Transform tf_body_to_cam_;
+  Eigen::Affine3d tf_body_to_cam_;
 
  public:
   // This fixes the Eigen aligment issue

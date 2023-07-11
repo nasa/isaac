@@ -2,12 +2,12 @@
 <robot name="cargo" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <link name="body">
-<!--     <collision>
+    <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
         <mesh filename="package://isaac_description/meshes/half_ctb_02_4.dae" scale="1 1 1"/>
       </geometry>
-    </collision> -->
+    </collision>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>

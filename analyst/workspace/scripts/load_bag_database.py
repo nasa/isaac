@@ -22,8 +22,12 @@
 # ----------------------------------------------------------------------------------------------------
 
 
+import cProfile
+import itertools
+
 # roslibpy needs a logger in order to output errors inside callbacks
 import logging
+import multiprocessing
 import sys
 import time
 from os import listdir
@@ -35,54 +39,110 @@ from pyArango.connection import *
 
 logging.basicConfig()
 
+# Create a lock
+lock = multiprocessing.Lock()
 
-class LoadBagDatabase:
-    def __init__(self, database, path, topics=[]):
-        self.db = database
-        # Check the folder contents
-        bagfiles = [f for f in listdir(path) if f.endswith(".bag")]
-        for bag in bagfiles:
-            self.read_bag(path + bag, topics)
 
-    def read_bag(self, bag_file, topics_list):
-        # access bag
-        print("Reading bag file ", bag_file)
-        bag = rosbag.Bag(bag_file)
-        topic_count = {}
-        messages_total = bag.get_message_count(topics_list)
-        message_count = 0
-        # Go through all the messages in a topic
-        for subtopic, msg, t in bag.read_messages(topics_list):
-            # Print loading status
-            message_count = message_count + 1
+def read_bag(bag_file, topics):
+    # Connect to database
+    conn = Connection(
+        arangoURL="http://iui_arangodb:8529", username="root", password="isaac"
+    )
+
+    # Open the isaac database / create it if it does not exist
+    if not conn.hasDatabase("isaac"):
+        conn.createDatabase(name="isaac")
+
+    db = conn["isaac"]
+
+    # access bag
+    bag = rosbag.Bag(bag_file)
+    print("Reading bag file ", bag_file)
+    topic_count = {}
+    if topics == []:
+        messages_total = bag.get_message_count()
+    else:
+        messages_total = bag.get_message_count(topics)
+    message_count = 0
+    # Go through all the messages in a topic
+    for topic, msg, t in bag.read_messages():
+        # Print loading status
+        message_count = message_count + 1
+        if message_count % 1000 == 0:
             print("Reading ", message_count, "/", messages_total, " ", end="\r")
 
-            # Fix topic name
-            subtopic = subtopic[1:].replace("/", "_")
+        # Delete data field to make loading faster
+        if hasattr(msg, "data"):
+            setattr(msg, "data", "")
+        elif hasattr(msg, "raw"):
+            if hasattr(msg.raw, "data"):
+                setattr(msg.raw, "data", "")
 
-            # Save topic count for later output
-            if subtopic in topic_count.keys():
-                topic_count[subtopic] = topic_count.get(subtopic) + 1
-            else:
-                topic_count[subtopic] = 1
+        # Fix topic name
+        topic = topic[1:].replace("/", "_")
 
-            # Create topic collection if it doesn't exist already
-            if not self.db.hasCollection(subtopic):
-                self.db.createCollection(name=subtopic)
-            # Convert message to yaml
-            msg = yaml.safe_load(str(msg))
-            # Upload to database
-            aql = (
-                "INSERT "
-                + "{'message':"
-                + str(msg)
-                + "}"
-                + " INTO "
-                + subtopic
-                + " LET newDoc = NEW RETURN newDoc"
-            )
-            queryResult = self.db.AQLQuery(aql)
+        # Save topic count for later output
+        if topic in topic_count.keys():
+            topic_count[topic] = topic_count.get(topic) + 1
+        else:
+            topic_count[topic] = 1
 
-        print("\nTopics found:")
-        print(topic_count)
-        bag.close()
+        # Create topic collection if it doesn't exist already
+        # Can't create 2 collections at the same time
+        # with lock:
+        if topic not in db.collections:
+            collection = db.createCollection(name=topic)
+        else:
+            collection = db[topic]
+
+        # Convert message to yaml
+        # self.profiler1.enable()
+        yaml_msg = yaml.safe_load(str(msg))
+        # self.profiler1.disable()
+
+        # Insert the YAML data into the collection
+        # self.profiler2.enable()
+        collection.createDocument(yaml_msg).save()
+        # self.profiler2.disable()
+
+    print("\nTopics found:")
+    print(topic_count)
+    bag.close()
+
+
+def read_bag_helper(zipped_vals):
+    return read_bag(*zipped_vals)
+
+
+class LoadBagDatabase:
+    def __init__(self, path, topics=[]):
+        # self.db = database
+        # self.profiler1 = cProfile.Profile()
+        # self.profiler2 = cProfile.Profile()
+
+        # Check the folder contents
+        bagfiles = [path + f for f in listdir(path) if f.endswith(".bag")]
+        print(bagfiles)
+
+        # Initialize pool
+        # num_processes = os.cpu_count()
+        num_processes = 5
+        pool = multiprocessing.Pool(num_processes)
+
+        # Run operations on individual bags
+        # izip arguments so we can pass as one argument to pool worker
+        pool.map(
+            read_bag_helper,
+            list(
+                zip(
+                    bagfiles,
+                    itertools.repeat(topics),
+                )
+            ),
+        )
+
+        pool.close()  # Prevents any more tasks from being submitted to the pool
+        pool.join()  # Waits for all worker processes to complete
+
+        # self.profiler1.print_stats()
+        # self.profiler2.print_stats()
