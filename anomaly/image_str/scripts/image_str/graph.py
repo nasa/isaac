@@ -54,4 +54,7 @@ if __name__ == "__main__":
     )
     # plt = graph(files)
     # plt.show()
+    files = [
+        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.dat"
+    ]
     graph(files)

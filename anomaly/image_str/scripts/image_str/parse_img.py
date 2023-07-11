@@ -5,12 +5,10 @@ import re
 import subprocess
 import time
 import warnings
-from collections import OrderedDict
 
-import craft.craft_utils as craft_utils
 import craft.file_utils as file_utils
-import craft.imgproc as imgproc
 import cv2
+import image_str.net_utils as net_utils
 import image_str.utils as utils
 import IPython
 import jellyfish
@@ -24,78 +22,6 @@ from craft.craft import CRAFT
 from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from torch.autograd import Variable
-
-
-def copyStateDict(state_dict):
-    if list(state_dict.keys())[0].startswith("module"):
-        start_idx = 1
-    else:
-        start_idx = 0
-    new_state_dict = OrderedDict()
-    for k, v in state_dict.items():
-        name = ".".join(k.split(".")[start_idx:])
-        new_state_dict[name] = v
-    return new_state_dict
-
-
-def test_net(
-    net, image, text_threshold, link_threshold, low_text, cuda, poly, refine_net=None
-):
-    t0 = time.time()
-
-    canvas_size = 1280
-    mag_ratio = 1.5
-
-    # resize
-    img_resized, target_ratio, size_heatmap = imgproc.resize_aspect_ratio(
-        image, canvas_size, interpolation=cv2.INTER_LINEAR, mag_ratio=mag_ratio
-    )
-    ratio_h = ratio_w = 1 / target_ratio
-
-    # preprocessing
-    x = imgproc.normalizeMeanVariance(img_resized)
-    x = torch.from_numpy(x).permute(2, 0, 1)  # [h, w, c] to [c, h, w]
-    x = Variable(x.unsqueeze(0))  # [c, h, w] to [b, c, h, w]
-    if cuda:
-        x = x.cuda()
-
-    # forward pass
-    with torch.no_grad():
-        y, feature = net(x)
-
-    # make score and link map
-    score_text = y[0, :, :, 0].cpu().data.numpy()
-    score_link = y[0, :, :, 1].cpu().data.numpy()
-
-    # refine link
-    if refine_net is not None:
-        with torch.no_grad():
-            y_refiner = refine_net(y, feature)
-        score_link = y_refiner[0, :, :, 0].cpu().data.numpy()
-
-    t0 = time.time() - t0
-    t1 = time.time()
-
-    # Post-processing
-    boxes, polys = craft_utils.getDetBoxes(
-        score_text, score_link, text_threshold, link_threshold, low_text, poly
-    )
-
-    # coordinate adjustment
-    boxes = craft_utils.adjustResultCoordinates(boxes, ratio_w, ratio_h)
-    polys = craft_utils.adjustResultCoordinates(polys, ratio_w, ratio_h)
-    for k in range(len(polys)):
-        if polys[k] is None:
-            polys[k] = boxes[k]
-
-    t1 = time.time() - t1
-
-    # render results (optional)
-    render_img = score_text.copy()
-    render_img = np.hstack((render_img, score_link))
-    ret_score_text = imgproc.cvt2HeatmapImg(render_img)
-
-    return boxes, polys, ret_score_text
 
 
 def get_bag_file(timestamp):
@@ -179,8 +105,11 @@ def parse_3D_result(string):
 
 def decode_image(
     image_path,
+    df,
     result_folder=None,
     bag_path=None,
+    set_locations=set(),
+    final_file=None,
     trained_model="models/craft_mlt_25k.pth",
 ):
     """
@@ -206,7 +135,6 @@ def decode_image(
     if result_folder is not None and not os.path.isdir(result_folder):
         os.mkdir(result_folder)
     # ============================ Initialization ============================
-
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
 
     # load net
@@ -214,10 +142,10 @@ def decode_image(
 
     print("Loading weights from checkpoint (" + trained_model + ")")
     if cuda:
-        net.load_state_dict(copyStateDict(torch.load(trained_model)))
+        net.load_state_dict(newt_utils.copyStateDict(torch.load(trained_model)))
     else:
         net.load_state_dict(
-            copyStateDict(torch.load(trained_model, map_location="cpu"))
+            net_utils.copyStateDict(torch.load(trained_model, map_location="cpu"))
         )
 
     if cuda:
@@ -233,7 +161,6 @@ def decode_image(
     parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
     img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
 
-    df = pd.DataFrame(columns=["label", "location"])
     # ============================ Start Processing ============================
 
     t = time.time()
@@ -281,7 +208,7 @@ def decode_image(
     total = round((end_w / offset_w) * (end_h / offset_h))
     num = 0
 
-    bboxes, polys, score_text = test_net(
+    bboxes, polys, score_text = net_utils.test_net(
         net,
         image,
         text_threshold,
@@ -343,7 +270,7 @@ def decode_image(
         for y in range(0, end_h, offset_h):
             img = utils.crop_image(image, x, y, x + crop_w, y + crop_h)
             print("\rTest part {:d}/{:d}".format(num + 1, total))
-            bboxes, polys, score_text = test_net(
+            bboxes, polys, score_text = net_utils.test_net(
                 net,
                 img,
                 text_threshold,
@@ -420,17 +347,28 @@ def decode_image(
 
     result_image = display_all(image, df, result_path)
     locations = None
+    added_locations = None
     if bag_name is not None:
-        locations = get_all_locations(df, data, bag_name, ros_command, result_path)
+        locations, added_locations = get_all_locations(
+            df, data, bag_name, ros_command, set_locations, result_path, final_file
+        )
     print("elapsed time : {}s".format(time.time() - t))
-    return df, result_image, image, locations
+    return df, result_image, image, locations, added_locations
 
 
-def get_all_locations(database, data, bag_name, ros_command, result_path):
+def get_all_locations(
+    database, data, bag_name, ros_command, set_locations, result_path, final_file
+):
     locations = {}
     total = len(database)
     header = "Label, Closest Timestamp Depth, Closest Timestamp Pose, Vector, Point Cloud to Vector Distance, PCL Intersection, Mesh Intersection\n"
-    f = open(result_path[:-4] + "_locations.dat", "wb")
+
+    f = None
+    final = None
+    if result_path is not None:
+        f = open(result_path[:-4] + "_locations.dat", "wb")
+        final = open(final_file, "a")
+
     np.savetxt(f, [], header=header)
     for i, row in database.iterrows():
         print("\rGetting Locations {:d}/{:d}".format(i + 1, total))
@@ -458,15 +396,24 @@ def get_all_locations(database, data, bag_name, ros_command, result_path):
             continue
 
         result_positions = parse_3D_result(stdout)
-
-        locations[label] = result_positions["PCL Intersection"]
+        location = tuple(result_positions["PCL Intersection"].values())
+        locations[label] = location
         # print(result_positions)
         line = list(result_positions.values())
         line.insert(0, label)
-        np.savetxt(f, [str(data) for data in line], fmt="%s")
+        line = np.array([str(i) for i in line])
+        np.savetxt(f, line.reshape(1, line.shape[0]), fmt="%s")
+        if location not in set_locations:
+            np.savetxt(final, line.reshape(1, line.shape[0]), fmt="%s")
+            set_locations.add(location)
 
-    f.close()
-    return locations
+    if f is not None:
+        f.close()
+
+    if final is not None:
+        final.close()
+
+    return locations, set_locations
 
 
 def get_closest_rect(rect, rectangles, distance):
@@ -573,22 +520,31 @@ if __name__ == "__main__":
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
-    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657544476.435.jpg"
+    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657550820.698.jpg"
     result_folder = "result/beehive/queen/"
-
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
     image_list, _, _ = file_utils.get_files(test_folder)
 
+    header = "Label, Closest Timestamp Depth, Closest Timestamp Pose, Vector, Point Cloud to Vector Distance, PCL Intersection, Mesh Intersection\n"
+
+    final_file = result_folder + "all_locations.dat"
+    f = open(final_file, "wb")
+    np.savetxt(f, [], header=header)
+    f.close()
+    database = pd.DataFrame(columns=["label", "location"])
+    set_locations = set()
     for k, image_path in enumerate(image_list):
         print("\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path))
-        result = decode_image(image_path, result_folder, bag_path)
+        result = decode_image(
+            image_path, database, result_folder, bag_path, set_locations, final_file
+        )
         if result is None:
             print("Skipped Image")
             continue
-        database, result_image, image, locations = result
+        database, result_image, image, locations, set_locations = result
         # print(database)
-    # result = decode_image(test_image, result_folder)
+    # result = decode_image(test_image, database, result_folder, bag_path)
     # database, result_image, image, locations = result
     # print(database)
 
