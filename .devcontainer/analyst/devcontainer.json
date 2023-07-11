@@ -39,6 +39,9 @@
 		"yzhang.markdown-all-in-one",
 		"zachflower.uncrustify"
 	],
-	"workspaceMount": "source=${localWorkspaceFolder},target=/src/isaac/src,type=bind",
+	"mounts": [
+		"source=${localWorkspaceFolder},target=/src/isaac/src,type=bind,consistency=cached",
+		"source=${localWorkspaceFolder}/../../astrobee/src,target=/src/astrobee/src,type=bind,consistency=cached"
+	],
 	"workspaceFolder": "/src/isaac/src"
 }

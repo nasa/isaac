@@ -36,11 +36,20 @@ logging.basicConfig()
 lock = multiprocessing.Lock()
 
 
-def read_bag(bag_file, topics):
-    # Connect to database
-    conn = Connection(
-        arangoURL="http://172.17.0.1:8529", username="root", password="isaac"
-    )
+def read_bag(bag_file, topics, robot):
+    # Check the folder contents
+    bagfiles = [f for f in listdir(path) if f.endswith(".bag")]
+    bags = [rosbag.Bag(f) for f in bagfiles]
+    # Connect to the database
+    addresses = ["http://iui_arangodb:8529", "http://172.19.0.1:8529"]
+    for address in addresses:
+        try:
+            conn = Connection(
+                arangoURL=address, username="root", password="isaac", max_retries=5
+            )
+            break  # Connection successful, exit the loop
+        except Exception as e:
+            continue
 
     # Open the isaac database / create it if it does not exist
     if not conn.hasDatabase("isaac"):
@@ -85,6 +94,7 @@ def read_bag(bag_file, topics):
         # Convert message to yaml
         # self.profiler1.enable()
         yaml_msg = yaml.safe_load(str(msg))
+        data["robot"] = robot
         # self.profiler1.disable()
 
         # Insert the YAML data into the collection
@@ -102,7 +112,7 @@ def read_bag_helper(zipped_vals):
 
 
 class LoadBagDatabase:
-    def __init__(self, path, topics=[]):
+    def __init__(self, path, topics=[], robot="bumble"):
         # self.db = database
         # self.profiler1 = cProfile.Profile()
         # self.profiler2 = cProfile.Profile()
@@ -110,10 +120,16 @@ class LoadBagDatabase:
         # Check the folder contents
         bagfiles = [f for f in listdir(path) if f.endswith(".bag")]
         bags = [rosbag.Bag(f) for f in bagfiles]
-        # Connect to database
-        conn = Connection(
-            arangoURL="http://172.17.0.1:8529", username="root", password="isaac"
-        )
+        # Connect to the database
+        addresses = ["http://iui_arangodb:8529", "http://172.19.0.1:8529"]
+        for address in addresses:
+            try:
+                conn = Connection(
+                    arangoURL=address, username="root", password="isaac", max_retries=5
+                )
+                break  # Connection successful, exit the loop
+            except Exception as e:
+                continue
         # Open the isaac database / create it if it does not exist
         if not conn.hasDatabase("isaac"):
             conn.createDatabase(name="isaac")

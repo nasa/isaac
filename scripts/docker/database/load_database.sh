@@ -19,4 +19,4 @@
 # under the License.
 
 # load the database, the password is isaac as previously set
-docker exec -it iui_arangodb arangorestore --server.database isaac --input-directory /data/arangodb3/dump
+docker exec -it iui_arangodb arangorestore --server.database isaac --input-directory /data/arangodb3/dump --create-database
