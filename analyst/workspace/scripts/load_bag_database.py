@@ -112,43 +112,42 @@ def read_bag_helper(zipped_vals):
 
 
 class LoadBagDatabase:
-    def __init__(self, path, topics=[], robot="bumble"):
+    def __init__(self, paths, topics=[], robot="bumble"):
         # self.db = database
         # self.profiler1 = cProfile.Profile()
         # self.profiler2 = cProfile.Profile()
+        bagfiles = []
+        bags = []
+        if isinstance(paths, str):
+            paths = [paths]
 
-        # Check the folder contents
-        bagfiles = [f for f in listdir(path) if f.endswith(".bag")]
-        bags = [rosbag.Bag(f) for f in bagfiles]
-        # Connect to the database
-        addresses = ["http://iui_arangodb:8529", "http://172.19.0.1:8529"]
-        for address in addresses:
-            try:
-                conn = Connection(
-                    arangoURL=address, username="root", password="isaac", max_retries=5
-                )
-                break  # Connection successful, exit the loop
-            except Exception as e:
-                continue
-        # Open the isaac database / create it if it does not exist
-        if not conn.hasDatabase("isaac"):
-            conn.createDatabase(name="isaac")
-        db = conn["isaac"]
+        for path in paths:
+            # Check the folder contents
+            bagfiles += [f for f in listdir(path) if f.endswith(".bag")]
 
-        for bag in bags:
-            bag_topics = bag.get_type_and_topic_info()[1].keys()
-            for topic in bag_topics:
-                # Fix topic name
-                topic = topic[1:].replace("/", "_")
-                # Create topic collection if it doesn't exist already
-                # Can't create 2 collections at the same time
-                # with lock:
-                if topic not in db.collections:
-                    collection = db.createCollection(name=topic)
+            # Connect to database
+            conn = Connection(
+                arangoURL="http://172.17.0.1:8529", username="root", password="isaac"
+            )
+            # Open the isaac database / create it if it does not exist
+            if not conn.hasDatabase("isaac"):
+                conn.createDatabase(name="isaac")
+            db = conn["isaac"]
+
+            for bagfile in bagfiles:
+                bag = rosbag.Bag(bagfile)
+                bag_topics = bag.get_type_and_topic_info()[1].keys()
+                for topic in bag_topics:
+                    # Fix topic name
+                    topic = topic[1:].replace("/", "_")
+                    # Create topic collection if it doesn't exist already
+                    # Can't create 2 collections at the same time
+                    # with lock:
+                    if topic not in db.collections:
+                        collection = db.createCollection(name=topic)
 
         # Initialize pool
-        # num_processes = os.cpu_count()
-        num_processes = 5
+        num_processes = os.cpu_count()
         pool = multiprocessing.Pool(num_processes)
 
         # Run operations on individual bags
@@ -159,6 +158,7 @@ class LoadBagDatabase:
                 zip(
                     bagfiles,
                     itertools.repeat(topics),
+                    itertools.repeat(robot),
                 )
             ),
         )
@@ -168,3 +168,10 @@ class LoadBagDatabase:
 
         # self.profiler1.print_stats()
         # self.profiler2.print_stats()
+
+
+if __name__ == "__main__":
+    path = "."
+    topics = []
+    robot = bsharp
+    LoadBagDatabase(path, topics, robot)
