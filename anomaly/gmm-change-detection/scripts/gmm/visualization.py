@@ -83,3 +83,79 @@ def visualize_3d_gmm(points, predictions, w, mu, stdev, n_gaussians, axes=None):
     # axes.set_ylabel('Y')
     # axes.set_zlabel('Z')
     # plt.show()
+
+
+def plot_gmm_results(
+    gmm1_init, gmm2_init, points1, points2, predictions1, predictions2
+):
+
+    fig = plt.figure(figsize=(12, 4))
+    ax1 = fig.add_subplot(141, projection="3d")
+    ax1.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax1.view_init(elev=-75, azim=-90)
+    ax1.title.set_text("Gamma (Before)")
+
+    ax2 = fig.add_subplot(142, projection="3d")
+    ax2.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax2.view_init(elev=-75, azim=-90)
+    ax2.title.set_text("Theta (After)")
+
+    ax3 = fig.add_subplot(143, projection="3d")
+    ax3.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax3.view_init(elev=-75, azim=-90)
+    ax3.title.set_text("Pi (Appearances)")
+
+    ax4 = fig.add_subplot(144, projection="3d")
+    ax4.set(xlabel="X", ylabel="Y", zlabel="Z")
+    ax4.view_init(elev=-75, azim=-90)
+    ax4.title.set_text("Pi (Disappearances)")
+
+    # GMM 1 (Gamma)
+    diag_covs1 = get_diag(gmm1_init.bestcov, gmm1_init.bestk)
+    visualize_3d_gmm(
+        points1,
+        predictions1,
+        gmm1_init.bestpp[0],
+        gmm1_init.bestmu.T,
+        np.sqrt(diag_covs1).T,
+        gmm1_init.bestk,
+        ax1,
+    )
+
+    # GMM 2 (Theta)
+    diag_covs2 = get_diag(gmm2_init.bestcov, gmm2_init.bestk)
+    visualize_3d_gmm(
+        points2,
+        predictions2,
+        gmm2_init.bestpp[0],
+        gmm2_init.bestmu.T,
+        np.sqrt(diag_covs2).T,
+        gmm2_init.bestk,
+        ax2,
+    )
+
+    # Appearance GMM (Pi 1), compared to GMM2 original points
+    piagonal = get_diag(pi_appearances.covariances, pi_appearances.weights.shape[0])
+    visualize_3d_gmm(
+        points2,
+        predictions2,
+        pi_appearances.weights,
+        pi_appearances.means.T,
+        np.sqrt(piagonal).T,
+        gmm2_init.bestk,
+        ax3,
+    )
+
+    # Disappearance GMM (Pi 2), compared to GMM2 original points
+    piagonal_dis = get_diag(
+        pi_disappearances.covariances, pi_disappearances.weights.shape[0]
+    )
+    visualize_3d_gmm(
+        points2,
+        predictions2,
+        pi_disappearances.weights,
+        pi_disappearances.means.T,
+        np.sqrt(piagonal_dis).T,
+        gmm2_init.bestk,
+        ax4,
+    )

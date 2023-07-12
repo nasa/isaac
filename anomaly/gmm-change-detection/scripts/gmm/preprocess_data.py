@@ -4,7 +4,8 @@
 #
 # All rights reserved.
 #
-# The Astrobee platform is licensed under the Apache License, Version 2.0
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
 # (the "License"); you may not use this file except in compliance with the
 # License. You may obtain a copy of the License at
 #
@@ -26,7 +27,7 @@ import time
 import geometry_msgs
 import matplotlib.pyplot as plt
 import numpy as np
-import pcl
+import pyntcloud
 import rosbag
 import rospy
 import sensor_msgs
@@ -46,7 +47,7 @@ def convert_pc2_pcl(data):
         np_points[:, 0] = np.resize(pc["x"], height)
         np_points[:, 1] = np.resize(pc["y"], height)
         np_points[:, 2] = np.resize(pc["z"], height)
-        p = pcl.PointCloud(np.array(np_points, dtype=np.float32))
+        p = pyntcloud.PyntCloud(pd.DataFrame(np_points, columns=["x", "y", "z"]))
 
     else:  # Ordered PC2 structure
         width = pc.shape[1]
@@ -54,19 +55,19 @@ def convert_pc2_pcl(data):
         np_points[:, 0] = np.resize(pc["x"], height * width)
         np_points[:, 1] = np.resize(pc["y"], height * width)
         np_points[:, 2] = np.resize(pc["z"], height * width)
-        p = pcl.PointCloud(np.array(np_points, dtype=np.float32))
+        p = pyntcloud.PyntCloud(pd.DataFrame(np_points, columns=["x", "y", "z"]))
     return p
 
 
 # Outlier and downsample filtering of data
 def filter_pcl(pcl_data):
-    p = pcl_data
-    pcl.save(p, "normal.pcd")
+    pcl_data.to_file("normal.pcd")
 
-    # Statistical Outlier Filter
-    fil = p.make_statistical_outlier_filter()
-    fil.set_mean_k(50)
-    fil.set_std_dev_mul_thresh(1.0)
+    # Apply Statistical Outlier Removal filter
+    cloud_filtered = pcl_data.remove_outliers(stat_outliers=True, k=50, std_mul=1.0)
+
+    # Convert filtered point cloud to NumPy array
+    np_arr = cloud_filtered.xyz.to_numpy()
 
     # pcl.save(fil.filter(), "inliers.pcd")
     # fil.set_negative(True)
@@ -77,9 +78,6 @@ def filter_pcl(pcl_data):
     # fil.set_leaf_size(0.01, 0.01, 0.01)
     # pcl.save(fil.filter(), "downsample.pcd")
 
-    # Conversion from pcl to numpy array
-    np_arr = fil.filter().to_array()
-    # np_arr = p.to_array()
     return np_arr
 
 
@@ -101,8 +99,8 @@ def concat_ground_truth_msgs(bagfile):
                 merged_pcl[i : i + n_points, :] = np_arr
                 i += n_points
 
-    p = pcl.PointCloud(merged_pcl)
-    pcl.save(p, "ground_truth_run5.pcd")
+    p = pyntcloud.PyntCloud(pd.DataFrame(merged_pcl, columns=["x", "y", "z"]))
+    p.to_file("ground_truth_run5.pcd")
     return p
 
 

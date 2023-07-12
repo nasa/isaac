@@ -26,5 +26,8 @@ add_compile_options(-std=c++14)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS)
 
+# Allow other packages to use python scripts from this package
+catkin_python_setup()
+
 catkin_package()
 
