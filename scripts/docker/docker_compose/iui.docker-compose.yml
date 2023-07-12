@@ -94,7 +94,7 @@ services:
     ports:
       - "8529:8529"
     volumes:
-      - arangodb_data_container:/data/arangodb3
+      - ${DATA_PATH_ARANGO:-$HOME/data/arangodb}:/data/arangodb3
       - arangodb_apps_data_container:/data/arangodb3-apps
     networks:
       - isaac
