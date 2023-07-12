@@ -21,9 +21,9 @@ import itertools
 # roslibpy needs a logger in order to output errors inside callbacks
 import logging
 import multiprocessing
+import os
 import sys
 import time
-import os
 from os import listdir
 from os.path import isfile, join
 
@@ -176,15 +176,24 @@ class LoadBagDatabase:
 
 
 if __name__ == "__main__":
-    path = os.path.join(os.path.expanduser('~'), "/data/bags/granite_lab/2023-04-19/bsharp/delayed/")
+    path = os.path.join(
+        os.path.expanduser("~"), "/data/bags/granite_lab/2023-04-19/bsharp/delayed/"
+    )
     topics = []
     robot = "bsharp"
     LoadBagDatabase(path, topics, robot)
-    path = [os.path.join(os.path.expanduser('~'), "data/bags/20220608_Isaac9/bumble"), os.path.join(os.path.expanduser('~'), "data/bags/20220711_Isaac11/bumble")]
+    path = [
+        os.path.join(os.path.expanduser("~"), "data/bags/20220608_Isaac9/bumble"),
+        os.path.join(os.path.expanduser("~"), "data/bags/20220711_Isaac11/bumble"),
+    ]
     topics = []
     robot = "bumble"
     LoadBagDatabase(path, topics, robot)
-    path = [os.path.join(os.path.expanduser('~'), "data/bags/20220617_Isaac10/queen"), os.path.join(os.path.expanduser('~'), "data/bags/20220711_Isaac11/queen"), os.path.join(os.path.expanduser('~'), "data/bags/20220711_Isaac11/queen")]
+    path = [
+        os.path.join(os.path.expanduser("~"), "data/bags/20220617_Isaac10/queen"),
+        os.path.join(os.path.expanduser("~"), "data/bags/20220711_Isaac11/queen"),
+        os.path.join(os.path.expanduser("~"), "data/bags/20220711_Isaac11/queen"),
+    ]
     topics = []
     robot = "queen"
     LoadBagDatabase(path, topics, robot)

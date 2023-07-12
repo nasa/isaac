@@ -69,19 +69,26 @@ def query_image(
         + ros_topic_image
         + "  LET image_stamp = doc_image.header.stamp.secs + doc_image.header.stamp.nsecs * 0.000000001"
         + "  LET closest_pose = ("
-        + "    FOR doc_pose IN " + ros_topic_pose
+        + "    FOR doc_pose IN "
+        + ros_topic_pose
         + "      FILTER doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001 >= image_stamp - 1.0"
         + "      FILTER doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001 <= image_stamp + 1.0"
         + "      SORT ABS((doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001) - image_stamp)"
         + "      LIMIT 1"
         + "      RETURN doc_pose"
         + "    )"
-        + "  FILTER closest_pose[0].pose.position.x >= " + str(target_position[0] - max_distance)
-        + "    AND closest_pose[0].pose.position.x <= " + str(target_position[0] + max_distance)
-        + "    AND closest_pose[0].pose.position.y >= " + str(target_position[1] - max_distance)
-        + "    AND closest_pose[0].pose.position.y <= " + str(target_position[1] + max_distance)
-        + "    AND closest_pose[0].pose.position.z >= " + str(target_position[2] - max_distance)
-        + "    AND closest_pose[0].pose.position.z <= " + str(target_position[2] + max_distance)
+        + "  FILTER closest_pose[0].pose.position.x >= "
+        + str(target_position[0] - max_distance)
+        + "    AND closest_pose[0].pose.position.x <= "
+        + str(target_position[0] + max_distance)
+        + "    AND closest_pose[0].pose.position.y >= "
+        + str(target_position[1] - max_distance)
+        + "    AND closest_pose[0].pose.position.y <= "
+        + str(target_position[1] + max_distance)
+        + "    AND closest_pose[0].pose.position.z >= "
+        + str(target_position[2] - max_distance)
+        + "    AND closest_pose[0].pose.position.z <= "
+        + str(target_position[2] + max_distance)
         + "\n"
         + "  RETURN {doc_image, closest_pose: closest_pose[0]}"
     )
