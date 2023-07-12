@@ -47,7 +47,7 @@ def query_image(
     target_size_z,
 ):
     # Connect to the database
-    addresses = ["http://iui_arangodb:8529", "http://172.19.0.1:8529"]
+    addresses = ["http://iui_arangodb:8529", "http://127.0.0.1:8529"]
     for address in addresses:
         try:
             conn = Connection(
@@ -67,25 +67,21 @@ def query_image(
     query = (
         "FOR doc_image IN "
         + ros_topic_image
+        + "  LET image_stamp = doc_image.header.stamp.secs + doc_image.header.stamp.nsecs * 0.000000001"
         + "  LET closest_pose = ("
-        + "    FOR doc_pose IN "
-        + ros_topic_pose
-        + "      SORT ABS((doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001) - (doc_image.header.stamp.secs + doc_image.header.stamp.nsecs * 0.000000001))"
+        + "    FOR doc_pose IN " + ros_topic_pose
+        + "      FILTER doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001 >= image_stamp - 1.0"
+        + "      FILTER doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001 <= image_stamp + 1.0"
+        + "      SORT ABS((doc_pose.header.stamp.secs + doc_pose.header.stamp.nsecs * 0.000000001) - image_stamp)"
         + "      LIMIT 1"
         + "      RETURN doc_pose"
         + "    )"
-        + "  FILTER closest_pose[0].pose.position.x >= "
-        + str(target_position[0] - max_distance)
-        + "    AND closest_pose[0].pose.position.x <= "
-        + str(target_position[0] + max_distance)
-        + "    AND closest_pose[0].pose.position.y >= "
-        + str(target_position[1] - max_distance)
-        + "    AND closest_pose[0].pose.position.y <= "
-        + str(target_position[1] + max_distance)
-        + "    AND closest_pose[0].pose.position.z >= "
-        + str(target_position[2] - max_distance)
-        + "    AND closest_pose[0].pose.position.z <= "
-        + str(target_position[2] + max_distance)
+        + "  FILTER closest_pose[0].pose.position.x >= " + str(target_position[0] - max_distance)
+        + "    AND closest_pose[0].pose.position.x <= " + str(target_position[0] + max_distance)
+        + "    AND closest_pose[0].pose.position.y >= " + str(target_position[1] - max_distance)
+        + "    AND closest_pose[0].pose.position.y <= " + str(target_position[1] + max_distance)
+        + "    AND closest_pose[0].pose.position.z >= " + str(target_position[2] - max_distance)
+        + "    AND closest_pose[0].pose.position.z <= " + str(target_position[2] + max_distance)
         + "\n"
         + "  RETURN {doc_image, closest_pose: closest_pose[0]}"
     )
