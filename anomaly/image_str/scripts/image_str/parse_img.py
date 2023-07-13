@@ -1,3 +1,4 @@
+import ast
 import json
 import math
 import os
@@ -105,10 +106,10 @@ def parse_3D_result(string):
 
 def decode_image(
     image_path,
-    df,
+    database,
     result_folder=None,
     bag_path=None,
-    set_locations=set(),
+    all_locations=set(),
     final_file=None,
     trained_model="models/craft_mlt_25k.pth",
 ):
@@ -134,6 +135,7 @@ def decode_image(
 
     if result_folder is not None and not os.path.isdir(result_folder):
         os.mkdir(result_folder)
+
     # ============================ Initialization ============================
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
 
@@ -219,6 +221,8 @@ def decode_image(
         refine_net,
     )
 
+    df = pd.DataFrame(columns=["label", "location"])
+
     # print(polys)
     for box in polys:
         # Box in form upper left -> upper right -> lower right -> lower left, (x, y)
@@ -269,7 +273,7 @@ def decode_image(
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
             img = utils.crop_image(image, x, y, x + crop_w, y + crop_h)
-            print("\rTest part {:d}/{:d}".format(num + 1, total))
+            print("Test part {:d}/{:d}\r".format(num + 1, total))
             bboxes, polys, score_text = net_utils.test_net(
                 net,
                 img,
@@ -345,33 +349,47 @@ def decode_image(
     if result_folder is not None:
         result_path = result_folder + filename + ".jpg"
 
-    result_image = display_all(image, df, result_path)
-    locations = None
-    added_locations = None
+    # result_image = display_all(image, df, result_path)
     if bag_name is not None:
-        locations, added_locations = get_all_locations(
-            df, data, bag_name, ros_command, set_locations, result_path, final_file
+        get_all_locations(
+            database,
+            df,
+            data,
+            bag_name,
+            ros_command,
+            all_locations,
+            result_path,
+            final_file,
+            image_path,
         )
     print("elapsed time : {}s".format(time.time() - t))
-    return df, result_image, image, locations, added_locations
 
 
 def get_all_locations(
-    database, data, bag_name, ros_command, set_locations, result_path, final_file
+    database,
+    image_df,
+    data,
+    bag_name,
+    ros_command,
+    all_locations,
+    result_path,
+    final_file,
+    image_file,
 ):
-    locations = {}
-    total = len(database)
-    header = "Label, Closest Timestamp Depth, Closest Timestamp Pose, Vector, Point Cloud to Vector Distance, PCL Intersection, Mesh Intersection\n"
-
+    # locations = {}
+    total = len(image_df)
+    header = "Label, PCL Intersection, Mesh Intersection\n"
     f = None
     final = None
     if result_path is not None:
         f = open(result_path[:-4] + "_locations.dat", "wb")
+        np.savetxt(f, [], header=header)
+
+    if final_file is not None:
         final = open(final_file, "a")
 
-    np.savetxt(f, [], header=header)
-    for i, row in database.iterrows():
-        print("\rGetting Locations {:d}/{:d}".format(i + 1, total))
+    for i, row in image_df.iterrows():
+        print("Getting Locations {:d}/{:d}\r".format(i + 1, total))
         label = row["label"]
         new_location = row["location"]
         data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
@@ -397,32 +415,37 @@ def get_all_locations(
 
         result_positions = parse_3D_result(stdout)
         location = tuple(result_positions["PCL Intersection"].values())
-        locations[label] = location
+        if location in all_locations:
+            continue
+        database[len(database)] = [label, new_location, image_file]
+        # locations[label] = location
         # print(result_positions)
-        line = list(result_positions.values())
-        line.insert(0, label)
-        line = np.array([str(i) for i in line])
-        np.savetxt(f, line.reshape(1, line.shape[0]), fmt="%s")
-        if location not in set_locations:
-            np.savetxt(final, line.reshape(1, line.shape[0]), fmt="%s")
-            set_locations.add(location)
+        pcl = result_positions["PCL Intersection"]
+        if pcl is not None:
+            pcl = str(list(pcl.values()))
+        else:
+            pcl = ""
+
+        mesh = result_positions["Mesh Intersection"]
+        if mesh is not None:
+            mesh = str(list(mesh.values()))
+        else:
+            mesh = ""
+
+        line = np.array(
+            [label, pcl, mesh, image_file, str(new_location).replace("\n", "")]
+        )
+        if f is not None:
+            np.savetxt(f, line.reshape(1, line.shape[0]), delimiter=";", fmt="%s")
+        if final is not None:
+            np.savetxt(final, line.reshape(1, line.shape[0]), delimiter=";", fmt="%s")
+            all_locations.add(location)
 
     if f is not None:
         f.close()
 
     if final is not None:
         final.close()
-
-    return locations, set_locations
-
-
-def get_closest_rect(rect, rectangles, distance):
-    rects = []
-    for r in rectangles:
-        d = utils.get_rect_distance(rect[0], rect[1], r[0], r[1])
-        if d < distance:
-            rects.append(r)
-    return rects
 
 
 def display_all(image, database, result_path=None):
@@ -461,9 +484,45 @@ def similar(label, input_label):
     return jellyfish.jaro_winkler_similarity(label, input_label) > 0.8
 
 
-def find(image, database, label):
+def find_panorama(database, label):
+    # TODO search among multiple images
+    words = label.split()
+    result = database.loc[database["label"].apply(similar, args=(words[0],))]
+    images = set(l_result["images"].tolist())
+    for l in words[1:]:
+        l_result = database.loc[database["label"].apply(similar, args=(l,))]
+        images = images.intersection(set(l_result["images"].tolist()))
+
+    full_images = []
+    cropped_images = []
+    for img_file in images:
+        image = cv2.imread(img_file)
+        df = database.loc[database["image"] == img_file]
+        result = find_image(image, df, label)
+        full_images.append(result[0])
+        cropped_images.extend(result[1])
+
+    return full_images, cropped_images
+
+
+def df_from_file(file_path):
+    database = pd.DataFrame(columns=["label", "location", "image"])
+    data = np.loadtxt(file_path, delimiter=";", dtype=str)
+
+    labels = data[:, 0]
+    files = data[:, 3]
+    locations = data[:, 4]
+
+    for i in range(len(labels)):
+        location = re.findall(r"[-+]?\d*\.\d+|\d+", locations[i])
+        database.loc[i] = [labels[i], location, files[i]]
+
+    return database
+
+
+def find_image(image, database, label):
     """
-    @param image array representing image
+    @param image    array representing image to be searched
     @param database database of labels (database['labels']) and their corresponding boundary boxes (database['location'])
     @param label text to search for
     @returns array representing image with label boxed if found and a list of all labels cropped from original image
@@ -482,10 +541,11 @@ def find(image, database, label):
             # letter_width = round((rect[1][0] - rect[0][0])/len(word))
             limit = 2 * (rect[1][1] - rect[0][1])
             # print(rect, other_rects)
-            closest_rect = get_closest_rect(rect, other_rects, limit)
+            closest_rect = utils.get_closest_rect(rect, other_rects, limit)
             for r in closest_rect:
                 new_rects.append(utils.get_bounding_box(rect, r))
         rectangles = new_rects
+
     new_image = np.array(image)
 
     offset = 10
@@ -513,6 +573,41 @@ def display_images(images):
         plt.imshow(image)
 
 
+def parse_folder(image_folder, trained_model=None, bag_path=None, result_folder=None):
+    database = pd.DataFrame(columns=["label", "location", "image"])
+    all_locations = set()
+    image_list, _, _ = file_utils.get_files(test_folder)
+
+    final_file = None
+    if result_folder is not None:
+        header = "Label, PCL Intersection, Mesh Intersection, Image, Boundary\n"
+        final_file = result_folder + "all_locations.dat"
+        f = open(final_file, "wb")
+        np.savetxt(f, [], header=header)
+        f.close()
+
+    for k, image_path in enumerate(image_list):
+        print("\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path))
+        decode_image(
+            image_path,
+            database,
+            result_folder=result_folder,
+            bag_path=bag_path,
+            all_locations=all_locations,
+            final_file=final_file,
+        )
+
+    return database
+
+
+def parse_image(image_file, trained_model=None, bag_path=None, result_folder=None):
+    database = pd.DataFrame(columns=["label", "location", "image"])
+
+    decode_image(image_path, database, result_folder, bag_path)
+
+    return database
+
+
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     os.environ["ASTROBEE_CONFIG_DIR"] = "/home/rlu3/astrobee/src/astrobee/config"
@@ -520,32 +615,12 @@ if __name__ == "__main__":
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
-    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657550820.698.jpg"
+    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657545020.689.jpg"
     result_folder = "result/beehive/queen/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
-    image_list, _, _ = file_utils.get_files(test_folder)
 
-    header = "Label, Closest Timestamp Depth, Closest Timestamp Pose, Vector, Point Cloud to Vector Distance, PCL Intersection, Mesh Intersection\n"
-
-    final_file = result_folder + "all_locations.dat"
-    f = open(final_file, "wb")
-    np.savetxt(f, [], header=header)
-    f.close()
-    database = pd.DataFrame(columns=["label", "location"])
-    set_locations = set()
-    for k, image_path in enumerate(image_list):
-        print("\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path))
-        result = decode_image(
-            image_path, database, result_folder, bag_path, set_locations, final_file
-        )
-        if result is None:
-            print("Skipped Image")
-            continue
-        database, result_image, image, locations, set_locations = result
-        # print(database)
-    # result = decode_image(test_image, database, result_folder, bag_path)
-    # database, result_image, image, locations = result
-    # print(database)
+    database = parse_folder(test_folder, bag_path=bag_path, result_folder=result_folder)
+    # database = parse_image(test_image, bad_path, result_folder)
 
     IPython.embed()

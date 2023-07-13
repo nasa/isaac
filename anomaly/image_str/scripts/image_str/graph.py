@@ -29,8 +29,8 @@ def graph(files):
         #             x.append(float(nums[0]))
         #             y.append(float(nums[1]))
         #             z.append(float(nums[2]))
-        data = np.loadtxt(file)
-        nums = data[:, 5]
+        data = np.loadtxt(file, delimiter=";", dtype=str)
+        nums = data[:, 1]
         nums = [re.findall(r"[-+]?\d*\.\d+|\d+", i) for i in nums]
         for i in nums:
             x.append(float(i[0]))
