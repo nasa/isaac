@@ -118,7 +118,7 @@ def decode_image(
     @param image_path path to image to parse
     @param result_folder if provided will save the marked image with boundary boxes and labels to the folder
     @param trained_model path to trained model
-    @returns database of labels database['label'] and boundary boxes database['location']
+    @returns database of labels database["label"] and boundary boxes database["location"]
              result_image array representing labeled image
              image array representing original nonlabeled image
     """
@@ -132,7 +132,7 @@ def decode_image(
     # mag_ratio = 1.5
 
     refiner_model = "weights/craft_refiner_CTW1500.pth"
-    # trained_model = 'models/craft_mlt_25k.pth'
+    # trained_model = "models/craft_mlt_25k.pth"
 
     if result_folder is not None and not os.path.isdir(result_folder):
         os.mkdir(result_folder)
@@ -253,11 +253,11 @@ def decode_image(
         ]
 
         # Find 3D position
-        # execute_command = ['./executable', 'param1', 'param2', 'param3']
+        # execute_command = ["./executable", "param1", "param2", "param3"]
         # subprocess.run(execute_command, check=True)
 
         if overlap_result.empty:
-            # print('empty')
+            # print("empty")
             df.loc[len(df)] = [label[0], np.array((upper_left, lower_right))]
         else:
             for index, row in overlap_result.iterrows():
@@ -330,11 +330,11 @@ def decode_image(
                     df.loc[index] = [label[0], new_location]
                 else:
                     for i, row in overlap_result.iterrows():
-                        # print(label[0], row['label'])
+                        # print(label[0], row["label"])
                         old_label = row["label"]
                         old_location = row["location"]
                         if similar(old_label, label[0]):
-                            # print('similar')
+                            # print("similar")
                             new_label = (
                                 old_label
                                 if len(old_label) >= len(label[0])
@@ -366,6 +366,33 @@ def decode_image(
     print("elapsed time : {}s".format(time.time() - t))
 
 
+def get_location(data, new_location, ros_command):
+    data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
+    data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
+
+    json_file = ros_command[-1]
+
+    with open(json_file, "w") as file:
+        json.dump(data, file)
+
+    # Run the ROS command using subprocess
+    process = subprocess.Popen(
+        ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+
+    # Wait for the process to finish and capture the output
+    stdout, stderr = process.communicate()
+    print("error: ", stderr)
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+    if len(stderr) != 0:
+        continue
+
+    result_positions = parse_3D_result(stdout)
+
+    return result_positions
+
+
 def get_all_locations(
     database,
     image_df,
@@ -377,7 +404,7 @@ def get_all_locations(
     final_file,
     image_file,
 ):
-    # locations = {}
+    locations = pd.DataFrame(columns=["label", "PCL Intersection", "Mesh Intersection"])
     total = len(image_df)
     header = ["label", "PCL Intersection", "Mesh Intersection"]
     f = None
@@ -395,28 +422,8 @@ def get_all_locations(
         print("Getting Locations {:d}/{:d}\r".format(i + 1, total))
         label = row["label"]
         new_location = row["location"]
-        data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
-        data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
 
-        json_file = ros_command[-1]
-
-        with open(json_file, "w") as file:
-            json.dump(data, file)
-
-        # Run the ROS command using subprocess
-        process = subprocess.Popen(
-            ros_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-
-        # Wait for the process to finish and capture the output
-        stdout, stderr = process.communicate()
-        print("error: ", stderr)
-        stdout = stdout.decode()
-        stderr = stderr.decode()
-        if len(stderr) != 0:
-            continue
-
-        result_positions = parse_3D_result(stdout)
+        result_positions = get_location(data, new_location, ros_command)
         location = tuple(result_positions["PCL Intersection"].values())
         if location in all_locations:
             continue
@@ -424,19 +431,21 @@ def get_all_locations(
         # locations[label] = location
         # print(result_positions)
         pcl = result_positions["PCL Intersection"]
+        pcl_str = ""
         if pcl is not None:
-            pcl = str(list(pcl.values()))
-        else:
-            pcl = ""
+            pcl = list(pcl.values())
+            pcl_str = str(pcl)
 
         mesh = result_positions["Mesh Intersection"]
+        mesh_str = ""
         if mesh is not None:
-            mesh = str(list(mesh.values()))
-        else:
-            mesh = ""
+            mesh = list(mesh.values())
+            mesh_str = str(mesh)
+
+        locations[len(locations)] = [label, pcl, mesh]
 
         line = np.array(
-            [label, pcl, mesh, image_file, str(new_location).replace("\n", "")]
+            [label, pcl_str, mesh_str, image_file, str(new_location).replace("\n", "")]
         )
         if f is not None:
             writer.writerow(line)
@@ -451,11 +460,13 @@ def get_all_locations(
     if final is not None:
         final.close()
 
+    return locations
+
 
 def display_all(image, database, result_path=None):
     """
     @param image    openCV array of image
-    @param database pandas database of columns 'label' and 'location' where 'location' is the upper left
+    @param database pandas database of columns "label" and "location" where "location" is the upper left
                     and lower right points of the rectangular bounding box for the corresponding label
     @returns array of image with the labels and boundary boxes displayed
     """
@@ -513,20 +524,34 @@ def df_from_file(file_path):
         file_path, delimiter=";", skiprows=[1], usecols=["label", "location", "image"]
     )
 
-    def convert_to_list(string):
+    locations = pd.read_csv(
+        file_path,
+        delimiter=";",
+        skiprows=[1],
+        usecols=["label", "PCL Intersection", "Mesh Intersection"],
+    )
+
+    def convert_to_location(string):
         location = re.findall(r"[-+]?\d*\.\d+|\d+", string)
         location = [int(i) for i in location]
         return [[location[0], location[1]], [location[2], location[3]]]
 
-    df["location"] = df["location"].apply(convert_to_list)
+    def convert_to_list(string):
+        nums = re.findall(r"[-+]?\d*\.\d+|\d+", string)
+        return [float(i) for i in nums]
 
-    return df
+    df["location"] = df["location"].apply(convert_to_location)
+    locations["PCL Intersection"] = locations["PCL Intersection"].apply(convert_to_list)
+    locations["Mesh Intersection"] = locations["Mesh Intersection"].apply(
+        convert_to_list
+    )
+    return df, locations
 
 
 def find_image(image, database, label):
     """
     @param image    array representing image to be searched
-    @param database database of labels (database['labels']) and their corresponding boundary boxes (database['location'])
+    @param database database of labels (database["labels"]) and their corresponding boundary boxes (database["location"])
     @param label text to search for
     @returns array representing image with label boxed if found and a list of all labels cropped from original image
     """
