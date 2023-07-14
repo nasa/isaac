@@ -11,6 +11,19 @@ from mpl_toolkits.mplot3d import Axes3D
 matplotlib_axes_logger.setLevel("ERROR")
 
 
+def get_diag(covs, k):
+    """Get diagonal covariance from full covariance
+    matrix for plotting"""
+
+    diag_covs = []
+    for i in range(k):
+        cov = covs[:, :, i]
+        l = len(cov[0])
+        diag = [cov[j][j] for j in range(l)]
+        diag_covs.append(diag)
+    return np.array(diag_covs)
+
+
 def plot_sphere(w=0, c=[0, 0, 0], r=[1, 1, 1], subdev=10, ax=None, sigma_multiplier=3):
     """
     plot a sphere surface
@@ -86,7 +99,14 @@ def visualize_3d_gmm(points, predictions, w, mu, stdev, n_gaussians, axes=None):
 
 
 def plot_gmm_results(
-    gmm1_init, gmm2_init, points1, points2, predictions1, predictions2
+    gmm1_init,
+    gmm2_init,
+    points1,
+    points2,
+    predictions1,
+    predictions2,
+    pi_appearances,
+    pi_disappearances,
 ):
 
     fig = plt.figure(figsize=(12, 4))

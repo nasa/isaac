@@ -22,8 +22,8 @@ import copy
 import os
 import pickle
 
-from emd_gmm import *
-from gmm import *
+from gmm.emd_gmm import *
+from gmm.gmm2 import *
 
 
 def get_filename(original_file):
@@ -111,25 +111,14 @@ def change_detection(gamma, theta):
     return pi
 
 
-def get_diag(covs, k):
-    """Get diagonal covariance from full covariance
-    matrix for plotting"""
-
-    diag_covs = []
-    for i in range(k):
-        cov = covs[:, :, i]
-        l = len(cov[0])
-        diag = [cov[j][j] for j in range(l)]
-        diag_covs.append(diag)
-    return np.array(diag_covs)
-
-
-def read_pre_clustered(filename, gmm_init, predictions):
+def read_pre_clustered(filename):
     with open(filename, "rb") as fi:
         (
             gmm_init,
             predictions,
+            points,
         ) = pickle.load(fi)
+    return gmm_init, predictions, points
 
 
 def save_pre_clustered(filename, gmm_init, predictions, points):

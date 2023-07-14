@@ -21,17 +21,24 @@
 # Converts ROS sensor_msgs:PointCloud2 to a
 # python-PCL-filtered numpy array
 
+import logging
 import math
 import time
+
+# Set the logging level to suppress INFO messages
+logging.getLogger("open3d").setLevel(logging.ERROR)
 
 import geometry_msgs
 import matplotlib.pyplot as plt
 import numpy as np
+import open3d as o3d
+import pandas as pd
 import pyntcloud
 import rosbag
 import rospy
 import sensor_msgs
 from PIL import Image
+from scipy.spatial import cKDTree
 
 
 # See https://stackoverflow.com/questions/39772424
@@ -47,7 +54,6 @@ def convert_pc2_pcl(data):
         np_points[:, 0] = np.resize(pc["x"], height)
         np_points[:, 1] = np.resize(pc["y"], height)
         np_points[:, 2] = np.resize(pc["z"], height)
-        p = pyntcloud.PyntCloud(pd.DataFrame(np_points, columns=["x", "y", "z"]))
 
     else:  # Ordered PC2 structure
         width = pc.shape[1]
@@ -55,19 +61,15 @@ def convert_pc2_pcl(data):
         np_points[:, 0] = np.resize(pc["x"], height * width)
         np_points[:, 1] = np.resize(pc["y"], height * width)
         np_points[:, 2] = np.resize(pc["z"], height * width)
-        p = pyntcloud.PyntCloud(pd.DataFrame(np_points, columns=["x", "y", "z"]))
-    return p
+
+    return np_points
 
 
 # Outlier and downsample filtering of data
-def filter_pcl(pcl_data):
-    pcl_data.to_file("normal.pcd")
+def filter_pcl(np_points):
 
-    # Apply Statistical Outlier Removal filter
-    cloud_filtered = pcl_data.remove_outliers(stat_outliers=True, k=50, std_mul=1.0)
-
-    # Convert filtered point cloud to NumPy array
-    np_arr = cloud_filtered.xyz.to_numpy()
+    p = pyntcloud.PyntCloud(pd.DataFrame(np_points, columns=["x", "y", "z"]))
+    p.to_file("normal.ply")
 
     # pcl.save(fil.filter(), "inliers.pcd")
     # fil.set_negative(True)
@@ -77,6 +79,20 @@ def filter_pcl(pcl_data):
     # fil = fil.make_voxel_grid_filter()
     # fil.set_leaf_size(0.01, 0.01, 0.01)
     # pcl.save(fil.filter(), "downsample.pcd")
+
+    # Create a cKDTree for efficient nearest neighbor search
+    # kdtree = cKDTree(np_points)
+
+    # # Compute the indices of the outliers using a statistical approach
+    # distances, _ = kdtree.query(np_points, k=50)  # k=50 nearest neighbors
+    # mean_distances = np.mean(distances, axis=1)
+    # std_distances = np.std(distances, axis=1)
+    # outlier_indices = np.where((distances > mean_distances[:, None] + std_distances[:, None]) |
+    #                        (distances < mean_distances[:, None] - std_distances[:, None]))
+
+    # # Filter out the outliers
+    # np_arr = np.delete(np_points, outlier_indices, axis=0)
+    np_arr = np_points
 
     return np_arr
 
@@ -100,7 +116,7 @@ def concat_ground_truth_msgs(bagfile):
                 i += n_points
 
     p = pyntcloud.PyntCloud(pd.DataFrame(merged_pcl, columns=["x", "y", "z"]))
-    p.to_file("ground_truth_run5.pcd")
+    p.to_file("ground_truth_run5.ply")
     return p
 
 
@@ -126,9 +142,13 @@ def read_pc2_msgs(bagfile):
 
 
 # Process PCD point cloud directly
-def read_pcd(pcdfile):
-    p = pcl.load(pcdfile)
-    np_arr = filter_pcl(p)
+def read_ply(pcdfile):
+
+    # Read the .ply file
+    pcd_read = o3d.io.read_point_cloud(pcdfile)
+    np_points = np.asarray(pcd_read.points, dtype=np.float32)
+    np_arr = filter_pcl(np_points)
+
     return np_arr
 
 
