@@ -1,4 +1,5 @@
 import ast
+import csv
 import json
 import math
 import os
@@ -378,15 +379,17 @@ def get_all_locations(
 ):
     # locations = {}
     total = len(image_df)
-    header = "Label, PCL Intersection, Mesh Intersection\n"
+    header = ["label", "PCL Intersection", "Mesh Intersection"]
     f = None
     final = None
     if result_path is not None:
-        f = open(result_path[:-4] + "_locations.dat", "wb")
-        np.savetxt(f, [], header=header)
+        f = open(result_path[:-4] + "_locations.csv", "w")
+        writer = csv.writer(f, delimiter=";")
+        writer.writerow(header)
 
     if final_file is not None:
         final = open(final_file, "a")
+        writer_final = csv.writer(final, delimiter=";")
 
     for i, row in image_df.iterrows():
         print("Getting Locations {:d}/{:d}\r".format(i + 1, total))
@@ -436,9 +439,10 @@ def get_all_locations(
             [label, pcl, mesh, image_file, str(new_location).replace("\n", "")]
         )
         if f is not None:
-            np.savetxt(f, line.reshape(1, line.shape[0]), delimiter=";", fmt="%s")
+            writer.writerow(line)
+
         if final is not None:
-            np.savetxt(final, line.reshape(1, line.shape[0]), delimiter=";", fmt="%s")
+            writer_final.writerow(line)
             all_locations.add(location)
 
     if f is not None:
@@ -485,13 +489,12 @@ def similar(label, input_label):
 
 
 def find_panorama(database, label):
-    # TODO search among multiple images
     words = label.split()
-    result = database.loc[database["label"].apply(similar, args=(words[0],))]
-    images = set(l_result["images"].tolist())
+    l_result = database.loc[database["label"].apply(similar, args=(words[0],))]
+    images = set(l_result["image"].tolist())
     for l in words[1:]:
         l_result = database.loc[database["label"].apply(similar, args=(l,))]
-        images = images.intersection(set(l_result["images"].tolist()))
+        images = images.intersection(set(l_result["image"].tolist()))
 
     full_images = []
     cropped_images = []
@@ -506,18 +509,18 @@ def find_panorama(database, label):
 
 
 def df_from_file(file_path):
-    database = pd.DataFrame(columns=["label", "location", "image"])
-    data = np.loadtxt(file_path, delimiter=";", dtype=str)
+    df = pd.read_csv(
+        file_path, delimiter=";", skiprows=[1], usecols=["label", "location", "image"]
+    )
 
-    labels = data[:, 0]
-    files = data[:, 3]
-    locations = data[:, 4]
+    def convert_to_list(string):
+        location = re.findall(r"[-+]?\d*\.\d+|\d+", string)
+        location = [int(i) for i in location]
+        return [[location[0], location[1]], [location[2], location[3]]]
 
-    for i in range(len(labels)):
-        location = re.findall(r"[-+]?\d*\.\d+|\d+", locations[i])
-        database.loc[i] = [labels[i], location, files[i]]
+    df["location"] = df["location"].apply(convert_to_list)
 
-    return database
+    return df
 
 
 def find_image(image, database, label):
@@ -569,8 +572,11 @@ def display_images(images):
     fig = plt.figure()
     size = math.ceil(math.sqrt(len(images)))
     for i, image in enumerate(images):
+        print(i)
         fig.add_subplot(size, size, i + 1)
         plt.imshow(image)
+
+    plt.show()
 
 
 def parse_folder(image_folder, trained_model=None, bag_path=None, result_folder=None):
@@ -580,10 +586,11 @@ def parse_folder(image_folder, trained_model=None, bag_path=None, result_folder=
 
     final_file = None
     if result_folder is not None:
-        header = "Label, PCL Intersection, Mesh Intersection, Image, Boundary\n"
-        final_file = result_folder + "all_locations.dat"
-        f = open(final_file, "wb")
-        np.savetxt(f, [], header=header)
+        header = ["label", "PCL Intersection", "Mesh Intersection", "image", "location"]
+        final_file = result_folder + "all_locations.csv"
+        f = open(final_file, "w")
+        writer = csv.writer(f, delimiter=";")
+        writer.writerow(header)
         f.close()
 
     for k, image_path in enumerate(image_list):
