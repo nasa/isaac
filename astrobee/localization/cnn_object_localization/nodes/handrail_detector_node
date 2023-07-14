@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+from cnn_object_localization.handrail_detector import *
+
+if __name__ == "__main__":
+    # Initialize node
+    rospy.init_node("handrail_detector_node")
+
+    # Define detector object
+    dm = HandrailDetectorManager()
+
+    # Spin
+    rospy.spin()

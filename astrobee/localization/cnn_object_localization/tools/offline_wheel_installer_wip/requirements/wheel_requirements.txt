@@ -1,0 +1,6 @@
+open3d
+torchvision
+pillow
+probreg
+scipy
+scikit-learn

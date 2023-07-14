@@ -1,0 +1,1 @@
+True handrail Pose: x: 0.96, y: 0.0325, z: -0.2176

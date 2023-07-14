@@ -1,0 +1,9 @@
+<launch>
+  <node pkg= "cnn_object_localization" type="handrail_detector_node" name="handrail_detector_node" output= "screen">
+      <param name="image_topic" value="/hw/cam_dock/image_raw" />
+  </node>
+  <node pkg= "cnn_object_localization" type="pointcloud_mask_node" name="pointcloud_mask_processor_node" output= "screen">
+      <param name="rgb_image_topic"  value="/hw/cam_dock/image_raw" />
+  </node>
+  <node pkg= "cnn_object_localization" type="icp_pose_estimator_node" name="icp_pose_estimator_node" output= "screen"/>
+</launch>
