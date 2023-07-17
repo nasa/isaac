@@ -5,6 +5,10 @@ The test is intended to be as standalone as possible, isolated from ROS and the 
 1. `wget https://download.pytorch.org/libtorch/nightly/cpu/libtorch-shared-with-deps-latest.zip`
 2. `unzip libtorch-shared-with-deps-latest.zip`
 3. `rm libtorch-shared-with-deps-latest.zip`
-4. `cmake -DCMAKE_PREFIX_PATH=libtorch -S . -B build`
+4. `git clone https://github.com/pytorch/vision.git`
+
+
+
+4. `cmake -S . -B build`
 5. `cmake --build build --config Release`
 6. `./build/libtorch_mrcnn_test /path/to/torchscript/model.pt`

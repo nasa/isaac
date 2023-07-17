@@ -1,3 +1,4 @@
 build
 libtorch
+vision
 *.zip

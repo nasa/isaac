@@ -17,6 +17,8 @@
 */
 
 #include <torch/script.h>  // One-stop header.
+#include <torch/torch.h>
+#include <torchvision/vision.h>
 
 #include <iostream>
 #include <memory>
