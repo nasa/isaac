@@ -16,29 +16,37 @@
 * under the License.
 */
 
-#include <torch/script.h>  // One-stop header.
-#include <torch/torch.h>
+#include <torch/script.h>
+// #include <torch/torch.h>  // Uncomment if there are any issues with linking...?
 #include <torchvision/vision.h>
+// #include <torchvision/ops/nms.h>  // Uncomment if there are any issues with linking...?
 
 #include <iostream>
 #include <memory>
 
 int main(int argc, const char* argv[]) {
   if (argc != 2) {
-    std::cerr << "usage: example-app <path-to-exported-script-module>\n";
+    std::cerr << "usage: libtorch_mrcnn_test <path-to-exported-script-module>\n";
     return -1;
   }
+  // if (argc != 3) {
+  //   std::cerr << "usage: libtorch_mrcnn_test <path-to-exported-script-module> <path-to-image-file>\n";
+  //   return -1;
+  // }
 
+  // This line doesn't do anything, but it makes sure the C++ linker doesn't prune libtorchvision
+  vision::cuda_version();
 
+  // Load the module
   torch::jit::script::Module module;
-  try {
-    // Deserialize the ScriptModule from a file using torch::jit::load().
-    module = torch::jit::load(argv[1]);
-  }
-  catch (const c10::Error& e) {
-    std::cerr << "error loading the model\n";
-    return -1;
-  }
+  module = torch::jit::load(argv[1]);
+  std::cout << "Module loaded OK.\n";
 
-  std::cout << "ok\n";
+  // Run the module on a dummy input
+  std::vector<torch::Tensor> inputInner;
+  inputInner.push_back(torch::ones({3, 240, 320}));
+  std::vector<torch::jit::IValue> inputOuter;
+  inputOuter.push_back(inputInner);
+  auto output = module.forward(inputOuter).toTuple()->elements()[1];
+  std::cout << "Module inference ran OK.\n";
 }
