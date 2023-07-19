@@ -23,6 +23,8 @@
 
 #include <iostream>
 #include <memory>
+#include <chrono>
+#include <string>
 
 int main(int argc, const char* argv[]) {
   if (argc != 2) {
@@ -42,11 +44,16 @@ int main(int argc, const char* argv[]) {
   module = torch::jit::load(argv[1]);
   std::cout << "Module loaded OK.\n";
 
-  // Run the module on a dummy input
+  // Prepare dummy input for testing
   std::vector<torch::Tensor> inputInner;
   inputInner.push_back(torch::ones({3, 240, 320}));
   std::vector<torch::jit::IValue> inputOuter;
   inputOuter.push_back(inputInner);
+
+  // Run the model and report runtime
+  auto t_start = std::chrono::high_resolution_clock::now();
   auto output = module.forward(inputOuter).toTuple()->elements()[1];
-  std::cout << "Module inference ran OK.\n";
+  auto t_end = std::chrono::high_resolution_clock::now();
+  double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
+  std::cout << "Module inference ran in " << std::to_string(elapsed_time_ms) << " milliseconds.\n";
 }
