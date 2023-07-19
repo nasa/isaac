@@ -166,15 +166,15 @@ def read_pc2_msgs(bagfile):
         "/hw/depth_haz/extended/amplitude_int",
     ]
     pc2_msg = None
-
-    count = 0
+    # First message should be saved
+    count = 100
     i = 0
     with rosbag.Bag(bagfile, "r") as bag:
         for topic, msg, t in bag.read_messages(topics_bag):
             if topic == "/hw/depth_haz/points":
-                count += 1
                 if count % skipped == 0:
                     pc2_msg = msg
+                count += 1
             if topic == "/gnc/ekf" and pc2_msg is not None:
 
                 pc2_body = translate_cam_frame(pc2_msg)

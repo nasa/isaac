@@ -23,7 +23,7 @@ import os
 import pickle
 
 from gmm.emd_gmm import *
-from gmm.gmm2 import *
+from gmm.gmm_edit import *
 
 
 def get_filename(original_file):
