@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.20"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ISAAC: Volumetric Mapper</title>
+<title>ISAAC: GMM Change Detection</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <link rel="icon" href="favicon.png" type="image/png" />
 <script type="text/javascript" src="jquery.js"></script>
@@ -67,7 +67,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:cf05388f2679ee054f2beb29a391d25f4e673ac3&amp;dn=gpl-2.0.txt GPL-v2 */
-$(document).ready(function(){initNavTree('volumetric_mapper.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('gmm.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -87,23 +87,19 @@ $(document).ready(function(){initNavTree('volumetric_mapper.html',''); initResiz
 
 <div class="PageDoc"><div class="header">
   <div class="headertitle">
-<div class="title">Volumetric Mapper </div>  </div>
+<div class="title">GMM Change Detection </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h1><a class="anchor" id="autotoc_md112"></a>
-Volumetric Mapper</h1>
-<h2><a class="anchor" id="autotoc_md113"></a>
-Overview</h2>
-<p>The wifi mapper subscribes to all the wifi signal strength messages and prcesses them for 3D visualization. Customization os the produced maps is defined in isaac/config/dense_map/wifi_mapper.config</p>
-<h2><a class="anchor" id="autotoc_md114"></a>
-Trace Map</h2>
-<p>The trace map is drawn at a certain resolution, within this resolution, every signal received is averaged. The result is depicted using MarkerArray's where the cube size is the map resolution.</p>
-<p>Parameters: plot_trace - enable or disable the trace map calculation resolution - resolution of the trace map where whithin it, the measurements will be averaged</p>
-<h2><a class="anchor" id="autotoc_md115"></a>
-Wifi 3D Map</h2>
-<p>The Wifi Mapper uses Gaussian Process Regression to mapp the ISS regarding the wifi signal strength. It makes use of the libgp library. When a new measure is obtained, the value is recorded in the GP object. When the timer responsible for calculating the wifi interpolation is enables, all the recorded data is processed.</p>
-<p>Parameters: plot_map - enable or disable the 3D map interpolation calculation </p>
-</div></div><!-- contents -->
+<div class="textblock"><h1><a class="anchor" id="autotoc_md45"></a>
+Overview</h1>
+<p>This implementation of a GMM-based anomaly detection algorithm was created by Jamie Santos, for the purposes of a [Master thesis](). This algorithm is able to detect changes on environments such as the ISS using 3D point depth cloud data.</p>
+<h1><a class="anchor" id="autotoc_md46"></a>
+Requirements</h1>
+<p>pip3 install pulp pip3 install scikit-learn pip3 install pyntcloud pip3 install pandas pip3 install open3d apt-get install glpk-utils apt-get install ros-noetic-ros-numpy</p>
+<h2><a class="anchor" id="autotoc_md47"></a>
+Usage</h2>
+<pre class="fragment">rosrun gmm gmm_change_detection.py
+</pre> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->
 <!-- HTML footer for doxygen 1.9.0-->

@@ -24,7 +24,8 @@ var searchData=
   ['getpropertytype_65',['getPropertyType',['../classhapply_1_1Element.html#a977434df80605b76e580bbefc1628743',1,'happly::Element']]],
   ['getvertexcolors_66',['getVertexColors',['../classhapply_1_1PLYData.html#ab323244a4cfe0ecafd08d5dc1a49fa0c',1,'happly::PLYData']]],
   ['getvertexpositions_67',['getVertexPositions',['../classhapply_1_1PLYData.html#a486c5daef175402f3a66afdbee85d50e',1,'happly::PLYData']]],
-  ['group_68',['Group',['../structdense__map_1_1IsaacObjModel_1_1Group.html',1,'dense_map::IsaacObjModel']]],
-  ['guest_20science_20action_20helper_69',['Guest Science Action Helper',['../gs_action_helper.html',1,'astrobee']]],
-  ['gsactionhelper_70',['GsActionHelper',['../classgs__action__helper_1_1GsActionHelper.html',1,'gs_action_helper']]]
+  ['gmm_20change_20detection_68',['GMM Change Detection',['../gmm.html',1,'ano']]],
+  ['group_69',['Group',['../structdense__map_1_1IsaacObjModel_1_1Group.html',1,'dense_map::IsaacObjModel']]],
+  ['guest_20science_20action_20helper_70',['Guest Science Action Helper',['../gs_action_helper.html',1,'astrobee']]],
+  ['gsactionhelper_71',['GsActionHelper',['../classgs__action__helper_1_1GsActionHelper.html',1,'gs_action_helper']]]
 ];
