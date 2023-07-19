@@ -119,7 +119,7 @@ class HandrailDetectorManager:
             raise IOError(("{:s} not found.").format(self.weights_path))
 
         # Load image parameter and confidence threshold
-        self.image_topic = rospy.get_param("~image_topic", "hw/cam_dock/image_raw")
+        self.image_topic = rospy.get_param("~image_topic", "hw/cam_dock")
         self.nms_th = rospy.get_param("~nms_th", 0.9)
 
         # Load publisher topics

@@ -62,7 +62,7 @@ class PerchCamProcess:
             "~pointcloud_topic", "/hw/depth_perch/points"
         )
         self.rgb_image_topic = rospy.get_param(
-            "~rgb_image_topic", "hw/cam_dock/image_raw"
+            "~rgb_image_topic", "hw/cam_dock"
         )
         self.mask = None
         self.pc = None
