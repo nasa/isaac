@@ -8,10 +8,11 @@ This algorithm is able to detect changes on environments such as the ISS using 3
 # Requirements
 pip3 install pulp
 pip3 install scikit-learn
-pip install pyntcloud
-pip install pandas
-pip install open3d
+pip3 install pyntcloud
+pip3 install pandas
+pip3 install open3d
 apt-get install glpk-utils
+apt-get install ros-noetic-ros-numpy
 
 ## Usage
 

@@ -49,13 +49,13 @@ class GMM:
             self.weights, gaussian.weights
         )  # PLACEHOLDER (weights are now incorrect)
         self.means = np.append(self.means, gaussian.means, axis=0)
-        print("Gauss type: " + str(type(gaussian.covariances.reshape((3, 3)))))
+        # print("Gauss type: " + str(type(gaussian.covariances.reshape((3, 3)))))
         if type(self.covariances) is not np.ndarray:
             self.covariances = gaussian.covariances.reshape((3, 3))
-            print("Pi cov initialized: " + str(self.covariances.shape))
+            # print("Pi cov initialized: " + str(self.covariances.shape))
         else:
-            print("Curr cov size: " + str(self.covariances.shape))
-            print("Gauss cov size: " + str(gaussian.covariances.reshape((3, 3)).shape))
+            # print("Curr cov size: " + str(self.covariances.shape))
+            # print("Gauss cov size: " + str(gaussian.covariances.reshape((3, 3)).shape))
             # self.covariances = np.vstack([[self.covariances], [gaussian.covariances.reshape((3,3))]])
             self.covariances = np.concatenate(
                 [self.covariances, gaussian.covariances], axis=0

@@ -24,7 +24,7 @@ import sys
 
 import numpy as np
 from gmm.artificial_data import generate_data
-from gmm.gmm2 import *
+from gmm.gmm_edit import *
 from gmm.gmm_mml import GmmMml
 from gmm.preprocess_data import *
 from gmm.utilities import *
