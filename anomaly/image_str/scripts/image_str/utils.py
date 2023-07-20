@@ -5,13 +5,18 @@ def get_euclidean_distance(p1, p2):
     return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
 
-def get_closest_rect(rect, rectangles, distance):
+def get_closest_rect(rect, rectangles, positions, distance):
     rects = []
-    for r in rectangles:
-        d = get_rect_distance(rect[0], rect[1], r[0], r[1])
+    pos = []
+    for i in range(len(rectangles)):
+        d = get_rect_distance(rect[0], rect[1], rectangles[i][0], rectangles[i][1])
         if d < distance:
-            rects.append(r)
-    return rects
+            rects.append(rectangles[i])
+            if positions is not None:
+                pos.append(positions[i])
+            else:
+                pos = None
+    return rects, pos
 
 
 def get_iou(rect1, rect2):
@@ -74,6 +79,10 @@ def get_bounding_box(rect1, rect2):
     )
 
     return np.array((upper_left, lower_right))
+
+
+def get_midpoint(pos1, pos2):
+    return [(pos1[i] + pos2[i]) / 2 for i in range(len(pos1))]
 
 
 def get_rect_distance(upper_a, lower_a, upper_b, lower_b):

@@ -7,6 +7,7 @@ import re
 import subprocess
 import time
 import warnings
+from multiprocessing import Process
 
 import craft.file_utils as file_utils
 import cv2
@@ -24,6 +25,7 @@ from craft.craft import CRAFT
 from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from torch.autograd import Variable
+from tqdm import tqdm
 
 
 def get_bag_file(timestamp):
@@ -109,10 +111,11 @@ def decode_image(
     image_path,
     database,
     result_folder=None,
-    bag_path=None,
     all_locations=set(),
     final_file=None,
-    trained_model="models/craft_mlt_25k.pth",
+    net=None,
+    parseq_model=None,
+    increment=False,
 ):
     """
     @param image_path path to image to parse
@@ -122,6 +125,15 @@ def decode_image(
              result_image array representing labeled image
              image array representing original nonlabeled image
     """
+
+    if result_folder is not None and not os.path.isdir(result_folder):
+        os.mkdir(result_folder)
+
+    # ============================ Initialization ============================
+    filename, file_ext = os.path.splitext(os.path.basename(image_path))
+
+    result_path = None
+
     cuda = False
     refine = False
     poly = False
@@ -130,39 +142,9 @@ def decode_image(
     low_text = 0.4
     link_threshold = 0.1
     # mag_ratio = 1.5
-
-    refiner_model = "weights/craft_refiner_CTW1500.pth"
-    # trained_model = "models/craft_mlt_25k.pth"
-
-    if result_folder is not None and not os.path.isdir(result_folder):
-        os.mkdir(result_folder)
-
-    # ============================ Initialization ============================
-    filename, file_ext = os.path.splitext(os.path.basename(image_path))
-
-    # load net
-    net = CRAFT()  # initialize
-
-    print("Loading weights from checkpoint (" + trained_model + ")")
-    if cuda:
-        net.load_state_dict(newt_utils.copyStateDict(torch.load(trained_model)))
-    else:
-        net.load_state_dict(
-            net_utils.copyStateDict(torch.load(trained_model, map_location="cpu"))
-        )
-
-    if cuda:
-        net = net.cuda()
-        net = torch.nn.DataParallel(net)
-        cudnn.benchmark = False
-
-    net.eval()
     refine_net = None
-    result_path = None
 
-    # Load model and image transforms for parseq
-    parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
-    img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
+    parseq, img_transform = parseq_model
 
     # ============================ Start Processing ============================
 
@@ -224,7 +206,6 @@ def decode_image(
 
     df = pd.DataFrame(columns=["label", "location"])
 
-    # print(polys)
     for box in polys:
         # Box in form upper left -> upper right -> lower right -> lower left, (x, y)
         box = np.array(box).astype(np.int32)
@@ -252,12 +233,7 @@ def decode_image(
             df["location"].apply(utils.overlap, args=(new_location,))
         ]
 
-        # Find 3D position
-        # execute_command = ["./executable", "param1", "param2", "param3"]
-        # subprocess.run(execute_command, check=True)
-
         if overlap_result.empty:
-            # print("empty")
             df.loc[len(df)] = [label[0], np.array((upper_left, lower_right))]
         else:
             for index, row in overlap_result.iterrows():
@@ -274,7 +250,6 @@ def decode_image(
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
             img = utils.crop_image(image, x, y, x + crop_w, y + crop_h)
-            print("Test part {:d}/{:d}\r".format(num + 1, total))
             bboxes, polys, score_text = net_utils.test_net(
                 net,
                 img,
@@ -330,11 +305,9 @@ def decode_image(
                     df.loc[index] = [label[0], new_location]
                 else:
                     for i, row in overlap_result.iterrows():
-                        # print(label[0], row["label"])
                         old_label = row["label"]
                         old_location = row["location"]
                         if similar(old_label, label[0]):
-                            # print("similar")
                             new_label = (
                                 old_label
                                 if len(old_label) >= len(label[0])
@@ -350,7 +323,8 @@ def decode_image(
     if result_folder is not None:
         result_path = result_folder + filename + ".jpg"
 
-    # result_image = display_all(image, df, result_path)
+    if increment:
+        result_image = display_all(image, df, result_path)
     if bag_name is not None:
         get_all_locations(
             database,
@@ -363,7 +337,6 @@ def decode_image(
             final_file,
             image_path,
         )
-    print("elapsed time : {}s".format(time.time() - t))
 
 
 def get_location(data, new_location, ros_command):
@@ -382,11 +355,10 @@ def get_location(data, new_location, ros_command):
 
     # Wait for the process to finish and capture the output
     stdout, stderr = process.communicate()
-    print("error: ", stderr)
     stdout = stdout.decode()
     stderr = stderr.decode()
     if len(stderr) != 0:
-        continue
+        return None
 
     result_positions = parse_3D_result(stdout)
 
@@ -404,7 +376,6 @@ def get_all_locations(
     final_file,
     image_file,
 ):
-    locations = pd.DataFrame(columns=["label", "PCL Intersection", "Mesh Intersection"])
     total = len(image_df)
     header = ["label", "PCL Intersection", "Mesh Intersection"]
     f = None
@@ -419,17 +390,17 @@ def get_all_locations(
         writer_final = csv.writer(final, delimiter=";")
 
     for i, row in image_df.iterrows():
-        print("Getting Locations {:d}/{:d}\r".format(i + 1, total))
         label = row["label"]
         new_location = row["location"]
 
         result_positions = get_location(data, new_location, ros_command)
+        if result_positions is None:
+            continue
+
         location = tuple(result_positions["PCL Intersection"].values())
         if location in all_locations:
             continue
-        database[len(database)] = [label, new_location, image_file]
-        # locations[label] = location
-        # print(result_positions)
+
         pcl = result_positions["PCL Intersection"]
         pcl_str = ""
         if pcl is not None:
@@ -442,7 +413,7 @@ def get_all_locations(
             mesh = list(mesh.values())
             mesh_str = str(mesh)
 
-        locations[len(locations)] = [label, pcl, mesh]
+        database[len(database)] = [label, new_location, image_file, pcl, mesh]
 
         line = np.array(
             [label, pcl_str, mesh_str, image_file, str(new_location).replace("\n", "")]
@@ -459,8 +430,6 @@ def get_all_locations(
 
     if final is not None:
         final.close()
-
-    return locations
 
 
 def display_all(image, database, result_path=None):
@@ -499,6 +468,39 @@ def similar(label, input_label):
     return jellyfish.jaro_winkler_similarity(label, input_label) > 0.8
 
 
+def df_from_file(file_path):
+    df = pd.read_csv(
+        file_path,
+        delimiter=";",
+        skiprows=[1],
+        usecols=["label", "location", "image", "PCL Intersection", "Mesh Intersection"],
+        dtype=str,
+        keep_default_na=False,
+        na_values="",
+    )
+
+    def convert_to_rect(string):
+        location = re.findall(r"[-+]?\d*\.\d+|\d+", string)
+        location = [int(i) for i in location]
+        return [[location[0], location[1]], [location[2], location[3]]]
+
+    def convert_to_list(string):
+        if pd.isna(string):
+            return None
+        nums = re.findall(r"[-+]?\d*\.\d+|\d+", string)
+        return [float(i) for i in nums]
+
+    df["location"] = df["location"].apply(convert_to_rect)
+    df["PCL Intersection"] = df["PCL Intersection"].apply(convert_to_list)
+    df["Mesh Intersection"] = df["Mesh Intersection"].apply(convert_to_list)
+    return df
+
+
+def set_bag_path(bag):
+    global bag_path
+    bag_path = bag
+
+
 def find_panorama(database, label):
     words = label.split()
     l_result = database.loc[database["label"].apply(similar, args=(words[0],))]
@@ -506,108 +508,163 @@ def find_panorama(database, label):
     for l in words[1:]:
         l_result = database.loc[database["label"].apply(similar, args=(l,))]
         images = images.intersection(set(l_result["image"].tolist()))
+    full = []
+    crop = []
+    results = []
 
-    full_images = []
-    cropped_images = []
-    for img_file in images:
-        image = cv2.imread(img_file)
+    for img_file in tqdm(images, desc="Searching for {:s}".format(label)):
         df = database.loc[database["image"] == img_file]
-        result = find_image(image, df, label)
-        full_images.append(result[0])
-        cropped_images.extend(result[1])
+        result = find_image(img_file, df, label)
+        full.extend(result[0])
+        crop.extend(result[1])
+        if result[2] is not None:
+            results.extend(result[2])
 
-    return full_images, cropped_images
+    for i in range(len(results)):
+        print(
+            "Location {:d}\n Position (x, y, z): {:s}\n Orientation (roll, pitch, yaw): {:s}\n".format(
+                i, str(results[i][:3]), str(results[i][3:])
+            )
+        )
 
-
-def df_from_file(file_path):
-    df = pd.read_csv(
-        file_path, delimiter=";", skiprows=[1], usecols=["label", "location", "image"]
-    )
-
-    locations = pd.read_csv(
-        file_path,
-        delimiter=";",
-        skiprows=[1],
-        usecols=["label", "PCL Intersection", "Mesh Intersection"],
-    )
-
-    def convert_to_location(string):
-        location = re.findall(r"[-+]?\d*\.\d+|\d+", string)
-        location = [int(i) for i in location]
-        return [[location[0], location[1]], [location[2], location[3]]]
-
-    def convert_to_list(string):
-        nums = re.findall(r"[-+]?\d*\.\d+|\d+", string)
-        return [float(i) for i in nums]
-
-    df["location"] = df["location"].apply(convert_to_location)
-    locations["PCL Intersection"] = locations["PCL Intersection"].apply(convert_to_list)
-    locations["Mesh Intersection"] = locations["Mesh Intersection"].apply(
-        convert_to_list
-    )
-    return df, locations
+    plt.show()
+    return full, crop, result
 
 
-def find_image(image, database, label):
+def find_image(image_file, database, label):
     """
     @param image    array representing image to be searched
     @param database database of labels (database["labels"]) and their corresponding boundary boxes (database["location"])
     @param label text to search for
     @returns array representing image with label boxed if found and a list of all labels cropped from original image
     """
+    image = cv2.imread(image_file)
     words = label.split()
     results = {}
     for l in words:
         l_result = database.loc[database["label"].apply(similar, args=(l,))]
-        results[l] = l_result["location"].tolist()
+        results[l] = l_result
 
-    rectangles = np.array(results[words[0]])
+    positions = np.array(results[words[0]]["PCL Intersection"].tolist())
+    rectangles = np.array(results[words[0]]["location"].tolist())
     for word in words[1:]:
         new_rects = []
-        other_rects = results[word]
-        for rect in rectangles:
-            # letter_width = round((rect[1][0] - rect[0][0])/len(word))
-            limit = 2 * (rect[1][1] - rect[0][1])
-            # print(rect, other_rects)
-            closest_rect = utils.get_closest_rect(rect, other_rects, limit)
-            for r in closest_rect:
-                new_rects.append(utils.get_bounding_box(rect, r))
+        new_positions = []
+        other_rects = results[word]["location"].tolist()
+        other_positions = results[word]["PCL Intersection"].tolist()
+
+        if None in other_positions:
+            other_positions = None
+
+        for j in range(len(rectangles)):
+            limit = 2 * (rectangles[j][1][1] - rectangles[j][0][1])
+            closest_rect, mid_positions = utils.get_closest_rect(
+                rectangles[j], other_rects, other_positions, limit
+            )
+            for i in range(len(closest_rect)):
+                new_rects.append(utils.get_bounding_box(rectangles[j], closest_rect[i]))
+                if mid_positions is not None:
+                    new_positions.append(
+                        utils.get_midpoint(positions[j], mid_positions[i])
+                    )
+                else:
+                    new_positions = None
+
         rectangles = new_rects
+        positions = new_positions
 
     new_image = np.array(image)
 
     offset = 10
     cropped_images = []
-    for rect in rectangles:
-        new_image = cv2.rectangle(new_image, rect[0], rect[1], (255, 0, 0), 10)
+    for i in range(len(rectangles)):
+        new_image = cv2.rectangle(
+            new_image, rectangles[i][0], rectangles[i][1], (255, 0, 0), 10
+        )
         cropped_images.append(
             utils.crop_image(
                 image,
-                rect[0][0] - offset,
-                rect[0][1] - offset,
-                rect[1][0] + offset,
-                rect[1][1] + offset,
+                rectangles[i][0][0] - offset,
+                rectangles[i][0][1] - offset,
+                rectangles[i][1][0] + offset,
+                rectangles[i][1][1] + offset,
             )
         )
 
-    return new_image, cropped_images
+    for i in range(0, len(cropped_images), 2):
+        fig = plt.figure()
+        ax1 = fig.add_subplot(122)
+        ax1.imshow(new_image)
+
+        ax2 = fig.add_subplot(221)
+        ax2.imshow(cropped_images[i])
+        if i + 1 == len(cropped_images):
+            break
+        ax3 = fig.add_subplot(223)
+        ax3.imshow(cropped_images[i + 1])
+
+    if len(cropped_images) == 0:
+        new_image = []
+    else:
+        new_image = [new_image]
+
+    return new_image, cropped_images, positions
 
 
 def display_images(images):
-    fig = plt.figure()
-    size = math.ceil(math.sqrt(len(images)))
+    fig = None
+    size = 2
     for i, image in enumerate(images):
-        print(i)
-        fig.add_subplot(size, size, i + 1)
+        if i % 4 == 0:
+            fig = plt.figure()
+        fig.add_subplot(size, size, i % 4 + 1)
         plt.imshow(image)
 
     plt.show()
 
 
-def parse_folder(image_folder, trained_model=None, bag_path=None, result_folder=None):
-    database = pd.DataFrame(columns=["label", "location", "image"])
+def get_parseq():
+    # Load model and image transforms for parseq
+    parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
+    img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
+    return (parseq, img_transform)
+
+
+def get_craft(trained_model):
+    cuda = False
+
+    refiner_model = "weights/craft_refiner_CTW1500.pth"
+    # trained_model = "models/craft_mlt_25k.pth"
+
+    # load net
+    net = CRAFT()  # initialize
+
+    if cuda:
+        net.load_state_dict(newt_utils.copyStateDict(torch.load(trained_model)))
+    else:
+        net.load_state_dict(
+            net_utils.copyStateDict(torch.load(trained_model, map_location="cpu"))
+        )
+
+    if cuda:
+        net = net.cuda()
+        net = torch.nn.DataParallel(net)
+        cudnn.benchmark = False
+
+    net.eval()
+
+    return net
+
+
+def parse_folder(image_folder, trained_model=None, result_folder=None, increment=False):
+    database = pd.DataFrame(
+        columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
+    )
     all_locations = set()
-    image_list, _, _ = file_utils.get_files(test_folder)
+    image_list, _, _ = file_utils.get_files(image_folder)
+
+    net = get_craft(trained_model)
+    parseq = get_parseq()
 
     final_file = None
     if result_folder is not None:
@@ -618,32 +675,49 @@ def parse_folder(image_folder, trained_model=None, bag_path=None, result_folder=
         writer.writerow(header)
         f.close()
 
-    for k, image_path in enumerate(image_list):
-        print("\rTest image {:d}/{:d}: {:s}".format(k + 1, len(image_list), image_path))
+    for k, image_path in enumerate(tqdm(image_list, desc="Parsing through Images")):
         decode_image(
             image_path,
             database,
             result_folder=result_folder,
-            bag_path=bag_path,
             all_locations=all_locations,
             final_file=final_file,
+            net=net,
+            parseq_model=parseq,
+            increment=increment,
         )
 
+    print("Success")
     return database
 
 
-def parse_image(image_file, trained_model=None, bag_path=None, result_folder=None):
-    database = pd.DataFrame(columns=["label", "location", "image"])
+def parse_image(image_file, trained_model=None, result_folder=None, increment=False):
+    database = pd.DataFrame(
+        columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
+    )
 
-    decode_image(image_path, database, result_folder, bag_path)
+    net = get_craft(trained_model)
+    parseq = get_parseq()
+    tqdm(
+        decode_image(
+            image_file,
+            database,
+            result_folder,
+            final_file=None,
+            net=net,
+            parseq_model=parseq,
+            increment=increment,
+        )
+    )
 
+    print("Success")
     return database
 
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     os.environ["ASTROBEE_CONFIG_DIR"] = "/home/rlu3/astrobee/src/astrobee/config"
-    os.environ["ASTROBEE_RESOURCE_DIR"] = "/home/rlu3/astrobee/src/astrobee/resource"
+    os.environ["ASTROBEE_RESOURCE_DIR"] = "/home/rlu3/astrobee/src/astrobee/resources"
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
@@ -651,8 +725,11 @@ if __name__ == "__main__":
     result_folder = "result/beehive/queen/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
-
-    database = parse_folder(test_folder, bag_path=bag_path, result_folder=result_folder)
+    set_bag_path(bag_path)
+    # database = parse_folder(test_folder, result_folder=result_folder)
     # database = parse_image(test_image, bad_path, result_folder)
+    database = df_from_file(
+        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
+    )
 
     IPython.embed()

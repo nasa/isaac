@@ -59,6 +59,7 @@ analyst/workspace/.jupyter
 analyst/workspace/.local
 analyst/workspace/.ipynb_checkpoints
 analyst/workspace/.cache
+analyst/workspace/results/
 
 # vscode
 isaac.code-workspace
