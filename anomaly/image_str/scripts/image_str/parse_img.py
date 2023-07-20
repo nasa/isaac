@@ -109,7 +109,7 @@ def parse_3D_result(string):
 
 def decode_image(
     image_path,
-    database,
+    dataframe,
     result_folder=None,
     all_locations=set(),
     final_file=None,
@@ -121,7 +121,7 @@ def decode_image(
     @param image_path path to image to parse
     @param result_folder if provided will save the marked image with boundary boxes and labels to the folder
     @param trained_model path to trained model
-    @returns database of labels database["label"] and boundary boxes database["location"]
+    @returns dataframe of labels dataframe["label"] and boundary boxes dataframe["location"]
              result_image array representing labeled image
              image array representing original nonlabeled image
     """
@@ -327,7 +327,7 @@ def decode_image(
         result_image = display_all(image, df, result_path)
     if bag_name is not None:
         get_all_locations(
-            database,
+            dataframe,
             df,
             data,
             bag_name,
@@ -366,7 +366,7 @@ def get_location(data, new_location, ros_command):
 
 
 def get_all_locations(
-    database,
+    dataframe,
     image_df,
     data,
     bag_name,
@@ -377,7 +377,7 @@ def get_all_locations(
     image_file,
 ):
     total = len(image_df)
-    header = ["label", "PCL Intersection", "Mesh Intersection"]
+    header = ["label", "PCL Intersection", "Mesh Intersection", "image", "location"]
     f = None
     final = None
     if result_path is not None:
@@ -413,7 +413,7 @@ def get_all_locations(
             mesh = list(mesh.values())
             mesh_str = str(mesh)
 
-        database[len(database)] = [label, new_location, image_file, pcl, mesh]
+        dataframe.loc[len(dataframe)] = [label, new_location, image_file, pcl, mesh]
 
         line = np.array(
             [label, pcl_str, mesh_str, image_file, str(new_location).replace("\n", "")]
@@ -432,10 +432,10 @@ def get_all_locations(
         final.close()
 
 
-def display_all(image, database, result_path=None):
+def display_all(image, dataframe, result_path=None):
     """
     @param image    openCV array of image
-    @param database pandas database of columns "label" and "location" where "location" is the upper left
+    @param dataframe pandas dataframe of columns "label" and "location" where "location" is the upper left
                     and lower right points of the rectangular bounding box for the corresponding label
     @returns array of image with the labels and boundary boxes displayed
     """
@@ -445,7 +445,7 @@ def display_all(image, database, result_path=None):
     thickness = 2
     font = cv2.FONT_HERSHEY_SIMPLEX
     result = ""
-    for _, row in database.iterrows():
+    for _, row in dataframe.iterrows():
         rect = row["location"]
         display_image = cv2.rectangle(display_image, rect[0], rect[1], blue, 10)
         display_image = cv2.putText(
@@ -501,48 +501,41 @@ def set_bag_path(bag):
     bag_path = bag
 
 
-def find_panorama(database, label):
+def find_panorama(dataframe, label):
     words = label.split()
-    l_result = database.loc[database["label"].apply(similar, args=(words[0],))]
+    l_result = dataframe.loc[dataframe["label"].apply(similar, args=(words[0],))]
     images = set(l_result["image"].tolist())
     for l in words[1:]:
-        l_result = database.loc[database["label"].apply(similar, args=(l,))]
+        l_result = dataframe.loc[dataframe["label"].apply(similar, args=(l,))]
         images = images.intersection(set(l_result["image"].tolist()))
     full = []
     crop = []
     results = []
 
     for img_file in tqdm(images, desc="Searching for {:s}".format(label)):
-        df = database.loc[database["image"] == img_file]
+        df = dataframe.loc[dataframe["image"] == img_file]
         result = find_image(img_file, df, label)
         full.extend(result[0])
         crop.extend(result[1])
         if result[2] is not None:
             results.extend(result[2])
 
-    for i in range(len(results)):
-        print(
-            "Location {:d}\n Position (x, y, z): {:s}\n Orientation (roll, pitch, yaw): {:s}\n".format(
-                i, str(results[i][:3]), str(results[i][3:])
-            )
-        )
-
-    plt.show()
-    return full, crop, result
+    return full, crop, results
 
 
-def find_image(image_file, database, label):
+def find_image(image_file, dataframe, label):
     """
     @param image    array representing image to be searched
-    @param database database of labels (database["labels"]) and their corresponding boundary boxes (database["location"])
+    @param dataframe dataframe of labels (dataframe["labels"]) and their corresponding boundary boxes (dataframe["location"])
     @param label text to search for
     @returns array representing image with label boxed if found and a list of all labels cropped from original image
     """
     image = cv2.imread(image_file)
+    h, w, _ = image.shape
     words = label.split()
     results = {}
     for l in words:
-        l_result = database.loc[database["label"].apply(similar, args=(l,))]
+        l_result = dataframe.loc[dataframe["label"].apply(similar, args=(l,))]
         results[l] = l_result
 
     positions = np.array(results[words[0]]["PCL Intersection"].tolist())
@@ -591,24 +584,61 @@ def find_image(image_file, database, label):
             )
         )
 
-    for i in range(0, len(cropped_images), 2):
-        fig = plt.figure()
-        ax1 = fig.add_subplot(122)
-        ax1.imshow(new_image)
+    results = []
+    for pos in positions:
+        pitch = pos[4]
+        yaw = pos[5]
 
-        ax2 = fig.add_subplot(221)
-        ax2.imshow(cropped_images[i])
-        if i + 1 == len(cropped_images):
-            break
-        ax3 = fig.add_subplot(223)
-        ax3.imshow(cropped_images[i + 1])
+        filename, file_ext = os.path.splitext(os.path.basename(image_file))
+        bag = get_bag_file(float(filename))
+
+        if "bay1" in bag:
+            loc = "usl_bay1"
+        elif "bay2" in bag:
+            loc = "usl_bay2"
+        elif "bay3" in bag:
+            loc = "usl_bay3"
+        elif "bay4" in bag:
+            loc = "usl_bay4"
+        elif "bay5" in bag:
+            loc = "usl_bay5"
+        else:
+            loc = ""
+
+        link = "https://ivr.ndc.nasa.gov/isaac_panos/pannellum.htm?config=tour.json&firstScene={:s}&pitch={:f}&yaw={:f}".format(
+            loc, pitch, yaw
+        )
+
+        print(link)
+        print(
+            "Position (x, y, z): {:s}\n Orientation (roll, pitch, yaw): {:s}\n".format(
+                str(pos[:3]), str(pos[3:])
+            )
+        )
+        results.append((link, pos))
+
+    for i in range(0, len(cropped_images), 2):
+        # pos1 = positions[i]
+
+        # pitch = pos1[4]
+        # yaw = pos[5]
+        plt.figure(figsize=(10, 6))
+        plt.imshow(new_image)
+
+        display_images(cropped_images)
+        # ax2 = fig.add_subplot(221)
+        # ax2.imshow(cropped_images[i])
+        # if i + 1 == len(cropped_images):
+        #     break
+        # ax3 = fig.add_subplot(223)
+        # ax3.imshow(cropped_images[i + 1])
 
     if len(cropped_images) == 0:
         new_image = []
     else:
         new_image = [new_image]
 
-    return new_image, cropped_images, positions
+    return new_image, cropped_images, results
 
 
 def display_images(images):
@@ -616,7 +646,7 @@ def display_images(images):
     size = 2
     for i, image in enumerate(images):
         if i % 4 == 0:
-            fig = plt.figure()
+            fig = plt.figure(figsize=(10, 6))
         fig.add_subplot(size, size, i % 4 + 1)
         plt.imshow(image)
 
@@ -656,8 +686,13 @@ def get_craft(trained_model):
     return net
 
 
-def parse_folder(image_folder, trained_model=None, result_folder=None, increment=False):
-    database = pd.DataFrame(
+def parse_folder(
+    image_folder,
+    trained_model="models/craft_mlt_25k.pth",
+    result_folder=None,
+    increment=False,
+):
+    dataframe = pd.DataFrame(
         columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
     )
     all_locations = set()
@@ -678,7 +713,7 @@ def parse_folder(image_folder, trained_model=None, result_folder=None, increment
     for k, image_path in enumerate(tqdm(image_list, desc="Parsing through Images")):
         decode_image(
             image_path,
-            database,
+            dataframe,
             result_folder=result_folder,
             all_locations=all_locations,
             final_file=final_file,
@@ -688,11 +723,16 @@ def parse_folder(image_folder, trained_model=None, result_folder=None, increment
         )
 
     print("Success")
-    return database
+    return dataframe
 
 
-def parse_image(image_file, trained_model=None, result_folder=None, increment=False):
-    database = pd.DataFrame(
+def parse_image(
+    image_file,
+    trained_model="models/craft_mlt_25k.pth",
+    result_folder=None,
+    increment=False,
+):
+    dataframe = pd.DataFrame(
         columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
     )
 
@@ -701,7 +741,7 @@ def parse_image(image_file, trained_model=None, result_folder=None, increment=Fa
     tqdm(
         decode_image(
             image_file,
-            database,
+            dataframe,
             result_folder,
             final_file=None,
             net=net,
@@ -711,7 +751,7 @@ def parse_image(image_file, trained_model=None, result_folder=None, increment=Fa
     )
 
     print("Success")
-    return database
+    return dataframe
 
 
 if __name__ == "__main__":
@@ -721,15 +761,15 @@ if __name__ == "__main__":
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
-    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657545020.689.jpg"
-    result_folder = "result/beehive/queen/"
+    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657550349.862.jpg"
+    result_folder = "result/test/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
     set_bag_path(bag_path)
-    # database = parse_folder(test_folder, result_folder=result_folder)
-    # database = parse_image(test_image, bad_path, result_folder)
-    database = df_from_file(
-        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
+    # dataframe = parse_folder(test_folder, result_folder=result_folder, increment=True)
+    dataframe = parse_image(test_image, result_folder=result_folder, increment=True)
+    dataframe = df_from_file(
+        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/test/1657550349.862_locations.csv"
     )
 
     IPython.embed()
