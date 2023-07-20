@@ -13,4 +13,11 @@ target_link_libraries(libtorch_mrcnn_test
 	${TORCH_LIBRARIES}
 	TorchVision::TorchVision
 	Python3::Python)
-set_property(TARGET libtorch_mrcnn_test PROPERTY CXX_STANDARD 17)
+set_property(TARGET libtorch_mrcnn_test PROPERTY CXX_STANDARD 14)
+
+install(TARGETS libtorch_mrcnn_test
+	ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+	LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+	RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+)
+install(TARGETS libtorch_mrcnn_test DESTINATION bin)

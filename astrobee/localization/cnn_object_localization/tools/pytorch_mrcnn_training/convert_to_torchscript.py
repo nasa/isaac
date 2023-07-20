@@ -23,7 +23,6 @@ import argparse
 import os
 
 # Third party imports
-import numpy as np
 import torch
 import torchvision
 from PIL import Image
@@ -54,7 +53,7 @@ def post_process(detections, num_detections, c_thresh=0.75):
     return p_detections
 
 
-def get_trained_model(weights_path, num_classes=5):
+def get_trained_model(weights_path, device, num_classes=5):
     # load an instance segmentation model pre-trained on COCO
     model = torchvision.models.detection.maskrcnn_resnet50_fpn()
     # replace the pre-trained head with a new one
@@ -66,22 +65,54 @@ def get_trained_model(weights_path, num_classes=5):
     model.roi_heads.mask_predictor = MaskRCNNPredictor(
         in_features_mask, hidden_layer, num_classes
     )
-    # load weights
-    model.load_state_dict(torch.load(weights_path))
+    # load weights 
+    # (weight name remappings necessary because we're playing dumb games with torch version numbers)
+    state_dict = torch.load(weights_path, map_location=device)
+    keys_old = [
+        "backbone.fpn.inner_blocks.0.0.weight", "backbone.fpn.inner_blocks.0.0.bias", 
+        "backbone.fpn.inner_blocks.1.0.weight", "backbone.fpn.inner_blocks.1.0.bias", 
+        "backbone.fpn.inner_blocks.2.0.weight", "backbone.fpn.inner_blocks.2.0.bias", 
+        "backbone.fpn.inner_blocks.3.0.weight", "backbone.fpn.inner_blocks.3.0.bias", 
+        "backbone.fpn.layer_blocks.0.0.weight", "backbone.fpn.layer_blocks.0.0.bias", 
+        "backbone.fpn.layer_blocks.1.0.weight", "backbone.fpn.layer_blocks.1.0.bias", 
+        "backbone.fpn.layer_blocks.2.0.weight", "backbone.fpn.layer_blocks.2.0.bias", 
+        "backbone.fpn.layer_blocks.3.0.weight", "backbone.fpn.layer_blocks.3.0.bias", 
+        "rpn.head.conv.0.0.weight", "rpn.head.conv.0.0.bias", 
+        "roi_heads.mask_head.0.0.weight", "roi_heads.mask_head.0.0.bias", 
+        "roi_heads.mask_head.1.0.weight", "roi_heads.mask_head.1.0.bias", 
+        "roi_heads.mask_head.2.0.weight", "roi_heads.mask_head.2.0.bias", 
+        "roi_heads.mask_head.3.0.weight", "roi_heads.mask_head.3.0.bias"]
+    keys_new = [
+        "backbone.fpn.inner_blocks.0.weight", "backbone.fpn.inner_blocks.0.bias", 
+        "backbone.fpn.inner_blocks.1.weight", "backbone.fpn.inner_blocks.1.bias", 
+        "backbone.fpn.inner_blocks.2.weight", "backbone.fpn.inner_blocks.2.bias", 
+        "backbone.fpn.inner_blocks.3.weight", "backbone.fpn.inner_blocks.3.bias", 
+        "backbone.fpn.layer_blocks.0.weight", "backbone.fpn.layer_blocks.0.bias", 
+        "backbone.fpn.layer_blocks.1.weight", "backbone.fpn.layer_blocks.1.bias", 
+        "backbone.fpn.layer_blocks.2.weight", "backbone.fpn.layer_blocks.2.bias", 
+        "backbone.fpn.layer_blocks.3.weight", "backbone.fpn.layer_blocks.3.bias", 
+        "rpn.head.conv.weight", "rpn.head.conv.bias", 
+        "roi_heads.mask_head.mask_fcn1.weight", "roi_heads.mask_head.mask_fcn1.bias", 
+        "roi_heads.mask_head.mask_fcn2.weight", "roi_heads.mask_head.mask_fcn2.bias", 
+        "roi_heads.mask_head.mask_fcn3.weight", "roi_heads.mask_head.mask_fcn3.bias", 
+        "roi_heads.mask_head.mask_fcn4.weight", "roi_heads.mask_head.mask_fcn4.bias"]
+    for key_old, key_new in zip(keys_old, keys_new):
+        state_dict[key_new] = state_dict.pop(key_old)
+    model.load_state_dict(state_dict)
     return model
 
 
 def main(dataset_path: str, weights_path: str):
 
-    model = get_trained_model(weights_path)
-    model.eval()
-
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model = get_trained_model(weights_path, device)
+    model.eval()
 
     img_path = os.path.join(dataset_path, os.listdir(dataset_path)[0])
     img = Image.open(img_path).convert("RGB")
     img = [[convert_tensor(img)]]
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     traced_model = torch.jit.script(model, img)
 
     output_dir, weights_name_ext = os.path.split(weights_path)
