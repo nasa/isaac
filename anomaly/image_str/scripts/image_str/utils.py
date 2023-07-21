@@ -2,10 +2,24 @@ import numpy as np
 
 
 def get_euclidean_distance(p1, p2):
+    """
+    @param p1
+    @param p2
+    @returns
+    """
+
     return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
 
 def get_closest_rect(rect, rectangles, positions, distance):
+    """
+    @param rect
+    @param rectangles
+    @param positions
+    @param distance
+    @returns
+    """
+
     rects = []
     pos = []
     for i in range(len(rectangles)):
@@ -21,11 +35,13 @@ def get_closest_rect(rect, rectangles, positions, distance):
 
 def get_iou(rect1, rect2):
     """
-    Calculates the intersection over union given two rectangles
+    Calculates the intersection over union given two rectangles in the form of [(upper_left, lower_right)] coordinates.
 
-    rectangles in the form of [(upper_left, lower_right)] coordinates
-
+    @param rect1
+    @param rect2
+    @returns
     """
+
     x1_ul, y1_ul = rect1[0]
     x1_lr, y1_lr = rect1[1]
     x2_ul, y2_ul = rect2[0]
@@ -58,16 +74,24 @@ def get_iou(rect1, rect2):
 
 
 def overlap(rect1, rect2):
+    """
+    @param rect1
+    @param rect2
+    @returns
+    """
+
     # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
     # representing the upper left and lower right points of each rectangle
     return get_iou(rect1, rect2) > 0.5
-    # or (rect1[0][0] >= rect2[0][0] and rect1[0][1] >= rect2[0][1]
-    #                                 and rect1[1][0] <= rect2[1][0] and rect1[1][1] <= rect2[1][1]) or
-    #                                 ((rect1[0][0] <= rect2[0][0] and rect1[0][1] <= rect2[0][1]
-    #                                 and rect1[1][0] >= rect2[1][0] and rect1[1][1] >= rect2[1][1])))
 
 
 def get_bounding_box(rect1, rect2):
+    """
+    @param rect1
+    @param rect2
+    @returns
+    """
+
     # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
     # representing the upper left and lower right points of each rectangle
 
@@ -82,10 +106,24 @@ def get_bounding_box(rect1, rect2):
 
 
 def get_midpoint(pos1, pos2):
+    """
+    @param pos1
+    @param pos2
+    @returns
+    """
+
     return [(pos1[i] + pos2[i]) / 2 for i in range(len(pos1))]
 
 
 def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
+    """
+    @param upper_a
+    @param lower_a
+    @param upper_b
+    @param lower_b
+    @returns
+    """
+
     x1, y1 = upper_a
     x1b, y1b = lower_a
     x2, y2 = upper_b

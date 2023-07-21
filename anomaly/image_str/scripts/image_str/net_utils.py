@@ -15,6 +15,11 @@ from torch.autograd import Variable
 
 
 def copyStateDict(state_dict):
+    """
+    @param state_dict
+    @returns
+    """
+
     if list(state_dict.keys())[0].startswith("module"):
         start_idx = 1
     else:
@@ -29,6 +34,8 @@ def copyStateDict(state_dict):
 def test_net(
     net, image, text_threshold, link_threshold, low_text, cuda, poly, refine_net=None
 ):
+    """ """
+
     t0 = time.time()
 
     canvas_size = 1280

@@ -553,7 +553,8 @@ def similar(label, input_label):
 
 def df_from_file(file_path):
     """
-    Generates a pandas dataframe
+    Generates a pandas dataframe from csv file with columns 'label', 'location' (location in image), 'image' (path to image),
+    'PCL Intersection', and 'Mesh Intersection' to be used to find labels.
 
     @param file_path    path to csv file
     @returns dataframe  pandas dataframe with all the information from csv file
@@ -588,11 +589,23 @@ def df_from_file(file_path):
 
 
 def set_bag_path(bag):
+    """
+    Sets the path to the bag files to be used in finding location of the label in the world frame.
+
+    @param bag  string to folder with all the bag files
+    """
+
     global bag_path
     bag_path = bag
 
 
 def find_panorama(dataframe, label):
+    """
+    @param dataframe
+    @param label
+    @returns
+    """
+
     words = label.split()
     l_result = dataframe.loc[dataframe["label"].apply(similar, args=(words[0],))]
     images = set(l_result["image"].tolist())
@@ -621,6 +634,7 @@ def find_image(image_file, dataframe, label):
     @param label text to search for
     @returns array representing image with label boxed if found and a list of all labels cropped from original image
     """
+
     image = cv2.imread(image_file)
     h, w, _ = image.shape
     words = label.split()
@@ -730,6 +744,11 @@ def find_image(image_file, dataframe, label):
 
 
 def display_images(images):
+    """
+    @param images
+    @returns
+    """
+
     fig = None
     size = 2
     for i, image in enumerate(images):
@@ -742,6 +761,9 @@ def display_images(images):
 
 
 def get_parseq():
+    """
+    @returns
+    """
     # Load model and image transforms for parseq
     parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
     img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
@@ -749,10 +771,13 @@ def get_parseq():
 
 
 def get_craft(trained_model):
+    """
+    @param trained_model
+    @returns
+    """
     cuda = False
 
     refiner_model = "weights/craft_refiner_CTW1500.pth"
-    # trained_model = "models/craft_mlt_25k.pth"
 
     # load net
     net = CRAFT()  # initialize
@@ -781,6 +806,15 @@ def parse_folder(
     increment=False,
     final_file=None,
 ):
+    """
+    @param image_folder
+    @param trained_model
+    @param result_folder
+    @param increment
+    @param final_file
+    @returns
+    """
+
     dataframe = pd.DataFrame(
         columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
     )
@@ -820,6 +854,14 @@ def parse_image(
     result_folder=None,
     increment=False,
 ):
+    """
+    @param image_file
+    @param trained_model
+    @param result_folder
+    @param increment
+    @returns
+    """
+
     dataframe = pd.DataFrame(
         columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
     )
