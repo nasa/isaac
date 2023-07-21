@@ -28,8 +28,30 @@ from torch.autograd import Variable
 from tqdm import tqdm
 
 
-def get_bag_file(timestamp):
-    bag_files = {
+def get_bag_file(timestamp, name):
+    """
+    Given a timestamp and the name of the astrobee, the corresponding bag file is returned.
+
+    @param timestamp    the timestamp the image is taken.
+    @param name         the astrobee that took the image
+    @returns string     the name of the bag file the image originated from
+    """
+    bumble_bag_files = {
+        "20220711_1238_survey_usl_bay6_std_panorama_run1.bag": (
+            1657543101.316589,
+            1657543934.13,
+        ),
+        "20220711_1255_survey_usl_bay5_std_panorama_run_1.bag": (
+            1657544120.136949,
+            1657545770.15,
+        ),
+        "20220711_1426_survey_usl_bay4_std_panorama_run_1.bag": (
+            1657549618.634919,
+            1657551283.42,
+        ),
+    }
+
+    queen_bag_files = {
         "20220711_1459_survey_usl_to_jem.bag": (1657551567.745524, 1657552130.3),
         "20220711_1123_survey_test.bag": (1657538626.193575, 1657538635.45),
         "20220711_1223_survey_jem_to_usl.bag": (1657542216.747706, 1657544398.74),
@@ -59,6 +81,13 @@ def get_bag_file(timestamp):
         ),
     }
 
+    if name == "bumble":
+        bag_files = bumble_bag_files
+    elif name == "queen":
+        bag_files = queen_bag_files
+    else:
+        raise Exception("Invalid bag files")
+
     for file in bag_files:
         if bag_files[file][0] <= timestamp and timestamp <= bag_files[file][1]:
             return file
@@ -67,6 +96,12 @@ def get_bag_file(timestamp):
 
 
 def parse_3D_result(string):
+    """
+    Given the string of the output from find_point_coordinate, returns a dictionary of the values.
+
+    @param string           output from find_point_coordinate
+    @returns dictionary     parsed values from the string output
+    """
     lines = string.split("\n")
     timestamps = re.findall(r"[-+]?\d*\.\d+|\d+", lines[0])
     vector = re.findall(r"[-+]?\d*\.\d+|\d+", lines[1])
@@ -118,12 +153,14 @@ def decode_image(
     increment=False,
 ):
     """
-    @param image_path path to image to parse
-    @param result_folder if provided will save the marked image with boundary boxes and labels to the folder
-    @param trained_model path to trained model
-    @returns dataframe of labels dataframe["label"] and boundary boxes dataframe["location"]
-             result_image array representing labeled image
-             image array representing original nonlabeled image
+    @param image_path       path to image to parse
+    @param dataframe        pandas dataframe to store labels and world frame/image positions of the labels
+    @param result_folder    if provided will save the dataframe as a csv file to the folder
+    @param all_locations    set to contain all the locations of labels found
+    @param final_file       if provided will save all the labels and their corresponding info to the csv file
+    @param net              craft model
+    @param parseq_model     parseq model
+    @param increment        if true, will save the image with all the labels boxed and marked to result folder
     """
 
     if result_folder is not None and not os.path.isdir(result_folder):
@@ -156,8 +193,16 @@ def decode_image(
     h, w, _ = image.shape
     bag_name = None
 
+    # Set up the command to find_point_coordinate
     if bag_path is not None:
-        bag_name = get_bag_file(float(filename))
+        if "queen" in bag_path:
+            name = "queen"
+        elif "bumble" in bag_path:
+            name = "bumble"
+        else:
+            raise Exception("Unknown bag path")
+
+        bag_name = get_bag_file(float(filename), name)
         if bag_name is not None:
             bag_name = bag_path + bag_name
 
@@ -181,6 +226,7 @@ def decode_image(
                 "height": h,
             }
 
+    # Set up for partial image cropping
     crop_w = 1500
     crop_h = 1500
     offset_w = 1000
@@ -193,6 +239,7 @@ def decode_image(
     total = round((end_w / offset_w) * (end_h / offset_h))
     num = 0
 
+    # Run the text region detection on the entire image
     bboxes, polys, score_text = net_utils.test_net(
         net,
         image,
@@ -229,6 +276,8 @@ def decode_image(
         label, confidence = parseq.tokenizer.decode(pred)
 
         new_location = np.array((upper_left, lower_right))
+
+        # Check if detected region overlap with other regions already detected.
         overlap_result = df.loc[
             df["location"].apply(utils.overlap, args=(new_location,))
         ]
@@ -247,6 +296,7 @@ def decode_image(
                     new_row = np.array([new_label, new_location], dtype=object)
                     df.iloc[index] = new_row
 
+    # Crop the image into sections to detect small text
     for x in range(0, end_w, offset_w):
         for y in range(0, end_h, offset_h):
             img = utils.crop_image(image, x, y, x + crop_w, y + crop_h)
@@ -274,6 +324,8 @@ def decode_image(
                 cropped_image = utils.crop_image(
                     img, upper_left[0], upper_left[1], lower_right[0], lower_right[1]
                 )
+
+                # Ignore labels near the edges of the cropped image
                 if (
                     min(x_coordinates) < edge_border
                     or max(x_coordinates) > crop_w - edge_border
@@ -325,21 +377,28 @@ def decode_image(
 
     if increment:
         result_image = display_all(image, df, result_path)
+
     if bag_name is not None:
+        # Get the locations in the world frame
         get_all_locations(
             dataframe,
             df,
             data,
-            bag_name,
             ros_command,
             all_locations,
             result_path,
             final_file,
             image_path,
+            increment,
         )
 
 
 def get_location(data, new_location, ros_command):
+    """
+    @param data         dictionary for all the parameters to be passed into find_point_coordinate
+    @param new_location 2D list representing location of the label in the image (pixels)
+    @param ros_command  list representing ros command used to call find_point_coordinate
+    """
     data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
     data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
 
@@ -357,6 +416,8 @@ def get_location(data, new_location, ros_command):
     stdout, stderr = process.communicate()
     stdout = stdout.decode()
     stderr = stderr.decode()
+
+    # If error occured
     if len(stderr) != 0:
         return None
 
@@ -369,18 +430,31 @@ def get_all_locations(
     dataframe,
     image_df,
     data,
-    bag_name,
     ros_command,
     all_locations,
     result_path,
     final_file,
-    image_file,
+    image_path,
+    increment,
 ):
+    """
+    Given parameters will save the labels and the corresponding info (pixel boundary box and 3D locations) from image_df to dataframe.
+
+    @param dataframe        pandas dataframe that stores all the labels found for numerous images
+    @param image_df         pandas dataframe that stores all the labels found for specific image
+    @param data             dictionary for all the parameters to be passed into find_point_coordinate
+    @param ros_command      list representing ros command used to call find_point_coordinate
+    @param all_locations    set to contain all the locations of labels found
+    @param result_path      location to save all the found labels for specific image as csv file
+    @param final_file       file that saves all the labels found for numerous images
+    @param image_path       path to image
+    @param increment        if true, will save the labels found to a csv file
+    """
     total = len(image_df)
     header = ["label", "PCL Intersection", "Mesh Intersection", "image", "location"]
     f = None
     final = None
-    if result_path is not None:
+    if result_path is not None and increment:
         f = open(result_path[:-4] + "_locations.csv", "w")
         writer = csv.writer(f, delimiter=";")
         writer.writerow(header)
@@ -413,10 +487,10 @@ def get_all_locations(
             mesh = list(mesh.values())
             mesh_str = str(mesh)
 
-        dataframe.loc[len(dataframe)] = [label, new_location, image_file, pcl, mesh]
+        dataframe.loc[len(dataframe)] = [label, new_location, image_path, pcl, mesh]
 
         line = np.array(
-            [label, pcl_str, mesh_str, image_file, str(new_location).replace("\n", "")]
+            [label, pcl_str, mesh_str, image_path, str(new_location).replace("\n", "")]
         )
         if f is not None:
             writer.writerow(line)
@@ -434,9 +508,10 @@ def get_all_locations(
 
 def display_all(image, dataframe, result_path=None):
     """
-    @param image    openCV array of image
-    @param dataframe pandas dataframe of columns "label" and "location" where "location" is the upper left
-                    and lower right points of the rectangular bounding box for the corresponding label
+    @param image        openCV array of image
+    @param dataframe    pandas dataframe of columns "label" and "location" where "location" is the upper left
+                        and lower right points of the rectangular bounding box for the corresponding label
+    @param result_path  if provided will save the labeled image to the result folder.
     @returns array of image with the labels and boundary boxes displayed
     """
     display_image = image.copy()
@@ -462,6 +537,14 @@ def display_all(image, dataframe, result_path=None):
 
 
 def similar(label, input_label):
+    """
+    Returns true is label and input_label are similar.
+
+    @param label        string
+    @param input_label  string
+    @returns true if label and input_label is within a similarity threshold
+    """
+
     # [0, 1] where 0 represents two completely dissimilar strings and 1 represents identical strings
     label = label.upper()
     input_label = input_label.upper()
@@ -469,6 +552,13 @@ def similar(label, input_label):
 
 
 def df_from_file(file_path):
+    """
+    Generates a pandas dataframe
+
+    @param file_path    path to csv file
+    @returns dataframe  pandas dataframe with all the information from csv file
+    """
+
     df = pd.read_csv(
         file_path,
         delimiter=";",
@@ -480,6 +570,7 @@ def df_from_file(file_path):
     )
 
     def convert_to_rect(string):
+
         location = re.findall(r"[-+]?\d*\.\d+|\d+", string)
         location = [int(i) for i in location]
         return [[location[0], location[1]], [location[2], location[3]]]
@@ -588,9 +679,14 @@ def find_image(image_file, dataframe, label):
     for pos in positions:
         pitch = pos[4]
         yaw = pos[5]
-
+        if "queen" in bag_path:
+            name = "queen"
+        elif "bumble" in bag_path:
+            name = "bumble"
+        else:
+            raise Exception("Unknown bag path")
         filename, file_ext = os.path.splitext(os.path.basename(image_file))
-        bag = get_bag_file(float(filename))
+        bag = get_bag_file(float(filename), name)
 
         if "bay1" in bag:
             loc = "usl_bay1"
@@ -602,6 +698,8 @@ def find_image(image_file, dataframe, label):
             loc = "usl_bay4"
         elif "bay5" in bag:
             loc = "usl_bay5"
+        elif "bay6" in bag:
+            loc = "usl_bay6"
         else:
             loc = ""
 
@@ -618,20 +716,10 @@ def find_image(image_file, dataframe, label):
         results.append((link, pos))
 
     for i in range(0, len(cropped_images), 2):
-        # pos1 = positions[i]
-
-        # pitch = pos1[4]
-        # yaw = pos[5]
         plt.figure(figsize=(10, 6))
         plt.imshow(new_image)
 
         display_images(cropped_images)
-        # ax2 = fig.add_subplot(221)
-        # ax2.imshow(cropped_images[i])
-        # if i + 1 == len(cropped_images):
-        #     break
-        # ax3 = fig.add_subplot(223)
-        # ax3.imshow(cropped_images[i + 1])
 
     if len(cropped_images) == 0:
         new_image = []
@@ -691,6 +779,7 @@ def parse_folder(
     trained_model="models/craft_mlt_25k.pth",
     result_folder=None,
     increment=False,
+    final_file=None,
 ):
     dataframe = pd.DataFrame(
         columns=["label", "location", "image", "PCL Intersection", "Mesh Intersection"]
@@ -701,8 +790,7 @@ def parse_folder(
     net = get_craft(trained_model)
     parseq = get_parseq()
 
-    final_file = None
-    if result_folder is not None:
+    if result_folder is not None and final_file is None:
         header = ["label", "PCL Intersection", "Mesh Intersection", "image", "location"]
         final_file = result_folder + "all_locations.csv"
         f = open(final_file, "w")
