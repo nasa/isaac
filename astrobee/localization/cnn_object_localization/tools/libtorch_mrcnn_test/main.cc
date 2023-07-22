@@ -18,8 +18,8 @@
 
 #include <torch/script.h>
 // #include <torch/torch.h>  // Uncomment if there are any issues with linking...?
-#include <torchvision/vision.h>
-// #include <torchvision/ops/nms.h>  // Uncomment if there are any issues with linking...?
+// #include <torchvision/vision.h>  // Uncomment if there are any issues with linking...?
+#include <torchvision/nms.h> 
 
 #include <iostream>
 #include <memory>
@@ -37,7 +37,7 @@ int main(int argc, const char* argv[]) {
   // }
 
   // This line doesn't do anything, but it makes sure the C++ linker doesn't prune libtorchvision
-  vision::cuda_version();
+  // vision::cuda_version();
 
   // Load the module
   torch::jit::script::Module module;

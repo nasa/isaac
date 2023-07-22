@@ -129,6 +129,8 @@ catkin_package(
 # ${catkin_INCLUDE_DIRS}
 # )
 
+add_subdirectory(tools/libtorch_mrcnn_test)
+
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/cnn_object_localization.cpp

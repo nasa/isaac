@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(libtorch_mrcnn_test)
 
-#set(CMAKE_OSX_ARCHITECTURES "armv7l")
 find_package(Torch REQUIRED)
 find_package(TorchVision REQUIRED)
 find_package(Python3 COMPONENTS Development)

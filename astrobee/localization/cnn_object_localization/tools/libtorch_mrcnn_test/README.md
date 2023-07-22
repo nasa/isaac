@@ -1,16 +1,11 @@
 This tool is intended to test the TorchScript compiled model created using the `pytorch_mrcnn_training` tool.
-The test is intended to be as standalone as possible, isolated from ROS and the rest of Astrobee/ISSAC code.
 
 # Instructions for installing libtorch:
-1. `cd $LIBTORCH_DIR`
-2. `wget https://download.pytorch.org/libtorch/nightly/cpu/libtorch-shared-with-deps-latest.zip`
-3. `unzip libtorch-shared-with-deps-latest.zip`
-4. `rm libtorch-shared-with-deps-latest.zip`
-5. `export CMAKE_PREFIX_PATH=$LIBTORCH_DIR:${CMAKE_PREFIX_PATH}` (consider adding to .bashrc)
+Ensure that Torch is on your `CMAKE_PREFIX_PATH`.
 
 # Instructions for installing libtorchvision:
 1. `cd` into a clean directory for downloading TorchVision
-2. `git clone https://github.com/pytorch/vision.git`
+2. `wget https://github.com/pytorch/vision/archive/refs/tags/v0.6.0.zip`
 3. `mkdir build`
 4. `cd build`
 5. `cmake ..`
