@@ -635,7 +635,9 @@ def find_image(image_file, dataframe, label):
     @returns array representing image with label boxed if found and a list of all labels cropped from original image
     """
 
-    image = cv2.imread(image_file)
+    image = cv2.imread(
+        image_file,
+    )
     h, w, _ = image.shape
     words = label.split()
     results = {}
@@ -693,15 +695,17 @@ def find_image(image_file, dataframe, label):
     for pos in positions:
         pitch = pos[4]
         yaw = pos[5]
-        if "queen" in bag_path:
+        if "queen" in image_file:
             name = "queen"
-        elif "bumble" in bag_path:
+        elif "bumble" in image_file:
             name = "bumble"
         else:
             raise Exception("Unknown bag path")
         filename, file_ext = os.path.splitext(os.path.basename(image_file))
         bag = get_bag_file(float(filename), name)
 
+        if bag is None:
+            print(image_file)
         if "bay1" in bag:
             loc = "usl_bay1"
         elif "bay2" in bag:
@@ -731,7 +735,7 @@ def find_image(image_file, dataframe, label):
 
     for i in range(0, len(cropped_images), 2):
         plt.figure(figsize=(10, 6))
-        plt.imshow(new_image)
+        plt.imshow(cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB))
 
         display_images(cropped_images)
 
@@ -755,8 +759,9 @@ def display_images(images):
         if i % 4 == 0:
             fig = plt.figure(figsize=(10, 6))
         fig.add_subplot(size, size, i % 4 + 1)
-        plt.imshow(image)
+        plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
+    plt.axis("off")
     plt.show()
 
 
