@@ -472,7 +472,9 @@ def get_all_locations(
             continue
 
         location = tuple(result_positions["PCL Intersection"].values())
-        if location in all_locations:
+        duplicate = [loc for loc in all_locations if utils.duplicate(location, loc)]
+        print(len(duplicate))
+        if len(duplicate) != 0:
             continue
 
         pcl = result_positions["PCL Intersection"]
@@ -497,7 +499,8 @@ def get_all_locations(
 
         if final is not None:
             writer_final.writerow(line)
-            all_locations.add(location)
+
+        all_locations.add(location)
 
     if f is not None:
         f.close()
@@ -624,6 +627,7 @@ def find_panorama(dataframe, label):
         if result[2] is not None:
             results.extend(result[2])
 
+    print("SUCCESS")
     return full, crop, results
 
 
@@ -652,7 +656,6 @@ def find_image(image_file, dataframe, label):
         new_positions = []
         other_rects = results[word]["location"].tolist()
         other_positions = results[word]["PCL Intersection"].tolist()
-
         if None in other_positions:
             other_positions = None
 
@@ -669,30 +672,23 @@ def find_image(image_file, dataframe, label):
                     )
                 else:
                     new_positions = None
-
         rectangles = new_rects
         positions = new_positions
 
     new_image = np.array(image)
 
-    offset = 10
+    offset = 30
     cropped_images = []
+    locations = []
+    all_locations = set()
     for i in range(len(rectangles)):
-        new_image = cv2.rectangle(
-            new_image, rectangles[i][0], rectangles[i][1], (255, 0, 0), 10
-        )
-        cropped_images.append(
-            utils.crop_image(
-                image,
-                rectangles[i][0][0] - offset,
-                rectangles[i][0][1] - offset,
-                rectangles[i][1][0] + offset,
-                rectangles[i][1][1] + offset,
-            )
-        )
+        pos = positions[i]
+        duplicate = [loc for loc in all_locations if utils.duplicate(pos, loc)]
+        if len(duplicate) != 0:
+            continue
 
-    results = []
-    for pos in positions:
+        all_locations.add(tuple(pos))
+
         pitch = pos[4]
         yaw = pos[5]
         if "queen" in image_file:
@@ -710,8 +706,10 @@ def find_image(image_file, dataframe, label):
             loc = "usl_bay1"
         elif "bay2" in bag:
             loc = "usl_bay2"
+            continue  # Panorama not available
         elif "bay3" in bag:
             loc = "usl_bay3"
+            continue  # Panorama not available
         elif "bay4" in bag:
             loc = "usl_bay4"
         elif "bay5" in bag:
@@ -721,8 +719,8 @@ def find_image(image_file, dataframe, label):
         else:
             loc = ""
 
-        link = "https://ivr.ndc.nasa.gov/isaac_panos/pannellum.htm?config=tour.json&firstScene={:s}&pitch={:f}&yaw={:f}".format(
-            loc, pitch, yaw
+        link = "https://ivr.ndc.nasa.gov/isaac_panos/pannellum.htm?config=tour.json&firstScene={:s}&pitch={:f}&yaw={:f}&hfov=30".format(
+            loc, -pitch, yaw
         )
 
         print(link)
@@ -731,10 +729,28 @@ def find_image(image_file, dataframe, label):
                 str(pos[:3]), str(pos[3:])
             )
         )
-        results.append((link, pos))
+        locations.append((link, pos))
+
+        new_image = cv2.rectangle(
+            new_image,
+            [i - offset for i in rectangles[i][0]],
+            [i + offset for i in rectangles[i][1]],
+            (255, 0, 0),
+            10,
+        )
+        cropped_images.append(
+            utils.crop_image(
+                image,
+                rectangles[i][0][0] - offset,
+                rectangles[i][0][1] - offset,
+                rectangles[i][1][0] + offset,
+                rectangles[i][1][1] + offset,
+            )
+        )
 
     for i in range(0, len(cropped_images), 2):
         plt.figure(figsize=(10, 6))
+        plt.axis("off")
         plt.imshow(cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB))
 
         display_images(cropped_images)
@@ -744,7 +760,7 @@ def find_image(image_file, dataframe, label):
     else:
         new_image = [new_image]
 
-    return new_image, cropped_images, results
+    return new_image, cropped_images, locations
 
 
 def display_images(images):
@@ -896,7 +912,7 @@ if __name__ == "__main__":
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
-    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657550349.862.jpg"
+    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657550844.481.jpg"
     result_folder = "result/test/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"

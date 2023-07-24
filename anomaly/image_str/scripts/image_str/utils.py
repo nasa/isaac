@@ -1,6 +1,13 @@
 import numpy as np
 
 
+def duplicate(p1, p2, limit=0.01):
+    pos1 = np.array(p1[:3])
+    pos2 = np.array(p2[:3])
+
+    return np.linalg.norm(pos2 - pos1) < limit
+
+
 def get_euclidean_distance(p1, p2):
     """
     @param p1
