@@ -1,3 +1,4 @@
+NOTE: The original idea behind the `offline_debian_installer` tool was to use it to install pip and its prerequisites on Astrobee, and then use `offline_wheel_installer` to install the necessary Python prerequisites for running the Python handrail segmentation ROS nodes. `offline_debian_installer` is able to do its job, but unfortunately `offline_wheel_installer` isn't, since it depends on the availability of pre-built wheels for the armv7l architecture and these wheels aren't available from PyPi for the packages we need, making both `offline_debian_installer` and `offline_wheel_installer` kind of useless in the context of this project.
 
 ### Workflow for installing debians on the robots
 

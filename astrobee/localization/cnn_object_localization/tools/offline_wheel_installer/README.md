@@ -1,5 +1,4 @@
-WARNING: This tool only works if all packages and their dependencies provide binaries for the Astrobee platform.
-Pay close attention while downloading packages to ensure none are skipped due to lack of support.
+WARNING: This tool depends on the availability of pre-built wheels for the armv7l architecture and these wheels aren't available from PyPi for the packages we need, making it kind of useless in the context of this project. As such, this tool is provided here for the sole purpose of hypothetical future re-use in a different use case.
 
 ### Workflow for installing python wheels on the robots
 
