@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+
 # =============================================================================
-# FUNCTION DEFINITIONS
+# CONFIG
 # =============================================================================
 
-# build_tools=(wheel six configobj typing-extensions tomli)
+PYTHON_PLATFORMS=("manylinux2014_armv7l")
+PYTHON_VERSIONS=("38")
+PYTHON_IMPLEMENTATIONS=("cp")
+PYTHON_ABIS=("abi3" "cp38" "cp38m")
 
 # =============================================================================
 # FUNCTION DEFINITIONS
@@ -39,24 +43,14 @@ REQUIREMENTS_DIR_REL="requirements"
 PACKAGE_LIST_REL="${REQUIREMENTS_DIR_REL}/wheel_requirements.txt"
 TEMP_DIR_REL="temp"
 PIP_FREEZE_REL="${TEMP_DIR_REL}/astrobee_initial_freeze.txt"
-VENV_DIR_REL="${TEMP_DIR_REL}/venv"
 WHEEL_DIR_REL="${TEMP_DIR_REL}/wheels"
 INSTALL_DIR_REL="lib/python3/dist-packages"
 
-# # Check pip version >= 20.3
-# pip_version=$(pip3 --version | awk '{print $2}')
-# IFS='.' read -ra version_parts <<< "$pip_version"
-# if [ "${version_parts[0]}" -lt 20 ] || ([ "${version_parts[0]}" -eq 20 ] && [ "${version_parts[1]}" -lt 3 ]); then
-#     echo "Error: pip3 version must be at least 20.3"
-#     exit 1
-# fi
-
-# Check if venv is installed
-python3 -m venv dummy_venv &> /dev/null
-if [ $? -eq 0 ]; then
-    rm -rf dummy_venv
-else
-    echo "Error: venv is not installed."
+# Check pip version >= 20.3
+pip_version=$(pip3 --version | awk '{print $2}')
+IFS='.' read -ra version_parts <<< "$pip_version"
+if [ "${version_parts[0]}" -lt 20 ] || ([ "${version_parts[0]}" -eq 20 ] && [ "${version_parts[1]}" -lt 3 ]); then
+    echo "Error: pip3 version must be at least 20.3"
     exit 1
 fi
 
@@ -89,42 +83,38 @@ EOT
 scp -r "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}/${PIP_FREEZE_REL}" "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}" 
 
 # User confirmation
-echo "Pip freeze of Astrobee environment obtained. About to download wheels on local system." # About to create venv on local system."
+echo "Pip freeze of Astrobee environment obtained. About to download wheels on local system." 
 confirm_or_continue
-
-# =============================================================================
-# CREATE LOCAL VENV
-# =============================================================================
-
-# # Create and activate the virtual environment
-# python3 -m venv "${LOCAL_TOOL_DIR}/${VENV_DIR_REL}"
-# source "${LOCAL_TOOL_DIR}/${VENV_DIR_REL}/bin/activate"
-# pip3 install --upgrade pip
-
-# # Install some build tools
-# for build_tool in "${build_tools[@]}"; do
-#     pip3 install $build_tool
-# done
-
-# # Read requirements file and install each package individually, ignoring dependencies
-# while IFS= read -r line; do
-#     pip3 install --no-deps "$line" || echo "Failed to install $line"
-# done < "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}"
-
-# # User confirmation
-# echo "Venv created on local system. About to download wheels on local system."
-# confirm_or_continue
 
 # =============================================================================
 # DOWNLOAD PYTHON PACKAGES
 # =============================================================================
 
 # Download all wheels
-# NOTE: This script doesn't work for cross-platform stuff.
-# You can fix it by using `pip3 download` with the `--platform`, `python-version`, `--implementation`, and `--abi` tags.
-# I'm not gonna do this because it turns out the packages I want to install don't have armv7l distributions anyways.
-# pip3 download -d "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" -r "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}" c "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}"
-pip3 wheel -w "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" -r "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}" -c "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}"
+PYTHON_CONSTRAINTS=""
+for PLATFORM in "${PYTHON_PLATFORMS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --platform ${PLATFORM}"
+done
+for VERSION in "${PYTHON_VERSIONS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --python-version ${VERSION}"
+done
+for IMPLEMENTATION in "${PYTHON_IMPLEMENTATIONS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --implementation ${IMPLEMENTATION}"
+done
+for ABI in "${PYTHON_ABIS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --abi ${ABI}"
+done
+pip3 download \
+    ${PYTHON_CONSTRAINTS} \
+    --only-binary=:all: \
+    -d "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" \
+    -r "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}" \
+    -c "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}" \
+
+# pip3 wheel \
+#     -w "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" \
+#     -r "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}" \
+#     -c "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}"
 
 # Cull wheels for packages already installed on Astrobee
 while IFS= read -r line; do
