@@ -104,11 +104,10 @@ class DOFPoseEstimator:
 
     def pointcloud_callback(self, points_msg):
         start = timeit.default_timer()
-        points_msg_world = self.align_transformer.dock_to_world_transform(points_msg)
 
-        detected_handrail = self.align_transformer.convert_pc_msg_to_np(
-            points_msg_world
-        )
+        # points_msg_world = self.align_transformer.dock_to_world_transform(points_msg)  # does nothing
+
+        detected_handrail = self.align_transformer.convert_pc_msg_to_np(points_msg)
         detected_handrail_o3d = o3d.geometry.PointCloud()
         detected_handrail_o3d.points = o3d.utility.Vector3dVector(detected_handrail)
 

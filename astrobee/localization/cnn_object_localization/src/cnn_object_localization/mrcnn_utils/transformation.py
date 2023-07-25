@@ -50,22 +50,22 @@ class TransformAlignment:
 
         return do_transform_cloud(orig_pointcloud, trans)
 
-    def dock_to_world_transform(self, orig_pointcloud):
-        try:
-            trans = self.tf_buffer.lookup_transform(
-                "dock_cam",
-                orig_pointcloud.header.frame_id,
-                orig_pointcloud.header.stamp,
-                rospy.Duration(100),
-            )
-        except tf2.LookupException as ex:
-            rospy.logwarn(ex)
-            return
-        except tf2.ExtrapolationException as ex:
-            rospy.logwarn(ex)
-            return
+    # def dock_to_world_transform(self, orig_pointcloud):
+    #     try:
+    #         trans = self.tf_buffer.lookup_transform(
+    #             "dock_cam",  # ??? shouldn't this be some kind of world coordinate frame?
+    #             orig_pointcloud.header.frame_id,
+    #             orig_pointcloud.header.stamp,
+    #             rospy.Duration(100),
+    #         )
+    #     except tf2.LookupException as ex:
+    #         rospy.logwarn(ex)
+    #         return
+    #     except tf2.ExtrapolationException as ex:
+    #         rospy.logwarn(ex)
+    #         return
 
-        return do_transform_cloud(orig_pointcloud, trans)
+    #     return do_transform_cloud(orig_pointcloud, trans)
 
     # def transform_pose_estimate(self, pose):
     #     pose_stamped = tf2_geometry_msgs.PoseStamped()
