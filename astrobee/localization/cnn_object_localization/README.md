@@ -8,10 +8,11 @@ Training data and pre-trained weights are not included in this git repository.
 # Preparation
 
 1. Set `dock_cam_rate = 1.0` in `astrobee/config/simulation/simulation.config`.
-2. Ensure that color dock camera data is being published. If necessary, modify the `image_topic` param value in `./launch/sim_handrail.launch` to point to this topic.
-3. Ensure prerequisites in `./requirements.txt` are installed. (Do not use a venv; this will mess with ROS dependencies.)
-4. Ensure the reference pointcloud for a 30-inch handrail is available at `$CNN_OBJECT_LOCALIZATION_RESOURCES_PATH/reference_pointclouds/handrail_30.pcd`.
-5. Ensure the fine-tuned Mask-RCNN checkpoint is available at `$CNN_OBJECT_LOCALIZATION_RESOURCES_PATH/checkpoints/handrail_finetune_ckpt_199.pth`.
+2. Check that color dock camera data is being published. If necessary, modify the `image_topic` param value in `./launch/sim_handrail.launch` to point to this topic.
+3. Check that hardcoded camera parameters in `./src/cnn_object_localization/mrcnn_utils/undistorter.py` match those in `description/description/urdf/sensor_dock_cam.urdf.xacro`.
+4. Install prerequisites in `./requirements.txt`. (Do not use a venv; this will mess with ROS dependencies.)
+5. Ensure the reference pointcloud for a 30-inch handrail is available at `$CNN_OBJECT_LOCALIZATION_RESOURCES_PATH/reference_pointclouds/handrail_30.pcd`.
+6. Ensure the fine-tuned Mask-RCNN checkpoint is available at `$CNN_OBJECT_LOCALIZATION_RESOURCES_PATH/checkpoints/handrail_finetune_ckpt_199.pth`.
 
 # Running
 1. `source` the `devel/setup.bash` files for both Astrobee and ISSAC.

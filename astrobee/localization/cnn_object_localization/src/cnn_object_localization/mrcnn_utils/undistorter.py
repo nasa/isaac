@@ -27,34 +27,21 @@ assert (
 
 
 class Undistorter:
-    def __init__(self, simulation=True):
-        if simulation:
-            self.K = np.array(
-                [
-                    [272.2921804722079, 0.0, 160.0],
-                    [0.0, 272.2921804722079, 120.0],
-                    [0.0, 0.0, 1.0],
-                ]
-            )
-            dims = np.asarray((320, 240))
-            dist = 1.06251
-        else:
-            self.K = np.array(
-                [
-                    [251.16995333333332, 0.0, 188.45150666666666],
-                    [0.0, 251.16995333333332, 161.27091333333334],
-                    [0.0, 0.0, 1.0],
-                ]
-            )
-            dist = 1.00447
+    def __init__(self):
 
-            # camera_dims = np.asarray((1280, 960))
+        # Camera parameters (hardcoded to reflect gazebo sensor plugin parameters)
+        horizontal_afov_rads = 1.61443
+        dims = np.asarray((320, 240))
+        dist = 1.06251
 
-            dims = np.asarray((320, 240))
-
-            # self.K = self.K / (camera_dims/dims)[0]
-
-        # FOV model -
+        focal_dist = (1 / np.tan(horizontal_afov_rads / 2)) * (dims[1] / 2)
+        self.K = np.array(
+            [
+                [focal_dist, 0.0, dims[0] / 2],
+                [0.0, focal_dist, dims[1] / 2],
+                [0.0, 0.0, 1.0],
+            ]
+        )
         K_undist = self.K.copy()
         K_undist[0:2, 2] = dims / 2.0
         # get set of x-y coordinates

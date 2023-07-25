@@ -106,7 +106,6 @@ def get_trained_model(weights_path, num_classes=5):
 class HandrailDetectorManager:
     def __init__(self):
 
-        self.simulation = True
         # Load weights parameter
         cnn_object_localization_resources_path = os.getenv("CNN_OBJECT_LOCALIZATION_RESOURCES_PATH")
         if cnn_object_localization_resources_path is None:
@@ -132,7 +131,7 @@ class HandrailDetectorManager:
         # Initialize width and height
         self.h = 240
         self.w = 320
-        self.undist_ = Undistorter(simulation=self.simulation)
+        self.undist_ = Undistorter()
 
         self.model = get_trained_model(self.weights_path)
         self.model.eval()  # Set in evaluation mode
