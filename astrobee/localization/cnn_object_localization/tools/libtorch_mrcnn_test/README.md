@@ -1,7 +1,9 @@
 This tool is intended to test the TorchScript compiled model created using the `pytorch_mrcnn_training` tool.
+The tool depends on having libtorch 1.5.0 and libtorchvision 0.6.0.
+The tool can currently only be built and run on native linux, and cannot be cross-compiled.
 
 # Instructions for installing libtorch:
-Ensure that Torch is on your `CMAKE_PREFIX_PATH`.
+- See `scripts/setup/dependencies/build_install_torch.sh`.
 
 # Instructions for installing libtorchvision:
 1. `cd` into a clean directory for downloading TorchVision
@@ -18,4 +20,4 @@ Ensure that Torch is on your `CMAKE_PREFIX_PATH`.
 1. `cd $TEST_DIR`
 2. `cmake -S . -B build`
 3. `cmake --build build --config Release`
-4. `./build/libtorch_mrcnn_test /home/astrobee/large_files/checkpoints/handrail_finetune_ckpt_199_torchscript.pt`
+4. `./build/libtorch_mrcnn_test $CNN_OBJECT_LOCALIZATION_RESOURCES_PATH/checkpoints/handrail_finetune_ckpt_199_torchscript.pt`

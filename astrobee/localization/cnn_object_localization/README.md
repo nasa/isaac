@@ -1,4 +1,7 @@
-This module contains the code for handrail pose estimation.
+This module contains the code for handrail pose estimation. 
+The below documentation is in regards to running the handrail pose estimation nodes themselves (relevant code is in `launch`, `msg`, `nodes` and `src`.)
+The `tools` folder contains code for generating synthetic training data, as well as for training/testing the model.
+Training data and pre-trained weights are not included in this git repository.
 
 ### Running handrail ICP localization nodes in simulation
 
@@ -19,3 +22,4 @@ This module contains the code for handrail pose estimation.
 ### Running handrail ICP localization nodes on the Astrobee
 
 Not currently possible.
+
