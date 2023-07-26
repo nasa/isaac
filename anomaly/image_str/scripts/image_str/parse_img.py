@@ -5,6 +5,7 @@ import math
 import os
 import re
 import subprocess
+import sys
 import time
 import warnings
 from multiprocessing import Process
@@ -22,6 +23,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from craft.craft import CRAFT
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from torch.autograd import Variable
@@ -262,7 +264,9 @@ class Ocr:
         elif "bumble" in img_file:
             bag_files = bumble_bag_files
         else:
-            raise Exception("Unknown bag files")
+            raise Exception(
+                "Unknown bag files. Is the image within a 'queen' or 'bumble' folder?"
+            )
 
         for file in bag_files:
             if bag_files[file][0] <= timestamp and timestamp <= bag_files[file][1]:
@@ -746,7 +750,11 @@ class Ocr:
         @param label
         @returns
         """
-
+        self.dataframe["similarity"] = self.dataframe["label"].apply(
+            jellyfish.jaro_winkler_similarity, args=(label,)
+        )
+        self.dataframe.sort_values(by="similarity", ascending=False, inplace=True)
+        self.dataframe.drop(columns="similarity", inplace=True)
         words = label.split()
         l_result = self.dataframe.loc[
             self.dataframe["label"].apply(self.__similar, args=(words[0],))
@@ -769,7 +777,56 @@ class Ocr:
             if result[2] is not None:
                 results.extend(result[2])
 
-        print("SUCCESS")
+        def display_labels(full, cropped, result):
+            fig = plt.gcf()
+
+            fig.axes[0].imshow(cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
+            fig.axes[0].axis("off")
+
+            fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+            fig.axes[1].axis("off")
+
+            plt.draw()
+
+            cls = lambda: os.system("cls" if os.name == "nt" else "clear")
+            cls()
+            print(result)
+
+        index = 0
+
+        def callback_left_button(event):
+            nonlocal index, full, crop, results
+            if index == 0:
+                return
+            index -= 1
+            display_labels(full[index], crop[index], results[index])
+
+        def callback_right_button(event):
+            nonlocal index, full, crop, results
+            """ this function gets called if we hit the left button"""
+            if index >= len(results) - 1:
+                return
+            index += 1
+            display_labels(full[index], crop[index], results[index])
+
+        if len(full) == 0:
+            print("No results found")
+            return full, crop, results
+
+        NavigationToolbar2Tk.forward = callback_right_button
+        NavigationToolbar2Tk.back = callback_left_button
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+        ax[0].imshow(cv2.cvtColor(full[0], cv2.COLOR_BGR2RGB))
+        ax[0].axis("off")
+
+        ax[1].imshow(cv2.cvtColor(crop[0], cv2.COLOR_BGR2RGB))
+        ax[1].axis("off")
+
+        print(results[0])
+        plt.tight_layout()
+
+        plt.show()
         return full, crop, results
 
     def __find_image(self, image_file, df, label):
@@ -819,7 +876,7 @@ class Ocr:
 
         new_image = np.array(image)
 
-        offset = 30
+        offset = 100
         cropped_images = []
         locations = []
         all_locations = set()
@@ -853,17 +910,24 @@ class Ocr:
             else:
                 loc = ""
 
-            link = "https://ivr.ndc.nasa.gov/isaac_panos/pannellum.htm?config=tour.json&firstScene={:s}&pitch={:f}&yaw={:f}&hfov=30".format(
+            link = "https://ivr.ndc.nasa.gov/isaac_panos/pannellum.htm?config=tour.json&firstScene={:s}&pitch={:f}&yaw={:f}&hfov=30\n".format(
                 loc, -pitch, yaw
             )
 
-            print(link)
-            print(
-                "Position (x, y, z): {:s}\n Orientation (roll, pitch, yaw): {:s}\n".format(
+            loc = (
+                "Position (x, y, z): {:s}\nOrientation (roll, pitch, yaw): {:s}".format(
                     str(pos[:3]), str(pos[3:])
                 )
             )
-            locations.append((link, pos))
+
+            result = link + loc
+            # print(link)
+            # print(
+            #     "Position (x, y, z): {:s}\n Orientation (roll, pitch, yaw): {:s}\n".format(
+            #         str(pos[:3]), str(pos[3:])
+            #     )
+            # )
+            locations.append(result)
 
             new_image = cv2.rectangle(
                 new_image,
@@ -882,17 +946,14 @@ class Ocr:
                 )
             )
 
-        for i in range(0, len(cropped_images), 2):
-            plt.figure(figsize=(10, 6))
-            plt.axis("off")
-            plt.imshow(cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB))
+        # for i in range(0, len(cropped_images), 2):
+        #     plt.figure(figsize=(10, 6))
+        #     plt.axis("off")
+        #     plt.imshow(cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB))
 
-            self.display_images(cropped_images)
+        #     self.display_images(cropped_images)
 
-        if len(cropped_images) == 0:
-            new_image = []
-        else:
-            new_image = [new_image]
+        new_image = [new_image for _ in range(len(cropped_images))]
 
         return new_image, cropped_images, locations
 
@@ -925,10 +986,10 @@ if __name__ == "__main__":
     result_folder = "result/test/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
-    ocr = Ocr(bag_path=bag_path, trained_model="models/craft_mlt_25k.pth")
+    # ocr = Ocr(bag_path=bag_path, trained_model="models/craft_mlt_25k.pth")
     # ocr.parse_image(test_image, result_folder=result_folder, increment=True)
     # ocr.parse_folder(test_folder, result_folder=result_folder, increment=True)
     ocr = Ocr.df_from_file(
-        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/test/all_locations.csv"
+        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
     )
     IPython.embed()

@@ -1,7 +1,13 @@
 import numpy as np
 
 
-def duplicate(p1, p2, limit=0.01):
+def duplicate(p1, p2, limit=0.05):
+    """
+    @param p1
+    @param p2
+    @param limit
+    """
+
     pos1 = np.array(p1[:3])
     pos2 = np.array(p2[:3])
 
