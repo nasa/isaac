@@ -78,12 +78,12 @@ void DataGeneration::Configure(const ignition::gazebo::Entity& _entity, const st
   this->INSPECTION_POSES_FILEPATH =
     scriptPathString + "/inspection_poses/" + configReader.getValue("INSPECTION_POSES_FILENAME");
   this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_NAME"));
-  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_POS_X"));
-  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_POS_Y"));
-  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_POS_Z"));
-  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_ROT_X"));
-  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_ROT_Y"));
-  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_ROT_Z"));
+  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_INSPECTION_POS_X"));
+  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_INSPECTION_POS_Y"));
+  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_INSPECTION_POS_Z"));
+  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_INSPECTION_ROT_X"));
+  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_INSPECTION_ROT_Y"));
+  this->inspectionPosesLabels.push_back(configReader.getValue("INSPECTION_POSES_LABEL_INSPECTION_ROT_Z"));
   this->groundTruthLabels.push_back(configReader.getValue("GROUND_TRUTH_LABEL_NAME"));
   this->groundTruthLabels.push_back(configReader.getValue("GROUND_TRUTH_LABEL_POS_X"));
   this->groundTruthLabels.push_back(configReader.getValue("GROUND_TRUTH_LABEL_POS_Y"));
