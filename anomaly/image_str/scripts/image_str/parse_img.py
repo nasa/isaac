@@ -15,7 +15,13 @@ import cv2
 import image_str.net_utils as net_utils
 import image_str.utils as utils
 import IPython
+
+# from matplotlib.widgets import Button
+import ipywidgets as widgets
 import jellyfish
+import matplotlib
+
+# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,11 +29,13 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from craft.craft import CRAFT
-from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from torch.autograd import Variable
 from tqdm import tqdm
+
+# from matplotlib.backends.backend_qt5 import NavigationToolbar2QT
+
 
 
 class Ocr:
@@ -360,6 +368,8 @@ class Ocr:
 
         # load data
         image = cv2.imread(image_path)
+        if image is None:
+            raise Exception("Missing image file")
 
         h, w, _ = image.shape
         bag_name = None
@@ -783,13 +793,12 @@ class Ocr:
             fig.axes[0].imshow(cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
             fig.axes[0].axis("off")
 
-            fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+            im = fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
             fig.axes[1].axis("off")
 
+            im.set_url(result.split("\n")[0])
+            # fig.text(.5, .05, result, ha='center')
             plt.draw()
-
-            cls = lambda: os.system("cls" if os.name == "nt" else "clear")
-            cls()
             print(result)
 
         index = 0
@@ -813,8 +822,6 @@ class Ocr:
             print("No results found")
             return full, crop, results
 
-        NavigationToolbar2Tk.forward = callback_right_button
-        NavigationToolbar2Tk.back = callback_left_button
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
 
         ax[0].imshow(cv2.cvtColor(full[0], cv2.COLOR_BGR2RGB))
@@ -823,10 +830,42 @@ class Ocr:
         ax[1].imshow(cv2.cvtColor(crop[0], cv2.COLOR_BGR2RGB))
         ax[1].axis("off")
 
-        print(results[0])
+        # url = results[0].split('\n')[0]
+        # fig.text(.5, .05, url, ha='center')
+
+        # fig.text(.5, .05, results[0], ha='center')
         plt.tight_layout()
 
+        previous = widgets.Button(
+            description="Prev",
+        )
+
+        previous.on_click(callback_left_button)
+        display(previous)
+        right = widgets.Button(
+            description="Next",
+        )
+
+        display(right)
+        right.on_click(callback_right_button)
+
+        output = widgets.Output()
+        display(output)
+        # # Previous button
+        # axprev = fig.add_axes([0.7, 0.05, 0.1, 0.075])
+        # btn1 = Button(
+        # axprev, label="Prev", color='pink', hovercolor='tomato')
+
+        # # Next button
+        # axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
+        # btn2 = Button(
+        # axnext, label="Next", color='pink', hovercolor='tomato')
+
+        # btn1.on_clicked(callback_left_button)
+        # btn2.on_clicked(callback_right_button)
+
         plt.show()
+        print(results[0])
         return full, crop, results
 
     def __find_image(self, image_file, df, label):
@@ -839,6 +878,10 @@ class Ocr:
         image = cv2.imread(
             image_file,
         )
+
+        if image is None:
+            raise Exception("Missing image file")
+
         h, w, _ = image.shape
         words = label.split()
         results = {}
