@@ -28,6 +28,15 @@ if [[ -z "$CONFIG_NAME" ]] || [[ -z "$OUTPUT_DIR" ]]; then
     exit 1
 fi
 
+# Cleanup function
+function cleanup {
+    echo "Cleaning up..."
+    rm -f "${OUTPUT_DIR}/colored_maps/colored_0000000.png"
+    rm -f "${OUTPUT_DIR}/images/image_0000000.png"
+    rm -f "${OUTPUT_DIR}/labels_maps/labels_0000000.png"
+}
+trap cleanup SIGINT EXIT
+
 # Figure out directories and filepaths of interest
 SCRIPT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
 CONFIG_FILE="${SCRIPT_DIR}/config/${CONFIG_NAME}.config"

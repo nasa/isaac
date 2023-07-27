@@ -152,7 +152,7 @@ void DataGeneration::PreUpdate(
   }
 
   // Stop generating data if finished
-  if (this->n_count >= handrailInspectPositions.size() * this->NUM_IMAGES_EACH) {
+  if (this->n_count > handrailInspectPositions.size() * this->NUM_IMAGES_EACH) {
     this->entityCreator.RequestRemoveEntity(this->entity);
   }
 }

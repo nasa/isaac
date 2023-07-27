@@ -94,8 +94,10 @@ def parse_args():
 def main(config_name):
 
     # Directories
-    tool_dir = "/usr/local/home/mnsun/ros_ws/isaac/src/astrobee/localization/cnn_object_localization/tools/synthetic_segmentation_data"
-    data_dir = "/usr/local/home/mnsun/large_files/data/handrail/synthetic/new_with_gt"
+    # tool_dir = "/usr/local/home/mnsun/ros_ws/isaac/src/astrobee/localization/cnn_object_localization/tools/synthetic_segmentation_data"
+    # data_dir = "/usr/local/home/mnsun/large_files/data/handrail/synthetic/new_with_gt"
+    tool_dir = "/home/astrobee/ros_ws/isaac/src/astrobee/localization/cnn_object_localization/tools/synthetic_segmentation_data"
+    data_dir = "/home/astrobee/large_files/data/handrail/synthetic/new_with_gt"
 
     # Reading parameters and data
     config_dict = read_config(os.path.join(tool_dir, "config", f"{config_name}.config"))
@@ -103,8 +105,12 @@ def main(config_name):
 
     # Keypoints in the target frame
     # In the future, this should be read from config as well
-    keypoints_target = {140: [[ 6.187375e-02, -1.315000e-04,  3.598150e-01], [ 6.187375e-02,  1.550000e-05, -3.588850e-01]]}
-    # keypoints_target = {140: [[3.588850e-01, 1.600000e-05, 2.834375e-02], [-3.598150e-01, -1.302500e-04,  2.834375e-02]]}
+    keypoints_target = {
+        100: [[0.06, 0, 0.09], [0.06, 0, -0.09]],
+        120: [[0.06, 0, 0.25], [0.06, 0, -0.25]],
+        140: [[0.06, 0, 0.36], [0.06, 0, -0.36]],
+        180: [[0.06, 0, 0.51], [0.06, 0, -0.51]],
+    }
 
     # Load data
     df_ground_truth_poses = pd.read_csv(data_dir + "/groundTruthPoses.csv")
@@ -114,76 +120,51 @@ def main(config_name):
          for k 
          in ("INSPECTION_POSES_LABEL_NAME", *INSPECTION_POSES_TARGET_POSE_LABELS, "INSPECTION_POSES_LABEL_OBJECT_CLASS")]]
     df_merged = pd.merge(df_ground_truth_poses, df_inspection_poses, how="left", on="name")
-
-
-
-
-    # Only take handrail_30 examples for testing purposes
-    # Only use first five images for testing purposes for now
-    # Remove this later
-    df_merged = df_merged[df_merged["label"] == 140]
-    df_merged = df_merged.iloc[0:5]
-    print(df_merged)
-
-
-
-
+    df_merged.index = np.arange(1, len(df_merged) + 1)  # reset index starting at 1, not 0
 
     # Extract inspection and target poses
     np_image_ids = df_merged.index.to_numpy().flatten()
     np_object_classes = df_merged[[config_dict["INSPECTION_POSES_LABEL_OBJECT_CLASS"]]].to_numpy().flatten()
-    np_inspection_poses = df_merged[
-        [config_dict[key] 
-         for key 
-         in INSPECTION_POSES_TARGET_POSE_LABELS]].to_numpy()
-    np_inspection_positions = np_inspection_poses[:, 0:3]
-    np_inspection_eulangles = np_inspection_poses[:, 3:6]
-    np_target_poses = df_merged[
+    np_inspection_poses = df_merged[  # randomized camera poses
         [config_dict[key] 
          for key 
          in GROUND_TRUTH_POSE_LABELS]].to_numpy()
+    np_inspection_positions = np_inspection_poses[:, 0:3]
+    np_inspection_eulangles = np_inspection_poses[:, 3:6]
+    np_target_poses = df_merged[  # static handrail poses
+        [config_dict[key] 
+         for key 
+         in INSPECTION_POSES_TARGET_POSE_LABELS]].to_numpy()
     np_target_positions = np_target_poses[:, 0:3]
     np_target_eulangles = np_target_poses[:, 3:6]
-    
-
-
-    # print(np_object_classes)
-    # print(np_inspection_poses)
-    # print(np_target_poses)
-
 
     # For each image, transform keypoints into image coordinates
     for image_idx in range(len(df_merged)):
 
         # Get transformation matrix
         np_transformation_matrix = transform.transform_between_frames(
-            np_target_positions[image_idx], np_target_eulangles[image_idx], 
-            np_inspection_positions[image_idx], np_inspection_eulangles[image_idx])
-        np_transformation_matrix_correction = np.array(
-            [[0, 1, 0, 0],
-             [0, 0, 1, 0],
-             [1, 0, 0, 0],
-             [0, 0, 0, 1]])
+            np_inspection_positions[image_idx], np_inspection_eulangles[image_idx],
+            np_target_positions[image_idx], np_target_eulangles[image_idx])
+        np_transformation_matrix_correction = np.array(  # necessary because of the way camera frame is defined in gazebo
+            [[ 0, 1, 0, 0],
+             [ 0, 0, 1, 0],
+             [-1, 0, 0, 0],
+             [ 0, 0, 0, 1]])
         np_transformation_matrix = np.matmul(np_transformation_matrix_correction, np_transformation_matrix)
         
-        # Transform keypoints to camera fram
+        # Transform keypoints to camera frame
         keypoints_camera = [
             transform.apply_transformation(np_transformation_matrix, p) 
             for p 
             in keypoints_target[np_object_classes[image_idx]]]
 
-        # print(keypoints_camera)
-
         # Transform keypoints to image frame
         keypoints_homogeneous_image = [np.dot(np_intrinsics_matrix, p) for p in keypoints_camera]
         keypoints_image = [p[:2] / p[2] for p in keypoints_homogeneous_image]
 
-
-        print(keypoints_image)
-
-        # Annotate
-        image_name_original = f"image_{np_image_ids[image_idx]:07d}.png"
-        image_name_annotated = f"annotated_{np_image_ids[image_idx]:07d}.png"
+        # Load, annotate and save image
+        image_name_original = f"image_{(np_image_ids[image_idx]):07d}.png"
+        image_name_annotated = f"annotated_{(np_image_ids[image_idx]):07d}.png"
         image_path = os.path.join(data_dir, "images", image_name_original)
         image = cv2.imread(image_path)
         for np_keypoint in keypoints_image:
