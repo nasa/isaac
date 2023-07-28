@@ -28,12 +28,19 @@ if [[ -z "$CONFIG_NAME" ]] || [[ -z "$OUTPUT_DIR" ]]; then
     exit 1
 fi
 
-# Cleanup function
+# Cleanup function to delete the zeroth image and shift all the other image filenames down by one
 function cleanup {
-    echo "Cleaning up..."
-    rm -f "${OUTPUT_DIR}/colored_maps/colored_0000000.png"
-    rm -f "${OUTPUT_DIR}/images/image_0000000.png"
-    rm -f "${OUTPUT_DIR}/labels_maps/labels_0000000.png"
+    echo "Fixing indexing for output files..."
+    for directory in colored_maps images labels_maps; do
+        for old_file in $(ls "${OUTPUT_DIR}/${directory}"/*.png | sort -V); do
+            base_name=$(basename "${old_file}" .png)
+            index=${base_name#*_}
+            index=$((10#$index))
+            index=$((index - 1))
+            new_file=$(printf "${OUTPUT_DIR}/${directory}/%s_%07d.png" "${base_name%_*}" "${index}")
+            mv "${old_file}" "${new_file}"
+        done
+    done
 }
 trap cleanup SIGINT EXIT
 
@@ -41,12 +48,12 @@ trap cleanup SIGINT EXIT
 SCRIPT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
 CONFIG_FILE="${SCRIPT_DIR}/config/${CONFIG_NAME}.config"
 
-# Export environment variables for C++
+# Export environment variables for C++ data generation plugin
 export SYNTHETIC_SEGMENTATION_DATA_CONFIG_FILE=${CONFIG_FILE}
 export SYNTHETIC_SEGMENTATION_DATA_OUTPUT_DIR=${OUTPUT_DIR}
 export SYNTHETIC_SEGMENTATION_DATA_SCRIPT_DIR=${SCRIPT_DIR}
 
-# Export environment variables for Ignition
+# Export environment variables for Ignition itself
 export IGN_GAZEBO_SYSTEM_PLUGIN_PATH="${SCRIPT_DIR}/ign_plugins/build"
 export IGN_GAZEBO_RESOURCE_PATH="${SCRIPT_DIR}/models"
 export MESA_GL_VERSION_OVERRIDE=3.3

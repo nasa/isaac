@@ -22,6 +22,7 @@
 import argparse
 from xml.etree import ElementTree
 import os
+import json
 
 # Third party imports
 import numpy as np
@@ -59,7 +60,7 @@ def read_config(config_file_path):
     return config_dict
 
 
-def read_camera_intrinsics(world_file_path):
+def read_camera_parameters(world_file_path):
     tree = ElementTree.parse(world_file_path)
     root = tree.getroot()
     for sensor in root.iter('sensor'):
@@ -77,40 +78,31 @@ def read_camera_intrinsics(world_file_path):
             height = image.find('height')
             if (width is None) or (height is None):
                 raise RuntimeError("Error parsing world file: <width> and/or <height> not found.")
-            fov_x = float(horizontal_fov.text)  # radians assumed
-            c_x = float(width.text) / 2
-            c_y = float(height.text) / 2
-            f = c_x / np.tan(fov_x / 2)
-            return np.array([[f, 0, c_x], [0, f, c_y], [0, 0, 1]])
+            horizontal_fov = float(horizontal_fov.text)  # radians assumed
+            width = int(width.text)
+            height = int(height.text)
+            return horizontal_fov, width, height
     raise RuntimeError("Error parsing world file: segmentation_camera not found.")
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--tool_dir", type=str, required=True)
     parser.add_argument("--config_name", type=str, required=True)
+    parser.add_argument("--data_dir", type=str, required=True)
     return parser.parse_args()
 
 
-def main(config_name):
+def main(tool_dir, config_name, data_dir):
 
-    # Directories
-    # tool_dir = "/usr/local/home/mnsun/ros_ws/isaac/src/astrobee/localization/cnn_object_localization/tools/synthetic_segmentation_data"
-    # data_dir = "/usr/local/home/mnsun/large_files/data/handrail/synthetic/new_with_gt"
-    tool_dir = "/home/astrobee/ros_ws/isaac/src/astrobee/localization/cnn_object_localization/tools/synthetic_segmentation_data"
-    data_dir = "/home/astrobee/large_files/data/handrail/synthetic/new_with_gt"
-
-    # Reading parameters and data
+    # Reading parameters
     config_dict = read_config(os.path.join(tool_dir, "config", f"{config_name}.config"))
-    np_intrinsics_matrix = read_camera_intrinsics(os.path.join(tool_dir, "worlds", "templates", config_dict["WORLD_FILENAME"]))
-
-    # Keypoints in the target frame
-    # In the future, this should be read from config as well
-    keypoints_target = {
-        100: [[0.06, 0, 0.09], [0.06, 0, -0.09]],
-        120: [[0.06, 0, 0.25], [0.06, 0, -0.25]],
-        140: [[0.06, 0, 0.36], [0.06, 0, -0.36]],
-        180: [[0.06, 0, 0.51], [0.06, 0, -0.51]],
-    }
+    keypoints_target = json.loads(config_dict["KEYPOINT_POSITIONS"])
+    horizontal_fov, width, height = read_camera_parameters(os.path.join(tool_dir, "worlds", "templates", config_dict["WORLD_FILENAME"]))
+    c_x = width / 2
+    c_y = height / 2
+    f = c_x / np.tan(horizontal_fov / 2)
+    np_intrinsics_matrix = np.array([[f, 0, c_x], [0, f, c_y], [0, 0, 1]])
 
     # Load data
     df_ground_truth_poses = pd.read_csv(data_dir + "/groundTruthPoses.csv")
@@ -120,11 +112,11 @@ def main(config_name):
          for k 
          in ("INSPECTION_POSES_LABEL_NAME", *INSPECTION_POSES_TARGET_POSE_LABELS, "INSPECTION_POSES_LABEL_OBJECT_CLASS")]]
     df_merged = pd.merge(df_ground_truth_poses, df_inspection_poses, how="left", on="name")
-    df_merged.index = np.arange(1, len(df_merged) + 1)  # reset index starting at 1, not 0
+    df_merged = df_merged.reset_index()
 
     # Extract inspection and target poses
     np_image_ids = df_merged.index.to_numpy().flatten()
-    np_object_classes = df_merged[[config_dict["INSPECTION_POSES_LABEL_OBJECT_CLASS"]]].to_numpy().flatten()
+    np_object_classes = df_merged[[config_dict["INSPECTION_POSES_LABEL_OBJECT_CLASS"]]].to_numpy().flatten().astype(str)
     np_inspection_poses = df_merged[  # randomized camera poses
         [config_dict[key] 
          for key 
@@ -138,7 +130,9 @@ def main(config_name):
     np_target_positions = np_target_poses[:, 0:3]
     np_target_eulangles = np_target_poses[:, 3:6]
 
-    # For each image, transform keypoints into image coordinates
+    # For each image, generate a mask for keypoints
+    os.mkdir(os.path.join(data_dir, "keypoint_annotated"))
+    os.mkdir(os.path.join(data_dir, "keypoint_masks"))
     for image_idx in range(len(df_merged)):
 
         # Get transformation matrix
@@ -162,29 +156,29 @@ def main(config_name):
         keypoints_homogeneous_image = [np.dot(np_intrinsics_matrix, p) for p in keypoints_camera]
         keypoints_image = [p[:2] / p[2] for p in keypoints_homogeneous_image]
 
-        # Load, annotate and save image
-        image_name_original = f"image_{(np_image_ids[image_idx]):07d}.png"
-        image_name_annotated = f"annotated_{(np_image_ids[image_idx]):07d}.png"
-        image_path = os.path.join(data_dir, "images", image_name_original)
-        image = cv2.imread(image_path)
+        # Load, annotate and save image (for debugging purposes only)
+        image_path_original = os.path.join(data_dir, "images", f"image_{(np_image_ids[image_idx]):07d}.png")
+        image_annotated = cv2.imread(image_path_original)
         for np_keypoint in keypoints_image:
-            image = cv2.circle(image, np_keypoint.flatten().astype(int), 10, (0, 0, 255), -1)
-        cv2.imwrite(image_name_annotated, image)
+            image_annotated = cv2.circle(image_annotated, np_keypoint.flatten().astype(int), int(config_dict["KEYPOINT_RADIUS"]), (127, 0, 0), -1)
+        image_path_annotated = os.path.join(data_dir, "keypoint_annotated", f"annotated_{(np_image_ids[image_idx]):07d}.png")
+        cv2.imwrite(image_path_annotated, image_annotated)
 
-
-
-
-
-
-    
-
+        # Generate a mask for keypoints (currently all keypoints have the same class)
+        image_keypoint_mask = np.zeros((height,width,3), np.uint8)
+        for np_keypoint in keypoints_image:
+            image_keypoint_mask = cv2.circle(image_keypoint_mask, np_keypoint.flatten().astype(int), int(config_dict["KEYPOINT_RADIUS"]), (127, 0, 0), -1)
+        image_path_keypoint_mask = os.path.join(data_dir, "keypoint_masks", f"colored_{(np_image_ids[image_idx]):07d}.png")
+        cv2.imwrite(image_path_keypoint_mask, image_keypoint_mask)
 
 
 if __name__ == "__main__":
 
     args = parse_args()
     main(
-        config_name=args.config_name)
+        tool_dir=args.tool_dir,
+        config_name=args.config_name,
+        data_dir=args.data_dir)
     
 
 
