@@ -97,25 +97,21 @@ void DataGeneration::Configure(const ignition::gazebo::Entity& _entity, const st
   vector<vector<string>> inspectionNameAndPoses = csvReader.readCSV(
     this->INSPECTION_POSES_FILEPATH, this->inspectionPosesLabels);
   for (auto& nameAndPose : inspectionNameAndPoses) {
-    this->handrailNames.push_back(nameAndPose[0]);
+    this->targetNames.push_back(nameAndPose[0]);
   }
   for (auto& nameAndPose : inspectionNameAndPoses) {
-    this->handrailInspectPositions.push_back(
+    this->targetInspectPositions.push_back(
       ignition::math::Pose3d(std::stof(nameAndPose[1]), std::stof(nameAndPose[2]), std::stof(nameAndPose[3]),
                              std::stof(nameAndPose[4]), std::stof(nameAndPose[5]), std::stof(nameAndPose[6])));
   }
 
   // Initialize ground truth output file with column label header if it doesn't already exist
   this->GROUND_TRUTH_FILEPATH = outputPathString + "/groundTruthPoses.csv";
-  std::ofstream file;
-  file.open(this->GROUND_TRUTH_FILEPATH, std::ios_base::in);
-  if (!file) {
-    file.open(this->GROUND_TRUTH_FILEPATH, std::ios_base::out);
-    file << this->groundTruthLabels[0] << "," << this->groundTruthLabels[1] << "," << this->groundTruthLabels[2] << ","
-         << this->groundTruthLabels[3] << "," << this->groundTruthLabels[4] << "," << this->groundTruthLabels[5] << ","
-         << this->groundTruthLabels[6] << std::endl;
-    file.close();
-  }
+  std::ofstream file(this->GROUND_TRUTH_FILEPATH, std::ios_base::app);
+  file << this->groundTruthLabels[0] << "," << this->groundTruthLabels[1] << "," << this->groundTruthLabels[2] << ","
+       << this->groundTruthLabels[3] << "," << this->groundTruthLabels[4] << "," << this->groundTruthLabels[5] << ","
+       << this->groundTruthLabels[6] << std::endl;
+  file.close();
 }
 
 // Run on every simulation frame (once every second)
@@ -124,35 +120,37 @@ void DataGeneration::PreUpdate(
     ignition::gazebo::EntityComponentManager& _ecm) {
 
   auto sec = std::chrono::duration_cast<std::chrono::seconds>(_info.simTime).count();
-  if (sec > this->lastPositionChange && this->n_count < handrailInspectPositions.size() * this->NUM_IMAGES_EACH) {
+  if (sec > this->lastPositionChange && this->n_count <= targetInspectPositions.size() * this->NUM_IMAGES_EACH) {
     // Randomize camera position
     auto poseComp = _ecm.Component<ignition::gazebo::components::Pose>(this->entity);
-    int handrailIdx = static_cast<int>(this->n_count / NUM_IMAGES_EACH);
-    auto inspectionPoseWithError = generateError(this->handrailInspectPositions[handrailIdx]);
+    int targetIdx = static_cast<int>(this->n_count / NUM_IMAGES_EACH);
+    auto inspectionPoseWithError = generateError(this->targetInspectPositions[targetIdx]);
     *poseComp = inspectionPoseWithError;
     _ecm.SetChanged(
       this->entity, ignition::gazebo::components::Pose::typeId,
       ignition::gazebo::ComponentState::OneTimeChange);
     this->lastPositionChange = sec;
+
+    // Append ground truth pose to file (if statement necessary due to pesky off-by-one bug I don't fully understand)
+    if (this->n_count < targetInspectPositions.size() * this->NUM_IMAGES_EACH) {
+      std::ofstream file(this->GROUND_TRUTH_FILEPATH, std::ios_base::app);
+      file << this->targetNames[targetIdx] << ","
+          << inspectionPoseWithError.Data().Pos().X() << "," << inspectionPoseWithError.Data().Pos().Y() << ","
+          << inspectionPoseWithError.Data().Pos().Z() << "," << inspectionPoseWithError.Data().Rot().Euler().X() << ","
+          << inspectionPoseWithError.Data().Rot().Euler().Y() << "," << inspectionPoseWithError.Data().Rot().Euler().Z()
+          << std::endl;
+      file.close();
+    }
+
+    // Update and print progress
     this->n_count += 1;
-
-    // Append ground truth pose to file
-    std::ofstream file(this->GROUND_TRUTH_FILEPATH, std::ios_base::app);
-    file << this->handrailNames[handrailIdx] << ","
-         << inspectionPoseWithError.Data().Pos().X() << "," << inspectionPoseWithError.Data().Pos().Y() << ","
-         << inspectionPoseWithError.Data().Pos().Z() << "," << inspectionPoseWithError.Data().Rot().Euler().X() << ","
-         << inspectionPoseWithError.Data().Rot().Euler().Y() << "," << inspectionPoseWithError.Data().Rot().Euler().Z()
-         << std::endl;
-    file.close();
-
-    // Print progress
-    if (static_cast<int>(this->n_count / NUM_IMAGES_EACH) > handrailIdx) {
-      std::cout << "Handrail number " << handrailIdx << " is completed. \n";
+    if (static_cast<int>(this->n_count / NUM_IMAGES_EACH) > targetIdx) {
+      std::cout << "Target object number " << targetIdx << " is completed. \n";
     }
   }
 
   // Stop generating data if finished
-  if (this->n_count > handrailInspectPositions.size() * this->NUM_IMAGES_EACH) {
+  if (this->n_count > targetInspectPositions.size() * this->NUM_IMAGES_EACH) {
     this->entityCreator.RequestRemoveEntity(this->entity);
   }
 }

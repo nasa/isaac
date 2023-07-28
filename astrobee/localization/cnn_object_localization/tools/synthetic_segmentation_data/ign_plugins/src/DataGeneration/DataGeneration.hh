@@ -58,15 +58,14 @@ namespace data_generation
     private: int lastPositionChange{0};
     private: int n_count = 0;
 
-    private: std::vector<ignition::math::Pose3d> handrailInspectPositions;
-    private: std::vector<std::string> handrailNames;
+    private: std::vector<ignition::math::Pose3d> targetInspectPositions;
+    private: std::vector<std::string> targetNames;
 
     private: int NUM_IMAGES_EACH;
     private: std::string INSPECTION_POSES_FILEPATH;
     private: std::vector<std::string> inspectionPosesLabels = std::vector<std::string>();
     private: std::string GROUND_TRUTH_FILEPATH;
     private: std::vector<std::string> groundTruthLabels = std::vector<std::string>();
-
   };
 }
 

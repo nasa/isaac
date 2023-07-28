@@ -30,7 +30,11 @@ fi
 
 # Cleanup function to delete the zeroth image and shift all the other image filenames down by one
 function cleanup {
+    echo ""
     echo "Fixing indexing for output files..."
+    rm -f "${OUTPUT_DIR}/colored_maps/colored_0000000.png"
+    rm -f "${OUTPUT_DIR}/images/image_0000000.png"
+    rm -f "${OUTPUT_DIR}/labels_maps/labels_0000000.png"
     for directory in colored_maps images labels_maps; do
         for old_file in $(ls "${OUTPUT_DIR}/${directory}"/*.png | sort -V); do
             base_name=$(basename "${old_file}" .png)
@@ -42,7 +46,7 @@ function cleanup {
         done
     done
 }
-trap cleanup SIGINT EXIT
+trap cleanup SIGINT
 
 # Figure out directories and filepaths of interest
 SCRIPT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
@@ -69,6 +73,10 @@ WORLD_GENERATE_FILE="${SCRIPT_DIR}/worlds/generated/${WORLD_FILENAME}"
 mkdir -p "$(dirname "$WORLD_GENERATE_FILE")"
 sed "s#__OUTPUT_DIR__#$OUTPUT_DIR#g" "$WORLD_TEMPLATE_FILE" > "$WORLD_GENERATE_FILE"
 
+# Make data output directory
+mkdir -p ${SYNTHETIC_SEGMENTATION_DATA_OUTPUT_DIR}
+
 # Run Ignition Gazebo
 echo "Running Ignition Gazebo. Remember to subscribe to the segmentation camera topic!"
 ign gazebo $WORLD_GENERATE_FILE
+
