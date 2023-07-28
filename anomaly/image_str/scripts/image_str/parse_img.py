@@ -12,6 +12,7 @@ from multiprocessing import Process
 
 import craft.file_utils as file_utils
 import cv2
+import gdown
 import image_str.net_utils as net_utils
 import image_str.utils as utils
 import IPython
@@ -37,12 +38,10 @@ from tqdm import tqdm
 # from matplotlib.backends.backend_qt5 import NavigationToolbar2QT
 
 
-
 class Ocr:
-    def __init__(self, df=None, bag_path=None, trained_model=None):
-        if trained_model is not None:
-            self.net = self.__get_craft(trained_model)
-            self.parseq, self.img_transform = self.__get_parseq()
+    def __init__(self, df=None, bag_path=None):
+        self.net = self.__get_craft()
+        self.parseq, self.img_transform = self.__get_parseq()
 
         if df is None:
             self.dataframe = pd.DataFrame(
@@ -184,9 +183,8 @@ class Ocr:
         img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
         return (parseq, img_transform)
 
-    def __get_craft(self, trained_model):
+    def __get_craft(self):
         """
-        @param trained_model
         @returns
         """
         cuda = False
@@ -195,6 +193,12 @@ class Ocr:
 
         # load net
         net = CRAFT()  # initialize
+        trained_model = "craft_mlt_25k.pth"
+        if not os.path.exists(trained_model):
+            url = "https://drive.google.com/uc?id=1Jk4eGD7crsqCCg9C9VjCLkMN3ze8kutZ"
+            gdown.download(url, trained_model, quiet=False)
+        else:
+            print("Found Craft Model")
 
         if cuda:
             net.load_state_dict(newt_utils.copyStateDict(torch.load(trained_model)))
@@ -787,9 +791,13 @@ class Ocr:
             if result[2] is not None:
                 results.extend(result[2])
 
-        def display_labels(full, cropped, result):
-            fig = plt.gcf()
+        text = widgets.Textarea(
+            value=results[0],
+            disable=True,
+            layout=widgets.Layout(height="100%", width="100%"),
+        )
 
+        def display_labels(fig, full, cropped, result, title):
             fig.axes[0].imshow(cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
             fig.axes[0].axis("off")
 
@@ -798,8 +806,9 @@ class Ocr:
 
             im.set_url(result.split("\n")[0])
             # fig.text(.5, .05, result, ha='center')
+            plt.title(title)
             plt.draw()
-            print(result)
+            text.value = title + "\n" + result
 
         index = 0
 
@@ -808,7 +817,9 @@ class Ocr:
             if index == 0:
                 return
             index -= 1
-            display_labels(full[index], crop[index], results[index])
+            title = "Image: {:d}/{:d}".format(index + 1, len(results))
+            fig = plt.gcf()
+            display_labels(fig, full[index], crop[index], results[index], title)
 
         def callback_right_button(event):
             nonlocal index, full, crop, results
@@ -816,24 +827,18 @@ class Ocr:
             if index >= len(results) - 1:
                 return
             index += 1
-            display_labels(full[index], crop[index], results[index])
+            title = "Image: {:d}/{:d}".format(index + 1, len(results))
+            fig = plt.gcf()
+            display_labels(fig, full[index], crop[index], results[index], title)
 
         if len(full) == 0:
             print("No results found")
             return full, crop, results
 
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        title = "Image: {:d}/{:d}".format(index + 1, len(results))
+        display_labels(fig, full[0], crop[0], results[0], title)
 
-        ax[0].imshow(cv2.cvtColor(full[0], cv2.COLOR_BGR2RGB))
-        ax[0].axis("off")
-
-        ax[1].imshow(cv2.cvtColor(crop[0], cv2.COLOR_BGR2RGB))
-        ax[1].axis("off")
-
-        # url = results[0].split('\n')[0]
-        # fig.text(.5, .05, url, ha='center')
-
-        # fig.text(.5, .05, results[0], ha='center')
         plt.tight_layout()
 
         previous = widgets.Button(
@@ -850,7 +855,7 @@ class Ocr:
         right.on_click(callback_right_button)
 
         output = widgets.Output()
-        display(output)
+        display(text)
         # # Previous button
         # axprev = fig.add_axes([0.7, 0.05, 0.1, 0.075])
         # btn1 = Button(
@@ -865,7 +870,6 @@ class Ocr:
         # btn2.on_clicked(callback_right_button)
 
         plt.show()
-        print(results[0])
         return full, crop, results
 
     def __find_image(self, image_file, df, label):
@@ -1008,12 +1012,55 @@ class Ocr:
 
         fig = None
         size = 2
-        for i, image in enumerate(images):
-            if i % 4 == 0:
-                fig = plt.figure(figsize=(10, 6))
-            fig.add_subplot(size, size, i % 4 + 1)
-            plt.axis("off")
-            plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        index = 0
+
+        def display_imgs(fig, axes, imgs):
+            for i in range(len(imgs)):
+                axes[int(i / 2), i % 2].imshow(cv2.cvtColor(imgs[i], cv2.COLOR_BGR2RGB))
+                axes[int(i / 2), i % 2].axis("off")
+            plt.draw()
+
+        index = 0
+
+        def callback_left_button(event):
+            nonlocal index, images
+            if index < 4:
+                return
+            index -= 4
+            fig = plt.gcf()
+            axes = plt.gca()
+            display_imgs(fig, axes, images[index : index + 4])
+
+        def callback_right_button(event):
+            nonlocal index, images
+            """ this function gets called if we hit the left button"""
+            if index + 4 >= len(results):
+                return
+            index += 4
+            fig = plt.gcf()
+            axes = plt.gca()
+            display_imgs(fig, images[index : index + 4])
+
+        if len(images) == 0:
+            print("No images provided")
+            return None
+
+        previous = widgets.Button(
+            description="Prev",
+        )
+
+        previous.on_click(callback_left_button)
+        display(previous)
+        right = widgets.Button(
+            description="Next",
+        )
+
+        display(right)
+        right.on_click(callback_right_button)
+
+        fig, ax = plt.subplots(2, 2, figsize=(10, 5))
+        display_imgs(fig, ax, images[0:4])
+        plt.tight_layout()
 
         plt.show()
 
@@ -1029,10 +1076,10 @@ if __name__ == "__main__":
     result_folder = "result/test/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
-    # ocr = Ocr(bag_path=bag_path, trained_model="models/craft_mlt_25k.pth")
-    # ocr.parse_image(test_image, result_folder=result_folder, increment=True)
+    ocr = Ocr(bag_path=bag_path)
+    ocr.parse_image(test_image, result_folder=result_folder, increment=True)
     # ocr.parse_folder(test_folder, result_folder=result_folder, increment=True)
-    ocr = Ocr.df_from_file(
-        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
-    )
+    # ocr = Ocr.df_from_file(
+    #     "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
+    # )
     IPython.embed()
