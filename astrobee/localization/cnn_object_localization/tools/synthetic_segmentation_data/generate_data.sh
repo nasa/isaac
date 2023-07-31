@@ -31,7 +31,7 @@ fi
 # Cleanup function to delete the zeroth image and shift all the other image filenames down by one
 function cleanup {
     echo ""
-    echo "Fixing indexing for output files..."
+    echo "Fixing indexing for output files. This will take some time."
     rm -f "${OUTPUT_DIR}/colored_maps/colored_0000000.png"
     rm -f "${OUTPUT_DIR}/images/image_0000000.png"
     rm -f "${OUTPUT_DIR}/labels_maps/labels_0000000.png"

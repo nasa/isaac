@@ -98,6 +98,7 @@ def main(tool_dir, config_name, data_dir):
     # Reading parameters
     config_dict = read_config(os.path.join(tool_dir, "config", f"{config_name}.config"))
     keypoints_target = json.loads(config_dict["KEYPOINT_POSITIONS"])
+    assert len(set(len(pts) for pts in keypoints_target.values())) == 1  # all classes must have the same number of keypoints
     horizontal_fov, width, height = read_camera_parameters(os.path.join(tool_dir, "worlds", "templates", config_dict["WORLD_FILENAME"]))
     c_x = width / 2
     c_y = height / 2
@@ -131,7 +132,7 @@ def main(tool_dir, config_name, data_dir):
     np_target_eulangles = np_target_poses[:, 3:6]
 
     # For each image, generate a mask for keypoints
-    os.mkdir(os.path.join(data_dir, "keypoint_annotated"))
+    # os.mkdir(os.path.join(data_dir, "keypoint_annotated"))  # (for debugging purposes only)
     os.mkdir(os.path.join(data_dir, "keypoint_masks"))
     for image_idx in range(len(df_merged)):
 
@@ -157,17 +158,19 @@ def main(tool_dir, config_name, data_dir):
         keypoints_image = [p[:2] / p[2] for p in keypoints_homogeneous_image]
 
         # Load, annotate and save image (for debugging purposes only)
-        image_path_original = os.path.join(data_dir, "images", f"image_{(np_image_ids[image_idx]):07d}.png")
-        image_annotated = cv2.imread(image_path_original)
-        for np_keypoint in keypoints_image:
-            image_annotated = cv2.circle(image_annotated, np_keypoint.flatten().astype(int), int(config_dict["KEYPOINT_RADIUS"]), (127, 0, 0), -1)
-        image_path_annotated = os.path.join(data_dir, "keypoint_annotated", f"annotated_{(np_image_ids[image_idx]):07d}.png")
-        cv2.imwrite(image_path_annotated, image_annotated)
+        # image_path_original = os.path.join(data_dir, "images", f"image_{(np_image_ids[image_idx]):07d}.png")
+        # image_annotated = cv2.imread(image_path_original)
+        # for np_keypoint in keypoints_image:
+        #     image_annotated = cv2.circle(image_annotated, np_keypoint.flatten().astype(int), int(config_dict["KEYPOINT_RADIUS"]), (0, 0, 255), -1)
+        # image_path_annotated = os.path.join(data_dir, "keypoint_annotated", f"annotated_{(np_image_ids[image_idx]):07d}.png")
+        # cv2.imwrite(image_path_annotated, image_annotated)
 
-        # Generate a mask for keypoints (currently all keypoints have the same class)
+        # Generate a mask for keypoints
         image_keypoint_mask = np.zeros((height,width,3), np.uint8)
+        keypoint_color = 80  # completely arbitrary
         for np_keypoint in keypoints_image:
-            image_keypoint_mask = cv2.circle(image_keypoint_mask, np_keypoint.flatten().astype(int), int(config_dict["KEYPOINT_RADIUS"]), (127, 0, 0), -1)
+            image_keypoint_mask = cv2.circle(image_keypoint_mask, np_keypoint.flatten().astype(int), int(config_dict["KEYPOINT_RADIUS"]), (keypoint_color, 0, 0), -1)
+            keypoint_color += 10  # also completely arbitrary
         image_path_keypoint_mask = os.path.join(data_dir, "keypoint_masks", f"colored_{(np_image_ids[image_idx]):07d}.png")
         cv2.imwrite(image_path_keypoint_mask, image_keypoint_mask)
 

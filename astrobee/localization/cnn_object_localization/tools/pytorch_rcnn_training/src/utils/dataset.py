@@ -26,30 +26,24 @@ import torch
 from PIL import Image, ImageOps
 from torchvision.transforms import functional as F
 
-# from .visualize import convert_mask_to_image
-
-"""
-Contents of `notes.txt` (not sure what it means but seems relevant to this class):
-[(4617, (0, 39, 143)), (1019383, (0, 0, 0))] --> 39
-[(10561, (0, 200, 172)), (1013439, (0, 0, 0))] --> 137
-[(18225, (0, 106, 200)), (1005775, (0, 0, 0))] --> 85
-[(10074, (0, 173, 2)), (1013926, (0, 0, 0))] --> 102
-"""
+EXPERIMENTAL_CHANGES_ON = True
 
 class AstrobeeHandrailDataset(torch.utils.data.Dataset):
-    def __init__(self, root, transforms):
+    def __init__(self, root, transforms, label_dict, images_dir, masks_dir):
         self.root = root
         self.transforms = transforms
         # load all image files, sorting them to
         # ensure that they are aligned
-        self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
-        self.masks = list(sorted(os.listdir(os.path.join(root, "colored_maps"))))
-        self.label_dict = {39: 1, 137: 2, 102: 3, 85: 4, 255: 1, 101: 1}
+        self.images_dir = images_dir
+        self.masks_dir = masks_dir
+        self.imgs = list(sorted(os.listdir(os.path.join(root, self.images_dir))))
+        self.masks = list(sorted(os.listdir(os.path.join(root, self.masks_dir))))
+        self.label_dict = label_dict
 
     def __getitem__(self, idx):
         # load images and masks
-        img_path = os.path.join(self.root, "images", self.imgs[idx])
-        mask_path = os.path.join(self.root, "colored_maps", self.masks[idx])
+        img_path = os.path.join(self.root, self.images_dir, self.imgs[idx])
+        mask_path = os.path.join(self.root, self.masks_dir, self.masks[idx])
         img = Image.open(img_path).convert("RGB")
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance

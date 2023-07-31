@@ -77,11 +77,12 @@ def main(
     # train on the GPU or on the CPU, if a GPU is not available
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    # our dataset has five classes only - background and handrail 8.5, handrail 21.5, handrail 30, handrail 41.5
-    num_classes = 5
+    # our dataset has two classes only - background and keypoint
+    num_classes = 3
     # use our dataset and defined transformations
-    dataset = AstrobeeHandrailDataset(dataset_path, get_transform(train=True))
-    dataset_test = AstrobeeHandrailDataset(dataset_path, get_transform(train=False))
+    label_dict = {9: 1, 10: 1}  # two keypoint instances per image, both of the same class
+    dataset = AstrobeeHandrailDataset(dataset_path, get_transform(train=True), label_dict=label_dict, images_dir="images", masks_dir="keypoint_masks")
+    dataset_test = AstrobeeHandrailDataset(dataset_path, get_transform(train=False), label_dict=label_dict, images_dir="images", masks_dir="keypoint_masks")
 
     # split the dataset in train and test set
     indices = torch.randperm(len(dataset)).tolist()
