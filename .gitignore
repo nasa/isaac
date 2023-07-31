@@ -60,6 +60,7 @@ analyst/workspace/.local
 analyst/workspace/.ipynb_checkpoints
 analyst/workspace/.cache
 analyst/workspace/results/
+analyst/workspace/craft_mlt_25k.pth
 
 # vscode
 isaac.code-workspace

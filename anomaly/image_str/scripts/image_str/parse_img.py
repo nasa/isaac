@@ -30,6 +30,8 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from craft.craft import CRAFT
+from IPython.display import HTML
+from IPython.display import display as idisplay
 from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from torch.autograd import Variable
@@ -759,7 +761,7 @@ class Ocr:
 
         self.bag_path = bag
 
-    def find_label(self, label):
+    def find_label(self, label, display_img=True):
         """
         @param label
         @returns
@@ -785,31 +787,36 @@ class Ocr:
 
         for img_file in tqdm(images, desc="Searching for {:s}".format(label)):
             df = self.dataframe.loc[self.dataframe["image"] == img_file]
-            result = self.__find_image(img_file, df, label)
+            result = self.__find_image(img_file, df, label, display_img)
             full.extend(result[0])
             crop.extend(result[1])
             if result[2] is not None:
                 results.extend(result[2])
 
-        text = widgets.Textarea(
-            value=results[0],
+        result_input = widgets.Textarea(
             disable=True,
             layout=widgets.Layout(height="100%", width="100%"),
         )
 
+        def update_link(result):
+            new_url = result.split("\n")[0]
+            link_html = f'<a href="{new_url}" target="_blank">{new_url}</a>'
+            display(HTML(link_html))
+
         def display_labels(fig, full, cropped, result, title):
-            fig.axes[0].imshow(cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
-            fig.axes[0].axis("off")
+            if display_img:
+                fig.axes[0].imshow(cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
+                fig.axes[0].axis("off")
 
-            im = fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
-            fig.axes[1].axis("off")
+                im = fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+                fig.axes[1].axis("off")
 
-            im.set_url(result.split("\n")[0])
-            # fig.text(.5, .05, result, ha='center')
-            plt.title(title)
-            plt.draw()
-            text.value = title + "\n" + result
+                url = result.split("\n")[0]
+                plt.title(title)
+                plt.draw()
+            result_input.value = result
 
+        widgets.interact(update_link, result=result_input)
         index = 0
 
         def callback_left_button(event):
@@ -818,8 +825,11 @@ class Ocr:
                 return
             index -= 1
             title = "Image: {:d}/{:d}".format(index + 1, len(results))
-            fig = plt.gcf()
-            display_labels(fig, full[index], crop[index], results[index], title)
+            if display_img:
+                fig = plt.gcf()
+                display_labels(fig, full[index], crop[index], results[index], title)
+            else:
+                display_labels(None, None, None, results[index], title)
 
         def callback_right_button(event):
             nonlocal index, full, crop, results
@@ -828,18 +838,23 @@ class Ocr:
                 return
             index += 1
             title = "Image: {:d}/{:d}".format(index + 1, len(results))
-            fig = plt.gcf()
-            display_labels(fig, full[index], crop[index], results[index], title)
+            if display_img:
+                fig = plt.gcf()
+                display_labels(fig, full[index], crop[index], results[index], title)
+            else:
+                display_labels(None, None, None, results[index], title)
 
-        if len(full) == 0:
+        if len(results) == 0:
             print("No results found")
             return full, crop, results
 
-        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         title = "Image: {:d}/{:d}".format(index + 1, len(results))
-        display_labels(fig, full[0], crop[0], results[0], title)
-
-        plt.tight_layout()
+        if display_img:
+            fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+            plt.tight_layout()
+            display_labels(fig, full[0], crop[0], results[0], title)
+        else:
+            display_labels(None, None, None, results[0], title)
 
         previous = widgets.Button(
             description="Prev",
@@ -854,39 +869,27 @@ class Ocr:
         display(right)
         right.on_click(callback_right_button)
 
-        output = widgets.Output()
-        display(text)
-        # # Previous button
-        # axprev = fig.add_axes([0.7, 0.05, 0.1, 0.075])
-        # btn1 = Button(
-        # axprev, label="Prev", color='pink', hovercolor='tomato')
-
-        # # Next button
-        # axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
-        # btn2 = Button(
-        # axnext, label="Next", color='pink', hovercolor='tomato')
-
-        # btn1.on_clicked(callback_left_button)
-        # btn2.on_clicked(callback_right_button)
-
-        plt.show()
+        if display_img:
+            plt.show()
         return full, crop, results
 
-    def __find_image(self, image_file, df, label):
+    def __find_image(self, image_file, df, label, display_img):
         """
         @param image    array representing image to be searched
         @param label text to search for
         @returns array representing image with label boxed if found and a list of all labels cropped from original image
         """
 
-        image = cv2.imread(
-            image_file,
-        )
+        if display_img:
+            image = cv2.imread(
+                image_file,
+            )
 
-        if image is None:
-            raise Exception("Missing image file")
+            if image is None:
+                raise Exception("Missing image file")
 
-        h, w, _ = image.shape
+            h, w, _ = image.shape
+
         words = label.split()
         results = {}
         for l in words:
@@ -920,8 +923,6 @@ class Ocr:
                         new_positions = None
             rectangles = new_rects
             positions = new_positions
-
-        new_image = np.array(image)
 
         offset = 100
         cropped_images = []
@@ -968,39 +969,30 @@ class Ocr:
             )
 
             result = link + loc
-            # print(link)
-            # print(
-            #     "Position (x, y, z): {:s}\n Orientation (roll, pitch, yaw): {:s}\n".format(
-            #         str(pos[:3]), str(pos[3:])
-            #     )
-            # )
             locations.append(result)
 
-            new_image = cv2.rectangle(
-                new_image,
-                [i - offset for i in rectangles[i][0]],
-                [i + offset for i in rectangles[i][1]],
-                (255, 0, 0),
-                10,
-            )
-            cropped_images.append(
-                utils.crop_image(
+            if display_img:
+                new_image = cv2.rectangle(
                     image,
-                    rectangles[i][0][0] - offset,
-                    rectangles[i][0][1] - offset,
-                    rectangles[i][1][0] + offset,
-                    rectangles[i][1][1] + offset,
+                    [i - offset for i in rectangles[i][0]],
+                    [i + offset for i in rectangles[i][1]],
+                    (255, 0, 0),
+                    10,
                 )
-            )
+                cropped_images.append(
+                    utils.crop_image(
+                        image,
+                        rectangles[i][0][0] - offset,
+                        rectangles[i][0][1] - offset,
+                        rectangles[i][1][0] + offset,
+                        rectangles[i][1][1] + offset,
+                    )
+                )
 
-        # for i in range(0, len(cropped_images), 2):
-        #     plt.figure(figsize=(10, 6))
-        #     plt.axis("off")
-        #     plt.imshow(cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB))
-
-        #     self.display_images(cropped_images)
-
-        new_image = [new_image for _ in range(len(cropped_images))]
+        if display_img:
+            new_image = [new_image for _ in range(len(cropped_images))]
+        else:
+            new_image = []
 
         return new_image, cropped_images, locations
 
