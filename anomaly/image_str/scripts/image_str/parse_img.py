@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import ast
 import csv
 import json
@@ -351,7 +353,7 @@ class Ocr:
         @param final_file       if provided will save all the labels and their corresponding info to the csv file
         @param increment        if true, will save the image with all the labels boxed and marked to result folder
         """
-
+        print("decode_image", image_path)
         if result_folder is not None and not os.path.isdir(result_folder):
             os.mkdir(result_folder)
 
@@ -479,7 +481,7 @@ class Ocr:
                         )
                         new_row = np.array([new_label, new_location], dtype=object)
                         df.iloc[index] = new_row
-
+        print("crop")
         # Crop the image into sections to detect small text
         for x in range(0, end_w, offset_w):
             for y in range(0, end_h, offset_h):
@@ -590,6 +592,7 @@ class Ocr:
         data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
         data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
 
+        print("get location")
         json_file = ros_command[-1]
 
         with open(json_file, "w") as file:
@@ -604,6 +607,7 @@ class Ocr:
         stdout, stderr = process.communicate()
         stdout = stdout.decode()
         stderr = stderr.decode()
+        print(stdout, stderr)
 
         # If error occured
         if len(stderr) != 0:
@@ -763,13 +767,14 @@ class Ocr:
 
         self.bag_path = bag
 
-    def find_label(self, label, display_img=True):
+    def find_label(self, label, display_img=True, jupyter=False):
         """
         Search for specified label and if display_img is true, create an interactive graph for Jupyter Notebook
         display.
 
         @param label        string to search for in dataframe
         @param display_img  if True, display images with label boxed and cropped.
+        @param jupyter      True if program is ran in Jupyter Notebook (necessary for interactive display)
         @throws error       if display_img is True, but the image path specified in the dataframe does not exist.
         """
 
@@ -806,17 +811,12 @@ class Ocr:
             if result[2] is not None:
                 results.extend(result[2])
 
-        # Text box to display 3D location of labels
-        result_input = widgets.Textarea(
-            disable=True,
-            layout=widgets.Layout(height="100%", width="100%"),
-        )
-
-        # Update panorama link
-        def update_link(result):
-            new_url = result.split("\n")[1]
-            link_html = f'<a href="{new_url}" target="_blank">{new_url}</a>'
-            display(HTML(link_html))
+        if jupyter:
+            # Text box to display 3D location of labels
+            result_input = widgets.Textarea(
+                disable=True,
+                layout=widgets.Layout(height="100%", width="100%"),
+            )
 
         def display_labels(fig, full, cropped, result, title):
             if display_img:
@@ -826,12 +826,15 @@ class Ocr:
                 im = fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
                 fig.axes[1].axis("off")
 
-                plt.title(title)
                 plt.draw()
-            result_input.value = title + "\n" + result
 
-        # Update panorama link with each text box update
-        widgets.interact(update_link, result=result_input)
+            if jupyter:
+                result_input.value = title + "\n" + result
+                plt.title(title)
+            else:
+                cls = lambda: os.system("cls" if os.name == "nt" else "clear")
+                cls()
+                print(title + "\n" + result)
 
         index = 0
 
@@ -872,20 +875,43 @@ class Ocr:
         else:
             display_labels(None, None, None, results[0], title)
 
-        previous = widgets.Button(
-            description="Prev",
-        )
+        if jupyter:
+            # Update panorama link
+            def update_link(result):
+                if len(result) == 0:
+                    return
+                new_url = result.split("\n")[1]
+                link_html = f'<a href="{new_url}" target="_blank">{new_url}</a>'
+                display(HTML(link_html))
 
-        previous.on_click(callback_left_button)
-        display(previous)
-        right = widgets.Button(
-            description="Next",
-        )
+            previous = widgets.Button(
+                description="Prev",
+            )
 
-        display(right)
-        right.on_click(callback_right_button)
+            previous.on_click(callback_left_button)
+            display(previous)
+            right = widgets.Button(
+                description="Next",
+            )
 
-        if display_img:
+            display(right)
+            right.on_click(callback_right_button)
+
+            # Update panorama link with each text box update
+            widgets.interact(update_link, result=result_input)
+            if display_img:
+                plt.show()
+        else:
+            # Define custom button positions
+            button_back = plt.axes([0.1, 0.01, 0.1, 0.05])  # [x, y, width, height]
+            button_forward = plt.axes([0.2, 0.01, 0.1, 0.05])
+
+            # Create custom buttons
+            btn_back = plt.Button(button_back, "Back")
+            btn_forward = plt.Button(button_forward, "Forward")
+
+            btn_back.on_clicked(callback_left_button)
+            btn_forward.on_clicked(callback_right_button)
             plt.show()
 
     def __find_image(self, image_file, df, label, display_img):
@@ -1030,14 +1056,68 @@ if __name__ == "__main__":
     os.environ["ASTROBEE_ROBOT"] = "queen"
     os.environ["ASTROBEE_WORLD"] = "iss"
 
-    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657550844.481.jpg"
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--bag_path", help="Path to bag folder where the images came from."
+    )
+    parser.add_argument("--image_file", help="Path to image to parse.")
+    parser.add_argument("--image_folder", help="Path to image folder to parse images.")
+    parser.add_argument(
+        "--result_folder", help="Path to result folder to save results."
+    )
+    parser.add_argument(
+        "--increment",
+        help="If True, will save the results of each individual image.",
+        type=bool,
+        default=True,
+    )
+    parser.add_argument(
+        "--df_file", help="If provided, will create an ocr using data from csv file."
+    )
+
+    args = parser.parse_args()
+    d = vars(args)
+
+    bag_path = d["bag_path"]
+    if d["df_file"] is not None:
+        ocr = Ocr.df_from_file(d["df_file"])
+        print("Created ocr. Use ocr.find_label(label, display) to search for labels.\n")
+    else:
+        ocr = Ocr(bag_path=bag_path)
+        if d["image_file"] is not None:
+            ocr.parse_image(
+                d["image_file"],
+                result_folder=d["result_folder"],
+                increment=d["increment"],
+            )
+            print(
+                "Created ocr. Finished parsing image. Use ocr.find_label(label, display) to search for labels.\n"
+            )
+        elif d["image_folder"] is not None:
+            ocr.parse_folder(
+                d["image_folder"],
+                result_folder=d["result_folder"],
+                increment=d["increment"],
+            )
+            print(
+                "Created ocr. Finished parsing folder. Use ocr.find_label(label, display) to search for labels.\n"
+            )
+
+    """
+    Examples:
+    
+    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657551170.616.jpg"
     result_folder = "result/test/"
     bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
     test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
     ocr = Ocr(bag_path=bag_path)
     ocr.parse_image(test_image, result_folder=result_folder, increment=True)
-    # ocr.parse_folder(test_folder, result_folder=result_folder, increment=True)
-    # ocr = Ocr.df_from_file(
-    #     "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
-    # )
+    ocr.parse_folder(test_folder, result_folder=result_folder, increment=True)
+    ocr = Ocr.df_from_file(
+        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
+    )
+    """
+
     IPython.embed()
