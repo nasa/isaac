@@ -3,9 +3,12 @@ import numpy as np
 
 def duplicate(p1, p2, limit=0.05):
     """
-    @param p1
-    @param p2
-    @param limit
+    Given two locations of labels, return true if the two labels are considered "duplicates" based
+    specified limit.
+
+    @param p1       array representing 3D position of label
+    @param p2       array representing 3D position of label
+    @param limit    max distance to be considered same location
     """
 
     pos1 = np.array(p1[:3])
@@ -16,9 +19,9 @@ def duplicate(p1, p2, limit=0.05):
 
 def get_euclidean_distance(p1, p2):
     """
-    @param p1
-    @param p2
-    @returns
+    @param p1       array representing 3D position of label
+    @param p2       array representing 3D position of label
+    @returns        euclidean 2D distance between p1 and p2
     """
 
     return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
@@ -26,11 +29,12 @@ def get_euclidean_distance(p1, p2):
 
 def get_closest_rect(rect, rectangles, positions, distance):
     """
-    @param rect
-    @param rectangles
-    @param positions
-    @param distance
-    @returns
+    @param rect         2D array representing rectangle (upper left and lower right coordinates)
+    @param rectangles   array of rectangles
+    @param positions    3D positions of the rectangles
+    @param distance     upper limit of distance to get close rectangles
+    @returns            rects array of rectangles within 'distance' of 'rect'
+                        pos array of the positions of the close rectangles
     """
 
     rects = []
@@ -50,9 +54,9 @@ def get_iou(rect1, rect2):
     """
     Calculates the intersection over union given two rectangles in the form of [(upper_left, lower_right)] coordinates.
 
-    @param rect1
-    @param rect2
-    @returns
+    @param rect1    2D array representing rectangle (upper left and lower right coordinates)
+    @param rect2    2D array representing rectangle (upper left and lower right coordinates)
+    @returns        iou of the two rectangles
     """
 
     x1_ul, y1_ul = rect1[0]
@@ -88,25 +92,20 @@ def get_iou(rect1, rect2):
 
 def overlap(rect1, rect2):
     """
-    @param rect1
-    @param rect2
-    @returns
+    @param rect1    2D array representing rectangle (upper left and lower right coordinates)
+    @param rect2    2D array representing rectangle (upper left and lower right coordinates)
+    @returns        true if rect1 and rect2 overlap
     """
 
-    # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
-    # representing the upper left and lower right points of each rectangle
     return get_iou(rect1, rect2) > 0.5
 
 
 def get_bounding_box(rect1, rect2):
     """
-    @param rect1
-    @param rect2
-    @returns
+    @param rect1    2D array representing rectangle (upper left and lower right coordinates)
+    @param rect2    2D array representing rectangle (upper left and lower right coordinates)
+    @returns        rectangle encasing rect1 and rect2
     """
-
-    # rect1 and rect2 are tuples in the form ((x1, y1), (x2, y2))
-    # representing the upper left and lower right points of each rectangle
 
     upper_left = np.array(
         (min(rect1[0][0], rect2[0][0]), min(rect1[0][1], rect2[0][1]))
@@ -120,9 +119,9 @@ def get_bounding_box(rect1, rect2):
 
 def get_midpoint(pos1, pos2):
     """
-    @param pos1
-    @param pos2
-    @returns
+    @param pos1     3D position
+    @param pos2     3D position
+    @returns the midpoint between pos1 and pos2
     """
 
     return [(pos1[i] + pos2[i]) / 2 for i in range(len(pos1))]
@@ -130,11 +129,11 @@ def get_midpoint(pos1, pos2):
 
 def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
     """
-    @param upper_a
-    @param lower_a
-    @param upper_b
-    @param lower_b
-    @returns
+    @param upper_a  upper left coordinate of rect 1
+    @param lower_a  lower right coordinate of rect 1
+    @param upper_b  upper left coordinate of rect 2
+    @param lower_b  lower right coordinate of rect 2
+    @returns distance between rect 1 and rect 2
     """
 
     x1, y1 = upper_a
@@ -168,11 +167,11 @@ def get_rect_distance(upper_a, lower_a, upper_b, lower_b):
 
 def crop_image(img, startx, starty, endx, endy):
     """
-    @param img array of image
-    @param startx
-    @param starty
-    @param endx
-    @param endy
+    @param img      array of image
+    @param startx   start x pixel
+    @param starty   start y pixel
+    @param endx     end x pixel
+    @param endy     end y pixel
     @returns a cropped image of img[startx:endx, starty:endy]
     """
     h, w, _ = img.shape

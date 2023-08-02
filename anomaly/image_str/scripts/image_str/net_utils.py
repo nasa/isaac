@@ -14,12 +14,9 @@ from craft.craft import CRAFT
 from torch.autograd import Variable
 
 
+# Credit to CRAFT-pytorch
+# https://github.com/clovaai/CRAFT-pytorch
 def copyStateDict(state_dict):
-    """
-    @param state_dict
-    @returns
-    """
-
     if list(state_dict.keys())[0].startswith("module"):
         start_idx = 1
     else:

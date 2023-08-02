@@ -87,7 +87,6 @@ class Ocr:
         )
 
         def convert_to_rect(string):
-
             location = re.findall(r"[-+]?\d*\.\d+|\d+", string)
             location = [int(i) for i in location]
             return [[location[0], location[1]], [location[2], location[3]]]
@@ -113,12 +112,11 @@ class Ocr:
         final_file=None,
     ):
         """
-        @param image_folder
-        @param trained_model
-        @param result_folder
-        @param increment
-        @param final_file
-        @returns
+        @param image_folder     folder containing images to parse
+        @param result_folder    if not None, folder to store resulting files
+        @param increment        if True, stores the resulting files for each file in folder
+        @param final_file       if None, creates a csv file to store parsed labels. If not None, adds to file provided.
+        @returns                pandas dataframe with all the labels and info parsed from images in specified folder
         """
 
         all_locations = set()
@@ -153,16 +151,14 @@ class Ocr:
     def parse_image(
         self,
         image_file,
-        trained_model="models/craft_mlt_25k.pth",
         result_folder=None,
         increment=False,
     ):
         """
-        @param image_file
-        @param trained_model
-        @param result_folder
-        @param increment
-        @returns
+        @param image_file       path to image to parse for text
+        @param result_folder    if not None, folder to store resulting files
+        @param increment        if True, stores the resulting files for each file in folder
+        @returns                pandas dataframe with all the labels and info parsed from images in specified image file
         """
 
         tqdm(
@@ -178,8 +174,9 @@ class Ocr:
 
     def __get_parseq(self):
         """
-        @returns
+        @returns parseq models for OCR
         """
+
         # Load model and image transforms for parseq
         parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
         img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
@@ -187,14 +184,17 @@ class Ocr:
 
     def __get_craft(self):
         """
-        @returns
+        @returns craft models for OCR
         """
+
         cuda = False
 
         refiner_model = "weights/craft_refiner_CTW1500.pth"
 
         # load net
         net = CRAFT()  # initialize
+
+        # Download craft model from web if does not exist in current path
         trained_model = "craft_mlt_25k.pth"
         if not os.path.exists(trained_model):
             url = "https://drive.google.com/uc?id=1Jk4eGD7crsqCCg9C9VjCLkMN3ze8kutZ"
@@ -220,7 +220,9 @@ class Ocr:
 
     def __get_bag_file(self, img_file):
         """
+        Given an image, return the bag the image is from.
 
+        @param img_file     the path to the ISS image
         @returns string     the name of the bag file the image originated from
         """
 
@@ -763,25 +765,35 @@ class Ocr:
 
     def find_label(self, label, display_img=True):
         """
-        @param label
-        @param display_img
-        @returns
+        Search for specified label and if display_img is true, create an interactive graph for Jupyter Notebook
+        display.
+
+        @param label        string to search for in dataframe
+        @param display_img  if True, display images with label boxed and cropped.
+        @throws error       if display_img is True, but the image path specified in the dataframe does not exist.
         """
+
+        # Sort such that labels closest to search label appear first.
         self.dataframe["similarity"] = self.dataframe["label"].apply(
             jellyfish.jaro_winkler_similarity, args=(label,)
         )
         self.dataframe.sort_values(by="similarity", ascending=False, inplace=True)
         self.dataframe.drop(columns="similarity", inplace=True)
+
+        # Get all images with label
         words = label.split()
         l_result = self.dataframe.loc[
             self.dataframe["label"].apply(self.__similar, args=(words[0],))
         ]
+
+        # Search through one image at a time
         images = set(l_result["image"].tolist())
         for l in words[1:]:
             l_result = self.dataframe.loc[
                 self.dataframe["label"].apply(self.__similar, args=(l,))
             ]
             images = images.intersection(set(l_result["image"].tolist()))
+
         full = []
         crop = []
         results = []
@@ -794,13 +806,15 @@ class Ocr:
             if result[2] is not None:
                 results.extend(result[2])
 
+        # Text box to display 3D location of labels
         result_input = widgets.Textarea(
             disable=True,
             layout=widgets.Layout(height="100%", width="100%"),
         )
 
+        # Update panorama link
         def update_link(result):
-            new_url = result.split("\n")[0]
+            new_url = result.split("\n")[1]
             link_html = f'<a href="{new_url}" target="_blank">{new_url}</a>'
             display(HTML(link_html))
 
@@ -812,12 +826,13 @@ class Ocr:
                 im = fig.axes[1].imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
                 fig.axes[1].axis("off")
 
-                url = result.split("\n")[0]
                 plt.title(title)
                 plt.draw()
-            result_input.value = result
+            result_input.value = title + "\n" + result
 
+        # Update panorama link with each text box update
         widgets.interact(update_link, result=result_input)
+
         index = 0
 
         def callback_left_button(event):
@@ -872,15 +887,18 @@ class Ocr:
 
         if display_img:
             plt.show()
-        return full, crop, results
 
     def __find_image(self, image_file, df, label, display_img):
         """
-        @param image_file
-        @param df
-        @param label
-        @param display_img
-        @returns
+        @param image_file   path to image currently being searched
+        @param df           dataframe for all labels in specified image
+        @param label        label to be searched
+        @param display_img  if True, display images with label boxed and cropped.
+        @returns            full array that holds array images with specified label boxed.
+                            crop array that holds array images of the labels cropped from image
+                            results array that holds the 3D location of the labels in the panorama/ISS
+                            if display_img is False, full and crop will always be empty.
+        @throws error       if display_img is True, but the image path specified in the dataframe does not exist.
         """
 
         if display_img:
@@ -893,12 +911,14 @@ class Ocr:
 
             h, w, _ = image.shape
 
-        words = label.split()
+        words = label.split()  # if search label is multi-word
         results = {}
         for l in words:
+            # Find all rectangles for each word
             l_result = df.loc[df["label"].apply(self.__similar, args=(l,))]
             results[l] = l_result
 
+        # Search for multi-word labels. Merge rectangles close to each other
         positions = np.array(results[words[0]]["PCL Intersection"].tolist())
         rectangles = np.array(results[words[0]]["location"].tolist())
         for word in words[1:]:
@@ -934,11 +954,14 @@ class Ocr:
         for i in range(len(rectangles)):
             pos = positions[i]
             duplicate = [loc for loc in all_locations if utils.duplicate(pos, loc)]
+
+            # Ignore duplicates
             if len(duplicate) != 0:
                 continue
 
             all_locations.add(tuple(pos))
 
+            # Create panorama link
             pitch = pos[4]
             yaw = pos[5]
             bag = self.__get_bag_file(image_file)
