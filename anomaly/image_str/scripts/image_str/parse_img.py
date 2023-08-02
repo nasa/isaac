@@ -764,6 +764,7 @@ class Ocr:
     def find_label(self, label, display_img=True):
         """
         @param label
+        @param display_img
         @returns
         """
         self.dataframe["similarity"] = self.dataframe["label"].apply(
@@ -875,9 +876,11 @@ class Ocr:
 
     def __find_image(self, image_file, df, label, display_img):
         """
-        @param image    array representing image to be searched
-        @param label text to search for
-        @returns array representing image with label boxed if found and a list of all labels cropped from original image
+        @param image_file
+        @param df
+        @param label
+        @param display_img
+        @returns
         """
 
         if display_img:
@@ -995,66 +998,6 @@ class Ocr:
             new_image = []
 
         return new_image, cropped_images, locations
-
-    def display_images(self, images):
-        """
-        @param images
-        @returns
-        """
-
-        fig = None
-        size = 2
-        index = 0
-
-        def display_imgs(fig, axes, imgs):
-            for i in range(len(imgs)):
-                axes[int(i / 2), i % 2].imshow(cv2.cvtColor(imgs[i], cv2.COLOR_BGR2RGB))
-                axes[int(i / 2), i % 2].axis("off")
-            plt.draw()
-
-        index = 0
-
-        def callback_left_button(event):
-            nonlocal index, images
-            if index < 4:
-                return
-            index -= 4
-            fig = plt.gcf()
-            axes = plt.gca()
-            display_imgs(fig, axes, images[index : index + 4])
-
-        def callback_right_button(event):
-            nonlocal index, images
-            """ this function gets called if we hit the left button"""
-            if index + 4 >= len(results):
-                return
-            index += 4
-            fig = plt.gcf()
-            axes = plt.gca()
-            display_imgs(fig, images[index : index + 4])
-
-        if len(images) == 0:
-            print("No images provided")
-            return None
-
-        previous = widgets.Button(
-            description="Prev",
-        )
-
-        previous.on_click(callback_left_button)
-        display(previous)
-        right = widgets.Button(
-            description="Next",
-        )
-
-        display(right)
-        right.on_click(callback_right_button)
-
-        fig, ax = plt.subplots(2, 2, figsize=(10, 5))
-        display_imgs(fig, ax, images[0:4])
-        plt.tight_layout()
-
-        plt.show()
 
 
 if __name__ == "__main__":
