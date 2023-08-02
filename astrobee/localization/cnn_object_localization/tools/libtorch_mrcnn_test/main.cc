@@ -19,7 +19,7 @@
 #include <torch/script.h>
 // #include <torch/torch.h>  // Uncomment if there are any issues with linking...?
 // #include <torchvision/vision.h>  // Uncomment if there are any issues with linking...?
-#include <torchvision/nms.h> 
+#include <torchvision/nms.h>
 
 #include <iostream>
 #include <memory>
@@ -46,7 +46,8 @@ int main(int argc, const char* argv[]) {
 
   // Prepare dummy input for testing
   std::vector<torch::Tensor> inputInner;
-  inputInner.push_back(torch::ones({3, 240, 320}));
+  auto options = torch::TensorOptions().dtype(torch::kHalf);
+  inputInner.push_back(torch::ones({3, 240, 320}, options));
   std::vector<torch::jit::IValue> inputOuter;
   inputOuter.push_back(inputInner);
 

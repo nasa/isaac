@@ -124,6 +124,8 @@ This tool is intended to test the TorchScript compiled model created using the `
 
 ## Step 6: Installing and running on Astrobee
 
-- Follow the normal Astrobee installation procedure.
-- The test executable should be located in `opt/astrobee/bin`.
-- Keep in mind that you will need to `scp` over your model weights as well.
+- `./scripts/prepare_shared_libraries --root=$ARMHF_CHROOT_DIR --output=$ISAAC_WS/armhf/opt/isaac/lib --libs=libc10.so,libtorchvision.so,libtorch_cpu.so,libtorch.so`
+- Follow the normal Astrobee installation procedure for ISAAC. The test executable should be located in `opt/isaac/bin`.
+- `scp` over your model weights.
+- On Astrobee: `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/isaac/lib`
+- On Astrobee: run the test executable.

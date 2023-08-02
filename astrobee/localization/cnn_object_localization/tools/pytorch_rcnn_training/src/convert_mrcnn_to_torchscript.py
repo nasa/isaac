@@ -98,6 +98,7 @@ def get_trained_model(weights_path, device, num_classes=5):
         "roi_heads.mask_head.mask_fcn4.weight", "roi_heads.mask_head.mask_fcn4.bias"]
     for key_old, key_new in zip(keys_old, keys_new):
         state_dict[key_new] = state_dict.pop(key_old)
+    model.half()  # the Astrobee can't fit the big boy model
     model.load_state_dict(state_dict)
     return model
 
