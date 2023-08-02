@@ -22,7 +22,8 @@ This tool is intended to test the TorchScript compiled model created using the `
 ## Step 3: Building the test
 
 - `cmake -S . -B build`
-- `cmake --build build --config Release`
+- `cd build`
+- `make`
 
 ## Step 4: Running the test
 
