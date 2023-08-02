@@ -79,7 +79,6 @@ This tool is intended to test the TorchScript compiled model created using the `
 
 ## Step 5: Cross compiling ISAAC
 
-- `cd $ISAAC_WS`
 - Make the following modifications:
 	- File: `${ISAAC_WS}/src/scripts/configure.sh`
 		- Line: 306
@@ -119,6 +118,7 @@ This tool is intended to test the TorchScript compiled model created using the `
                 ```
                 INTERFACE_INCLUDE_DIRECTORIES "${ARMHF_CHROOT_DIR}/usr/local/include"
                 ```
+- `cd $ISAAC_WS`
 - `./src/scripts/configure.sh -a; source ~/.bashrc; catkin build`
 
 ## Step 6: Installing and running on Astrobee
