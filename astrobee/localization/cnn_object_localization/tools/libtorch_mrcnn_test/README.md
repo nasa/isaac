@@ -125,3 +125,4 @@ This tool is intended to test the TorchScript compiled model created using the `
 
 - Follow the normal Astrobee installation procedure.
 - The test executable should be located in `opt/astrobee/bin`.
+- Keep in mind that you will need to `scp` over your model weights as well.
