@@ -5,16 +5,12 @@ This tool is intended to test the TorchScript compiled model created using the `
 
 # Building and running this tool locally
 
-## Step 1: Getting ready
-
-- Remove the `./CATKIN_IGNORE` file. (It is there so that people uninterested in this functionality don't have to deal with Torch/TorchVision dependencies.)
-
-## Step 2: Installing libtorch
+## Step 1: Installing libtorch
 
 - See `scripts/setup/dependencies/build_install_torch.sh` for an outline of the procedure. Remember that we want Torch v1.5.0.
 - `export CMAKE_PREFIX_PATH=<TORCH_DIR>:${CMAKE_PREFIX_PATH}`, where `<TORCH_DIR>` is the directory in which `TorchConfig.cmake` was installed. (Consider adding this or some equivalent to `~/.bashrc`.)
 
-## Step 3: Installing libtorchvision:
+## Step 2: Installing libtorchvision:
 
 - `cd` into a clean directory for downloading TorchVision v0.6.0.
 - `wget https://github.com/pytorch/vision/archive/refs/tags/v0.6.0.zip`
@@ -23,7 +19,7 @@ This tool is intended to test the TorchScript compiled model created using the `
 - `cmake ..; make; make install`
 - `export CMAKE_PREFIX_PATH=<VISION_DIR>:${CMAKE_PREFIX_PATH}`, where `<VISION_DIR>` is the directory in which `TorchVisionConfig.cmake` was installed. (Consider adding this or some equivalent to `~/.bashrc`.)
 
-## Step 4: Building the test
+## Step 3: Building the test
 
 - `cmake -S . -B build`
 - `cmake --build build --config Release`
