@@ -10,7 +10,6 @@ import subprocess
 import sys
 import time
 import warnings
-from multiprocessing import Process
 
 import craft.file_utils as file_utils
 import cv2
@@ -799,17 +798,15 @@ class Ocr:
             ]
             images = images.intersection(set(l_result["image"].tolist()))
 
-        full = []
-        crop = []
+        rectangles = []
         results = []
-
+        full = []
         for img_file in tqdm(images, desc="Searching for {:s}".format(label)):
             df = self.dataframe.loc[self.dataframe["image"] == img_file]
             result = self.__find_image(img_file, df, label, display_img)
             full.extend(result[0])
-            crop.extend(result[1])
-            if result[2] is not None:
-                results.extend(result[2])
+            rectangles.extend(result[1])
+            results.extend(result[2])
 
         if jupyter:
             # Text box to display 3D location of labels
@@ -818,8 +815,29 @@ class Ocr:
                 layout=widgets.Layout(height="100%", width="100%"),
             )
 
-        def display_labels(fig, full, cropped, result, title):
+        def display_labels(fig, image_file, rect, result, title):
+            offset = 100
             if display_img:
+                image = cv2.imread(image_file)
+                if image is None:
+                    raise Exception("Missing image from path")
+
+                full = cv2.rectangle(
+                    image,
+                    [i - offset for i in rect[0]],
+                    [i + offset for i in rect[1]],
+                    (255, 0, 0),
+                    10,
+                )
+
+                cropped = utils.crop_image(
+                    image,
+                    rect[0][0] - offset,
+                    rect[0][1] - offset,
+                    rect[1][0] + offset,
+                    rect[1][1] + offset,
+                )
+
                 fig.axes[0].imshow(cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
                 fig.axes[0].axis("off")
 
@@ -839,19 +857,21 @@ class Ocr:
         index = 0
 
         def callback_left_button(event):
-            nonlocal index, full, crop, results
+            nonlocal index, full, rectangles, results
             if index == 0:
                 return
             index -= 1
             title = "Image: {:d}/{:d}".format(index + 1, len(results))
             if display_img:
                 fig = plt.gcf()
-                display_labels(fig, full[index], crop[index], results[index], title)
+                display_labels(
+                    fig, full[index], rectangles[index], results[index], title
+                )
             else:
                 display_labels(None, None, None, results[index], title)
 
         def callback_right_button(event):
-            nonlocal index, full, crop, results
+            nonlocal index, full, rectangles, results
             """ this function gets called if we hit the left button"""
             if index >= len(results) - 1:
                 return
@@ -859,19 +879,21 @@ class Ocr:
             title = "Image: {:d}/{:d}".format(index + 1, len(results))
             if display_img:
                 fig = plt.gcf()
-                display_labels(fig, full[index], crop[index], results[index], title)
+                display_labels(
+                    fig, full[index], rectangles[index], results[index], title
+                )
             else:
                 display_labels(None, None, None, results[index], title)
 
         if len(results) == 0:
             print("No results found")
-            return full, crop, results
+            return
 
         title = "Image: {:d}/{:d}".format(index + 1, len(results))
         if display_img:
             fig, ax = plt.subplots(1, 2, figsize=(10, 5))
             plt.tight_layout()
-            display_labels(fig, full[0], crop[0], results[0], title)
+            display_labels(fig, full[0], rectangles[0], results[0], title)
         else:
             display_labels(None, None, None, results[0], title)
 
@@ -920,23 +942,12 @@ class Ocr:
         @param df           dataframe for all labels in specified image
         @param label        label to be searched
         @param display_img  if True, display images with label boxed and cropped.
-        @returns            full array that holds array images with specified label boxed.
-                            crop array that holds array images of the labels cropped from image
+        @returns            images array that holds images file paths for each rectangle.
+                            rects array that holds rectangle positions of each label
                             results array that holds the 3D location of the labels in the panorama/ISS
                             if display_img is False, full and crop will always be empty.
         @throws error       if display_img is True, but the image path specified in the dataframe does not exist.
         """
-
-        if display_img:
-            image = cv2.imread(
-                image_file,
-            )
-
-            if image is None:
-                raise Exception("Missing image file")
-
-            h, w, _ = image.shape
-
         words = label.split()  # if search label is multi-word
         results = {}
         for l in words:
@@ -973,10 +984,10 @@ class Ocr:
             rectangles = new_rects
             positions = new_positions
 
-        offset = 100
         cropped_images = []
         locations = []
         all_locations = set()
+        rects = []
         for i in range(len(rectangles)):
             pos = positions[i]
             duplicate = [loc for loc in all_locations if utils.duplicate(pos, loc)]
@@ -985,6 +996,7 @@ class Ocr:
             if len(duplicate) != 0:
                 continue
 
+            rects.append(rectangles[i])
             all_locations.add(tuple(pos))
 
             # Create panorama link
@@ -1023,30 +1035,11 @@ class Ocr:
             result = link + loc
             locations.append(result)
 
-            if display_img:
-                new_image = cv2.rectangle(
-                    image,
-                    [i - offset for i in rectangles[i][0]],
-                    [i + offset for i in rectangles[i][1]],
-                    (255, 0, 0),
-                    10,
-                )
-                cropped_images.append(
-                    utils.crop_image(
-                        image,
-                        rectangles[i][0][0] - offset,
-                        rectangles[i][0][1] - offset,
-                        rectangles[i][1][0] + offset,
-                        rectangles[i][1][1] + offset,
-                    )
-                )
-
+        images = []
         if display_img:
-            new_image = [new_image for _ in range(len(cropped_images))]
-        else:
-            new_image = []
+            images = [image_file for _ in rects]
 
-        return new_image, cropped_images, locations
+        return images, rects, locations
 
 
 if __name__ == "__main__":
