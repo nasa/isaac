@@ -78,7 +78,7 @@ def main(
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     # our dataset has two classes only - background and keypoint
-    num_classes = 3
+    num_classes = 2
     # use our dataset and defined transformations
     label_dict = {9: 1, 10: 1}  # two keypoint instances per image, both of the same class
     dataset = AstrobeeHandrailDataset(dataset_path, get_transform(train=True), label_dict=label_dict, images_dir="images", masks_dir="keypoint_masks")

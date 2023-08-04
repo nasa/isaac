@@ -46,8 +46,7 @@ int main(int argc, const char* argv[]) {
 
   // Prepare dummy input for testing
   std::vector<torch::Tensor> inputInner;
-  auto options = torch::TensorOptions().dtype(torch::kHalf);
-  inputInner.push_back(torch::ones({3, 240, 320}, options));
+  inputInner.push_back(torch::ones({3, 240, 320}));
   std::vector<torch::jit::IValue> inputOuter;
   inputOuter.push_back(inputInner);
 

@@ -79,7 +79,7 @@ def get_trained_model(weights_path, num_classes=5):
 
 def main(dataset_path: str, output_path: str, weights_path: str, nms_thresh: Optional[str]):
 
-    model = get_trained_model(weights_path, num_classes=3)
+    model = get_trained_model(weights_path, num_classes=2)
     model.eval()
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
