@@ -1,3 +1,22 @@
+# NOTE:
+
+NOTE: The code in this folder is in a fairly complete state. 
+Everything "works" and is reasonably well-documented. 
+A minimal C++ test of the model can be cross-compiled and installed to Astrobee.
+The only problem is that the Mask-RCNN model used is too large, and can't be loaded into Astrobee's memory.
+If you were to hypothetically slap another stick of RAM into Astrobee, the model would probably be able to run.
+
+See the `lightweight_cnn_object_localization` folder for a newer approach to this project. Some key differences include:
+
+- Using a keypoint-based pipeline instead of a mask-based pipeline
+- Using a model with MobileNetV3 instead of ResNet-50 as the backbone (orders of magnitude faster/smaller)
+- Torch 1.13.1 instead of Torch 1.5.0
+- Substantially less complete
+    - Essentially just a proof-of-concept that the model works and can run on the robot
+    - No integration of the model, either in simulation or on the robot hardware, for actual localization
+
+If you need to build this package, you probably want to remove the `CATKIN_IGNORE` file.
+
 # Overview
 
 This module contains the code for handrail pose estimation. 
