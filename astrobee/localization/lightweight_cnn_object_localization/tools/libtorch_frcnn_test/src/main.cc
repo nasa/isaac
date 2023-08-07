@@ -17,9 +17,7 @@
 */
 
 #include <torch/script.h>
-// #include <torch/torch.h>  // Uncomment if there are any issues with linking...?
-// #include <torchvision/vision.h>  // Uncomment if there are any issues with linking...?
-#include <torchvision/nms.h>
+#include <torchvision/vision.h>
 
 #include <iostream>
 #include <memory>
@@ -31,9 +29,6 @@ int main(int argc, const char* argv[]) {
     std::cerr << "usage: libtorch_frcnn_test <path-to-exported-script-module>\n";
     return -1;
   }
-
-  // This line doesn't do anything, but it makes sure the C++ linker doesn't prune libtorchvision
-  // vision::cuda_version();
 
   // Load the module
   torch::jit::script::Module module;
@@ -48,8 +43,9 @@ int main(int argc, const char* argv[]) {
 
   // Run the model and report runtime
   auto t_start = std::chrono::high_resolution_clock::now();
-  auto output = module.forward(inputOuter).toTuple()->elements()[1];
+  auto output = module.forward(inputOuter).toTuple()->elements()[1].toListRef()[0];
   auto t_end = std::chrono::high_resolution_clock::now();
+  std::cout << output << "\n";
   double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
   std::cout << "Module inference ran in " << std::to_string(elapsed_time_ms) << " milliseconds.\n";
 }

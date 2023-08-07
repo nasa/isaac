@@ -4,7 +4,7 @@ This tool contains scripts for training and testing the Faster-RCNN, as well as 
 For testing the TorchScript model in a C++ environment, see the `libtorch_frcnn_test` tool.
 
 Training, testing, conversion to TorchScript, and inference in libtorch all use `torch==1.13.1 torchvision==0.14.1`. 
-This is the most up-to-date version of Torch that can be compiled for the Astrobee platform; newer versions require higher cmake version than supported by Astrobee's platform.
+This is the final 1.X version of Torch.
 For a full list of Python dependencies for training and testing, see `requirements.txt`.
 
 NOTE: In its current state, this model training code is a quick-and-dirty experiment. 

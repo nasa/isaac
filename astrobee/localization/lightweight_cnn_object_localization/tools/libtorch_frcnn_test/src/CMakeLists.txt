@@ -5,7 +5,7 @@ find_package(Torch REQUIRED)
 find_package(TorchVision REQUIRED)
 find_package(Python3 COMPONENTS Development)
 
-add_executable(libtorch_frcnn_test src/main.cc)
+add_executable(libtorch_frcnn_test main.cc)
 
 target_compile_features(libtorch_frcnn_test PUBLIC cxx_range_for)
 target_link_libraries(libtorch_frcnn_test 
