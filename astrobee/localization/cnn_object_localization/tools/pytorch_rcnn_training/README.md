@@ -18,7 +18,7 @@ The training for Mask-RCNN relies on features from modern Torch/TorchVision. How
 2. `python3 convert_mrcnn_to_torchscript.py -d "PATH/TO/IMAGES/FOLDER" -w "PATH/TO/CHECKPOINTS/FOLDER/handrail_mrcnn_finetune_ckpt_199.pth"`
 3. `python3 test_mrcnn_torchscript.py -d "PATH/TO/IMAGES/FOLDER" -o "PATH/TO/OUTPUTS/FOLDER" -w "PATH/TO/CHECKPOINTS/FOLDER/handrail_mrcnn_finetune_ckpt_199_torchscript.pt"`
 
-# Keypoint-RCNN for handrail detection
+# Keypoint-RCNN for handrail detection (EXPERIMENTAL)
 
 This tool also contains scripts for training and testing an experimental keypoint-based version of RCNN. Note that this does not use the actual Keypoint-RCNN architecture, but instead just trains a Mask-RCNN on data containing keypoint masks. To train it on synthetic data and then test it:
 
