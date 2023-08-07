@@ -53,7 +53,7 @@ def main(
     # use gpu if available
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    # screw it, we're going 100% training
+    # 100% training for now
     
     # prepare dataset
     dataset_train = KeypointsDataset(dataset_path, is_train=True, bbox_size=bbox_size)
