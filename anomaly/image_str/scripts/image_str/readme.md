@@ -14,7 +14,7 @@ Prerequisites
 ---------
 
 This package relies on the CRAFT-Pytorch and PARSeq libraries. To ensure the Image STR package works smoothly, clone the repos associated with the 
-libraries and set them as Python packages.
+libraries and build them as Python packages.
 
 CRAFT-Pytorch
 
