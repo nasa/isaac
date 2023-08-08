@@ -33,7 +33,8 @@ Running the Code
 
 The python code containing the label detection and search is in parse_img.py.
 
-Parameters:
+Parameters
+```
 --bag_path BAG_PATH   Path to bag folder where the images came from.
 --image_file IMAGE_FILE
                     Path to image to parse.
@@ -46,5 +47,6 @@ Parameters:
                     image.
 --df_file DF_FILE   If provided, will create an ocr using data from csv
                     file.
+```
 
 To see the demo, run the Analyst Notebook. Directions are specified in the readme.md in the Analyst Folder.
