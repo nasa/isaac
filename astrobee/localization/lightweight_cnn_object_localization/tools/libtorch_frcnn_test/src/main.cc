@@ -16,6 +16,7 @@
 * under the License.
 */
 
+#include <opencv2/opencv.hpp>
 #include <torch/script.h>
 #include <torchvision/vision.h>
 
@@ -25,8 +26,8 @@
 #include <string>
 
 int main(int argc, const char* argv[]) {
-  if (argc != 2) {
-    std::cerr << "usage: libtorch_frcnn_test <path-to-exported-script-module>\n";
+  if (argc != 3) {
+    std::cerr << "usage: libtorch_frcnn_test <path-to-exported-script-module> <path-to-input-image>\n";
     return -1;
   }
 
@@ -35,9 +36,25 @@ int main(int argc, const char* argv[]) {
   module = torch::jit::load(argv[1]);
   std::cout << "Module loaded OK.\n";
 
-  // Prepare dummy input for testing
+  // Use OpenCV to read the image
+  std::string imagePath = argv[2];
+  cv::Mat image = cv::imread(imagePath, cv::IMREAD_COLOR);
+  if (image.empty()) {
+      std::cerr << "Error reading image from path: " << imagePath << std::endl;
+      return -1;
+  }
+
+  // Convert the image to float
+  cv::Mat imageFloat;
+  image.convertTo(imageFloat, CV_32F, 1.0 / 255.0);
+
+  // Convert the data layout from HxWxC to CxHxW
+  torch::Tensor imageTensor = torch::from_blob(imageFloat.data, {image.rows, image.cols, 3}, torch::kFloat32);
+  imageTensor = imageTensor.permute({2, 0, 1});
+
+  // Prepare input for testing
   std::vector<torch::Tensor> inputInner;
-  inputInner.push_back(torch::ones({3, 240, 320}));
+  inputInner.push_back(imageTensor);
   std::vector<torch::jit::IValue> inputOuter;
   inputOuter.push_back(inputInner);
 

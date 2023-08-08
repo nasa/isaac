@@ -27,6 +27,7 @@ IFS=',' read -ra LIBARRAY <<< "$LIBS"
 
 # Process each library
 for lib in "${LIBARRAY[@]}"; do
+    echo ""
     # Remove leading/trailing whitespace
     lib=$(echo $lib | xargs)
     # Find all files matching the library name
@@ -34,6 +35,7 @@ for lib in "${LIBARRAY[@]}"; do
     buildid=""
     selected_file=""
     for file in $files; do
+	echo $file
         # Get the build id for this file
         this_buildid=$(file $file | grep -o 'BuildID\[sha1\]=\S\+')
         if [ -z "$buildid" ]; then
@@ -42,7 +44,7 @@ for lib in "${LIBARRAY[@]}"; do
             selected_file=$file
         elif [ "$this_buildid" != "$buildid" ]; then
             # If this file has a different build id, print a warning
-            echo "Warning: Multiple BuildIDs found for $lib. Choosing arbitrarily."
+            echo "WARNING: Multiple BuildIDs found for $lib. Choosing arbitrarily. You should probably look into this."
         fi
     done
     if [ -z "$buildid" ]; then
