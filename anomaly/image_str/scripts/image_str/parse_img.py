@@ -17,13 +17,9 @@ import gdown
 import image_str.net_utils as net_utils
 import image_str.utils as utils
 import IPython
-
-# from matplotlib.widgets import Button
 import ipywidgets as widgets
 import jellyfish
 import matplotlib
-
-# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -37,8 +33,6 @@ from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
 from torch.autograd import Variable
 from tqdm import tqdm
-
-# from matplotlib.backends.backend_qt5 import NavigationToolbar2QT
 
 
 class Ocr:
@@ -352,7 +346,7 @@ class Ocr:
         @param final_file       if provided will save all the labels and their corresponding info to the csv file
         @param increment        if true, will save the image with all the labels boxed and marked to result folder
         """
-        print("decode_image", image_path)
+
         if result_folder is not None and not os.path.isdir(result_folder):
             os.mkdir(result_folder)
 
@@ -480,7 +474,6 @@ class Ocr:
                         )
                         new_row = np.array([new_label, new_location], dtype=object)
                         df.iloc[index] = new_row
-        print("crop")
         # Crop the image into sections to detect small text
         for x in range(0, end_w, offset_w):
             for y in range(0, end_h, offset_h):
@@ -588,10 +581,10 @@ class Ocr:
         @param new_location 2D list representing location of the label in the image (pixels)
         @param ros_command  list representing ros command used to call find_point_coordinate
         """
+
         data["coord"]["x"] = int((new_location[1][0] + new_location[0][0]) / 2)
         data["coord"]["y"] = int((new_location[1][1] + new_location[0][1]) / 2)
 
-        print("get location")
         json_file = ros_command[-1]
 
         with open(json_file, "w") as file:
@@ -606,7 +599,6 @@ class Ocr:
         stdout, stderr = process.communicate()
         stdout = stdout.decode()
         stderr = stderr.decode()
-        print(stdout, stderr)
 
         # If error occured
         if len(stderr) != 0:
@@ -639,6 +631,7 @@ class Ocr:
         @param image_path       path to image
         @param increment        if true, will save the labels found to a csv file
         """
+
         total = len(image_df)
         header = ["label", "PCL Intersection", "Mesh Intersection", "image", "location"]
         f = None
@@ -715,6 +708,7 @@ class Ocr:
         @param result_path  if provided will save the labeled image to the result folder.
         @returns array of image with the labels and boundary boxes displayed
         """
+
         display_image = image.copy()
         blue = (255, 0, 0)
         red = (0, 0, 255)
