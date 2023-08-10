@@ -31,6 +31,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 # Local imports
+from config import Config
 from model import get_model
 
 
@@ -55,11 +56,8 @@ def main(dataset_path: str, output_path: str, weights_path: str):
 
     torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    # our dataset has two classes (background, plus keypoint; all keypoints are the same right now)
-    num_classes = 2
-
     # get the trained model
-    model = get_model(num_classes, weights_path=weights_path)
+    model = get_model(num_classes=Config.num_classes, model_name=Config.model_name, weights_path=weights_path)
     model.eval()
 
     # inference on images

@@ -27,7 +27,7 @@
 
 int main(int argc, const char* argv[]) {
   if (argc != 3) {
-    std::cerr << "usage: libtorch_frcnn_test <path-to-exported-script-module> <path-to-input-image>\n";
+    std::cerr << "usage: libtorch_cnn_test <path-to-exported-script-module> <path-to-input-image>\n";
     return -1;
   }
 

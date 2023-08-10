@@ -11,6 +11,7 @@ import torch
 import tqdm
 
 # Local imports
+from config import Config
 from dataset import KeypointsDataset
 from model import get_model
 
@@ -22,29 +23,6 @@ def main(
         output_path: str, 
         output_label: Optional[str] = None, 
         init_weights_path: Optional[str] = None):
-    
-    # =========================================================================
-    # Hyperparameters
-    # =========================================================================
-
-    # training dataset
-    bbox_size = 3
-
-    # data loading
-    batch_size = 2
-    num_workers = 4
-
-    # optimizer
-    learning_rate = 0.0001
-    momentum = 0.9
-    weight_decay = 0.0005
-
-    # learning rate scheduling
-    warmup_factor = 1.0 / 1000
-    warmup_iters = 1000
-
-    # checkpointing
-    checkpoint_interval = 10
 
     # =========================================================================
     # set up for training
@@ -53,10 +31,10 @@ def main(
     # use gpu if available
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    # 100% training for now
+    # TODO: 100% training for now, no validation (validation metrics not even implemented)
     
     # prepare dataset
-    dataset_train = KeypointsDataset(dataset_path, is_train=True, bbox_size=bbox_size)
+    dataset_train = KeypointsDataset(dataset_path, is_train=True, bbox_size=Config.bbox_size)
     # indices = torch.randperm(len(dataset_train)).tolist()
     # cutoff = int(len(dataset_train) * 0.8)
     # dataset_train = torch.utils.data.Subset(dataset_train, indices[:cutoff])
@@ -68,9 +46,9 @@ def main(
         return tuple(zip(*batch))
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
-        batch_size=batch_size,
+        batch_size=Config.batch_size,
         shuffle=True,
-        num_workers=num_workers,
+        num_workers=Config.num_workers,
         collate_fn=collate_fn,
     )
     # data_loader_test = torch.utils.data.DataLoader(
@@ -81,30 +59,26 @@ def main(
     #     collate_fn=collate_fn,
     # )
 
-    # our dataset has two classes (background, plus keypoint; all keypoints are the same right now)
-    num_classes = 2
-
     # construct the model and move to device
-    model = get_model(num_classes, weights_path=init_weights_path)
+    model = get_model(num_classes=Config.num_classes, model_name=Config.model_name, weights_path=init_weights_path)
     model.to(device)
 
     # construct an optimizer and learning rate scheduler
-    # TODO Why not try Adam? Also I have no idea why any of these hyperparameters were selected
     optimizer_params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(  
         optimizer_params,
-        lr=learning_rate,
-        momentum=momentum,
-        weight_decay=weight_decay,
+        lr=Config.learning_rate,
+        momentum=Config.momentum,
+        weight_decay=Config.weight_decay,
     )
 
     # construct learning rate schedulers
-    warmup_iters = min(warmup_iters, len(data_loader_train) - 1)
+    warmup_iters = min(Config.warmup_iters, len(data_loader_train) - 1)
     def warmup_function(x):
         if x >= warmup_iters:
             return 1
         alpha = float(x) / warmup_iters
-        return warmup_factor * (1 - alpha) + alpha
+        return Config.warmup_factor * (1 - alpha) + alpha
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_function)
 
     # =========================================================================
@@ -132,7 +106,7 @@ def main(
                 lr_scheduler.step()
 
         # save checkpoints
-        if ((epoch + 1) % checkpoint_interval == 0) or (epoch == (n_epochs - 1)):
+        if (epoch == 0) or ((epoch + 1) % Config.checkpoint_interval == 0) or (epoch == (n_epochs - 1)):
             checkpoint_path = os.path.join(output_path, f"{'unlabelled' if output_label is None else output_label}_ckpt_{epoch}.pth")
             print(f"---- Saving checkpoint to: '{checkpoint_path}' ----")
             torch.save(model.state_dict(), checkpoint_path)

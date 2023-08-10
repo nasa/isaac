@@ -1,6 +1,6 @@
 # Overview
 
-This tool is intended to test the TorchScript compiled model created using the `pytorch_frcnn_training` tool. Much more importantly, it provides documentation on how code that depends on `libtorch` and `libtorchvision` can be cross-compiled and installed on Astrobee. The below procedures are not particularly elegant or clean, but they work.
+This tool is intended to test the TorchScript compiled model created using the `pytorch_cnn_training` tool. Much more importantly, it provides documentation on how code that depends on `libtorch` and `libtorchvision` can be cross-compiled and installed on Astrobee. The below procedures are not particularly elegant or clean, but they work.
 
 # Building and running this tool locally
 
