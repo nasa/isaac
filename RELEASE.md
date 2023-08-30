@@ -1,5 +1,9 @@
 # Releases
 
+## Release 0.2.55
+
+  * Make it compatible with 0.17.0
+
 ## Release 0.2.6
 
   * Upgrades on inspection tool

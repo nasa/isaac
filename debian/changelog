@@ -1,3 +1,9 @@
+isaac (0.2.55) testing; urgency=medium
+
+  * Make it compatible with 0.17.0
+
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Tue, 29 Aug 2023 17:14:48 -0700
+
 isaac (0.2.6) testing; urgency=medium
 
   * Upgrades on inspection tool
