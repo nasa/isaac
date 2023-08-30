@@ -29,7 +29,7 @@
 #include <Eigen/Core>
 
 // Astrobee includes
-#include <ff_common/ff_names.h>
+#include <ff_util/ff_names.h>
 #include <ff_common/utils.h>
 #include <camera/camera_model.h>
 #include <config_reader/config_reader.h>

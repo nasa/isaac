@@ -25,7 +25,7 @@
 
 // Shared project includes
 #include <ff_util/ff_action.h>
-#include <ff_common/ff_names.h>
+#include <ff_util/ff_names.h>
 #include <isaac_util/isaac_names.h>
 
 // Messages
