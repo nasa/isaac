@@ -298,9 +298,6 @@
                 (at start (not (robot-order ?robot ?old-order)))
                 (at end (robot-order ?robot ?order))
 
-                ;; Mark success
-                (at end (completed-stereo ?robot ?order ?from ?to ?run-number))
-
                 ;; Grab and release reserved locations.
                 (at start (robot-reserves ?robot ?to))
                 (at end (not (robot-reserves ?robot ?from)))
