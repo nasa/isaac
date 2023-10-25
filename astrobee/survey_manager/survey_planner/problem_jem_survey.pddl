@@ -274,8 +274,9 @@
         (robot-at bumble berth1)
         (robot-at honey berth2)
 
-        (robot-reserves bumble berth1)
-        (robot-reserves honey berth2)
+        ;; Robots currently can't move into these spaces because they are occupied.
+        (location-reserved berth1)
+        (location-reserved berth2)
 
         (robot-order bumble o-init)
         (robot-order honey o-init)

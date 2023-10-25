@@ -44,11 +44,11 @@
         ;; motion actions).
         (robot-at ?robot - robot ?location - location)
 
-        ;; robot-reserves: Indicates that a robot may be occupying this location and it's not safe
-        ;; for other robots to have a conflicting reservation (robots can't reserve the same
+        ;; location-reserved: Indicates that a robot may be occupying this location and it's not
+        ;; safe for other robots to have a conflicting reservation (robots can't reserve the same
         ;; location and can't reserve adjacent bays while flying). In the initial state, the robot
-        ;; must assert a robot-reserves predicate for its starting location as well as robot-at.
-        (robot-reserves ?robot - robot ?location - location)
+        ;; must assert a location-reserved predicate for its starting location as well as robot-at.
+        (location-reserved ?location - location)
 
         ;; robot-order: Indicates the order of the last action executed by ?robot. Later actions
         ;; must not have a lower order. Each robot must have order o-init in the initial state, and
@@ -92,20 +92,7 @@
                 (at start (dock-connected ?approach ?berth))
 
                 ;; Check collision avoidance
-                (over all
-                    (forall (?other_robot - robot)
-                        (or
-                            (= ?robot ?other_robot)  ;; Exclude this robot from check
-                            (forall (?location - location)
-                                (not
-                                    ;; Check for potential collision with ?other_robot at ?location
-                                    (and
-                                        (robot-reserves ?other_robot ?location)
-                                        (or
-                                            (= ?location ?approach)
-                                            (= ?location ?berth)
-                                            ;; Keep one bay margin between robots
-                                            (move-connected ?location ?approach))))))))
+                (at start (not (location-reserved ?berth)))
             )
         :effect
             (and
@@ -114,8 +101,8 @@
                 (at end (robot-available ?robot))
 
                 ;; Grab and release reserved locations
-                (at start (robot-reserves ?robot ?berth))
-                (at end (not (robot-reserves ?robot ?approach)))
+                (at start (location-reserved ?berth))
+                (at end (not (location-reserved ?approach)))
 
                 ;; Update robot location
                 (at start (not (robot-at ?robot ?approach)))
@@ -136,20 +123,13 @@
                 (at start (dock-connected ?approach ?berth))
 
                 ;; Check collision avoidance
-                (over all
-                    (forall (?other_robot - robot)
-                        (or
-                            (= ?robot ?other_robot)  ;; Exclude this robot from check
-                            (forall (?location - location)
-                                (not
-                                    ;; Check for potential collision with ?other_robot at ?location
-                                    (and
-                                        (robot-reserves ?other_robot ?location)
-                                        (or
-                                            (= ?location ?berth)
-                                            (= ?location ?approach)
-                                            ;; Keep one bay margin between robots
-                                            (move-connected ?location ?approach))))))))
+                (at start (not (location-reserved ?approach)))
+                (at start
+                    (forall (?nearby - location)
+                        (not
+                            (and
+                                (location-reserved ?nearby)
+                                (move-connected ?nearby ?approach)))))
             )
         :effect
             (and
@@ -158,8 +138,8 @@
                 (at end (robot-available ?robot))
 
                 ;; Grab and release reserved locations
-                (at start (robot-reserves ?robot ?approach))
-                (at end (not (robot-reserves ?robot ?berth)))
+                (at start (location-reserved ?approach))
+                (at end (not (location-reserved ?berth)))
 
                 ;; Update robot location
                 (at start (not (robot-at ?robot ?berth)))
@@ -180,21 +160,13 @@
                 (at start (move-connected ?from ?to))
 
                 ;; Check collision avoidance
-                (over all
-                    (forall (?other_robot - robot)
-                        (or
-                            (= ?robot ?other_robot)  ;; Exclude this robot from check
-                            (forall (?location - location)
-                                (not
-                                    ;; Check for potential collision with ?other_robot at ?location
-                                    (and
-                                        (robot-reserves ?other_robot ?location)
-                                        (or
-                                            (= ?location ?from)
-                                            (= ?location ?to)
-                                            ;; Keep one bay margin between robots
-                                            (move-connected ?location ?from)
-                                            (move-connected ?location ?to))))))))
+                (at start (not (location-reserved ?to)))
+                (at start
+                    (forall (?nearby - location)
+                        (not
+                            (and
+                                (location-reserved ?nearby)
+                                (move-connected ?nearby ?to)))))
             )
         :effect
             (and
@@ -203,8 +175,8 @@
                 (at end (robot-available ?robot))
 
                 ;; Grab and release reserved locations
-                (at start (robot-reserves ?robot ?to))
-                (at end (not (robot-reserves ?robot ?from)))
+                (at start (location-reserved ?to))
+                (at end (not (location-reserved ?from)))
 
                 ;; Update robot location
                 (at start (not (robot-at ?robot ?from)))
@@ -269,24 +241,15 @@
                 ;; Check parameters make sense
                 (at start (robot-at ?robot ?from))
 
-                ;; Check collision avoidance (note we only reserve the locations ?from
-                ;; and ?to... this may be ok if they always bracket the bays included
-                ;; in the survey)
-                (over all
-                    (forall (?other_robot - robot)
-                        (or
-                            (= ?robot ?other_robot)  ;; Exclude this robot from check
-                            (forall (?location - location)
-                                (not
-                                    ;; Check for potential collision with ?other_robot at ?location
-                                    (and
-                                        (robot-reserves ?other_robot ?location)
-                                        (or
-                                            (= ?location ?from)
-                                            (= ?location ?to)
-                                            ;; Keep one bay margin between robots
-                                            (move-connected ?location ?from)
-                                            (move-connected ?location ?to))))))))
+                ;; Check collision avoidance (note we only check/reserve the locations ?from and
+                ;; ?to... this may be ok if they always bracket the bays included in the survey)
+                (at start (not (location-reserved ?to)))
+                (at start
+                    (forall (?nearby - location)
+                        (not
+                            (and
+                                (location-reserved ?nearby)
+                                (move-connected ?nearby ?to)))))
             )
         :effect
             (and
@@ -298,9 +261,9 @@
                 (at start (not (robot-order ?robot ?old-order)))
                 (at end (robot-order ?robot ?order))
 
-                ;; Grab and release reserved locations.
-                (at start (robot-reserves ?robot ?to))
-                (at end (not (robot-reserves ?robot ?from)))
+                ;; Grab and release reserved locations
+                (at start (location-reserved ?to))
+                (at end (not (location-reserved ?from)))
 
                 ;; Update robot location
                 (at start (not (robot-at ?robot ?from)))
