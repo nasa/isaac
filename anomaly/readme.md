@@ -9,3 +9,4 @@ Anomaly Detectors
 \subpage image_anomaly
 \subpage volumetric_anomaly
 \subpage str_anomaly
+\subpage gmm

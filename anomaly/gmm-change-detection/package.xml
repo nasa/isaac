@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>gmm</name>
+  <version>0.0.0</version>
+  <description>GMM Change Detection package</description>
+  <license>
+    Apache License, Version 2.0
+  </license>
+  <author email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </author>
+  <maintainer email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <exec_depend>roscpp</exec_depend>
+</package>
