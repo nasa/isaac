@@ -242,8 +242,6 @@
                 (at start (robot-available ?robot))
 
                 ;; Check order
-                ;(at start (robot-order ?robot ?old-order))
-                ;(at start (order-before ?old-order ?order))
                 (at start (< (robot-order ?robot) (order-identity ?order)))
 
                 ;; Check parameters make sense
@@ -256,8 +254,6 @@
                 (at end (robot-available ?robot))
 
                 ;; Update order
-                ;(at start (not (robot-order ?robot ?old-order)))
-                ;(at end (robot-order ?robot ?order))
                 (at end (assign (robot-order ?robot) (order-identity ?order)))
 
                 ;; Mark success
