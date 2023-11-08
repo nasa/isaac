@@ -91,35 +91,35 @@ $(document).ready(function(){initNavTree('demos_native.html',''); initResizable(
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>To run demos using docker containers, please see <a class="el" href="docker.html">Docker Install</a>. There you'll find instructions on how to run the containers and available demos.</p>
-<h1><a class="anchor" id="autotoc_md21"></a>
+<h1><a class="anchor" id="autotoc_md22"></a>
 Starting ISAAC FSW</h1>
 <pre class="fragment">roslaunch isaac sim.launch dds:=false robot:=sim_pub rviz:=true
-</pre><h1><a class="anchor" id="autotoc_md22"></a>
+</pre><h1><a class="anchor" id="autotoc_md23"></a>
 Native Demos</h1>
-<h2><a class="anchor" id="autotoc_md23"></a>
+<h2><a class="anchor" id="autotoc_md24"></a>
 Inspection Demos</h2>
 <p>The inspection node facilitates the robot to take inspect its surroundings, there are multiple modes to do so. If the robot is not already undocked, it will do so when the inspection command is executed. There are many costuymization options available to the inspection tool, so please check the help output with: </p><pre class="fragment">rosrun inspection inspection_tool -help
-</pre><h3><a class="anchor" id="autotoc_md24"></a>
+</pre><h3><a class="anchor" id="autotoc_md25"></a>
 Anomaly</h3>
 <p>Used to take a close-up picture of an area and analyses it with the image anomaly detection node: </p><pre class="fragment">rosrun inspection inspection_tool -anomaly
 </pre><p>The robot will inspect the target defined in astrobee/behaviors/inspection/resources/inspection_iss.txt by default, which is a vent on entry of the JEM, bay1. The robot will generate the survey, go to the inspection point and take a picture with the sci camera. The incoming picture will be analysed by the image anomaly detector. In this case it will report back whether the analysed vent is free or obstructed. Note: if the image anomaly detector was not launched with the fsw, then it will only take the picture and skip the analysis.</p>
 <p>Options include: target_distance (desired distance to target); target_size_x (target size x - width); target_size_y (target size y - height)</p>
-<h3><a class="anchor" id="autotoc_md25"></a>
+<h3><a class="anchor" id="autotoc_md26"></a>
 Geometry</h3>
 <p>Used to create a geometric model of an area (3D model with texture). Takes pictures at all the locations specified in the survey plan. </p><pre class="fragment">rosrun inspection inspection_tool -geometry
 </pre><p>The robot will inspect the target defined in astrobee/behaviors/inspection/resources/geometry_iss.txt by default, which corresponds to the bay 5 in the JEM. The robot will go to all locations, and after stable stationkeep, will take a sci camera image. When the image is confirmed to have been received the robot moves forward to another station.</p>
 <p>For instructions on how to analysed the abtained data recorded in a bagfile, go to <a class="el" href="geometric_streaming_mapper.html">Geometry mapper and streaming mapper</a>.</p>
-<h3><a class="anchor" id="autotoc_md26"></a>
+<h3><a class="anchor" id="autotoc_md27"></a>
 Volumetric</h3>
 <p>Used to create a volumetric model of a given signal. </p><pre class="fragment">rosrun inspection inspection_tool -volumetric
 </pre><p>The robot will inspect the target defined in astrobee/behaviors/inspection/resources/volumetric_iss.txt by default, which corresponds to going around the JEM module. The robot stops at each station and then continue to the next.</p>
 <p>To learn more about how to process this data, consult <a class="el" href="volumetric_mapper.html">Volumetric Mapper</a>. Data types that can be scoped though this method are signals such as wifi signal strength and RFID tags.</p>
-<h3><a class="anchor" id="autotoc_md27"></a>
+<h3><a class="anchor" id="autotoc_md28"></a>
 Panorama</h3>
 <p>Used to take pictures of a certain location that can be stitched into a panorama. </p><pre class="fragment">rosrun inspection inspection_tool -panorama
 </pre><p>The robot will take pictures with the camera centered at the location defined in the survey file in astrobee/behaviors/inspection/resources/panorama_iss.txt. The inspection node generates the survey given the parameters provided or derived from the camera model, therefore the pose specified in the survey file is the panorama center and not each station coordinate. The robot will take pictures at each generated station similarly to the geometry mode.</p>
 <p>Options include: h_fov (camera horizontal fov, default -1 uses camera matrix); max_angle (maximum angle (deg) to target); max_distance (maximum distance to target); min_distance (minimum distance to target); overlap (overlap between images); pan_max (maximum pan); pan_min (minimum pan).</p>
-<h2><a class="anchor" id="autotoc_md28"></a>
+<h2><a class="anchor" id="autotoc_md29"></a>
 Cargo Transport</h2>
 <p>In simulation, it is possible to perform cargo transfer using Astrobee. To do so you will tave to spawn the cargo at a certain location, and send the commands to pick up and drop the cargo.</p>
 <p>To spawn a cargo: </p><pre class="fragment">roslaunch isaac_gazebo spawn_object.launch spawn:=cargo pose:="11.3 -5.6 5.7 -0.707 0 0 0.707" name:=CTB_05_1070

@@ -40,7 +40,8 @@ var NAVTREE =
       [ "Building the code", "md_INSTALL.html#autotoc_md9", null ],
       [ "Cross-compiling isaac (NASA only)", "md_INSTALL.html#autotoc_md10", null ],
       [ "Install the code on the robot (NASA only)", "md_INSTALL.html#autotoc_md11", null ],
-      [ "Build ISAAC debian (NASA only)", "md_INSTALL.html#autotoc_md12", null ]
+      [ "Build ISAAC debian (NASA only)", "md_INSTALL.html#autotoc_md12", null ],
+      [ "Switching build profiles", "md_INSTALL.html#autotoc_md13", null ]
     ] ],
     [ "Docker Install", "docker.html", null ],
     [ "Subsystems", "subsystems.html", "subsystems" ],

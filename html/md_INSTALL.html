@@ -96,44 +96,51 @@ Machine setup</h1>
 </pre><p><em>Note: You will need 4 GBs of RAM to compile the software. If you don't have that much RAM available, please use swap space.</em></p>
 <p><em>Note: Please ensure you install Ubuntu 16.04, 18.04 or 20.04. At this time we do not support any other operating system or Ubuntu versions.</em></p>
 <p><em>Note: Please ensure you install the 64-bit version of Ubuntu. We do not support running ISAAC Software on 32-bit systems.</em></p>
-<p><b>The <code>isaac</code> repo depends on some <code>astrobee</code> packages, therefore, <code>astrobee</code> needs to be installed beforehand.</b></p>
+<p><b>The <code>isaac</code> repo depends on some <code>astrobee</code> packages, therefore, <code>astrobee</code> needs to be installed beforehand.</b> See the <a href="https://nasa.github.io/astrobee/html/md_INSTALL.html">Astrobee Robot Software Installation Instructions</a> for detailed setup instructions.</p>
 <h1><a class="anchor" id="autotoc_md6"></a>
 Checkout the project source code</h1>
-<p>At this point you need to decide where you'd like to put the ISAAC workspace and code (<code>ISAAC_WS</code>) on your machine (add this to your .bashrc for persistency): </p><pre class="fragment">export ISAAC_WS=$HOME/isaac
-</pre><p>First, clone the flight software repository: </p><pre class="fragment">git clone --recursive https://github.com/nasa/isaac.git \
---branch develop $ISAAC_WS/src/
-</pre><p>Checkout the submodule: </p><pre class="fragment">git submodule update --init --recursive
+<p>At this point you need to decide where you'd like to put the ISAAC workspace and code (<code>ISAAC_WS</code>) on your machine, add this to your <code>.bashrc</code> or <code>.zshrc</code> for persistence: </p><pre class="fragment">export ISAAC_WS=$HOME/isaac
+</pre><p>First, clone the flight software repository: </p><pre class="fragment">git clone --recursive https://github.com/nasa/isaac.git --branch develop $ISAAC_WS/src
+</pre><p>Checkout the submodule: </p><pre class="fragment">pushd $ISAAC_WS/src
+git submodule update --init --recursive
+popd
 </pre><h1><a class="anchor" id="autotoc_md7"></a>
 Dependencies</h1>
 <p>Next, install all required dependencies: <em>Note: <code>root</code> access is necessary to install the packages below</em> <em>Note: Before running this please ensure that your system is completely updated by running 'sudo apt-get update' and then 'sudo apt-get upgrade'</em></p>
-<p>pushd $ISAAC_WS/src cd scripts/setup ./install_desktop_packages.sh ./build_install_dependencies.sh sudo rosdep init rosdep update popd</p>
+<p>pushd $ISAAC_WS/src/scripts/setup ./install_desktop_packages.sh ./build_install_dependencies.sh sudo rosdep init rosdep update popd</p>
 <h1><a class="anchor" id="autotoc_md8"></a>
 Configuring the build</h1>
-<p>By default, the catkin uses the following paths:</p><ul>
-<li>devel build path: <code>$ISAAC_WS/devel</code></li>
-<li>install build path: <code>$ISAAC_WS/install</code></li>
-</ul>
-<h1><a class="anchor" id="autotoc_md9"></a>
-Building the code</h1>
 <p>Source your astrobee build environment, for example as: </p><pre class="fragment">source $ASTROBEE_WS/devel/setup.bash
-</pre><p>The configure script prepares your build directory for compiling the code. Note that <code>configure.sh</code> is simply a wrapper around CMake that provides an easy way of turning on and off options. To see which options are supported, simply run <code>configure.sh -h</code>. </p><pre class="fragment">pushd $ASTROBEE_WS
+</pre><p>The configure script prepares your build directory for compiling the code. Note that <code>configure.sh</code> is simply a wrapper around CMake that provides an easy way of turning on and off options. To see which options are supported, simply run <code>configure.sh -h</code>. </p><pre class="fragment">pushd $ISAAC_WS
 ./src/scripts/configure.sh -l
 source ~/.bashrc
 popd
-</pre><p>The configure script modifies your <code>.bashrc</code> to source <code>setup.bash</code> for the current ROS distribution and to set CMAKE_PREFIX_PATH. It is suggested to examine it and see if all changes were made correctly.</p>
-<p>If you want to explicitly specify the workspace and/or install directories, use instead: </p><pre class="fragment">./scripts/configure.sh -l -p $INSTALL_PATH -w $WORKSPACE_PATH
-</pre><p><em>Note: If a workspace is specified but not an explicit install distectory, install location will be $WORKSPACE_PATH/install.</em></p>
-<p>To build, run <code>catkin build</code> in the <code>$WORKSPACE_PATH</code>. Note that depending on your host machine, this might take in the order of tens of minutes to complete the first time round. Future builds will be faster, as only changes to the code are rebuilt, and not the entire code base. </p><pre class="fragment">pushd $ASTROBEE_WS
+</pre><p>If you run a Zsh session, then </p><pre class="fragment">pushd $ISAAC_WS
+./src/scripts/configure.sh -l
+source ~/.zshrc
+popd
+</pre><p>By default, the catkin uses the following paths:</p><ul>
+<li>devel build path: <code>$ISAAC_WS/devel</code></li>
+<li>install build path: <code>$ISAAC_WS/install</code> If you want to explicitly specify the workspace and/or install directories, set <code>$WORKSPACE_PATH</code> and <code>$INSTALL_PATH</code> to the desired paths and use the <code>-p</code> ad <code>-w</code> flags as shown: <pre class="fragment">$ISAAC_WS/src/scripts/configure.sh -l -p $INSTALL_PATH -w $WORKSPACE_PATH
+</pre></li>
+</ul>
+<p><em>Note: If a workspace is specified but not an explicit install directory, install location will be $WORKSPACE_PATH/install.</em></p>
+<p>The configure script modifies your <code>.bashrc</code>/<code>.zshrc</code> to source <code>setup.bash</code>/<code>setup.zsh</code> for the current ROS distribution and to set CMAKE_PREFIX_PATH. It is suggested to examine it and see if all changes were made correctly.</p>
+<h1><a class="anchor" id="autotoc_md9"></a>
+Building the code</h1>
+<p>To build, run <code>catkin build</code> in the <code>$WORKSPACE_PATH</code>. Note that depending on your host machine, this might take in the order of tens of minutes to complete the first time round. Future builds will be faster, as only changes to the code are rebuilt, and not the entire code base. </p><pre class="fragment">pushd $ISAAC_WS
 catkin build
 popd
 </pre><p>If you are working in simulation only, then you're all done! The next steps are only for running ISAAC onboard Astrobee.</p>
 <h1><a class="anchor" id="autotoc_md10"></a>
 Cross-compiling isaac (NASA only)</h1>
-<p>To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that <code>ASTROBEE_WS</code> must be defined!!!</p>
+<p>To cross-compile ISAAC, one must first cross compile the astobee code using the NASA_INSTALL instructions. Note that <code>ASTROBEE_WS</code> and <code>ARMHF_CHROOT_DIR</code> must be defined!</p>
 <p>Cross compiling for the robot follows the same process, except the configure script takes a <code>-a</code> flag instead of <code>-l</code>. </p><pre class="fragment">pushd $ISAAC_WS
 ./src/scripts/configure.sh -a
 popd
-</pre><p>Or with explicit build and install paths: </p><pre class="fragment">./scripts/configure.sh -a -p $INSTALL_PATH -w $WORKSPACE_PATH
+</pre><p>Or with explicit build and install paths: </p><pre class="fragment">pushd $ISAAC_WS
+./src/scripts/configure.sh -a -p $INSTALL_PATH -w $WORKSPACE_PATH
+popd
 </pre><p><em>Warning: <code>$INSTALL_PATH</code> and <code>$WORKSPACE_PATH</code> used for cross compiling HAVE to be different than the paths for native build! See above for the default values for these.</em></p>
 <p>Once the code has been built, it also installs the code to a singular location. CMake remembers what <code>$INSTALL_PATH</code> you specified, and will copy all products into this directory.</p>
 <h1><a class="anchor" id="autotoc_md11"></a>
@@ -144,7 +151,13 @@ popd
 </pre><p>Here, p4d is the name of the robot, which may be different in your case.</p>
 <h1><a class="anchor" id="autotoc_md12"></a>
 Build ISAAC debian (NASA only)</h1>
-<p>To build a debian you must first confirm that cross-compiling is functional. Once it is: </p><pre class="fragment">./src/scripts/build/build_debian.sh
+<p>To build a debian you must first confirm that cross-compiling is functional. Once it is: </p><pre class="fragment">pushd $ISAAC_WS
+./src/scripts/build/build_debian.sh
+popd
+</pre><h1><a class="anchor" id="autotoc_md13"></a>
+Switching build profiles</h1>
+<p>To alternate between native and armhf (cross-compile) profiles: </p><pre class="fragment">catkin profile set native
+catkin profile set armhf
 </pre> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

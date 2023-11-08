@@ -91,7 +91,7 @@ $(document).ready(function(){initNavTree('pano_coverage.html',''); initResizable
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>A panorama coverage plan is a sequence of image center pan/tilt values. The objective of panorama coverage planning is to generate a plan that completely covers the specified range of pan/tilt values with sufficient image-to-image overlap to permit downstream processing (e.g., Hugin panorama stitching), and is sufficiently robust to attitude error. Within those constraints, we want to optimize the plan for minimum image count, as a proxy for minimum run time.</p>
-<h1><a class="anchor" id="autotoc_md56"></a>
+<h1><a class="anchor" id="autotoc_md57"></a>
 Relevant files</h1>
 <ul>
 <li><a href="./scripts/pano_orientations.py">pano_orientations.py</a>: This was the initial reference implementation of a panorama planner. It has been superseded by improvements in the C++ code and may eventually go away.</li>
@@ -101,7 +101,7 @@ Relevant files</h1>
 <li><a href="./scripts/plot_pano.py">plot_pano.py</a>: A script that checks the output of the <code>test_pano</code> tool and produces plots for debugging.</li>
 <li><a href="./scripts/field_of_view_calculator.py">field_of_view_calculator.py</a>: A script to calculate the field of view for various Astrobee cameras.</li>
 </ul>
-<h1><a class="anchor" id="autotoc_md57"></a>
+<h1><a class="anchor" id="autotoc_md58"></a>
 Panorama design approach</h1>
 <p>Panorama planning starts from the concept of a rectangular grid of image centers, evenly spaced so as to completely cover the specified (rectangular) imaging area with the desired overlap and attitude tolerance.</p>
 <p>The collection order of images in the grid follows a column-major raster pattern: alternating columns are collected top-to-bottom and bottom-to-top. Column-major is preferred because it makes it easier for crew to stay behind the robot during panorama collection, if they care to do so. Following an alternating raster pattern minimizes large attitude changes that are challenging for Astrobee localization.</p>
@@ -114,10 +114,10 @@ Panorama design approach</h1>
 </table>
 <p>The primary effect of the warping is to make the effective image coverage wider near the poles. We take advantage of this effect by reducing the number of images in grid rows near the poles. A downside of reducing the image count is that the images no longer form a grid, so the column-major raster sequencing is only approximate (Fig. 2).</p>
 <p>A secondary effect of the warping is that it complicates determining how to position the warped rectangles of individual image coverage so that together they cover the boundaries of the rectangular desired imaging area. As a result, although the panorama planner's simple heuristic image spacing algorithm tries to meet the coverage and overlap requirements, it can <em>not</em> guarantee they are satisfied in general. Instead, you are encouraged to use the <code>test_pano</code> tool and <code>plot_pano.py</code> script together to check correctness, and if there is a problem, inflate the <code>plan_attitude_tolerance_degrees</code> parameter (used by the <code>test_pano</code> tool at planning time) while leaving unchanged the <code>test_attitude_tolerance_degrees</code> parameter (used by the <code>plot_pano.py</code> tool at testing time), until the problem is corrected.</p>
-<h1><a class="anchor" id="autotoc_md58"></a>
+<h1><a class="anchor" id="autotoc_md59"></a>
 ISAAC panorama survey parameters</h1>
 <p>There are different styles of panorama that could be useful for different applications.</p>
-<h2><a class="anchor" id="autotoc_md59"></a>
+<h2><a class="anchor" id="autotoc_md60"></a>
 &lt;tt&gt;5_mapper_and_hugin&lt;/tt&gt;</h2>
 <p>The parameters in this test case are recommended as a potential "workhorse" panorama type for doing complete module surveys. The design criteria were:</p>
 <ol type="1">
@@ -134,15 +134,15 @@ ISAAC panorama survey parameters</h1>
 <tr class="markdownTableRowOdd">
 <td class="markdownTableBodyCenter">Figure 2: <code>5_mapper_and_hugin</code> sequence   </td></tr>
 </table>
-<h2><a class="anchor" id="autotoc_md60"></a>
+<h2><a class="anchor" id="autotoc_md61"></a>
 &lt;tt&gt;4_mapper&lt;/tt&gt;</h2>
 <p>This test case examines the scenario of relaxing the Hugin auto-stitch requirement #2 above. In that case, requirement #5 becomes the driving requirement. Because the panorama motion is vertical and HazCam images are acquired continuously at ~5 Hz, the HazCam vertical spacing is not a driving constraint, even though the HazCam has a smaller FOV than the SciCam. As a result, we specify the VFOV from the SciCam, the HFOV from the the HazCam, and as a bit of a hack, we pad the tilt radius slightly to make doubly sure the HazCam gets complete coverage near the poles, despite its smaller VFOV.</p>
 <p>The resulting panorama plan has far fewer images than <code>5_mapper_and_hugin</code>, 30 vs. 56, which is attractive. The downsides are that it may not be compatible with Hugin auto-stitch (although it may be feasible to pass pan/tilt parameters from NavCam bundle adjustment to Hugin instead), and probably more importantly, it would be less robust to excessive robot pointing error. If time permits, it might be useful to try to capture a panorama in this more aggressive mode to evaluate whether the data is sufficient for downstream analysis.</p>
-<h2><a class="anchor" id="autotoc_md61"></a>
+<h2><a class="anchor" id="autotoc_md62"></a>
 &lt;tt&gt;6_nav_hugin&lt;/tt&gt;</h2>
 <p>This test case examines the scenario of relaxing both requirements #2 and #5 above, so that the NavCam overlap requirement #4 becomes the driving requirement. HazCam and SciCam coverage would be incomplete, so the geometry mapper could not build a full 3D mesh, but the resulting NavCam imagery could be used to build a low-resolution NavCam panorama with Hugin auto-stitch.</p>
 <p>The resulting panorama plan has only 15 images. This type of panorama could occasionally be suitable for a fast low-resolution survey.</p>
-<h1><a class="anchor" id="autotoc_md62"></a>
+<h1><a class="anchor" id="autotoc_md63"></a>
 Validation</h1>
 <p>The following shell commands can be used to validate the panorama planner on the test cases:</p>
 <div class="fragment"><div class="line">ISAAC_DIR=&quot;$HOME/isaac&quot;</div>
@@ -157,7 +157,7 @@ Validation</h1>
 </ul>
 <p>As of this writing, all test cases in <code>pano_test_cases.csv</code> pass with the <code>pano_orientations2()</code> planner.</p>
 <p>During the validation process, <code>plot_pano.py</code> also writes several plots for each test case that can be used to visualize the resulting panorama plan.</p>
-<h1><a class="anchor" id="autotoc_md63"></a>
+<h1><a class="anchor" id="autotoc_md64"></a>
 Camera field of view estimation</h1>
 <p>Modeling the field of view of a camera is complicated. The Astrobee cameras of interest for panorama planning each have a rectangular sensor and a lens with radial distortion. As a result, when the shape of the camera FOV is displayed in a standard equirectangular projection, even at tilt = 0, the FOV shape is not actually a rectangle, but instead has a curved shape with "spikes at the corners". For the purposes of panorama planning, the radial distortion effect is very significant for the NavCam, somewhat significant for the HazCam, and almost negligible for the SciCam.</p>
 <p>The true camera FOV shape is both complicated to calculate and difficult to use for panorama planning purposes. As a result, our tools model the FOV as a simplified rectangle. In particular, the rectangle dimensions we use, as output by <code>field_of_view_calculator.py</code>, are an estimate of the inscribed rectangle, i.e., the largest (axis-aligned) rectangle that fits completely within the true FOV shape. This rectangular approximate FOV is currently used both during panorama planning and validation. This is a conservative approach in that it will underestimate the true coverage and overlap in the panorama.</p>
