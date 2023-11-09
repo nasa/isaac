@@ -239,7 +239,8 @@
                 ?location - location
                 ?run-number - run-number
             )
-        :duration (= ?duration 900)  ;; 15 minutes
+        ;; ~13 minutes, per https://babelfish.arc.nasa.gov/confluence/display/FFOPS/ISAAC+Phase+1X+Activity+9+Ground+Procedure
+        :duration (= ?duration 780)
         :condition
             (and
                 ;; Check robot mutex
