@@ -22,8 +22,6 @@ import argparse
 import subprocess
 import sys
 
-
-
 command = 'rosrun inspection inspection_tool -panorama -panorama_poses /resources/panorama_iss.txt -panorama_mode "5_mapper_and_hugin"'
 
 
