@@ -69,7 +69,7 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
         order = goal["order"]
         location = goal["location"]
         run = goal["run"]
-        return f"(completed-panorama {robot} {order} {location} {run})"
+        return f"(completed-panorama {robot} o{order} {location} run{run})"
 
     if goal_type == "stereo":
         robot = goal["robot"]
@@ -79,7 +79,7 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
         traj_info = config_static["stereo"][trajectory]
         base = traj_info["base_location"]
         bound = traj_info["bound_location"]
-        return f"(completed-stereo {robot} {order} {base} {bound} {run})"
+        return f"(completed-stereo {robot} o{order} {base} {bound} run{run})"
 
     if goal_type == "robot_at":
         robot = goal["robot"]
