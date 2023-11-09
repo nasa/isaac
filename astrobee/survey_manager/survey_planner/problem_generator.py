@@ -32,9 +32,10 @@ import argparse
 import itertools
 import pathlib
 import re
-import yaml
-from typing import Any, Dict, Generator, Iterable, Sequence, T, Tuple
+import sys
+from typing import Any, Dict, Iterable, Sequence, T, Tuple
 
+import yaml
 
 GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at")
 
@@ -62,13 +63,15 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
     assert (
         goal_type in GOAL_TYPE_OPTIONS
     ), f"Expected goal type in {GOAL_TYPE_OPTIONS}, got {goal_type}"
+
     if goal_type == "panorama":
         robot = goal["robot"]
         order = goal["order"]
         location = goal["location"]
         run = goal["run"]
         return f"(completed-panorama {robot} {order} {location} {run})"
-    elif goal_type == "stereo":
+
+    if goal_type == "stereo":
         robot = goal["robot"]
         order = goal["order"]
         trajectory = goal["trajectory"]
@@ -77,11 +80,14 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
         base = traj_info["base_location"]
         bound = traj_info["bound_location"]
         return f"(completed-stereo {robot} {order} {base} {bound} {run})"
-    elif goal_type == "robot_at":
+
+    if goal_type == "robot_at":
         robot = goal["robot"]
         location = goal["location"]
         return f"(robot-at {robot} {location})"
+
     assert False, "Never reach this point"
+    return {}  # Make pylint happy
 
 
 def indent_lines(lines: Sequence[str], indent: int) -> str:
@@ -249,6 +255,7 @@ def problem_generator(
     # print(yaml.safe_dump(params, indent=4, sort_keys=False))
     filled_template = TEMPLATE_SUBST_REGEX.sub(TemplateFiller(params), problem_template)
     output_path.write_text(filled_template)
+    print(f"Wrote to {output_path}", file=sys.stderr)
 
 
 class CustomFormatter(
