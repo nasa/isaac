@@ -67,7 +67,7 @@
         ;; preconditions of the stereo action, and one of its effects is to clear the
         ;; predicate. Therefore, the planner won't waste time trying to execute stereo actions that
         ;; the user didn't explicitly request. Without this hack, the planner run time blows up.
-        (need-stereo ?robot - robot ?order - order ?from ?to - location ?run-number - run-number)
+        (need-stereo ?robot - robot ?order - order ?base ?bound - location ?run-number - run-number)
 
         ;; === Goal predicates ===
         ;; completed-panorama: The goal to add if you want the plan to include collecting a
@@ -84,13 +84,17 @@
         ;; completed-stereo: The goal to add if you want the plan to include collecting a stereo
         ;; survey. For now, goals specify ?robot and ?order parameters that constrain multi-robot
         ;; task allocation and task ordering. The ?run-number is used to indicate retries and is
-        ;; meaningless to the planner but helpful for post-run analysis. (Note that the current
-        ;; collision check only checks at the ?to location. That may be ok if ?from and ?to always
-        ;; bracket the bays included in the survey, but should be revisited otherwise.)
+        ;; meaningless to the planner but helpful for post-run analysis. The current model for
+        ;; stereo surveys assumes the robot starts and ends the survey at the same location called
+        ;; ?base (these locations only need to be same to the effective precision modeled in the
+        ;; planner, "less than a bay apart").  The ?bound argument indicates the other end of the
+        ;; interval covered by the survey and is used for collision checking. It's assumed that
+        ;; ?base and ?bound are not adjacent locations. If future stereo surveys violate these
+        ;; assumptions the model will need to be revisited.
         (completed-stereo
             ?robot - robot
             ?order - order
-            ?from ?to - location  ;; Start and end of trajectory
+            ?base ?bound - location
             ?run-number - run-number
         )
     )
@@ -266,7 +270,9 @@
             (
                 ?robot - robot
                 ?order - order
-                ?from ?to - location  ;; Start and end of the trajectory
+                ;; ?base: The bay where we start and also stop. ?bound: The other end of the survey
+                ?base ?bound - location
+                ;; ?check1 and ?check2: Planner-selected neighbors of ?bound for collision check
                 ?check1 ?check2 - location
                 ?run-number - run-number
             )
@@ -280,18 +286,18 @@
                 (at start (< (robot-order ?robot) (order-identity ?order)))
 
                 ;; Check parameters make sense
-                (at start (robot-at ?robot ?from))
-                (at start (location-real ?to))
+                (at start (robot-at ?robot ?base))
+                (at start (location-real ?bound))
 
                 ;; Check for need-stereo so the planner only tries this action when the user
                 ;; explicitly requests it.
-                (at start (need-stereo ?robot ?order ?from ?to ?run-number))
+                (at start (need-stereo ?robot ?order ?base ?bound ?run-number))
 
                 ;; Check collision avoidance
-                (at start (location-available ?to))
+                (at start (location-available ?bound))
                 (at start (locations-different ?check1 ?check2))
-                (at start (move-connected ?check1 ?to))
-                (at start (move-connected ?check2 ?to))
+                (at start (move-connected ?check1 ?bound))
+                (at start (move-connected ?check2 ?bound))
                 (at start (location-available ?check1))
                 (at start (location-available ?check2))
             )
@@ -305,19 +311,19 @@
                 (at end (assign (robot-order ?robot) (order-identity ?order)))
 
                 ;; Grab and release reserved locations
-                (at start (not (location-available ?to)))
-                (at end (location-available ?from))
+                (at start (not (location-available ?bound)))
+                (at end (location-available ?bound))
 
-                ;; Update robot location
-                (at start (not (robot-at ?robot ?from)))
-                (at end (robot-at ?robot ?to))
+                ;; Update robot location - technically correct but not really needed
+                ;(at start (not (robot-at ?robot ?base)))
+                ;(at end (robot-at ?robot ?base))
 
                 ;; Clear need-stereo so the planner won't try to use the stereo action
                 ;; again after the user request is satisfied.
-                (at end (not (need-stereo ?robot ?order ?from ?to ?run-number)))
+                (at end (not (need-stereo ?robot ?order ?base ?bound ?run-number)))
 
                 ;; Mark success
-                (at end (completed-stereo ?robot ?order ?from ?to ?run-number))
+                (at end (completed-stereo ?robot ?order ?base ?bound ?run-number))
             )
     )
 

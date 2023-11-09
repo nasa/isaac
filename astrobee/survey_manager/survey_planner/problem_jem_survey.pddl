@@ -29,7 +29,12 @@
             (completed-panorama honey o0 bay7 run1)
             (completed-panorama honey o1 bay6 run1)
             (completed-panorama honey o2 bay5 run1)
-            (completed-stereo   honey o3 bay4 bay7 run1)
+
+            ;; This is another objective we want to include that for some reason causes POPF
+            ;; to fail to generate a plan (hang indefinitely). No obvious reason why it should
+            ;; cause a problem.
+            ;(completed-stereo   honey o3 bay7 bay4 run1)
+
             (robot-at honey berth2)  ;; return to berth when done
         )
     )
@@ -160,7 +165,7 @@
         ;; These need-stereo predicates must be asserted with identical parameters to the
         ;; stereo-completed goals.  See the need-stereo docs for more.
         (need-stereo   bumble o4 bay1 bay4 run1)
-        (need-stereo   honey o3 bay4 bay7 run1)
+        (need-stereo   honey o3 bay7 bay4 run1)
 
         ;; === Static numeric fluents ===
         (= (order-identity o0) 0)
