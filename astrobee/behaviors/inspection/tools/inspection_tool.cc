@@ -185,7 +185,7 @@ geometry_msgs::PoseArray ReadPosesFile(std::string file) {
           quat_robot.setRPY(euler_roll * DEG2RAD, euler_pitch * DEG2RAD, euler_yaw * DEG2RAD);
 
         } else {
-          std::cout << "Ignoring invalid line: " << line  << std::endl;
+          // std::cout << "Ignoring invalid line: " << line  << std::endl;
           continue;
         }
       }
@@ -390,7 +390,7 @@ void ConnectedCallback(
   if (!client->IsConnected()) return;
   // Print out a status message
   std::cout << "\r                                                   "
-            << "\rState: CONNECTED" << std::flush;
+            << "\rState: CONNECTED\n" << std::flush;
   SendGoal(client);
 }
 
