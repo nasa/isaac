@@ -4,7 +4,7 @@ Native Install
 Machine setup
 ---------
 
-Install the 64-bit version of [Ubuntu 16.04, 18.04 or 20.04](http://releases.ubuntu.com/)
+Install the 64-bit version of [Ubuntu 16.04 or 20.04](http://releases.ubuntu.com/)
 on a host machine, and make sure that you can checkout and build code.
 
     sudo apt-get install build-essential git
@@ -12,7 +12,7 @@ on a host machine, and make sure that you can checkout and build code.
 *Note: You will need 4 GBs of RAM to compile the software. If you don't have
 that much RAM available, please use swap space.*
 
-*Note: Please ensure you install Ubuntu 16.04, 18.04 or 20.04. At this time we do not support
+*Note: Please ensure you install Ubuntu 16.04 or 20.04. At this time we do not support
 any other operating system or Ubuntu versions.*
 
 *Note: Please ensure you install the 64-bit version of Ubuntu. We do not

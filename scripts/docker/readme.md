@@ -21,8 +21,8 @@ If you want to build the docker images locally instead of pulling from the remot
 	./build --help
 
 The build script will automatically detect the current Ubuntu OS version and define the docker files variables
-`UBUNTU_VERSION`, `ROS_VERSION`, and `PYTHON` accordingly. If a specific version is desired, the option --xenial, --bionic,
-and --focal is used for ubuntu 16.04, 18.04, and 20.04 docker images, respectively.
+`UBUNTU_VERSION`, `ROS_VERSION`, and `PYTHON` accordingly. If a specific version is desired, the options --xenial
+and --focal are used for Ubuntu 16.04 and 20.04 docker images, respectively.
 
 If you don't want to run mast or don't have access to it (not a public repository), the use the option --no-mast.
 
@@ -41,8 +41,8 @@ To run the docker containers:
 Make sure the default paths are correct, if not configure those options. Read through the
 different optional modules to understand if it fits your purpose.
 
-It will automatically detect the current Ubuntu OS version. If a specific version is desired, the option
---xenial, --bionic, and --focal is used for ubuntu 16.04, 18.04, and 20.04 docker images, respectively.
+It will automatically detect the current Ubuntu OS version. If a specific version is desired, the options
+--xenial and --focal are used for Ubuntu 16.04 and 20.04 docker images, respectively.
 
 Once the command is executed the host location of the modules launched will be printed. Open those paths
 on your favorite browser.

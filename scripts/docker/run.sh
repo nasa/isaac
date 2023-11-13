@@ -28,7 +28,6 @@ print_help()
   echo -e "define the docker files variables UBUNTU_VERSION, ROS_VERSION, and PYTHON accordingly."
   echo -e "Options:"
   echo -e "\t-x | --xenial\t\t\tRun images for Ubuntu 16.04"
-  echo -e "\t-b | --bionic\t\t\tRun images for Ubuntu 18.04"
   echo -e "\t-f | --focal\t\t\tRun images for Ubuntu 20.04"
   echo -e "\t-i | --iui-source-dir\t\tSpecify the idi source directory to use"
   echo -e "\t\t\t\tdefault=isaac_source/../../isaac_data_interface"
@@ -77,8 +76,6 @@ while [ "$1" != "" ]; do
                                       exit
                                       ;;
         -x | --xenial )               os="xenial"
-                                      ;;
-        -b | --bionic )               os="bionic"
                                       ;;
         -f | --focal )                os="focal"
                                       ;;
@@ -135,10 +132,6 @@ fi
 if [ "$os" == "xenial" ]; then
   export UBUNTU_VERSION=16.04
   export ROS_VERSION=kinetic
-  export PYTHON=''
-elif [ "$os" == "bionic" ]; then
-  export UBUNTU_VERSION=18.04
-  export ROS_VERSION=melodic
   export PYTHON=''
 elif [ "$os" == "focal" ]; then
   export UBUNTU_VERSION=20.04
