@@ -28,27 +28,6 @@ jobs:
     - name: Build code for isaac:astrobee Ubuntu 16
       run: isaac/scripts/docker/build.sh --remote --xenial --astrobee-source-path astrobee/
 
-
-  build-bionic:
-
-    runs-on: ubuntu-20.04
-
-    steps:
-
-    - name: Checkout Astrobee
-      uses: actions/checkout@v3
-      with:
-        repository: nasa/astrobee
-        path: astrobee/
-
-    - name: Checkout ISAAC
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-        path: isaac/
-
-    - name: Build code for isaac:astrobee Ubuntu 18
-      run: isaac/scripts/docker/build.sh --remote --bionic --astrobee-source-path astrobee/
   build-focal:
 
     runs-on: ubuntu-20.04
