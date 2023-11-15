@@ -69,7 +69,7 @@ class CameraView : public camera::CameraModel  {
   // f: far clip, maximum camera distance (m)
   // n: near clip, minimum camera distance (m)
   // cam_transform: transform from body->camera, useful for offline applications where tf is not available
-  CameraView(const camera::CameraParameters & params, const float f = 2.0, const float n = 0.19,
+  CameraView(const std::string, const camera::CameraParameters & params, const float f = 2.0, const float n = 0.19,
                       const geometry_msgs::Transform::ConstPtr cam_transform = NULL);
 
 

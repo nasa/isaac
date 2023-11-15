@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
     new geometry_msgs::Transform(msg_conversions::eigen_transform_to_ros_transform(transform_body_to_cam)));
 
   camera::CameraParameters cam_params(&config, FLAGS_camera.c_str());
-  inspection::CameraView camera(cam_params, 2.0, 0.19, msg_pointer);
+  inspection::CameraView camera(FLAGS_camera.c_str(), cam_params, 2.0, 0.19, msg_pointer);
 
 
   // Extract the input list from the command-line argument
