@@ -436,8 +436,9 @@ bool Inspection::GenerateAnomalySurvey(geometry_msgs::PoseArray &points_anomaly)
     curr_camera_ = cam_name.c_str();
     if (cameras_.find(cam_name) == cameras_.end()) {
     static camera::CameraParameters cam_params(&cfg_cam_, cam_name.c_str());
-    cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
-                     std::make_tuple(cam_params, cfg_->Get<double>("max_distance"), cfg_->Get<double>("min_distance")));
+    cameras_.emplace(
+      std::piecewise_construct, std::make_tuple(cam_name),
+      std::make_tuple(cam_name, cam_params, cfg_->Get<double>("max_distance"), cfg_->Get<double>("min_distance")));
     }
 
 
@@ -523,8 +524,9 @@ bool Inspection::GeneratePanoramaSurvey(geometry_msgs::PoseArray &points_panoram
   curr_camera_ = cam_name.c_str();
   if (cameras_.find(cam_name) == cameras_.end()) {
     static camera::CameraParameters cam_params(&cfg_cam_, cam_name.c_str());
-    cameras_.emplace(std::piecewise_construct, std::make_tuple(cam_name),
-                     std::make_tuple(cam_params, cfg_->Get<double>("max_distance"), cfg_->Get<double>("min_distance")));
+    cameras_.emplace(
+      std::piecewise_construct, std::make_tuple(cam_name),
+      std::make_tuple(cam_name, cam_params, cfg_->Get<double>("max_distance"), cfg_->Get<double>("min_distance")));
   }
 
   geometry_msgs::PoseArray panorama_relative;
