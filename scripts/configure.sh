@@ -228,8 +228,6 @@ ff_path=`canonicalize ${rootpath}`
 DIST=`cat /etc/os-release | grep -oP "(?<=VERSION_CODENAME=).*"`
 if [ "$DIST" = "xenial" ]; then
     ros_version=kinetic
-elif [ "$DIST" = "bionic" ]; then
-    ros_version=melodic
 elif [ "$DIST" = "focal" ]; then
     ros_version=noetic
 fi
@@ -317,7 +315,7 @@ if [ $armhf_build == 1 ] ; then
         --install \
         --cmake-args -DARMHF_CHROOT_DIR=$ARMHF_CHROOT_DIR ${armhf_opts} ${use_ctc} ${extra_opts} \
             -DCMAKE_BUILD_TYPE=Release
-    if [ "$DIST" = "xenial" ] || [ "$DIST" = "bionic" ]; then
+    if [ "$DIST" = "xenial" ]; then
         catkin config \
         --whitelist isaac_astrobee_description isaac_util isaac_msgs inspection cargo isaac_hw_msgs wifi isaac gs_action_helper
     elif [ "$DIST" = "focal" ]; then

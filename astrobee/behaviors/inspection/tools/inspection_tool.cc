@@ -100,7 +100,7 @@ DEFINE_string(att, "", "Desired attitude in RPY format 'roll pitch yaw' (degrees
 
 // Plan files
 DEFINE_string(anomaly_poses, "/resources/inspection_iss.txt", "Vent pose list to inspect");
-DEFINE_string(geometry_poses, "/resources/survey_bay_6.txt", "Geometry poses list to map");
+DEFINE_string(geometry_poses, "/resources/geometry_iss.txt", "Geometry poses list to map");
 DEFINE_string(panorama_poses, "/resources/panorama_iss.txt", "Panorama poses list to map");
 DEFINE_string(volumetric_poses, "/resources/volumetric_iss.txt", "Wifi poses list to map");
 
