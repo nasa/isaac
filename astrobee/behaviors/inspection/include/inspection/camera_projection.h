@@ -69,9 +69,8 @@ class CameraView : public camera::CameraModel  {
   // f: far clip, maximum camera distance (m)
   // n: near clip, minimum camera distance (m)
   // cam_transform: transform from body->camera, useful for offline applications where tf is not available
-  CameraView(const std::string, const camera::CameraParameters & params, const float f = 2.0, const float n = 0.19,
-                      const geometry_msgs::Transform::ConstPtr cam_transform = NULL);
-
+  CameraView(const std::string& cam_name, const camera::CameraParameters& params, const float f = 2.0,
+             const float n = 0.19, const geometry_msgs::Transform::ConstPtr cam_transform = NULL);
 
   // Gets the points x y where the point is in the image. If outside the image, then it will return false
   // If the robot pose is not specified, it's considered to be the current one

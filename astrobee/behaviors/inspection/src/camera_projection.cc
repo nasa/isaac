@@ -34,9 +34,11 @@ namespace inspection {
   the camera frame and the other way around. It automatically reads the camera parameters
   from the config files based on the camera name, such that no setup is necessary.
 */
-CameraView::CameraView(const std::string cam_name, const camera::CameraParameters& params, const float f, const float n,
-                       const geometry_msgs::Transform::ConstPtr cam_transform)
+CameraView::CameraView(const std::string& cam_name, const camera::CameraParameters& params, const float f,
+                       const float n, const geometry_msgs::Transform::ConstPtr cam_transform)
     : cam_name_(cam_name), camera::CameraModel(params), f_(f), n_(n) {
+  cfg_cam_.AddFile("cameras.config");
+  if (!cfg_cam_.ReadFiles()) ROS_FATAL("Failed to read config files.");
   // Get relative camera position
   if (cam_transform == NULL) {
     // Create a transform buffer to listen for transforms
@@ -146,7 +148,7 @@ bool CameraView::InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, 
                                            double size_y) {
     // Create depth cam camera model
     static camera::CameraParameters depth_cam_params(&cfg_cam_, (depth_cam_name + "_cam").c_str());
-    CameraView depth_cam(depth_cam_name, depth_cam_params, f_, n_);
+    CameraView depth_cam(depth_cam_name + "_cam", depth_cam_params, f_, n_);
 
     // Get most recent depth message
     std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;
