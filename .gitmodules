@@ -3,17 +3,9 @@
 	url = https://github.com/nasa/isaac_msgs.git
 [submodule "astrobee/survey_manager/survey_planner/src/ros2_planning_system"]
 	path = astrobee/survey_manager/survey_planner/src/ros2_planning_system
-	url = https://github.com/traclabs/ros2_planning_system.git
+	url = https://github.com/traclabs/ros2_planning_system
 	branch = noetic-devel
 [submodule "astrobee/survey_manager/survey_planner/src/ros1_lifecycle"]
 	path = astrobee/survey_manager/survey_planner/src/ros1_lifecycle
 	url = https://github.com/traclabs/ros1_lifecycle
-	branch = noetic-devel
-[submodule "ros1_lifecycle"]
-	path = ros1_lifecycle
-	url = https://github.com/traclabs/ros1_lifecycle
-	branch = noetic-devel
-[submodule "ros2_planning_system"]
-	path = ros2_planning_system
-	url = https://github.com/traclabs/ros2_planning_system.git
 	branch = noetic-devel
