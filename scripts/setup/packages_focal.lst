@@ -4,6 +4,6 @@ python3-osrf-pycommon
 python3-rosdep
 ros-noetic-eigen-conversions
 ros-noetic-pcl-ros
-ros-noetic-behaviortree-cpp-v3
+ros-noetic-behaviortree-cpp
 libmnl-dev
 libproj-dev
