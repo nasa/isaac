@@ -91,7 +91,7 @@ $(document).ready(function(){initNavTree('inspection.html',''); initResizable();
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>This directory provides two tools: inspection_tool and sci_cam_tool.</p>
-<h3><a class="anchor" id="autotoc_md65"></a>
+<h3><a class="anchor" id="autotoc_md66"></a>
 Using the inspection tool</h3>
 <p>This tool is used to initiate inspection actions. To run the tool: </p><pre class="fragment">rosrun inspection inspection_tool -$ACTION [OPTIONS]
 </pre><p>General parameters </p><table class="markdownTable">
@@ -165,7 +165,7 @@ Using the inspection tool</h3>
 </table>
 <p><em>volumetric</em>: This will perform a volumetric survey</p>
 <p>An example command for this type of anomaly would be: </p><pre class="fragment">rosrun inspection inspection_tool -volumetric -volumetric_poses /resources/volumetric_iss.txt
-</pre><h3><a class="anchor" id="autotoc_md66"></a>
+</pre><h3><a class="anchor" id="autotoc_md67"></a>
 Using sci_cam_tool</h3>
 <p>This tool is used to control the sci cam plugin in the Astrobee simulator, more precisely the way it acquires pictures. To use it, perform the following steps:</p>
 <p>Start the simulator, for example as: </p><pre class="fragment">roslaunch astrobee sim.launch
@@ -177,7 +177,7 @@ Using sci_cam_tool</h3>
 <p>The pictures will be published on the topic </p><pre class="fragment">/hw/cam_sci/compressed
 </pre><p>They will also show up in the sci cam window in RVIZ.</p>
 <p>If requests to take a single picture come at a high rate, some of them will be dropped.</p>
-<h3><a class="anchor" id="autotoc_md67"></a>
+<h3><a class="anchor" id="autotoc_md68"></a>
 Using export panorama tool</h3>
 <p>This tool was created to allow for panorama surveys to be created and exported. This is useful to make panorama plans beforehand to ensure reproduceability.</p>
 <p>To export the panorama file: </p><pre class="fragment">rosrun inspection export_panorama -panorama_poses $PANORAMA_POSES -panorama_out $OUTPUL_PLAN

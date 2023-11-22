@@ -96,8 +96,14 @@ Using the cargo tool</h1>
 <p>This tool is used to initiate pickup and drop cargo actions.</p>
 <p>To run the tool: </p><pre class="fragment">rosrun cargo cargo_tool -$ACTION [OPTIONS]
 </pre><p>The actions that can be defined are: pick - picks up the cargo drop - drops the cargo</p>
-<p>The options that can be defined are: cargo_pose - a pose defined in quaternions of the cargo bag </p>
-</div></div><!-- contents -->
+<p>The options that can be defined are: cargo_pose - a pose defined in quaternions of the cargo bag</p>
+<h1><a class="anchor" id="autotoc_md57"></a>
+Demo example</h1>
+<p>Launch isaac simulation normally</p>
+<p>Spawn cargo: </p><pre class="fragment">roslaunch isaac_gazebo spawn_object.launch spawn:=cargo pose:="11.3 -5.6 5.6 -0.707 0 0 0.707" name:=CTB_05_1070
+</pre><p>Pick up cargo (make sure astrobee is undocked) - the pose is the cargo pose inserted above: </p><pre class="fragment">rosrun cargo cargo_tool -id CTB_05_1070 -pick -pose "11.3 -5.6 5.6 -0.707 0 0 0.707"
+</pre><p>Drop cargo - the pose is the dock pose: </p><pre class="fragment">rosrun cargo cargo_tool -drop -pose "10.4 -5.6 5.855 -0.707 0 0 0.707"
+</pre> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->
 <!-- HTML footer for doxygen 1.9.0-->
