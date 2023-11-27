@@ -19,34 +19,35 @@
 # under the License.
 
 """
-A wrapper that injects the specified child command into a tmux target window, waits for the child to exit,
-and returns its exit code. This enables us to run a command with a terminal interface automatically
-from within a ROS service while retaining the option for an operator to use that terminal interface
-later by attaching to the relevant tmux session.
+A wrapper that injects the specified child command into a tmux target window, waits for the child to
+exit, and returns its exit code. This enables us to run a command with a terminal interface
+automatically from within a ROS service while retaining the option for an operator to use that
+terminal interface later by attaching to the relevant tmux session.
 
 Example usage:
-In terminal 1: tmux.py -s 1 -p 5 -- ipython3 --no-banner  # Run command under tmux
+In terminal 1: tmux_inject.py -s 1 -w 5 -- ipython3 --no-banner  # Inject command in tmux window
 In terminal 2: tmux attach -s 1  # Then change to window 5 to interact with ipython3; exit ipython3
-In terminal 1: echo $?  # tmux.py exits after ipython3 exits. Echo return code of ipython3.
+In terminal 1: echo $?  # tmux_inject.py exits after ipython3 exits. Echo return code of ipython3.
 
-Note that we used the '--' separator to ensure that tmux.py doesn't try to capture/interpret flags
-after that point that are intended for the underlying command.
+Note that we used the '--' separator to ensure that tmux_inject.py doesn't try to capture/interpret
+flags after that point that are intended for the child command.
 
 Behavior details:
-- Caveat: If targeting multiple tmux.py commands at the same tmux window, you must ensure each
-  command completes before running the next command. (When two commands try to take over the same
-  terminal, you just get chaos.)
 
-- The targeted tmux session and window are created if they don't already exist.
+- Caveat: If targeting multiple tmux_inject.py commands at the same tmux window, you must ensure
+  each command completes before running the next command. (When two commands try to take over the
+  same terminal, you just get a mess.)
+
+- The targeted tmux session (-s) and window (-w) are created if they don't already exist.
 
 - It's a bit tricky to propagate the return code from the child command because its parent process
-  is the shell running in the tmux window, not tmux.py. To make this work, when we inject the
-  specified command into the tmux window, we wrap it in the pidwrap.sh script, which exposes its
-  pid and return code.
+  is the shell running in the tmux window, not tmux_inject.py. To make this work, when we inject the
+  specified command into the tmux window, we wrap it in the pidwrap.sh script, which exposes its pid
+  and return code.
 
-- The tmux.py script will try to kill the child if it is forced to exit while the child is
-  still running. This doesn't happen automatically because the child's parent process is the
-  tmux window shell.
+- The tmux_inject.py script will try to kill the child if it is forced to exit while the child is
+  still running. (This doesn't happen automatically because the child's parent process is the tmux
+  window shell.)
 """
 
 import argparse
@@ -69,7 +70,7 @@ WINDOW_EXISTED_REGEX = re.compile(r"^create window failed: index \d+ in use\n$")
 
 class TmuxTimeoutError(RuntimeError):
     """
-    Represents a timeout exception raised from tmux.py.
+    Represents a timeout exception raised from tmux_inject.py.
     """
 
 
@@ -104,7 +105,7 @@ def wait_until_path_exists(
         time.sleep(check_period_seconds)
 
 
-def tmux(session: str, window: str, command_args: List[str]) -> None:
+def tmux_inject(session: str, window: str, command_args: List[str]) -> None:
     """
     The main driver function.
     """
@@ -130,7 +131,7 @@ def tmux(session: str, window: str, command_args: List[str]) -> None:
 
     # Create unique temp dir and copy pidwrap.sh into it
     pidwrap_src_path = THIS_DIR / "pidwrap.sh"
-    temp_dir = pathlib.Path(tempfile.mkdtemp(prefix="tmuxpy_"))
+    temp_dir = pathlib.Path(tempfile.mkdtemp(prefix="tmux_inject_"))
     pidwrap_dst_path = temp_dir / "pidwrap.sh"
     shutil.copy(pidwrap_src_path, pidwrap_dst_path)
 
@@ -148,11 +149,14 @@ def tmux(session: str, window: str, command_args: List[str]) -> None:
         logging.info("Child has PID %s. Waiting for child to exit.", pid)
         run(["tail", "-f", f"--pid={pid}", "/dev/null"], check=True)
     finally:
+        # This branch runs every time but really exists for the case that the run() command above
+        # exits before the child process finished. (Like if the tail command or this script received
+        # a signal, perhaps user typed Ctrl-C.)
         pid_status_path = pathlib.Path(f"/proc/{pid}")
         if pid_status_path.is_dir():
             logging.warning(
                 "%s",
-                "\nTail or tmux.py forced exit while child still running. Trying to kill child.",
+                "\nEarly exit while child may still be running. Trying to kill child.",
             )
             logging.info("+ kill -TERM %s", pid)
             os.kill(pid, signal.SIGTERM)
@@ -174,7 +178,7 @@ class CustomFormatter(
 
 def main():
     """
-    Parse command line arguments and call tmux() main driver.
+    Parse command line arguments and call tmux_inject() main driver.
     """
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
@@ -197,7 +201,7 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(format="%(message)s", level=logging.INFO)
-    tmux(session=args.session, window=args.window, command_args=args.arg)
+    tmux_inject(session=args.session, window=args.window, command_args=args.arg)
 
 
 if __name__ == "__main__":
