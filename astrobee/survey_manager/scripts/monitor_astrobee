@@ -19,10 +19,11 @@
 # under the License.
 
 import argparse
-import sys
 import os
-import threading
 import socket
+import sys
+import threading
+
 
 def thread_write_input(sock_input):
     print("starting thread_write_input...")

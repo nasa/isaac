@@ -19,13 +19,13 @@
 # under the License.
 
 import argparse
+import os
+import select
+import socket
 import subprocess
 import sys
-import os
 import threading
 
-import socket
-import select
 
 def get_position(bay):
 
