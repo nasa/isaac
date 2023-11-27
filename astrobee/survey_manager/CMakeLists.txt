@@ -52,5 +52,5 @@ include_directories(
 ## Install ##
 #############
 
-catkin_install_python(PROGRAMS scripts/command_astrobee
+catkin_install_python(PROGRAMS scripts/command_astrobee scripts/monitor_astrobee
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
