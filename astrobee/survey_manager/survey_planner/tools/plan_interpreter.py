@@ -67,7 +67,9 @@ class PlanAction:
     Class representing one entry in the output plan sequence of a PDDL planner.
     """
 
-    def __init__(self, start_time_seconds: FloatStr, action: str, duration_seconds: FloatStr):
+    def __init__(
+        self, start_time_seconds: FloatStr, action: str, duration_seconds: FloatStr
+    ):
         self.start_time_seconds = start_time_seconds
         self.action = action
         self.duration_seconds = duration_seconds
