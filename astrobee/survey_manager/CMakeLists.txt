@@ -48,6 +48,11 @@ include_directories(
 )
 
 
+# Uncomment this when plansys merged
+# # Action for move_inspect
+# add_executable(move_action_node src/move_action_node.cpp)
+# target_link_libraries(move_action_node ${catkin_LIBRARIES} )
+
 #############
 ## Install ##
 #############
