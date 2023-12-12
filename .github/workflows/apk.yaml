@@ -1,5 +1,3 @@
-# Check for lint error and auto correct them
-
 name: Compile APK
 
 on: ['push', 'pull_request', 'workflow_dispatch']

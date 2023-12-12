@@ -1,0 +1,31 @@
+$ time popf domain_survey.pddl problem_jem_survey.pddl
+Constructing lookup tables: [10%] [20%] [30%] [40%] [50%] [60%] [70%] [80%] [90%] [100%]
+Post filtering unreachable actions:  [10%] [20%] [30%] [40%] [50%] [60%] [70%] [80%] [90%] [100%]
+3% of the ground temporal actions in this problem are compression-safe
+b (25.000 | 30.000)b (24.000 | 50.001)b (23.000 | 70.002)b (22.000 | 90.003)b (21.000 | 990.004)b (20.000 | 990.004)b (19.000 | 1010.005)b (18.000 | 1910.006)b (17.000 | 1910.006)b (16.000 | 1930.007)b (15.000 | 2830.008)b (14.000 | 2830.008)b (13.000 | 2850.009)b (12.000 | 3750.010)b (11.000 | 3750.010)b (10.000 | 4350.011)b (9.000 | 4350.011)b (8.000 | 4350.011)b (7.000 | 4350.011)b (6.000 | 4350.011)b (5.000 | 4350.011)b (4.000 | 5270.013)b (3.000 | 5270.013)b (2.000 | 5290.014)b (1.000 | 5310.015);;;; Solution Found
+; Time 0.56
+0.000: (undock bumble berth1 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+30.001: (move bumble jem_bay7 jem_bay6 jem_bay5)  [20.000]
+50.002: (move bumble jem_bay6 jem_bay5 jem_bay4)  [20.000]
+70.003: (move bumble jem_bay5 jem_bay4 jem_bay3)  [20.000]
+70.003: (undock honey berth2 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+90.004: (panorama bumble o0 jem_bay4 run1)  [900.000]
+100.004: (panorama honey o0 jem_bay7 run1)  [900.000]
+990.005: (move bumble jem_bay4 jem_bay3 jem_bay2)  [20.000]
+1000.005: (move honey jem_bay7 jem_bay6 jem_bay5)  [20.000]
+1010.006: (panorama bumble o1 jem_bay3 run1)  [900.000]
+1020.006: (panorama honey o1 jem_bay6 run1)  [900.000]
+1910.007: (move bumble jem_bay3 jem_bay2 jem_bay1)  [20.000]
+1930.008: (panorama bumble o2 jem_bay2 run1)  [900.000]
+2830.009: (move bumble jem_bay2 jem_bay1 jem_bay0)  [20.000]
+2850.010: (panorama bumble o3 jem_bay1 run1)  [900.000]
+3750.011: (stereo bumble o4 jem_bay1 jem_bay4 jem_bay5 jem_bay3 run1)  [600.000]
+4350.012: (move honey jem_bay6 jem_bay5 jem_bay4)  [20.000]
+4370.013: (panorama honey o2 jem_bay5 run1)  [900.000]
+5270.014: (move honey jem_bay5 jem_bay6 jem_bay7)  [20.000]
+5290.015: (move honey jem_bay6 jem_bay7 jem_bay8)  [20.000]
+5310.016: (dock honey jem_bay7 berth2)  [30.000]
+
+real	0m0.585s
+user	0m0.553s
+sys	0m0.032s

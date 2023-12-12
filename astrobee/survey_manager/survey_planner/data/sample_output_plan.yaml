@@ -1,0 +1,200 @@
+- start_time_seconds: '0.000'
+  action:
+    type: undock
+    robot: bumble
+  duration_seconds: '30.000'
+- start_time_seconds: '30.001'
+  action:
+    type: move
+    robot: bumble
+    to_name: jem_bay6
+    to_pos:
+    - 11.0
+    - -9.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '50.002'
+  action:
+    type: move
+    robot: bumble
+    to_name: jem_bay5
+    to_pos:
+    - 11.0
+    - -8.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '70.003'
+  action:
+    type: move
+    robot: bumble
+    to_name: jem_bay4
+    to_pos:
+    - 11.0
+    - -7.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '70.003'
+  action:
+    type: undock
+    robot: honey
+  duration_seconds: '30.000'
+- start_time_seconds: '90.004'
+  action:
+    type: panorama
+    robot: bumble
+    location_name: jem_bay4
+    location_pos:
+    - 11.0
+    - -7.0
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '100.004'
+  action:
+    type: panorama
+    robot: honey
+    location_name: jem_bay7
+    location_pos:
+    - 11.0
+    - -9.7
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '990.005'
+  action:
+    type: move
+    robot: bumble
+    to_name: jem_bay3
+    to_pos:
+    - 11.0
+    - -6.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '1000.005'
+  action:
+    type: move
+    robot: honey
+    to_name: jem_bay6
+    to_pos:
+    - 11.0
+    - -9.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '1010.006'
+  action:
+    type: panorama
+    robot: bumble
+    location_name: jem_bay3
+    location_pos:
+    - 11.0
+    - -6.0
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '1020.006'
+  action:
+    type: panorama
+    robot: honey
+    location_name: jem_bay6
+    location_pos:
+    - 11.0
+    - -9.0
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '1910.007'
+  action:
+    type: move
+    robot: bumble
+    to_name: jem_bay2
+    to_pos:
+    - 11.0
+    - -5.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '1930.008'
+  action:
+    type: panorama
+    robot: bumble
+    location_name: jem_bay2
+    location_pos:
+    - 11.0
+    - -5.0
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '2830.009'
+  action:
+    type: move
+    robot: bumble
+    to_name: jem_bay1
+    to_pos:
+    - 11.0
+    - -4.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2850.010'
+  action:
+    type: panorama
+    robot: bumble
+    location_name: jem_bay1
+    location_pos:
+    - 11.0
+    - -4.0
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '3750.011'
+  action:
+    type: stereo
+    robot: bumble
+    fplan: jem_stereo_mapping_bay1_to_bay3.fplan
+    run: 1
+  duration_seconds: '600.000'
+- start_time_seconds: '4350.012'
+  action:
+    type: move
+    robot: honey
+    to_name: jem_bay5
+    to_pos:
+    - 11.0
+    - -8.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '4370.013'
+  action:
+    type: panorama
+    robot: honey
+    location_name: jem_bay5
+    location_pos:
+    - 11.0
+    - -8.0
+    - 4.8
+    run: 1
+  duration_seconds: '900.000'
+- start_time_seconds: '5270.014'
+  action:
+    type: move
+    robot: honey
+    to_name: jem_bay6
+    to_pos:
+    - 11.0
+    - -9.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '5290.015'
+  action:
+    type: move
+    robot: honey
+    to_name: jem_bay7
+    to_pos:
+    - 11.0
+    - -9.7
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '5310.016'
+  action:
+    type: dock
+    robot: honey
+    berth: berth2
+  duration_seconds: '30.000'

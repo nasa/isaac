@@ -19,12 +19,12 @@
 # This will set up an Astrobee docker container using the non-NASA install instructions.
 # You must set the docker context to be the repository root directory
 
-ARG UBUNTU_VERSION=16.04
+ARG UBUNTU_VERSION=20.04
 ARG REMOTE=isaac
 FROM ${REMOTE}/isaac:latest-astrobee-ubuntu${UBUNTU_VERSION}
 
-ARG ROS_VERSION=kinetic
-ARG PYTHON=""
+ARG ROS_VERSION=noetic
+ARG PYTHON=3
 
 # suppress detached head warnings later
 RUN git config --global advice.detachedHead false

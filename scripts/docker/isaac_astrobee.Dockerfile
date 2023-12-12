@@ -19,13 +19,13 @@
 # This will set up an Astrobee docker container using the non-NASA install instructions.
 # You must set the docker context to be the repository root directory
 
-ARG UBUNTU_VERSION=16.04
+ARG UBUNTU_VERSION=20.04
 ARG REMOTE=astrobee
 FROM ${REMOTE}/astrobee:latest-ubuntu${UBUNTU_VERSION}
 
 # Already inherited from astrobee:base-latest-ubuntu...
-ARG ROS_VERSION=kinetic
-ARG PYTHON=""
+ARG ROS_VERSION=noetic
+ARG PYTHON=3
 
 RUN apt-get update && apt-get install -y \
   libmnl-dev \

@@ -33,6 +33,7 @@ the [Astrobee robot](https://github.com/nasa/astrobee). This repository includes
 - [Dense mapping](https://nasa.github.io/isaac/html/geometric_streaming_mapper.html) to create a textured 3D map
 - [Volumetric mapping](https://nasa.github.io/isaac/html/volumetric_mapper.html) to map volumetric signals, such as WiFi.
 - [Image analysis](https://nasa.github.io/isaac/html/ano.html) module to train a neural network to detect anomalies
+- [Survey Manager](https://nasa.github.io/isaac/html/survey.html) semi-autonomous planning and execution of imaging tasks.
 
 You may also be interested in the separate repository for the [ISAAC User Interface](https://github.com/nasa/isaac_user_interface),
 which enables monitoring of multiple robots through a web browser.
