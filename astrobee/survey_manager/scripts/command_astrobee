@@ -235,7 +235,8 @@ class ProcessExecutor:
             print("Killing input thread...")
             self._stop_event.set()
             input_thread.join()
-            output_thread.join()  # In normal scenarios this should have already happened
+            if output_thread.is_alive():
+                output_thread.join()
 
         # Get the final exit code
         return return_code
