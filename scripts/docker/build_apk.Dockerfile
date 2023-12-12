@@ -20,7 +20,7 @@
 # You must set the docker context to be the repository root directory
 
 ARG REMOTE=isaac
-FROM ${REMOTE}/isaac:msgs-ubuntu20.04
+FROM ${REMOTE}/isaac:msgs-ubuntu16.04
 
 RUN apt-get update && apt-get install -y \
   unzip \
