@@ -37,7 +37,7 @@ from ff_msgs.msg import (
     CommandConstants,
     CommandStamped,
 )
-from std_msgs.msg import String, Header
+from std_msgs.msg import Header, String
 
 # Type alias
 YamlMapping = Dict[str, Any]
@@ -145,6 +145,8 @@ class ProcessExecutor:
                         conn.setblocking(False)
 
                         connected = True
+                        # Always send full history to each newly connecting client so history
+                        # is not lost if the connection is dropped
                         conn.send(output_total.encode("utf-8")[:1024])
                     except socket.timeout:
                         continue
