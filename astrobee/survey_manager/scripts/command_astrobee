@@ -37,13 +37,13 @@ from ff_msgs.msg import (
     CommandConstants,
     CommandStamped,
 )
-from std_msgs.msg import String
+from std_msgs.msg import String, Header
 
 # Type alias
 YamlMapping = Dict[str, Any]
 
 # Constants
-MAX_COUNTER = 10
+MAX_COUNTER = 3
 
 def exposure_change(bay_origin, bay_destination, value):
     # Going to JEM
@@ -81,7 +81,7 @@ def map_change(bay_origin, bay_destination, map_name):
 # Mostly used for actions where user inteference might be required
 class ProcessExecutor:
 
-    def __init__(self, robot_name, goal, bay, run):
+    def __init__(self, robot_name):
 
         self.input_path = '/tmp/input_' + robot_name
         self.output_path = '/tmp/output_' + robot_name
@@ -258,8 +258,8 @@ class ProcessExecutor:
                 print("Invalid input. Please enter 'y' or 'n'.")
 
     def send_command_recursive(self, command):
-        if send_command(command):
-            recursive_command(command)
+        if self.send_command(command):
+            self.recursive_command(command)
 
 
 # This class sends a command to the executor and waits to get a response
@@ -270,25 +270,21 @@ class CommandExecutor:
 
     def __init__(self, ns):
         self.ns = ns
-        # Start ROS node
-        rospy.init_node("survey_namager_cmd_" + robot_name)
+        rospy.loginfo(self.ns + "/command")
         # Declare guest science command publisher
-        self.pub_guest_sci = rospy.Publisher(self.ns + "command", CommandStamped, queue_size=5)
-
+        self.sub_ack = rospy.Subscriber(self.ns + "/mgt/ack", AckStamped, self.ack_callback)
+        self.ack_needed = False
+        self.pub_command = rospy.Publisher(self.ns + "/command", CommandStamped, queue_size=5)
+        while self.pub_command.get_num_connections() == 0:
+            rospy.loginfo("Waiting for subscriber to connect")
+            rospy.sleep(1)
         self.unique_cmd_id = ""
 
-    def __del__(self):
-        rospy.shutdown()
-
-    def start_recording():
-
+    def start_recording(self, bag_description):
         # Arg is bagfile name description
         arg1 = CommandArg()
         arg1.data_type = CommandArg.DATA_TYPE_STRING
-        arg1.s = "Front"
-
-        # Create CommandStamped message
-        cmd_args = [arg1]
+        arg1.s = bag_description
 
         cmd = CommandStamped()
         cmd.header = Header(stamp=rospy.Time.now())
@@ -297,11 +293,13 @@ class CommandExecutor:
         self.unique_cmd_id = cmd.cmd_id
         cmd.cmd_src = "isaac fsw"
         cmd.cmd_origin = "isaac fsw"
+        cmd.args = [arg1]
 
         # Publish the CommandStamped message
-        result = publish_and_wait_response(cmd)
+        result = self.publish_and_wait_response(cmd)
+        return result
 
-    def stop_recording(bag_description):
+    def stop_recording(self):
         cmd = CommandStamped()
         cmd.header = Header(stamp=rospy.Time.now())
         cmd.cmd_name = CommandConstants.CMD_NAME_STOP_RECORDING
@@ -311,17 +309,18 @@ class CommandExecutor:
         cmd.cmd_origin = "isaac fsw"
 
         # Publish the CommandStamped message
-        result = publish_and_wait_response(cmd)
+        result = self.publish_and_wait_response(cmd)
+        return result
 
-    def change_exposure(val):
+    def change_exposure(self, val):
         #TBD
         rospy.loginfo("Change exposure to " + val)
 
-    def change_map(map_name):
+    def change_map(self, map_name):
         #TBD
         rospy.loginfo("Change map to " + map_name)
 
-    def set_plan():
+    def set_plan(self):
         # TODO Add call to plan_pub.cc
 
         cmd = CommandStamped()
@@ -334,9 +333,10 @@ class CommandExecutor:
         cmd.args = cmd_args
 
         # Publish the CommandStamped message
-        result = publish_and_wait_response(cmd)
+        result = self.publish_and_wait_response(cmd)
+        return result
 
-    def run_plan():
+    def run_plan(self):
         cmd = CommandStamped()
         cmd.header = Header(stamp=rospy.Time.now())
         cmd.cmd_name = CommandConstants.CMD_NAME_RUN_PLAN
@@ -346,30 +346,39 @@ class CommandExecutor:
         cmd.cmd_origin = "isaac fsw"
 
         # Publish the CommandStamped message
-        result = publish_and_wait_response(cmd)
+        result = self.publish_and_wait_response(cmd)
+        return result
 
-    def publish_and_wait_response(cmd):
+    def ack_callback(self, msg):
+        if self.ack_needed == True and msg.cmd_id == self.unique_cmd_id:
+            self.ack_msg = msg
+            self.ack_needed = False
+
+    def publish_and_wait_response(self, cmd):
 
         # Publish the CommandStamped message
-        self.pub_guest_sci.publish(cmd)
+        self.ack_needed = True
+        self.pub_command.publish(cmd)
 
         # Wait for ack
         counter = 0
         while counter < MAX_COUNTER:
-            try:
-                msg = rospy.wait_for_message(self.ns + "gt/ack", AckStamped, timeout = 5)
-                if msg.cmd_id == self.unique_cmd_id:
-                    if msg.completed_status.status == AckCompletedStatus.NOT:
-                        rospy.loginfo("Command is being executed and has not completed.")
-                    elif msg.completed_status.status == AckCompletedStatus.OK:
-                        rospy.loginfo("Command completed successfully!")
-                        return 0
-                    else:
-                        rospy.loginfo("Command failed! Message: " + Ack.message)
-                        return 1
-            except:
-                continue
-            counter += 1
+            # got message
+            if self.ack_needed == False:
+                rospy.loginfo("GOT MSG.")
+                if self.ack_msg.completed_status.status == AckCompletedStatus.NOT:
+                    rospy.loginfo("Command is being executed and has not completed.")
+                    self.ack_needed = True
+                elif self.ack_msg.completed_status.status == AckCompletedStatus.OK:
+                    rospy.loginfo("Command completed successfully!")
+                    return 0
+                else:
+                    rospy.loginfo("Command failed! Message: " + self.ack_msg.message)
+                    return 1
+            else:
+                rospy.sleep(1)
+                counter += 1
+        return 1
 
 
 def load_yaml(yaml_path: pathlib.Path) -> YamlMapping:
@@ -379,11 +388,11 @@ def load_yaml(yaml_path: pathlib.Path) -> YamlMapping:
     with yaml_path.open(encoding="utf-8") as yaml_stream:
         return yaml.safe_load(yaml_stream)
 
-def get_stereo_traj(from_bay, to_bay):
+def get_stereo_traj(config_static, from_bay, to_bay):
     # Get stereo trajectory
     traj_matches = [
         traj
-        for traj in static_config["stereo"].values()
+        for traj in config_static["stereo"].values()
         if traj["base_location"] == from_bay and traj["bound_location"] == to_bay
     ]
     assert (
@@ -394,6 +403,9 @@ def get_stereo_traj(from_bay, to_bay):
 
 def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_static_path: pathlib.Path):
 
+    # Start ROS node
+    rospy.init_node("survey_namager_cmd_" + robot_name, anonymous=True)
+
     # Read the static configs that convert constants to values
     config_static = load_yaml(config_static_path)
 
@@ -403,7 +415,7 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
     if not current_robot:
         rospy.loginfo("We're in simulation. Let's get the robotname using the topic")
         # This is a latching messge so it shouldn't take long
-        data = rospy.wait_for_message('/robot_name', String, timeout=2)
+        data = rospy.wait_for_message('/robot_name', String, timeout=5)
         current_robot = data.data.lower()
         sim = True
 
@@ -413,10 +425,10 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
         rospy.loginfo("We're commanding a robot remotely!")
         ns = " -remote -ns " + robot_name
         # Command executor will add namespace for bridge forwarding
-        command_executor = CommandExecutor(robot_name + "/")
+        command_executor = CommandExecutor(robot_name)
     else:
         command_executor = CommandExecutor("")
-    process_executor = ProcessExecutor()
+    process_executor = ProcessExecutor(robot_name)
 
     # Initialize exit code
     exit_code = 0
@@ -437,8 +449,8 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
             exit_code += command_executor.change_map(map_name)
 
     elif goal == "panorama":
-        exit_code += command_executor.start_recording("pano_" + bay + "_" + run)
-        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -panorama -panorama_mode '5_mapper_and_hugin' " + static_config["bays"][to_bay] + ns)
+        exit_code += command_executor.start_recording("pano_" + to_bay + "_" + run)
+        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -panorama -panorama_mode '5_mapper_and_hugin' " + config_static["bays"][to_bay] + ns)
         exit_code += command_executor.stop_recording()
 
     elif goal == "stereo":
