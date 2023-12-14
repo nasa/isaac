@@ -2,31 +2,10 @@ name: Build and Test CI for Pull Requests
 
 on:
   pull_request:
-    branches: [ 'master', 'develop' ]
+    branches: [ 'master', 'develop', 'survey_manager' ]
   workflow_dispatch:
 
 jobs:
-
-  build-xenial:
-
-    runs-on: ubuntu-20.04
-
-    steps:
-
-    - name: Checkout Astrobee
-      uses: actions/checkout@v3
-      with:
-        repository: nasa/astrobee
-        path: astrobee/
-
-    - name: Checkout ISAAC
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-        path: isaac/
-
-    - name: Build code for isaac:astrobee Ubuntu 16
-      run: isaac/scripts/docker/build.sh --remote --xenial --astrobee-source-path astrobee/
 
   build-focal:
 

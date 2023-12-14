@@ -10,3 +10,5 @@ The Astrobeemodule contains the ISAAC additions to the Astrobee FSW
 \subpage sim : Gazebo plugins for simulation including acoustic and heat camera, RFID reader and emmiter, as well as WiFi reader and emmiters.
 
 \subpage gs_action_helper : Guest science action helper used to communicate with the ground through DDS messages
+
+\subpage survey : Semi-autonomous survey tasking of Astrobees.
