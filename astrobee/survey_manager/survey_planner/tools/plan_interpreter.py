@@ -110,20 +110,17 @@ def yaml_action_from_pddl(action: str, static_config: YamlMapping) -> YamlMappin
         }
 
     if action_type == "panorama":
-        robot, _order, location, run_name = action_args[1:]
-        run_number = int(run_name[-1])
+        robot, _order, location = action_args[1:]
         # Can discard order. Look up coordinates for location.
         return {
             "type": "panorama",
             "robot": robot,
             "location_name": location,
             "location_pos": static_config["bays"][location],
-            "run": run_number,
         }
 
     if action_type == "stereo":
-        robot, _order, base, bound, _check1, _check2, run_name = action_args[1:]
-        run_number = int(run_name[-1])
+        robot, _order, base, bound, _check1, _check2 = action_args[1:]
         # Use base and bound to look up trajectory.
         traj_matches = [
             traj
@@ -135,7 +132,7 @@ def yaml_action_from_pddl(action: str, static_config: YamlMapping) -> YamlMappin
         ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
         fplan = traj_matches[0]["fplan"]
         # Can discard order, base, bound, check1, check2.
-        return {"type": "stereo", "robot": robot, "fplan": fplan, "run": run_number}
+        return {"type": "stereo", "robot": robot, "fplan": fplan}
 
     assert False, "Never reach this point."
     return {}  # Make pylint happy

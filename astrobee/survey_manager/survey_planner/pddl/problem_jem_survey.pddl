@@ -12,19 +12,18 @@
         jem_bay0 jem_bay1 jem_bay2 jem_bay3 jem_bay4 jem_bay5 jem_bay6 jem_bay7 jem_bay8 berth1 berth2 - location
         bumble honey - robot
         o0 o1 o2 o3 o4 o5 o6 o7 o8 o9 - order
-        run1 run2 run3 run4 run5 - run-number
     )
 
     (:goal
         (and
-            (completed-panorama bumble o0 jem_bay4 run1)
-            (completed-panorama bumble o1 jem_bay3 run1)
-            (completed-panorama bumble o2 jem_bay2 run1)
-            (completed-panorama bumble o3 jem_bay1 run1)
-            (completed-stereo bumble o4 jem_bay1 jem_bay4 run1)
-            (completed-panorama honey o0 jem_bay7 run1)
-            (completed-panorama honey o1 jem_bay6 run1)
-            (completed-panorama honey o2 jem_bay5 run1)
+            (completed-panorama bumble o0 jem_bay4)
+            (completed-panorama bumble o1 jem_bay3)
+            (completed-panorama bumble o2 jem_bay2)
+            (completed-panorama bumble o3 jem_bay1)
+            (completed-stereo bumble o4 jem_bay1 jem_bay4)
+            (completed-panorama honey o0 jem_bay7)
+            (completed-panorama honey o1 jem_bay6)
+            (completed-panorama honey o2 jem_bay5)
             (robot-at honey berth2)
         )
     )
@@ -154,7 +153,7 @@
 
         ;; need-stereo predicates must be asserted with identical parameters to the
         ;; stereo-completed goals.  See the need-stereo docs for more.
-        (need-stereo bumble o4 jem_bay1 jem_bay4 run1)
+        (need-stereo bumble o4 jem_bay1 jem_bay4)
 
         ;; === Static numeric fluents ===
         (= (order-identity o0) 0)
