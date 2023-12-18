@@ -48,10 +48,6 @@
 
 ;; Include raw high-level config in problem in case an (ISAAC-custom) planner prefers to use it.
 
-;; BEGIN CONFIG_DYNAMIC
-{{ config_dynamic }}
-;; END CONFIG_DYNAMIC
-
-;; BEGIN CONFIG_STATIC
-{{ config_static }}
-;; END CONFIG_STATIC
+;; BEGIN CONFIG
+{{ config }}
+;; END CONFIG
