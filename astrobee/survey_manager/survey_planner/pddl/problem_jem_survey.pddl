@@ -46,7 +46,6 @@
         (move-connected jem_bay7 jem_bay6)
         (move-connected jem_bay7 jem_bay8)
         (move-connected jem_bay8 jem_bay7)
-
         (location-real jem_bay1)
         (location-real jem_bay2)
         (location-real jem_bay3)
@@ -54,13 +53,10 @@
         (location-real jem_bay5)
         (location-real jem_bay6)
         (location-real jem_bay7)
-
         (dock-connected jem_bay7 berth1)
         (dock-connected jem_bay7 berth2)
-
         (robots-different bumble honey)
         (robots-different honey bumble)
-
         (locations-different jem_bay0 jem_bay1)
         (locations-different jem_bay0 jem_bay2)
         (locations-different jem_bay0 jem_bay3)
@@ -137,10 +133,8 @@
         ;; === Dynamic predicates ===
         (robot-available bumble)
         (robot-available honey)
-
         (robot-at bumble berth1)
         (robot-at honey berth2)
-
         (location-available jem_bay0)
         (location-available jem_bay1)
         (location-available jem_bay2)
@@ -150,9 +144,6 @@
         (location-available jem_bay6)
         (location-available jem_bay7)
         (location-available jem_bay8)
-
-        ;; need-stereo predicates must be asserted with identical parameters to the
-        ;; stereo-completed goals.  See the need-stereo docs for more.
         (need-stereo bumble o4 jem_bay1 jem_bay4)
 
         ;; === Static numeric fluents ===

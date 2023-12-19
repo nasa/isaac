@@ -36,13 +36,16 @@ locations, etc.
 """
 
 import argparse
+import collections
 import io
 import itertools
+import os
 import pathlib
 import re
 import shlex
 import sys
-from typing import Any, Dict, Iterable, List, Sequence, T, Tuple
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, TypeVar
 
 import yaml
 
@@ -50,8 +53,8 @@ GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at")
 
 THIS_DIR = pathlib.Path(__file__).resolve().parent
 CWD = pathlib.Path.cwd()
-DATA_DIR = (THIS_DIR / ".." / "data").resolve().relative_to(CWD)
-PDDL_DIR = (THIS_DIR / ".." / "pddl").resolve().relative_to(CWD)
+DATA_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / "data").resolve()), CWD))
+PDDL_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / "pddl").resolve()), CWD))
 DEFAULT_CONFIGS = [
     DATA_DIR / "jem_survey_static.yaml",
     DATA_DIR / "jem_survey_dynamic.yaml",
@@ -59,6 +62,7 @@ DEFAULT_CONFIGS = [
 
 # Type alias
 YamlMapping = Dict[str, Any]
+T = TypeVar("T")
 
 # Replace the text "{{ foo }}" in the template with the value of the foo parameter
 TEMPLATE_SUBST_REGEX = re.compile(r"{{\s*([\w]+)\s*}}")
@@ -151,7 +155,7 @@ class TemplateFiller:
     def __init__(self, params):
         self.params = params
 
-    def __call__(self, match: re.match) -> str:
+    def __call__(self, match: re.Match) -> str:
         param = match.group(1)
         if param not in self.params:
             raise KeyError(
@@ -167,39 +171,142 @@ def comment_for_pddl(text: str) -> str:
     return "\n".join([f";; {line}".strip() for line in text.splitlines()])
 
 
-class TerminalWriter:
+class ProblemWriter(ABC):
+    "Abstract class for writing a problem intance."
+
+    @abstractmethod
+    def getvalue(self) -> str:
+        "Return problem text to output."
+
+    def set_param(self, key: str, value: str) -> None:
+        "Set template parameter `key` to `value`. (This method is a no-op; override in children.)"
+
+    @abstractmethod
+    def get_extension(self) -> str:
+        "Return standard extension to use for output file."
+
+    @abstractmethod
+    def declare_instance(self, instance_name: str, pddl_type: str) -> None:
+        "Declare `instance_name` as an instance of `pddl_type`."
+
+    def declare_instances(self, instance_names: Iterable[str], pddl_type: str) -> None:
+        "Declare `instance_names` as instances of `pddl_type`."
+        for instance_name in instance_names:
+            self.declare_instance(instance_name, pddl_type)
+
+    @abstractmethod
+    def declare_predicate(self, predicate: str, section: str) -> None:
+        "Declare `predicate` as a PDDL predicate in `section`."
+
+    def declare_predicates(self, predicates: Iterable[str], section: str) -> None:
+        "Declare `predicates` as PDDL predicates in `section`."
+        for predicate in predicates:
+            self.declare_predicate(predicate, section)
+
+    @abstractmethod
+    def declare_goals(self, goals: Iterable[str]) -> None:
+        "Declare `goals` as PDDL goals. (Can only be called once, with all goals.)"
+
+    @abstractmethod
+    def declare_fluent(self, fluent: str, section: str) -> None:
+        "Declare `fluent` as a PDDL fluent in `section`."
+
+    def declare_fluents(self, fluents: Iterable[str], section: str) -> None:
+        "Declare `fluents` as PDDL fluents in `section`."
+        for fluent in fluents:
+            self.declare_fluent(fluent, section)
+
+
+class PddlWriter(ProblemWriter):
+    "Class for writing a problem intance in PDDL format."
+
+    def __init__(self, template_path: pathlib.Path):
+        self.template_path = template_path
+        self._params: Dict[str, str] = {}
+        self._section_bufs: Mapping[str, io.StringIO] = collections.defaultdict(
+            io.StringIO
+        )
+        self._instances_of_types: Mapping[str, List[str]] = collections.defaultdict(
+            list
+        )
+
+    def get_extension(self) -> str:
+        return ".pddl"
+
+    def set_param(self, key: str, value: str) -> None:
+        "Set template parameter `key` to `value`."
+        self._params[key] = value
+
+    def _get_objects_str(self) -> str:
+        "Return object instance declarations in PDDL format."
+        indent = " " * 8
+        return "\n".join(
+            (
+                f"{indent}{' '.join(instances)} - {pddl_type}"
+                for pddl_type, instances in self._instances_of_types.items()
+            )
+        ).lstrip()
+
+    def getvalue(self) -> str:
+        self._params["objects"] = self._get_objects_str()
+        self._params.update(
+            {
+                section: buf.getvalue().strip()
+                for section, buf in self._section_bufs.items()
+            }
+        )
+        template_text = self.template_path.read_text()
+        filled_template = TEMPLATE_SUBST_REGEX.sub(
+            TemplateFiller(self._params), template_text
+        )
+        return filled_template
+
+    def declare(self, statement: str, section: str) -> None:
+        "Declare `statement` in `section`."
+        indent = " " * 8
+        self._section_bufs[section].write(indent + statement + "\n")
+
+    def declare_instance(self, instance_name: str, pddl_type: str) -> None:
+        self._instances_of_types[pddl_type].append(instance_name)
+
+    def declare_predicate(self, predicate: str, section: str) -> None:
+        self.declare(predicate, section)
+
+    def declare_goals(self, goals: Iterable[str]) -> None:
+        indent = " " * 12
+        self.set_param("goals", "\n".join((indent + goal for goal in goals)).lstrip())
+
+    def declare_fluent(self, fluent: str, section: str) -> None:
+        self.declare(fluent, section)
+
+
+class TerminalWriter(ProblemWriter):
+    "Class for writing a problem instance as a sequence of PlanSys2 terminal commands."
+
     def __init__(self):
         self._buf = io.StringIO()
 
-    def getvalue(self):
+    def get_extension(self) -> str:
+        return ".ps2.pddl"
+
+    def getvalue(self) -> str:
         return self._buf.getvalue()
 
-    def command(self, cmd: str) -> None:
-        self._buf.write(cmd + "\n")
+    def declare(self, statement: str) -> None:
+        "Declare `statement`."
+        self._buf.write(statement + "\n")
 
-    def set_instance(self, instance_name: str, pddl_type: str) -> None:
-        self.command(f"set instance {instance_name} {pddl_type}")
+    def declare_instance(self, instance_name: str, pddl_type: str) -> None:
+        self.declare(f"set instance {instance_name} {pddl_type}")
 
-    def set_instances(self, instance_names: Iterable[str], pddl_type: str) -> None:
-        for instance_name in instance_names:
-            self.set_instance(instance_name, pddl_type)
+    def declare_predicate(self, predicate: str, section: str) -> None:
+        self.declare(f"set predicate {predicate}")
 
-    def set_predicate(self, predicate: str) -> None:
-        self.command(f"set predicate {predicate}")
+    def declare_goals(self, goals: Iterable[str]) -> None:
+        self.declare(f"set goal (and {' '.join(goals)})")
 
-    def set_predicates(self, predicates: Iterable[str]) -> None:
-        for predicate in predicates:
-            self.set_predicate(predicate)
-
-    def set_goals(self, goals: Iterable[str]) -> None:
-        self.command(f"set goal (and {' '.join(goals)})")
-
-    def set_fluent(self, fluent: str) -> None:
-        self.command(f"set function {fluent}")
-
-    def set_fluents(self, fluents: Iterable[str]) -> None:
-        for fluent in fluents:
-            self.set_fluent(fluent)
+    def declare_fluent(self, fluent: str, section: str) -> None:
+        self.declare(f"set function {fluent}")
 
 
 def problem_generator(
@@ -212,73 +319,54 @@ def problem_generator(
     """
     The main function that generates the problem.
     """
-    problem_template = problem_template_path.read_text()
     config = {}
     for config_path in config_paths:
         config.update(load_yaml(config_path))
-    params = {}
 
-    header_lines = (
-        ";; Auto-generated by problem_generator.py. Do not edit!\n"
-        f";; Command was: {command}\n"
-        f";; Working directory was: {CWD}\n"
-        f";; Problem template: {problem_template_path}\n"
-    )
-    for i, config_path in enumerate(config_paths):
-        header_lines += f";; Config {i + 1}: {config_path}\n"
     if terminal:
-        writer = TerminalWriter()
+        writer: ProblemWriter = TerminalWriter()
     else:
-        params["header"] = header_lines
+        writer = PddlWriter(problem_template_path)
+        header_lines = (
+            ";; Auto-generated by problem_generator.py. Do not edit!\n"
+            f";; Command was: {command}\n"
+            f";; Working directory was: {CWD}\n"
+            f";; Problem template: {problem_template_path}\n"
+        )
+        full_config = ""
+        for i, config_path in enumerate(config_paths):
+            header_lines += f";; Config {i + 1}: {config_path}\n"
+            full_config += config_path.read_text()
+        writer.set_param("header", header_lines)
+        writer.set_param("config", comment_for_pddl(full_config))
 
     bays = list(config["bays"].keys())
     bogus_bays = config["bogus_bays"]
     all_bays = sorted(bays + bogus_bays)
-    if terminal:
-        writer.set_instances(all_bays, "location")
-    else:
-        params["bays"] = " ".join(all_bays)
+    writer.declare_instances(all_bays, "location")
 
     berths = config["berths"]
-    if terminal:
-        writer.set_instances(berths, "location")
-    else:
-        params["berths"] = " ".join(berths)
+    writer.declare_instances(berths, "location")
 
     robots = config["robots"]
-    if terminal:
-        writer.set_instances(robots, "robot")
-    else:
-        params["robots"] = " ".join(robots)
+    writer.declare_instances(robots, "robot")
 
     max_order = max([goal.get("order", -1) for goal in config["goals"]])
     num_orders = max_order + 1
     orders = [f"o{i}" for i in range(num_orders)]
-    if terminal:
-        writer.set_instances(orders, "order")
-    else:
-        params["orders"] = " ".join(orders)
+    writer.declare_instances(orders, "order")
 
     yaml_goals = config["goals"]
     pddl_goals = [pddl_goal_from_yaml(goal, config) for goal in yaml_goals]
-    if terminal:
-        writer.set_goals(pddl_goals)
-    else:
-        params["goals"] = indent_lines(pddl_goals, 12)
+    writer.declare_goals(pddl_goals)
 
     move_connected_lines = [
         f"(move-connected {a} {b})" for a, b in both_ways(pairwise(all_bays))
     ]
-    if terminal:
-        writer.set_predicates(move_connected_lines)
-    else:
-        params["move_connected_predicates"] = indent_lines(move_connected_lines, 8)
+    writer.declare_predicates(move_connected_lines, "static_predicates")
 
     location_real_lines = [f"(location-real {bay})" for bay in bays]
-    if terminal:
-        writer.set_predicates(location_real_lines)
-    else:
-        params["location_real_predicates"] = indent_lines(location_real_lines, 8)
+    writer.declare_predicates(location_real_lines, "static_predicates")
 
     candidates = (("jem_bay7", "berth1"), ("jem_bay7", "berth2"))
     dock_connected_lines = [
@@ -286,41 +374,26 @@ def problem_generator(
         for bay, berth in candidates
         if bay in bays and berth in berths
     ]
-    if terminal:
-        writer.set_predicates(dock_connected_lines)
-    else:
-        params["dock_connected_predicates"] = indent_lines(dock_connected_lines, 8)
+    writer.declare_predicates(dock_connected_lines, "static_predicates")
 
     robots_different_lines = [
         f"(robots-different {a} {b})" for a, b in distinct_pairs(robots)
     ]
-    if terminal:
-        writer.set_predicates(robots_different_lines)
-    else:
-        params["robots_different_predicates"] = indent_lines(robots_different_lines, 8)
+    writer.declare_predicates(robots_different_lines, "static_predicates")
 
     locs_different_lines = [
         f"(locations-different {a} {b})" for a, b in distinct_pairs(all_bays)
     ]
-    if terminal:
-        writer.set_predicates(locs_different_lines)
-    else:
-        params["locs_different_predicates"] = indent_lines(locs_different_lines, 8)
+    writer.declare_predicates(locs_different_lines, "static_predicates")
 
     robot_available_lines = [f"(robot-available {robot})" for robot in robots]
-    if terminal:
-        writer.set_predicates(robot_available_lines)
-    else:
-        params["robot_available_predicates"] = indent_lines(robot_available_lines, 8)
+    writer.declare_predicates(robot_available_lines, "dynamic_predicates")
 
     init = config["init"]
     robot_at_lines = [
         f"(robot-at {robot} {init[robot]['location']})" for robot in robots
     ]
-    if terminal:
-        writer.set_predicates(robot_at_lines)
-    else:
-        params["robot_at_predicates"] = indent_lines(robot_at_lines, 8)
+    writer.declare_predicates(robot_at_lines, "dynamic_predicates")
 
     all_locations = all_bays + berths
     occupied_locations = [init[robot]["location"] for robot in robots]
@@ -328,65 +401,47 @@ def problem_generator(
     location_available_lines = [
         f"(location-available {location})" for location in available_locations
     ]
-    if terminal:
-        writer.set_predicates(location_available_lines)
-    else:
-        params["location_available_predicates"] = indent_lines(location_available_lines, 8)
+    writer.declare_predicates(location_available_lines, "dynamic_predicates")
 
     need_stereo_lines = [
         goal.replace("completed-stereo", "need-stereo")
         for goal in pddl_goals
         if "completed-stereo" in goal
     ]
-    if terminal:
-        writer.set_predicates(need_stereo_lines)
-    else:
-        params["need_stereo_predicates"] = indent_lines(need_stereo_lines, 8)
+    writer.declare_predicates(need_stereo_lines, "dynamic_predicates")
 
     order_identity_lines = [f"(= (order-identity o{i}) {i})" for i in range(num_orders)]
-    if terminal:
-        writer.set_fluents(order_identity_lines)
-    else:
-        params["order_identity_fluents"] = indent_lines(order_identity_lines, 8)
+    writer.declare_fluents(order_identity_lines, "static_fluents")
 
     robot_order_lines = [f"(= (robot-order {robot}) -1)" for robot in robots]
-    if terminal:
-        writer.set_fluents(robot_order_lines)
-    else:
-        params["robot_order_fluents"] = indent_lines(robot_order_lines, 8)
+    writer.declare_fluents(robot_order_lines, "dynamic_fluents")
 
-    if terminal:
-        output_path = pathlib.Path(str(output_path_template).replace("{ext}", ".ps2.pddl"))
-        output_path.write_text(writer.getvalue())
-        print(f"Wrote to {output_path}", file=sys.stderr)
-    else:
-        config_text = ""
-        for config_path in config_paths:
-            config_text += config_path.read_text()
-        params["config"] = comment_for_pddl(config_text)
-
-        filled_template = TEMPLATE_SUBST_REGEX.sub(TemplateFiller(params), problem_template)
-        output_path = pathlib.Path(str(output_path_template).replace("{ext}", ".pddl"))
-        output_path.write_text(filled_template)
-        print(f"Wrote to {output_path}", file=sys.stderr)
+    output_path = pathlib.Path(
+        str(output_path_template).replace("{ext}", writer.get_extension())
+    )
+    output_path.write_text(writer.getvalue())
+    print(f"Wrote to {output_path}", file=sys.stderr)
 
 
 class CustomFormatter(
     argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter
 ):
-    pass
+    "Custom formatter for argparse that combines mixins."
 
 
 def path_list(paths_text: str) -> List[pathlib.Path]:
+    "Return the list of paths parsed from comma-separated list `paths_text`."
     return [pathlib.Path(pstr) for pstr in paths_text.split(",")]
 
 
 def main():
+    "Parse arguments and invoke problem_generator()."
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
     parser.add_argument(
-        "-t", "--terminal",
+        "-t",
+        "--terminal",
         help="Format output for PlanSys2 terminal instead of PDDL",
         action="store_true",
         default=False,
