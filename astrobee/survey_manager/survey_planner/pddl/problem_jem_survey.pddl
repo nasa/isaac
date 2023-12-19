@@ -11,7 +11,7 @@
     (:objects
         jem_bay0 jem_bay1 jem_bay2 jem_bay3 jem_bay4 jem_bay5 jem_bay6 jem_bay7 jem_bay8 berth1 berth2 - location
         bumble honey - robot
-        o0 o1 o2 o3 o4 o5 o6 o7 o8 o9 - order
+        o0 o1 o2 o3 o4 - order
     )
 
     (:goal
@@ -161,11 +161,6 @@
         (= (order-identity o2) 2)
         (= (order-identity o3) 3)
         (= (order-identity o4) 4)
-        (= (order-identity o5) 5)
-        (= (order-identity o6) 6)
-        (= (order-identity o7) 7)
-        (= (order-identity o8) 8)
-        (= (order-identity o9) 9)
 
         ;; === Dynamic numeric fluents ===
         (= (robot-order bumble) -1)
@@ -218,7 +213,6 @@
 ;; bogus_bays: [jem_bay0, jem_bay8]
 ;; berths: [berth1, berth2]
 ;; robots: [bumble, honey]
-;; num_orders: 10
 ;;
 ;; stereo:
 ;;   # Meta-data about stereo survey options

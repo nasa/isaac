@@ -40,7 +40,6 @@ bays:
 bogus_bays: [jem_bay0, jem_bay8]
 berths: [berth1, berth2]
 robots: [bumble, honey]
-num_orders: 10
 
 stereo:
   # Meta-data about stereo survey options

@@ -19,8 +19,15 @@
 # under the License.
 
 """
-Generates a PDDL problem specification for the survey domain in domain_survey.pddl.  Takes as input
-a PDDL problem template and higher-level static and dynamic configuration specified in YAML.
+Generates a problem specification for the survey domain in domain_survey.pddl. Output is either a
+PDDL problem instance or the equivalent sequence of commands to pass to the PlanSys2 terminal (if
+-t is specified).
+
+Takes as input a list of higher-level configuration files specified in YAML. Normally, this is a
+static config that contains non-changing information like bay coordinates, plus a dynamic config
+that contains things that are likely to change during execution, like initial state and
+goals. However, the split is arbitrary and you can just concatenate all the config files to get the
+same effect.
 
 The generator takes care of error-prone repetitive tasks like asserting predicates for which
 locations are different, which robots are different, asserting a need-stereo predicate for every
@@ -29,6 +36,7 @@ locations, etc.
 """
 
 import argparse
+import io
 import itertools
 import pathlib
 import re
@@ -159,11 +167,47 @@ def comment_for_pddl(text: str) -> str:
     return "\n".join([f";; {line}".strip() for line in text.splitlines()])
 
 
+class TerminalWriter:
+    def __init__(self):
+        self._buf = io.StringIO()
+
+    def getvalue(self):
+        return self._buf.getvalue()
+
+    def command(self, cmd: str) -> None:
+        self._buf.write(cmd + "\n")
+
+    def set_instance(self, instance_name: str, pddl_type: str) -> None:
+        self.command(f"set instance {instance_name} {pddl_type}")
+
+    def set_instances(self, instance_names: Iterable[str], pddl_type: str) -> None:
+        for instance_name in instance_names:
+            self.set_instance(instance_name, pddl_type)
+
+    def set_predicate(self, predicate: str) -> None:
+        self.command(f"set predicate {predicate}")
+
+    def set_predicates(self, predicates: Iterable[str]) -> None:
+        for predicate in predicates:
+            self.set_predicate(predicate)
+
+    def set_goals(self, goals: Iterable[str]) -> None:
+        self.command(f"set goal (and {' '.join(goals)})")
+
+    def set_fluent(self, fluent: str) -> None:
+        self.command(f"set function {fluent}")
+
+    def set_fluents(self, fluents: Iterable[str]) -> None:
+        for fluent in fluents:
+            self.set_fluent(fluent)
+
+
 def problem_generator(
     problem_template_path: pathlib.Path,
     config_paths: Iterable[pathlib.Path],
-    output_path: pathlib.Path,
+    output_path_template: pathlib.Path,
     command: str,
+    terminal: bool,
 ) -> None:
     """
     The main function that generates the problem.
@@ -182,33 +226,59 @@ def problem_generator(
     )
     for i, config_path in enumerate(config_paths):
         header_lines += f";; Config {i + 1}: {config_path}\n"
-    params["header"] = header_lines
+    if terminal:
+        writer = TerminalWriter()
+    else:
+        params["header"] = header_lines
 
     bays = list(config["bays"].keys())
     bogus_bays = config["bogus_bays"]
     all_bays = sorted(bays + bogus_bays)
-    params["bays"] = " ".join(all_bays)
+    if terminal:
+        writer.set_instances(all_bays, "location")
+    else:
+        params["bays"] = " ".join(all_bays)
 
     berths = config["berths"]
-    params["berths"] = " ".join(berths)
+    if terminal:
+        writer.set_instances(berths, "location")
+    else:
+        params["berths"] = " ".join(berths)
 
     robots = config["robots"]
-    params["robots"] = " ".join(robots)
+    if terminal:
+        writer.set_instances(robots, "robot")
+    else:
+        params["robots"] = " ".join(robots)
 
-    num_orders = config["num_orders"]
-    params["orders"] = " ".join([f"o{i}" for i in range(num_orders)])
+    max_order = max([goal.get("order", -1) for goal in config["goals"]])
+    num_orders = max_order + 1
+    orders = [f"o{i}" for i in range(num_orders)]
+    if terminal:
+        writer.set_instances(orders, "order")
+    else:
+        params["orders"] = " ".join(orders)
 
     yaml_goals = config["goals"]
     pddl_goals = [pddl_goal_from_yaml(goal, config) for goal in yaml_goals]
-    params["goals"] = indent_lines(pddl_goals, 12)
+    if terminal:
+        writer.set_goals(pddl_goals)
+    else:
+        params["goals"] = indent_lines(pddl_goals, 12)
 
     move_connected_lines = [
         f"(move-connected {a} {b})" for a, b in both_ways(pairwise(all_bays))
     ]
-    params["move_connected_predicates"] = indent_lines(move_connected_lines, 8)
+    if terminal:
+        writer.set_predicates(move_connected_lines)
+    else:
+        params["move_connected_predicates"] = indent_lines(move_connected_lines, 8)
 
     location_real_lines = [f"(location-real {bay})" for bay in bays]
-    params["location_real_predicates"] = indent_lines(location_real_lines, 8)
+    if terminal:
+        writer.set_predicates(location_real_lines)
+    else:
+        params["location_real_predicates"] = indent_lines(location_real_lines, 8)
 
     candidates = (("jem_bay7", "berth1"), ("jem_bay7", "berth2"))
     dock_connected_lines = [
@@ -216,28 +286,41 @@ def problem_generator(
         for bay, berth in candidates
         if bay in bays and berth in berths
     ]
-    params["dock_connected_predicates"] = indent_lines(dock_connected_lines, 8)
+    if terminal:
+        writer.set_predicates(dock_connected_lines)
+    else:
+        params["dock_connected_predicates"] = indent_lines(dock_connected_lines, 8)
 
     robots_different_lines = [
         f"(robots-different {a} {b})" for a, b in distinct_pairs(robots)
     ]
-    params["robots_different_predicates"] = indent_lines(robots_different_lines, 8)
+    if terminal:
+        writer.set_predicates(robots_different_lines)
+    else:
+        params["robots_different_predicates"] = indent_lines(robots_different_lines, 8)
 
-    locations_different_lines = [
+    locs_different_lines = [
         f"(locations-different {a} {b})" for a, b in distinct_pairs(all_bays)
     ]
-    params["locations_different_predicates"] = indent_lines(
-        locations_different_lines, 8
-    )
+    if terminal:
+        writer.set_predicates(locs_different_lines)
+    else:
+        params["locs_different_predicates"] = indent_lines(locs_different_lines, 8)
 
     robot_available_lines = [f"(robot-available {robot})" for robot in robots]
-    params["robot_available_predicates"] = indent_lines(robot_available_lines, 8)
+    if terminal:
+        writer.set_predicates(robot_available_lines)
+    else:
+        params["robot_available_predicates"] = indent_lines(robot_available_lines, 8)
 
     init = config["init"]
     robot_at_lines = [
         f"(robot-at {robot} {init[robot]['location']})" for robot in robots
     ]
-    params["robot_at_predicates"] = indent_lines(robot_at_lines, 8)
+    if terminal:
+        writer.set_predicates(robot_at_lines)
+    else:
+        params["robot_at_predicates"] = indent_lines(robot_at_lines, 8)
 
     all_locations = all_bays + berths
     occupied_locations = [init[robot]["location"] for robot in robots]
@@ -245,29 +328,47 @@ def problem_generator(
     location_available_lines = [
         f"(location-available {location})" for location in available_locations
     ]
-    params["location_available_predicates"] = indent_lines(location_available_lines, 8)
+    if terminal:
+        writer.set_predicates(location_available_lines)
+    else:
+        params["location_available_predicates"] = indent_lines(location_available_lines, 8)
 
     need_stereo_lines = [
         goal.replace("completed-stereo", "need-stereo")
         for goal in pddl_goals
         if "completed-stereo" in goal
     ]
-    params["need_stereo_predicates"] = indent_lines(need_stereo_lines, 8)
+    if terminal:
+        writer.set_predicates(need_stereo_lines)
+    else:
+        params["need_stereo_predicates"] = indent_lines(need_stereo_lines, 8)
 
     order_identity_lines = [f"(= (order-identity o{i}) {i})" for i in range(num_orders)]
-    params["order_identity_fluents"] = indent_lines(order_identity_lines, 8)
+    if terminal:
+        writer.set_fluents(order_identity_lines)
+    else:
+        params["order_identity_fluents"] = indent_lines(order_identity_lines, 8)
 
     robot_order_lines = [f"(= (robot-order {robot}) -1)" for robot in robots]
-    params["robot_order_fluents"] = indent_lines(robot_order_lines, 8)
+    if terminal:
+        writer.set_fluents(robot_order_lines)
+    else:
+        params["robot_order_fluents"] = indent_lines(robot_order_lines, 8)
 
-    config_text = ""
-    for config_path in config_paths:
-        config_text += config_path.read_text()
-    params["config"] = comment_for_pddl(config_text)
+    if terminal:
+        output_path = pathlib.Path(str(output_path_template).replace("{ext}", ".ps2.pddl"))
+        output_path.write_text(writer.getvalue())
+        print(f"Wrote to {output_path}", file=sys.stderr)
+    else:
+        config_text = ""
+        for config_path in config_paths:
+            config_text += config_path.read_text()
+        params["config"] = comment_for_pddl(config_text)
 
-    filled_template = TEMPLATE_SUBST_REGEX.sub(TemplateFiller(params), problem_template)
-    output_path.write_text(filled_template)
-    print(f"Wrote to {output_path}", file=sys.stderr)
+        filled_template = TEMPLATE_SUBST_REGEX.sub(TemplateFiller(params), problem_template)
+        output_path = pathlib.Path(str(output_path_template).replace("{ext}", ".pddl"))
+        output_path.write_text(filled_template)
+        print(f"Wrote to {output_path}", file=sys.stderr)
 
 
 class CustomFormatter(
@@ -285,8 +386,14 @@ def main():
         description=__doc__, formatter_class=CustomFormatter
     )
     parser.add_argument(
+        "-t", "--terminal",
+        help="Format output for PlanSys2 terminal instead of PDDL",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--problem-template",
-        help="Path to input PDDL problem template",
+        help="Path to input PDDL problem template (unused if -t specified)",
         type=pathlib.Path,
         default=PDDL_DIR / "jem_survey_template.pddl",
     )
@@ -299,17 +406,18 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        help="Path for output PDDL problem",
+        help="Path for output PDDL problem ({ext} filled with extension)",
         type=pathlib.Path,
-        default=PDDL_DIR / "problem_jem_survey.pddl",
+        default=PDDL_DIR / "problem_jem_survey{ext}",
     )
     args = parser.parse_args()
 
     problem_generator(
         problem_template_path=args.problem_template,
         config_paths=args.config,
-        output_path=args.output,
+        output_path_template=args.output,
         command=shlex.join(sys.argv),
+        terminal=args.terminal,
     )
 
 

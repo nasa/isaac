@@ -24,7 +24,7 @@
 
         {{ robots_different_predicates }}
 
-        {{ locations_different_predicates }}
+        {{ locs_different_predicates }}
 
         ;; === Dynamic predicates ===
         {{ robot_available_predicates }}
