@@ -24,11 +24,11 @@
 
 goals:
 
-- {type: panorama, robot: bumble, order: 0, location: jem_bay4, run: 1}
-- {type: panorama, robot: bumble, order: 1, location: jem_bay3, run: 1}
-- {type: panorama, robot: bumble, order: 2, location: jem_bay2, run: 1}
-- {type: panorama, robot: bumble, order: 3, location: jem_bay1, run: 1}
-- {type: stereo, robot: bumble, order: 4, trajectory: jem_bay1_to_bay3, run: 1}
+- {type: panorama, robot: bumble, order: 0, location: jem_bay4}
+- {type: panorama, robot: bumble, order: 1, location: jem_bay3}
+- {type: panorama, robot: bumble, order: 2, location: jem_bay2}
+- {type: panorama, robot: bumble, order: 3, location: jem_bay1}
+- {type: stereo, robot: bumble, order: 4, trajectory: jem_bay1_to_bay3}
 
 # We want Bumble to return to its berth at the end of the run, but adding this goal causes POPF to
 # get confused and greatly increase the total run time. For some reason, it doesn't notice it can
@@ -37,13 +37,13 @@ goals:
 # about 2x.
 # - {type: robot_at, robot: bumble, location: berth1}
 
-- {type: panorama, robot: honey, order: 0, location: jem_bay7, run: 1}
-- {type: panorama, robot: honey, order: 1, location: jem_bay6, run: 1}
-- {type: panorama, robot: honey, order: 2, location: jem_bay5, run: 1}
+- {type: panorama, robot: honey, order: 0, location: jem_bay7}
+- {type: panorama, robot: honey, order: 1, location: jem_bay6}
+- {type: panorama, robot: honey, order: 2, location: jem_bay5}
 
 # This is another objective we want to include that for some reason causes POPF to fail to generate
 # a plan (hang indefinitely). No obvious reason why it should cause a problem.
-# - {type: stereo, robot: honey, order: 3, trajectory: jem_bay4_to_bay7, run: 1}
+# - {type: stereo, robot: honey, order: 3, trajectory: jem_bay4_to_bay7}
 
 - {type: robot_at, robot: honey, location: berth2}
 
