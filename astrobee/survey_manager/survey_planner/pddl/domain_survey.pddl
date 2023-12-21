@@ -10,7 +10,6 @@
         location
         robot
         order
-        run-number
     )
 
     (:predicates
@@ -67,35 +66,31 @@
         ;; preconditions of the stereo action, and one of its effects is to clear the
         ;; predicate. Therefore, the planner won't waste time trying to execute stereo actions that
         ;; the user didn't explicitly request. Without this hack, the planner run time blows up.
-        (need-stereo ?robot - robot ?order - order ?base ?bound - location ?run-number - run-number)
+        (need-stereo ?robot - robot ?order - order ?base ?bound - location)
 
         ;; === Goal predicates ===
         ;; completed-panorama: The goal to add if you want the plan to include collecting a
         ;; panorama. For now, goals specify ?robot and ?order parameters that constrain
-        ;; multi-robot task allocation and task ordering. The ?run-number is used to indicate
-        ;; retries and is meaningless to the planner but helpful for post-run analysis.
+        ;; multi-robot task allocation and task ordering.
         (completed-panorama
             ?robot - robot
             ?order - order
             ?location - location
-            ?run-number - run-number
         )
 
         ;; completed-stereo: The goal to add if you want the plan to include collecting a stereo
         ;; survey. For now, goals specify ?robot and ?order parameters that constrain multi-robot
-        ;; task allocation and task ordering. The ?run-number is used to indicate retries and is
-        ;; meaningless to the planner but helpful for post-run analysis. The current model for
-        ;; stereo surveys assumes the robot starts and ends the survey at the same location called
-        ;; ?base (these locations only need to be same to the effective precision modeled in the
-        ;; planner, "less than a bay apart").  The ?bound argument indicates the other end of the
-        ;; interval covered by the survey and is used for collision checking. It's assumed that
-        ;; ?base and ?bound are not adjacent locations. If future stereo surveys violate these
-        ;; assumptions the model will need to be revisited.
+        ;; task allocation and task ordering. The current model for stereo surveys assumes the robot
+        ;; starts and ends the survey at the same location called ?base (these locations only need
+        ;; to be same to the effective precision modeled in the planner, "less than a bay apart").
+        ;; The ?bound argument indicates the other end of the interval covered by the survey and is
+        ;; used for collision checking. It's assumed that ?base and ?bound are not adjacent
+        ;; locations. If future stereo surveys violate these assumptions the model will need to be
+        ;; revisited.
         (completed-stereo
             ?robot - robot
             ?order - order
             ?base ?bound - location
-            ?run-number - run-number
         )
     )
 
@@ -237,7 +232,6 @@
                 ?robot - robot
                 ?order - order
                 ?location - location
-                ?run-number - run-number
             )
         ;; ~13 minutes, per https://babelfish.arc.nasa.gov/confluence/display/FFOPS/ISAAC+Phase+1X+Activity+9+Ground+Procedure
         :duration (= ?duration 780)
@@ -262,7 +256,7 @@
                 (at end (assign (robot-order ?robot) (order-identity ?order)))
 
                 ;; Mark success
-                (at end (completed-panorama ?robot ?order ?location ?run-number))
+                (at end (completed-panorama ?robot ?order ?location))
             )
     )
 
@@ -275,7 +269,6 @@
                 ?base ?bound - location
                 ;; ?check1 and ?check2: Planner-selected neighbors of ?bound for collision check
                 ?check1 ?check2 - location
-                ?run-number - run-number
             )
         :duration (= ?duration 600)  ;; 10 minutes
         :condition
@@ -292,7 +285,7 @@
 
                 ;; Check for need-stereo so the planner only tries this action when the user
                 ;; explicitly requests it.
-                (at start (need-stereo ?robot ?order ?base ?bound ?run-number))
+                (at start (need-stereo ?robot ?order ?base ?bound))
 
                 ;; Check collision avoidance
                 (at start (location-available ?bound))
@@ -321,10 +314,10 @@
 
                 ;; Clear need-stereo so the planner won't try to use the stereo action
                 ;; again after the user request is satisfied.
-                (at end (not (need-stereo ?robot ?order ?base ?bound ?run-number)))
+                (at end (not (need-stereo ?robot ?order ?base ?bound)))
 
                 ;; Mark success
-                (at end (completed-stereo ?robot ?order ?base ?bound ?run-number))
+                (at end (completed-stereo ?robot ?order ?base ?bound))
             )
     )
 

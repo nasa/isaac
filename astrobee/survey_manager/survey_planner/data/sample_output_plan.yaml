@@ -47,8 +47,7 @@
     - 11.0
     - -7.0
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
+  duration_seconds: '780.000'
 - start_time_seconds: '100.004'
   action:
     type: panorama
@@ -58,9 +57,8 @@
     - 11.0
     - -9.7
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
-- start_time_seconds: '990.005'
+  duration_seconds: '780.000'
+- start_time_seconds: '870.005'
   action:
     type: move
     robot: bumble
@@ -70,7 +68,7 @@
     - -6.0
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '1000.005'
+- start_time_seconds: '880.005'
   action:
     type: move
     robot: honey
@@ -80,7 +78,7 @@
     - -9.0
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '1010.006'
+- start_time_seconds: '890.006'
   action:
     type: panorama
     robot: bumble
@@ -89,9 +87,8 @@
     - 11.0
     - -6.0
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
-- start_time_seconds: '1020.006'
+  duration_seconds: '780.000'
+- start_time_seconds: '900.006'
   action:
     type: panorama
     robot: honey
@@ -100,9 +97,8 @@
     - 11.0
     - -9.0
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
-- start_time_seconds: '1910.007'
+  duration_seconds: '780.000'
+- start_time_seconds: '1670.007'
   action:
     type: move
     robot: bumble
@@ -112,7 +108,7 @@
     - -5.0
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '1930.008'
+- start_time_seconds: '1690.008'
   action:
     type: panorama
     robot: bumble
@@ -121,9 +117,8 @@
     - 11.0
     - -5.0
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
-- start_time_seconds: '2830.009'
+  duration_seconds: '780.000'
+- start_time_seconds: '2470.009'
   action:
     type: move
     robot: bumble
@@ -133,7 +128,7 @@
     - -4.0
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '2850.010'
+- start_time_seconds: '2490.010'
   action:
     type: panorama
     robot: bumble
@@ -142,16 +137,14 @@
     - 11.0
     - -4.0
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
-- start_time_seconds: '3750.011'
+  duration_seconds: '780.000'
+- start_time_seconds: '3270.011'
   action:
     type: stereo
     robot: bumble
     fplan: jem_stereo_mapping_bay1_to_bay3.fplan
-    run: 1
   duration_seconds: '600.000'
-- start_time_seconds: '4350.012'
+- start_time_seconds: '3870.012'
   action:
     type: move
     robot: honey
@@ -161,7 +154,7 @@
     - -8.0
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '4370.013'
+- start_time_seconds: '3890.013'
   action:
     type: panorama
     robot: honey
@@ -170,9 +163,8 @@
     - 11.0
     - -8.0
     - 4.8
-    run: 1
-  duration_seconds: '900.000'
-- start_time_seconds: '5270.014'
+  duration_seconds: '780.000'
+- start_time_seconds: '4670.014'
   action:
     type: move
     robot: honey
@@ -182,7 +174,7 @@
     - -9.0
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '5290.015'
+- start_time_seconds: '4690.015'
   action:
     type: move
     robot: honey
@@ -192,7 +184,7 @@
     - -9.7
     - 4.8
   duration_seconds: '20.000'
-- start_time_seconds: '5310.016'
+- start_time_seconds: '4710.016'
   action:
     type: dock
     robot: honey
