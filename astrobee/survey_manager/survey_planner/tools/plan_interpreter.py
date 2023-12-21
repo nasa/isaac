@@ -35,7 +35,7 @@ import collections
 import pathlib
 import re
 import sys
-from typing import Any, Dict, Iterable, List, Optional, Tuple, TypeVar
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, TypeVar
 
 import numpy as np
 import yaml
@@ -43,7 +43,7 @@ from matplotlib import collections as mc
 from matplotlib import patches as mp
 from matplotlib import pyplot as plt
 
-from problem_generator import CWD, DATA_DIR, PDDL_DIR, load_yaml, path_list
+from problem_generator import DATA_DIR, load_yaml, path_list
 
 DEFAULT_CONFIGS = [
     DATA_DIR / "jem_survey_static.yaml",
@@ -59,11 +59,12 @@ ACTION_TYPE_OPTIONS = (
     "let-other-robot-reach",
 )
 COLORS = {"bumble": "#4080ffff", "honey": "#c0c080ff"}
+ROBOTS = list(COLORS.keys())
 
 # Type alias
 YamlMapping = Dict[str, Any]
 FloatStr = str  # String representation of a floating-point value
-T = TypeVar("T")
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 # POPF plan output weirdly mixes its random debugging output with the actual plan actions that it
 # outputs in a standard format. (Maybe there's some way to suppress the debug info?) Anyway, this
@@ -183,7 +184,7 @@ def parse_plan(plan_path: pathlib.Path) -> List[PlanAction]:
     """
     Return a list of PlanActions read from the PDDL plan at `plan_path`.
     """
-    actions = []
+    actions: List[PlanAction] = []
     with plan_path.open(encoding="utf-8") as plan_stream:
         for plan_line in plan_stream:
             match = PLAN_ACTION_REGEX.search(plan_line)
@@ -216,6 +217,7 @@ def parse_plan(plan_path: pathlib.Path) -> List[PlanAction]:
 
 
 def filter_none(elts: Iterable[Optional[T]]) -> List[T]:
+    "Return `elts` filtered to remove `None` values."
     return [x for x in elts if x is not None]
 
 
@@ -231,18 +233,21 @@ class NoAliasDumper(
 
 
 def save_plan_yaml(output_path: pathlib.Path, yaml_actions: List[YamlMapping]) -> None:
+    "Save plan `yaml_actions` to `output_path` in YAML format."
     with output_path.open("w", encoding="utf-8") as output_stream:
         yaml.dump(yaml_actions, output_stream, Dumper=NoAliasDumper, sort_keys=False)
     print(f"Wrote YAML plan to {output_path}", file=sys.stderr)
 
 
-def plot_plan(
-    plot_path: pathlib.Path, yaml_actions: List[YamlMapping], config: YamlMapping
-) -> None:
-    robot_time_pos = collections.defaultdict(list)
-    # robot_dock_points = collections.defaultdict(list)
-    robot_pano_lines = collections.defaultdict(list)
-    robot_stereo_rects = collections.defaultdict(list)
+def plot_plan(plot_path: pathlib.Path, yaml_actions: List[YamlMapping]) -> None:
+    "Save a plot image of plan `yaml_actions` to `plot_path`."
+    # Type aliases
+    TimePos = Tuple[float, int]
+    PanoLine = Tuple[TimePos, TimePos]
+
+    robot_time_pos: Mapping[str, List[TimePos]] = collections.defaultdict(list)
+    robot_pano_lines: Mapping[str, List[PanoLine]] = collections.defaultdict(list)
+    robot_stereo_rects: Mapping[str, List[mp.Rectangle]] = collections.defaultdict(list)
 
     for plan_action in yaml_actions:
         action = plan_action["action"]
@@ -289,8 +294,8 @@ def plot_plan(
                 )
             )
 
-    fig, ax = plt.subplots()
-    for robot in config["robots"]:
+    fig, ax = plt.subplots()  # pylint: disable=invalid-name
+    for robot in ROBOTS:
         time_pos = np.array(robot_time_pos[robot])
         plt.plot(time_pos[:, 0], time_pos[:, 1], "o-", label=robot, color=COLORS[robot])
 
@@ -342,16 +347,17 @@ def plan_interpreter(
     save_plan_yaml(output_path, yaml_actions)
 
     if plot_path is not None:
-        plot_plan(plot_path, yaml_actions, config)
+        plot_plan(plot_path, yaml_actions)
 
 
 class CustomFormatter(
     argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter
 ):
-    pass
+    "Custom formatter for argparse that combines mixins."
 
 
 def main():
+    "Parse arguments and invoke plan_interpreter()."
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
