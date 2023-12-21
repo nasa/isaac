@@ -1,7 +1,0 @@
-<root BTCPP_format="4" main_tree_to_execute = "MainTree" >
-    <BehaviorTree ID="MainTree">
-       <Sequence name="root_sequence">
-           <Move    name="collecting_panoramas" goal="${arg2}"/>
-       </Sequence>
-    </BehaviorTree>
-</root>

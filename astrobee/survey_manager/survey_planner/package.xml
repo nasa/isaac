@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>survey_planner</name>
+  <version>0.1.0</version>
+  <description>PDDL Planning via Plansys2 on ROS1 Noetic for Astrobee</description>
+  <license>
+    Apache License, Version 2.0
+  </license>
+  <author email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </author>
+  <maintainer email="astrobee-fsw@nx.arc.nasa.gov">
+    ISAAC Flight Software
+  </maintainer>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>roscpp</depend>
+  <depend>std_srvs</depend>
+  <depend>lifecycle_msgs</depend>
+
+  <depend>plansys2_domain_expert</depend>
+  <depend>plansys2_problem_expert</depend>
+  <depend>plansys2_executor</depend>
+  <depend>plansys2_planner</depend>
+  <depend>plansys2_msgs</depend>
+  <depend>tf</depend>
+
+  <depend>ff_msgs</depend>
+
+  <export>
+    <nodelet plugin="${prefix}/nodelet_plugins.xml" />
+  </export>
+</package>

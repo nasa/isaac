@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- arguments -->
+  <arg name="model_file" default="$(find survey_planner)/pddl/domain_survey.pddl"/>
+  <arg name="namespace" default="" />
+  <arg name="params_file" default="$(find plansys2_bringup)/params/plansys2_params.yaml" />
+
+  <!-- true: There is a lifecycle management node for the Lifecycles nodes. If false, the nodes start on their own -->
+  <param name="lifecycle_enabled" value="true"/>
+
+  <!-- Domain Expert -->
+  <include file="$(find plansys2_domain_expert)/launch/domain_expert.launch">
+    <arg name="model_file"   value="$(arg model_file)"/>
+    <arg name="namespace"  value="$(arg namespace)"/>
+    <arg name="params_file" value="$(arg params_file)"/>
+  </include>
+
+  <!-- Problem Expert -->
+  <include file="$(find plansys2_problem_expert)/launch/problem_expert.launch">
+    <arg name="model_file"   value="$(arg model_file)"/>
+    <arg name="namespace"  value="$(arg namespace)"/>
+    <arg name="params_file" value="$(arg params_file)"/>
+  </include>
+
+  <!-- Manager -->
+  <node name="lifecycle_manager_node" pkg="plansys2_lifecycle_manager" type="lifecycle_manager_node" output="screen">
+  </node>
+
+</launch>
+
