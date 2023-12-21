@@ -44,14 +44,14 @@ robots: [bumble, honey]
 stereo:
   # Meta-data about stereo survey options
   jem_bay1_to_bay3:
-    # fplan: Name of external fplan specification of trajectory in astrobee_ops/gds/plans/ISAAC/
+    # fplan: Name of external fplan specification of trajectory in astrobee_ops/gds/plans/ISAAC/ . The
+    # bay names are intended to indicate which bays are covered by the stereo survey.
     fplan: "jem_stereo_mapping_bay1_to_bay3.fplan"
     # base_location: Where trajectory starts and ends for planning purposes (rough location, not exact)
     base_location: jem_bay1
-    # bound_location: The other end of the interval covered by the trajectory, for planner collision
-    # check purposes. (Note a trajectory may fly a bit into a bay that it doesn't claim to cover.
-    # The two surveys that cover the module purposefully overlap.)
-    bound_location: jem_bay4
+    # bound_location: The other end of the interval visited by the trajectory, for planner collision
+    # check purposes.
+    bound_location: jem_bay4  # The survey flies into bay4 even though it only covers up to bay3
   jem_bay4_to_bay7:
     fplan: "jem_stereo_mapping_bay4_to_bay7.fplan"
     base_location: jem_bay7

@@ -92,6 +92,16 @@
             ?order - order
             ?base ?bound - location
         )
+
+	;; completed-let-other-robot-reach: The goal to add if you want one robot to wait for the
+	;; other to reach a certain location before pursuing its remaining goals (ones with larger
+	;; ?order values). This basically enables a user to provide a specific kind of
+	;; between-robots ordering hint to the planner.
+	(completed-let-other-robot-reach
+	    ?robot - robot
+	    ?order - order
+	    ?loc - location
+	)
     )
 
     (:functions
@@ -321,4 +331,35 @@
             )
     )
 
+    (:durative-action let-other-robot-reach
+        :parameters (
+            ?robot - robot
+	    ?order - order
+            ?other-loc - location  ;; location other robot needs to reach
+	    ?other-robot - robot
+        )
+        :duration (= ?duration 0)
+        :condition
+            (and
+                ;; Check robot mutex
+                (at start (robot-available ?robot))
+
+                ;; Check order
+                (at start (< (robot-order ?robot) (order-identity ?order)))
+
+		;; Check parameters make sense
+		(at start (robots-different ?robot ?other-robot))
+
+                ;; The main point is to wait until this condition is met
+		(at start (robot-at ?other-robot ?other-loc))
+            )
+        :effect
+            (and
+                ;; Update order
+                (at end (assign (robot-order ?robot) (order-identity ?order)))
+
+		; Mark success
+	        (at end (completed-let-other-robot-reach ?robot ?order ?other-loc))
+            )
+    )
 )

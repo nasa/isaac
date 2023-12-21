@@ -49,7 +49,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, TypeVar
 
 import yaml
 
-GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at")
+GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at", "let_other_robot_reach")
 
 THIS_DIR = pathlib.Path(__file__).resolve().parent
 CWD = pathlib.Path.cwd()
@@ -104,6 +104,12 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
         robot = goal["robot"]
         location = goal["location"]
         return f"(robot-at {robot} {location})"
+
+    if goal_type == "let_other_robot_reach":
+        robot = goal["robot"]
+        location = goal["location"]
+        order = goal["order"]
+        return f"(completed-let-other-robot-reach {robot} o{order} {location})"
 
     assert False, "Never reach this point"
     return {}  # Make pylint happy

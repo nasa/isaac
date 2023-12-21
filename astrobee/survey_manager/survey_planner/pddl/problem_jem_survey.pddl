@@ -21,9 +21,12 @@
             (completed-panorama bumble o2 jem_bay2)
             (completed-panorama bumble o3 jem_bay1)
             (completed-stereo bumble o4 jem_bay1 jem_bay4)
-            (completed-panorama honey o0 jem_bay7)
-            (completed-panorama honey o1 jem_bay6)
-            (completed-panorama honey o2 jem_bay5)
+            (robot-at bumble berth1)
+            (completed-let-other-robot-reach honey o0 jem_bay5)
+            (completed-panorama honey o1 jem_bay7)
+            (completed-panorama honey o2 jem_bay6)
+            (completed-panorama honey o3 jem_bay5)
+            (completed-stereo honey o4 jem_bay7 jem_bay4)
             (robot-at honey berth2)
         )
     )
@@ -145,6 +148,7 @@
         (location-available jem_bay7)
         (location-available jem_bay8)
         (need-stereo bumble o4 jem_bay1 jem_bay4)
+        (need-stereo honey o4 jem_bay7 jem_bay4)
 
         ;; === Static numeric fluents ===
         (= (order-identity o0) 0)
@@ -257,15 +261,16 @@
 ;; # use the same plan as without this goal and then add some motion actions at the end to achieve this
 ;; # goal. Instead, it falls back to only undocking one robot at a time, which slows things down by
 ;; # about 2x.
-;; # - {type: robot_at, robot: bumble, location: berth1}
+;; - {type: robot_at, robot: bumble, location: berth1}
 ;;
-;; - {type: panorama, robot: honey, order: 0, location: jem_bay7}
-;; - {type: panorama, robot: honey, order: 1, location: jem_bay6}
-;; - {type: panorama, robot: honey, order: 2, location: jem_bay5}
+;; - {type: let_other_robot_reach, robot: honey, order: 0, location: jem_bay5}
+;; - {type: panorama, robot: honey, order: 1, location: jem_bay7}
+;; - {type: panorama, robot: honey, order: 2, location: jem_bay6}
+;; - {type: panorama, robot: honey, order: 3, location: jem_bay5}
 ;;
 ;; # This is another objective we want to include that for some reason causes POPF to fail to generate
 ;; # a plan (hang indefinitely). No obvious reason why it should cause a problem.
-;; # - {type: stereo, robot: honey, order: 3, trajectory: jem_bay4_to_bay7}
+;; - {type: stereo, robot: honey, order: 4, trajectory: jem_bay4_to_bay7}
 ;;
 ;; - {type: robot_at, robot: honey, location: berth2}
 ;;

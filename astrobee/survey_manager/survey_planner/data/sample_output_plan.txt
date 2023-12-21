@@ -1,31 +1,154 @@
-$ time popf pddl/domain_survey.pddl pddl/problem_jem_survey.pddl
+$ (ulimit -t 10 && time ./optic_planner pddl/domain_survey.pddl pddl/problem_jem_survey.pddl)
+Number of literals: 215
 Constructing lookup tables: [10%] [20%] [30%] [40%] [50%] [60%] [70%] [80%] [90%] [100%]
 Post filtering unreachable actions:  [10%] [20%] [30%] [40%] [50%] [60%] [70%] [80%] [90%] [100%]
-16% of the ground temporal actions in this problem are compression-safe
-b (25.000 | 30.000)b (24.000 | 50.001)b (23.000 | 70.002)b (22.000 | 90.003)b (21.000 | 870.004)b (20.000 | 870.004)b (19.000 | 890.005)b (18.000 | 1670.006)b (17.000 | 1670.006)b (16.000 | 1690.007)b (15.000 | 2470.008)b (14.000 | 2470.008)b (13.000 | 2490.009)b (12.000 | 3270.010)b (11.000 | 3270.010)b (10.000 | 3870.011)b (9.000 | 3870.011)b (8.000 | 3870.011)b (7.000 | 3870.011)b (6.000 | 3870.011)b (5.000 | 3870.011)b (4.000 | 4670.013)b (3.000 | 4670.013)b (2.000 | 4690.014)b (1.000 | 4710.015);;;; Solution Found
-; Time 0.21
+(robot-order bumble) has finite bounds: [-1.000,4.000]
+(robot-order honey) has finite bounds: [-1.000,4.000]
+Have identified that smaller values of (robot-order bumble) are preferable
+Have identified that smaller values of (robot-order honey) are preferable
+Seeing if metric is defined in terms of task vars or a minimal value of makespan
+- Yes it is
+Recognised a monotonic-change-induced limit on -1.000*<special>
+- Must be >=  the metric
+[01;31mLooking for achievers for goal index 0, fact (completed-panorama bumble o0 jem_bay4) with fID 83[00m
+ (panorama bumble o0 jem_bay4)
+[01;34mFor limits: literal goal index 0, fact (completed-panorama bumble o0 jem_bay4), could be achieved by operator (panorama bumble o0 jem_bay4), which has other interesting effects (including one on (robot-available bumble) )[00m
+[01;31mLooking for achievers for goal index 1, fact (completed-panorama bumble o1 jem_bay3) with fID 75[00m
+ (panorama bumble o1 jem_bay3)
+[01;34mFor limits: literal goal index 1, fact (completed-panorama bumble o1 jem_bay3), could be achieved by operator (panorama bumble o1 jem_bay3), which has other interesting effects (including one on (robot-available bumble) )[00m
+[01;31mLooking for achievers for goal index 2, fact (completed-panorama bumble o2 jem_bay2) with fID 67[00m
+ (panorama bumble o2 jem_bay2)
+[01;34mFor limits: literal goal index 2, fact (completed-panorama bumble o2 jem_bay2), could be achieved by operator (panorama bumble o2 jem_bay2), which has other interesting effects (including one on (robot-available bumble) )[00m
+[01;31mLooking for achievers for goal index 3, fact (completed-panorama bumble o3 jem_bay1) with fID 59[00m
+ (panorama bumble o3 jem_bay1)
+[01;34mFor limits: literal goal index 3, fact (completed-panorama bumble o3 jem_bay1), could be achieved by operator (panorama bumble o3 jem_bay1), which has other interesting effects (including one on (robot-available bumble) )[00m
+[01;31mLooking for achievers for goal index 4, fact (completed-stereo bumble o4 jem_bay1 jem_bay4) with fID 123[00m
+ (stereo bumble o4 jem_bay1 jem_bay4 jem_bay5 jem_bay3) (stereo bumble o4 jem_bay1 jem_bay4 jem_bay3 jem_bay5)
+[01;34mFor limits: literal goal index 4, fact (completed-stereo bumble o4 jem_bay1 jem_bay4), could be achieved by operator (stereo bumble o4 jem_bay1 jem_bay4 jem_bay5 jem_bay3), which has other interesting effects (including one on (location-available jem_bay4) )[00m
+[01;34mFor limits: literal goal index 5, fact (robot-at bumble berth1), is static or a precondition[00m
+[01;31mLooking for achievers for goal index 6, fact (completed-let-other-robot-reach honey o0 jem_bay5) with fID 155[00m
+ (let-other-robot-reach honey o0 jem_bay5 bumble)
+  Looking at numeric effects of (let-other-robot-reach honey o0 jem_bay5 bumble): 1 and 0
+[01;34mFor limits: literal goal index 6, fact (completed-let-other-robot-reach honey o0 jem_bay5), could be achieved by operator (let-other-robot-reach honey o0 jem_bay5 bumble), which has a non-trivial numeric effect ((robot-order honey) = 0.000)[00m
+[01;31mLooking for achievers for goal index 7, fact (completed-panorama honey o1 jem_bay7) with fID 116[00m
+ (panorama honey o1 jem_bay7)
+[01;34mFor limits: literal goal index 7, fact (completed-panorama honey o1 jem_bay7), could be achieved by operator (panorama honey o1 jem_bay7), which has other interesting effects (including one on (robot-available honey) )[00m
+[01;31mLooking for achievers for goal index 8, fact (completed-panorama honey o2 jem_bay6) with fID 108[00m
+ (panorama honey o2 jem_bay6)
+[01;34mFor limits: literal goal index 8, fact (completed-panorama honey o2 jem_bay6), could be achieved by operator (panorama honey o2 jem_bay6), which has other interesting effects (including one on (robot-available honey) )[00m
+[01;31mLooking for achievers for goal index 9, fact (completed-panorama honey o3 jem_bay5) with fID 100[00m
+ (panorama honey o3 jem_bay5)
+[01;34mFor limits: literal goal index 9, fact (completed-panorama honey o3 jem_bay5), could be achieved by operator (panorama honey o3 jem_bay5), which has other interesting effects (including one on (robot-available honey) )[00m
+[01;31mLooking for achievers for goal index 10, fact (completed-stereo honey o4 jem_bay7 jem_bay4) with fID 124[00m
+ (stereo honey o4 jem_bay7 jem_bay4 jem_bay5 jem_bay3) (stereo honey o4 jem_bay7 jem_bay4 jem_bay3 jem_bay5)
+[01;34mFor limits: literal goal index 10, fact (completed-stereo honey o4 jem_bay7 jem_bay4), could be achieved by operator (stereo honey o4 jem_bay7 jem_bay4 jem_bay5 jem_bay3), which has other interesting effects (including one on (location-available jem_bay4) )[00m
+[01;34mFor limits: literal goal index 11, fact (robot-at honey berth2), is static or a precondition[00m
+Assignment numeric effect ((robot-order bumble) = 0.000) makes effects on 0 be order-dependent
+Assignment numeric effect ((robot-order honey) = 0.000) makes effects on 1 be order-dependent
+Assignment numeric effect ((robot-order bumble) = 1.000) makes effects on 0 be order-dependent
+Assignment numeric effect ((robot-order honey) = 1.000) makes effects on 1 be order-dependent
+Assignment numeric effect ((robot-order bumble) = 2.000) makes effects on 0 be order-dependent
+Assignment numeric effect ((robot-order honey) = 2.000) makes effects on 1 be order-dependent
+Assignment numeric effect ((robot-order bumble) = 3.000) makes effects on 0 be order-dependent
+Assignment numeric effect ((robot-order honey) = 3.000) makes effects on 1 be order-dependent
+Assignment numeric effect ((robot-order bumble) = 4.000) makes effects on 0 be order-dependent
+Assignment numeric effect ((robot-order honey) = 4.000) makes effects on 1 be order-dependent
+27% of the ground temporal actions in this problem are compression-safe
+Initial heuristic = 29.000, admissible cost estimate 930.008
+b (28.000 | 630.001)
+Resorting to best-first search
+Running WA* with W = 5.000, not restarting with goal states
+b (28.000 | 630.001)b (28.000 | 70.003)b (27.000 | 870.005)b (26.000 | 870.005)b (25.000 | 880.005)b (24.000 | 880.005)b (23.000 | 1670.007)b (22.000 | 1670.007)b (21.000 | 1680.007)b (20.000 | 1680.007)b (19.000 | 2470.009)b (18.000 | 2470.009)b (17.000 | 2470.009)b (16.000 | 3270.011)b (15.000 | 3270.011)b (14.000 | 3870.012)b (13.000 | 3890.013)b (12.000 | 4470.013)b (12.000 | 3930.015)b (11.000 | 3950.016)b (10.000 | 3970.017)b (9.000 | 3990.018)b (7.000 | 4020.019)b (6.000 | 4650.021)b (4.000 | 4890.024)b (3.000 | 4910.025)b (2.000 | 5510.026)b (1.000 | 5510.026)(G)
+; LP calculated the cost
+
+; Plan found with metric 5540.027
+; Theoretical reachable cost 5540.028
+; States evaluated so far: 504
+; States pruned based on pre-heuristic cost lower bound: 0
+; Time 1.64
 0.000: (undock bumble berth1 jem_bay7 jem_bay8 jem_bay6)  [30.000]
 30.001: (move bumble jem_bay7 jem_bay6 jem_bay5)  [20.000]
 50.002: (move bumble jem_bay6 jem_bay5 jem_bay4)  [20.000]
-70.003: (move bumble jem_bay5 jem_bay4 jem_bay3)  [20.000]
-70.003: (undock honey berth2 jem_bay7 jem_bay8 jem_bay6)  [30.000]
-90.004: (panorama bumble o0 jem_bay4)  [780.000]
-100.004: (panorama honey o0 jem_bay7)  [780.000]
-870.005: (move bumble jem_bay4 jem_bay3 jem_bay2)  [20.000]
-880.005: (move honey jem_bay7 jem_bay6 jem_bay5)  [20.000]
-890.006: (panorama bumble o1 jem_bay3)  [780.000]
-900.006: (panorama honey o1 jem_bay6)  [780.000]
-1670.007: (move bumble jem_bay3 jem_bay2 jem_bay1)  [20.000]
-1690.008: (panorama bumble o2 jem_bay2)  [780.000]
-2470.009: (move bumble jem_bay2 jem_bay1 jem_bay0)  [20.000]
-2490.010: (panorama bumble o3 jem_bay1)  [780.000]
-3270.011: (stereo bumble o4 jem_bay1 jem_bay4 jem_bay5 jem_bay3)  [600.000]
-3870.012: (move honey jem_bay6 jem_bay5 jem_bay4)  [20.000]
-3890.013: (panorama honey o2 jem_bay5)  [780.000]
-4670.014: (move honey jem_bay5 jem_bay6 jem_bay7)  [20.000]
-4690.015: (move honey jem_bay6 jem_bay7 jem_bay8)  [20.000]
-4710.016: (dock honey jem_bay7 berth2)  [30.000]
+70.003: (let-other-robot-reach honey o0 jem_bay5 bumble)  [0.000]
+70.004: (move bumble jem_bay5 jem_bay4 jem_bay3)  [20.000]
+70.004: (undock honey berth2 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+90.005: (panorama bumble o0 jem_bay4)  [780.000]
+100.005: (panorama honey o1 jem_bay7)  [780.000]
+870.006: (move bumble jem_bay4 jem_bay3 jem_bay2)  [20.000]
+880.006: (move honey jem_bay7 jem_bay6 jem_bay5)  [20.000]
+890.007: (panorama bumble o1 jem_bay3)  [780.000]
+900.007: (panorama honey o2 jem_bay6)  [780.000]
+1670.008: (move bumble jem_bay3 jem_bay2 jem_bay1)  [20.000]
+1680.008: (move honey jem_bay6 jem_bay7 jem_bay8)  [20.000]
+1690.009: (panorama bumble o2 jem_bay2)  [780.000]
+1700.009: (dock honey jem_bay7 berth2)  [30.000]
+2470.010: (move bumble jem_bay2 jem_bay1 jem_bay0)  [20.000]
+2490.011: (panorama bumble o3 jem_bay1)  [780.000]
+3270.012: (stereo bumble o4 jem_bay1 jem_bay4 jem_bay5 jem_bay3)  [600.000]
+3870.013: (move bumble jem_bay1 jem_bay2 jem_bay3)  [20.000]
+3890.014: (move bumble jem_bay2 jem_bay3 jem_bay4)  [20.000]
+3910.015: (move bumble jem_bay3 jem_bay4 jem_bay5)  [20.000]
+3930.016: (move bumble jem_bay4 jem_bay5 jem_bay6)  [20.000]
+3950.017: (move bumble jem_bay5 jem_bay6 jem_bay7)  [20.000]
+3970.018: (move bumble jem_bay6 jem_bay7 jem_bay8)  [20.000]
+3990.019: (dock bumble jem_bay7 berth1)  [30.000]
+4020.020: (undock honey berth2 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+4050.021: (move honey jem_bay7 jem_bay6 jem_bay5)  [20.000]
+4070.022: (move honey jem_bay6 jem_bay5 jem_bay4)  [20.000]
+4090.023: (panorama honey o3 jem_bay5)  [780.000]
+4870.024: (move honey jem_bay5 jem_bay6 jem_bay7)  [20.000]
+4890.025: (move honey jem_bay6 jem_bay7 jem_bay8)  [20.000]
+4910.026: (stereo honey o4 jem_bay7 jem_bay4 jem_bay5 jem_bay3)  [600.000]
+5510.027: (dock honey jem_bay7 berth2)  [30.000]
 
-real	0m0.221s
-user	0m0.208s
-sys	0m0.013s
+ * All goal deadlines now no later than 5540.027
+b (1.000 | 5470.024)(G)
+; LP calculated the cost
+
+; Plan found with metric 5500.025
+; Theoretical reachable cost 5500.026
+; States evaluated so far: 866
+; States pruned based on pre-heuristic cost lower bound: 1
+; Time 2.85
+0.000: (undock bumble berth1 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+30.001: (move bumble jem_bay7 jem_bay6 jem_bay5)  [20.000]
+50.002: (move bumble jem_bay6 jem_bay5 jem_bay4)  [20.000]
+70.003: (let-other-robot-reach honey o0 jem_bay5 bumble)  [0.000]
+70.004: (move bumble jem_bay5 jem_bay4 jem_bay3)  [20.000]
+70.004: (undock honey berth2 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+90.005: (panorama bumble o0 jem_bay4)  [780.000]
+100.005: (panorama honey o1 jem_bay7)  [780.000]
+870.006: (move bumble jem_bay4 jem_bay3 jem_bay2)  [20.000]
+880.006: (move honey jem_bay7 jem_bay6 jem_bay5)  [20.000]
+890.007: (panorama bumble o1 jem_bay3)  [780.000]
+900.007: (panorama honey o2 jem_bay6)  [780.000]
+1670.008: (move bumble jem_bay3 jem_bay2 jem_bay1)  [20.000]
+1690.009: (panorama bumble o2 jem_bay2)  [780.000]
+2470.010: (move bumble jem_bay2 jem_bay1 jem_bay0)  [20.000]
+2490.011: (panorama bumble o3 jem_bay1)  [780.000]
+3270.012: (stereo bumble o4 jem_bay1 jem_bay4 jem_bay5 jem_bay3)  [600.000]
+3870.013: (move bumble jem_bay1 jem_bay2 jem_bay3)  [20.000]
+3870.013: (move honey jem_bay6 jem_bay5 jem_bay4)  [20.000]
+3890.014: (move bumble jem_bay2 jem_bay3 jem_bay4)  [20.000]
+3890.014: (panorama honey o3 jem_bay5)  [780.000]
+4670.015: (move honey jem_bay5 jem_bay6 jem_bay7)  [20.000]
+4690.016: (move bumble jem_bay3 jem_bay4 jem_bay5)  [20.000]
+4690.016: (move honey jem_bay6 jem_bay7 jem_bay8)  [20.000]
+4710.017: (dock honey jem_bay7 berth2)  [30.000]
+4710.017: (move bumble jem_bay4 jem_bay3 jem_bay2)  [20.000]
+4730.018: (move bumble jem_bay3 jem_bay2 jem_bay1)  [20.000]
+4740.018: (undock honey berth2 jem_bay7 jem_bay8 jem_bay6)  [30.000]
+4770.019: (stereo honey o4 jem_bay7 jem_bay4 jem_bay5 jem_bay3)  [600.000]
+5370.020: (dock honey jem_bay7 berth2)  [30.000]
+5370.020: (move bumble jem_bay2 jem_bay3 jem_bay4)  [20.000]
+5390.021: (move bumble jem_bay3 jem_bay4 jem_bay5)  [20.000]
+5410.022: (move bumble jem_bay4 jem_bay5 jem_bay6)  [20.000]
+5430.023: (move bumble jem_bay5 jem_bay6 jem_bay7)  [20.000]
+5450.024: (move bumble jem_bay6 jem_bay7 jem_bay8)  [20.000]
+5470.025: (dock bumble jem_bay7 berth1)  [30.000]
+
+ * All goal deadlines now no later than 5500.025
+
+real	0m10.009s
+user	0m9.767s
+sys	0m0.240s
