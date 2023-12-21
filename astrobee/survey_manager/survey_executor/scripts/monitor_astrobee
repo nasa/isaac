@@ -53,7 +53,7 @@ def thread_read_output(sock_output):
             request = sock_output.recv(1024)
             request = request.decode("utf-8")  # convert bytes tro str
 
-            print(request)
+            print(request, end='')
     except:
         print("exit input")
 

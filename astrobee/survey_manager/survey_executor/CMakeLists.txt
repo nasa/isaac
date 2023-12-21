@@ -17,7 +17,7 @@
 # under the License.
 
 cmake_minimum_required(VERSION 3.0)
-project(survey_manager)
+project(survey_executor)
 
 ## Compile as C++14, supported in ROS Kinetic and newer
 add_compile_options(-std=c++14)

@@ -113,16 +113,6 @@ class ProcessExecutor:
         self.sock_input.close()
         self.sock_output.close()
 
-    # def connect_input_callback(sock, addr):
-    #     """Callback function that is called when a connection is made to the socket."""
-    #     print("Input connection made from", addr)
-    #     sock_input_connected = False
-
-    # def connect_output_callback(sock, addr):
-    #     """Callback function that is called when a connection is made to the socket."""
-    #     print("Output connection made from", addr)
-    #     sock_output_connected = False
-
     def thread_write_output(self, process):
         print("starting thread_write_output...")
         # Store cumulative output
@@ -131,22 +121,30 @@ class ProcessExecutor:
         try:
             while True:
                 # Get output from process
-                output = process.stdout.readline()
-                if (output == '' and process.poll() is not None) or self._stop_event.is_set():
+                char = process.stdout.read(1)
+                # output = process.stdout.readline()
+                if (char == '' and process.poll() is not None) or self._stop_event.is_set():
                     break
-                if output:
-                    output_total += output
+                if char:
+                    if char == '\r':
+                        print("got rrrr")
+                        last_newline_index = output_total.rfind('\n')
+                        output_total = output_total[:last_newline_index + 1] if last_newline_index != -1 else ""
+                    else:
+                        output_total += char
+                    # Check if output has \r
 
                 # If socket is not connected try to connect
                 if not connected:
                     try:
-                        print("trying to connect")
+                        # print("trying to connect output")
                         conn, addr = self.sock_output.accept()
                         conn.setblocking(False)
 
                         connected = True
                         # Always send full history to each newly connecting client so history
                         # is not lost if the connection is dropped
+                        print(output_total)
                         conn.send(output_total.encode("utf-8")[:1024])
                     except socket.timeout:
                         continue
@@ -157,7 +155,7 @@ class ProcessExecutor:
                 # If socket is already connected, send output
                 elif connected:
                     try:
-                        conn.send(output.encode("utf-8")[:1024])
+                        conn.send(char.encode("utf-8")[:1024])
                     except (socket.error, BrokenPipeError):
                         print("Error sending data. Receiver may have disconnected.")
                         connected = False
@@ -165,7 +163,7 @@ class ProcessExecutor:
             print("exit output:")
             print(e)
         # finally:
-        #     # Save total output into a log
+        #     # Save total output into a log file
         #     print(output_total)
 
     def thread_read_input(self, process):
@@ -173,7 +171,7 @@ class ProcessExecutor:
         try:
             while True:
                 while not self._stop_event.is_set():
-                    print("waiting for connection")
+                    # print("waiting for connection")
                     try:
                         client_socket, client_address = self.sock_input.accept()
                         break

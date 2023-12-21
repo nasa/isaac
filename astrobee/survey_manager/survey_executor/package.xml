@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>survey_manager</name>
+  <name>survey_executor</name>
   <version>0.0.0</version>
   <description>The survey_manager package</description>
   <license>
