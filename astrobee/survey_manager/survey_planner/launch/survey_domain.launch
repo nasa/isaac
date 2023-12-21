@@ -23,6 +23,18 @@
     <arg name="params_file" value="$(arg params_file)"/>
   </include>
 
+  <!-- Planner -->
+  <include file="$(find plansys2_planner)/launch/planner.launch">
+    <arg name="namespace"  value="$(arg namespace)"/>
+    <arg name="params_file" value="$(arg params_file)"/>
+  </include>
+
+  <!-- Executor -->
+  <include file="$(find plansys2_executor)/launch/executor.launch">
+    <arg name="namespace"  value="$(arg namespace)"/>
+    <arg name="params_file" value="$(arg params_file)"/>
+  </include>
+
   <!-- Manager -->
   <node name="lifecycle_manager_node" pkg="plansys2_lifecycle_manager" type="lifecycle_manager_node" output="screen">
   </node>
