@@ -9,3 +9,7 @@
 	path = astrobee/survey_manager/ros1_lifecycle
 	url = https://github.com/bckempa/ros1_lifecycle
 	branch = noetic-devel
+[submodule "astrobee/survey_manager/popf"]
+	path = astrobee/survey_manager/popf
+	url = https://github.com/Bckempa/popf.git
+	branch = noetic-devel
