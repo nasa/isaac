@@ -72,11 +72,7 @@
         ;; completed-panorama: The goal to add if you want the plan to include collecting a
         ;; panorama. For now, goals specify ?robot and ?order parameters that constrain
         ;; multi-robot task allocation and task ordering.
-        (completed-panorama
-            ?robot - robot
-            ?order - order
-            ?location - location
-        )
+        (completed-panorama ?robot - robot ?order - order ?location - location )
 
         ;; completed-stereo: The goal to add if you want the plan to include collecting a stereo
         ;; survey. For now, goals specify ?robot and ?order parameters that constrain multi-robot
@@ -87,21 +83,13 @@
         ;; used for collision checking. It's assumed that ?base and ?bound are not adjacent
         ;; locations. If future stereo surveys violate these assumptions the model will need to be
         ;; revisited.
-        (completed-stereo
-            ?robot - robot
-            ?order - order
-            ?base ?bound - location
-        )
+        (completed-stereo ?robot - robot ?order - order ?base ?bound - location )
 
 	;; completed-let-other-robot-reach: The goal to add if you want one robot to wait for the
 	;; other to reach a certain location before pursuing its remaining goals (ones with larger
 	;; ?order values). This basically enables a user to provide a specific kind of
 	;; between-robots ordering hint to the planner.
-	(completed-let-other-robot-reach
-	    ?robot - robot
-	    ?order - order
-	    ?loc - location
-	)
+	(completed-let-other-robot-reach ?robot - robot ?order - order ?loc - location )
     )
 
     (:functions
