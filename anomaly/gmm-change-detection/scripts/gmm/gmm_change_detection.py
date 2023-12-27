@@ -23,6 +23,7 @@ import os
 import sys
 
 import numpy as np
+
 from gmm.artificial_data import generate_data
 from gmm.gmm_edit import *
 from gmm.gmm_mml import GmmMml
