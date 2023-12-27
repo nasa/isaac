@@ -49,7 +49,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, TypeVar
 
 import yaml
 
-GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at")
+GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at", "let_other_robot_reach")
 
 THIS_DIR = pathlib.Path(__file__).resolve().parent
 CWD = pathlib.Path.cwd()
@@ -62,7 +62,7 @@ DEFAULT_CONFIGS = [
 
 # Type alias
 YamlMapping = Dict[str, Any]
-T = TypeVar("T")
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 # Replace the text "{{ foo }}" in the template with the value of the foo parameter
 TEMPLATE_SUBST_REGEX = re.compile(r"{{\s*([\w]+)\s*}}")
@@ -105,6 +105,12 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
         location = goal["location"]
         return f"(robot-at {robot} {location})"
 
+    if goal_type == "let_other_robot_reach":
+        robot = goal["robot"]
+        location = goal["location"]
+        order = goal["order"]
+        return f"(completed-let-other-robot-reach {robot} o{order} {location})"
+
     assert False, "Never reach this point"
     return {}  # Make pylint happy
 
@@ -123,7 +129,7 @@ def pairwise(elts: Iterable[T]) -> Iterable[Tuple[T, T]]:
     Returns consecutive pairs drawn from `elts`. Back-port itertools.pairwise() to earlier Python
     versions.
     """
-    a, b = itertools.tee(elts)
+    a, b = itertools.tee(elts)  # pylint: disable=invalid-name
     next(b, None)
     return zip(a, b)
 
@@ -133,7 +139,7 @@ def both_ways(elts: Iterable[Tuple[T, T]]) -> Iterable[Tuple[T, T]]:
     Given `elts` an iterable of 2-tuples, return a new iterable that includes each 2-tuple twice,
     once in its original order and once reversed.
     """
-    for a, b in elts:
+    for a, b in elts:  # pylint: disable=invalid-name
         yield a, b
         yield b, a
 
@@ -142,6 +148,7 @@ def distinct_pairs(elts: Iterable[T]) -> Iterable[Tuple[T, T]]:
     """
     Return distinct pairs of items drawn from `elts`.
     """
+    # pylint: disable=invalid-name
     for a, b in itertools.product(elts, repeat=2):
         if a != b:
             yield a, b
