@@ -28,14 +28,12 @@ find_package(catkin2 REQUIRED COMPONENTS
   ff_msgs
 )
 
-foreach( dir pddl launch)
-   install( DIRECTORY ${dir}/
-         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir} )
-endforeach(dir)
-
 catkin_package(
   INCLUDE_DIRS src
   CATKIN_DEPENDS
 )
 
-
+foreach( dir pddl launch)
+   install( DIRECTORY ${dir}/
+         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir} )
+endforeach(dir)
