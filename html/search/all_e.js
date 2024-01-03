@@ -11,5 +11,7 @@ var searchData=
   ['stampedposestorage_122',['StampedPoseStorage',['../classdense__map_1_1StampedPoseStorage.html',1,'dense_map']]],
   ['station_5finfo_123',['station_info',['../structwifi_1_1station__info.html',1,'wifi']]],
   ['streamingmapper_124',['StreamingMapper',['../classdense__map_1_1StreamingMapper.html',1,'dense_map']]],
-  ['subsystems_125',['Subsystems',['../subsystems.html',1,'']]]
+  ['subsystems_125',['Subsystems',['../subsystems.html',1,'']]],
+  ['survey_20manager_126',['Survey Manager',['../survey.html',1,'astrobee']]],
+  ['survey_20planner_127',['Survey Planner',['../survey_planner.html',1,'survey']]]
 ];

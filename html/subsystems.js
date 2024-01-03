@@ -16,5 +16,6 @@ var subsystems =
       ] ]
     ] ],
     [ "Astrobee", "astrobee.html", "astrobee" ],
+    [ "Survey Manager", "survey.html", "survey" ],
     [ "Utility code", "shared.html", null ]
 ];
