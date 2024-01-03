@@ -2,7 +2,9 @@ doxygen
 python3-catkin-tools
 python3-osrf-pycommon
 python3-rosdep
+libreadline-dev
 ros-noetic-eigen-conversions
 ros-noetic-pcl-ros
+ros-noetic-behaviortree-cpp
 libmnl-dev
 libproj-dev
