@@ -27,10 +27,16 @@ FROM ${REMOTE}/astrobee:latest-ubuntu${UBUNTU_VERSION}
 ARG ROS_VERSION=noetic
 ARG PYTHON=3
 
-RUN apt-get update && apt-get install -y \
-  libmnl-dev \
-  ros-${ROS_VERSION}-eigen-conversions \
-  ros-${ROS_VERSION}-pcl-ros \
+# Install isaac souce dependecies
+COPY ./scripts/setup/*.sh /setup/isaac/
+COPY ./scripts/setup/dependencies /setup/isaac/dependencies
+RUN apt-get update \
+  && /setup/isaac/build_install_dependencies.sh \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install isaac package dependencies 
+COPY ./scripts/setup/packages*.lst /setup/isaac/
+RUN /setup/isaac/install_desktop_packages.sh \
   && rm -rf /var/lib/apt/lists/*
 
 # Minimal isaac robot folders
