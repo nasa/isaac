@@ -153,8 +153,8 @@ Compiling the software</h2>
 <h3><a class="anchor" id="autotoc_md85"></a>
 Compiling VoxBlox</h3>
 <p>To compile Voxblox, clone </p><pre class="fragment">https://github.com/oleg-alexandrov/voxblox/
-</pre><p>(branch isaac, comitt 9098a0f). This fork differs from the main repository at <a href="https://github.com/ethz-asl/voxblox">https://github.com/ethz-asl/voxblox</a> by the introduction of a small tool named batch_tsdf.cc that reads the clouds to fuse and the transforms from disk and writes the output mesh back to disk, instead of using ROS. It also can take into account a point's reliability when fusing the clouds, which is computed by the geometry mapper.</p>
-<p>Compile it using the instructions at: </p><pre class="fragment">https://github.com/oleg-alexandrov/voxblox/blob/master/docs/pages/Installation.rst
+</pre><p>(branch isaac). This fork differs from the main repository at <a href="https://github.com/ethz-asl/voxblox">https://github.com/ethz-asl/voxblox</a> by the introduction of a small tool named batch_tsdf.cc that reads the clouds to fuse and the transforms from disk and writes the output mesh back to disk, instead of using ROS. It also can take into account a point's reliability when fusing the clouds, which is computed by the geometry mapper.</p>
+<p>Compile it using the instructions at: </p><pre class="fragment">https://github.com/oleg-alexandrov/voxblox/blob/isaac/docs/pages/Installation.rst
 </pre><p>This should end up creating the program: </p><pre class="fragment">$HOME/catkin_ws/devel/lib/voxblox_ros/batch_tsdf
 </pre><h3><a class="anchor" id="autotoc_md86"></a>
 Compiling CGAL</h3>
