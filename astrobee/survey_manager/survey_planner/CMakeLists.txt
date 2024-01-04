@@ -29,7 +29,6 @@ find_package(catkin2 REQUIRED COMPONENTS
 )
 
 catkin_package(
-  INCLUDE_DIRS src
   CATKIN_DEPENDS
 )
 
