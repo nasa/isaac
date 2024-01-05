@@ -45,15 +45,26 @@ class MoveAction : public plansys2::ActionExecutorClient {
 int main(int argc, char *argv[]) {
   // Initialize a ros node
   ros::init(argc, argv, "move_action");
-  ros::NodeHandle nh(name);
+
+  std::string name = ros::this_node::getName();
+  if (name.empty() || (name.size() == 1 && name[0] == '/'))
+    name = "default";
+  else if (name[0] == '/')
+    name = name.substr(1);
+
+  ros::NodeHandle nh("~");
+  nh.setParam("action_name", "move");
 
   // Start action node
   // We could actually add multiple action nodes here being aware that we might need a ros::AsyncSpinner
   // (https://github.com/Bckempa/ros2_planning_system/blob/noetic-devel/plansys2_bt_actions/src/bt_action_node.cpp#L41)
-  auto action_node = std::make_shared<plansys2::MoveAction>(nh, name, std::chrono_literals::1s);
+  auto action_node = std::make_shared<plansys2_actions::MoveAction>(nh, "move",  std::chrono::seconds(1));
   action_node->trigger_transition(ros::lifecycle::CONFIGURE);
+
+  ROS_ERROR_STREAM("Starting action");
 
   // Synchronous mode
   ros::spin();
   // Make for great success
   return 0;
+}

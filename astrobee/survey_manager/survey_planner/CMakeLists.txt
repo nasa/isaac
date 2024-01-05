@@ -26,11 +26,38 @@ SET(catkin2_DIR "${CMAKE_SOURCE_DIR}/../../../cmake")
 find_package(catkin2 REQUIRED COMPONENTS
   roscpp
   ff_msgs
+  lifecycle
+  plansys2_executor
 )
 
 catkin_package(
   CATKIN_DEPENDS
 )
+
+###########
+## Build ##
+###########
+
+# Specify additional locations of header files
+# Your package locations should be listed before other locations
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
+
+# Action for move_inspect
+add_executable(move_action_node src/move_action_node.cpp)
+target_link_libraries(move_action_node ${catkin_LIBRARIES} )
+
+#############
+## Install ##
+#############
+
+catkin_install_python(PROGRAMS tools/command_astrobee tools/monitor_astrobee
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+# Install actions
+install(TARGETS move_action_node
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 foreach( dir pddl launch)
    install( DIRECTORY ${dir}/
