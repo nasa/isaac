@@ -24,18 +24,8 @@ services:
       - astrobee-base
 
   isaac-astrobee:
-    image: ${REMOTE:-isaac}/isaac:latest-astrobee-ubuntu${UBUNTU_VERSION}
-    build:
-      context: ${ISAAC_PATH}
-      dockerfile: ${ISAAC_PATH}/scripts/docker/isaac_astrobee.Dockerfile
-      args:
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-20.04}
-        REMOTE: ${REMOTE:-astrobee}
-        ROS_VERSION: ${ROS_VERSION:-noetic}
-        PYTHON: ${PYTHON:-3}
     links:
       - astrobee
-
   isaac:
     links:
       - isaac-astrobee

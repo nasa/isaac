@@ -1,4 +1,4 @@
-# Copyright (c) 2021, United States Government, as represented by the
+# Copyright (c) 2023, United States Government, as represented by the
 # Administrator of the National Aeronautics and Space Administration.
 #
 # All rights reserved.
@@ -16,16 +16,23 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-# Check to see if correct version of media has been downloaded into tree. We
-# dont do this if we are cross-compiling, as there is no need for it. We must
-# also make sure the media is copied in a native install to a simulator.
-
 cmake_minimum_required(VERSION 2.8.3)
-project(isaac_description)
+project(survey_planner)
 
-find_package(catkin REQUIRED COMPONENTS)
+add_compile_options(-std=c++17)
 
-catkin_package()
+find_package(catkin REQUIRED)
+SET(catkin2_DIR "${CMAKE_SOURCE_DIR}/../../../cmake")
+find_package(catkin2 REQUIRED COMPONENTS
+  roscpp
+  ff_msgs
+)
 
-install(DIRECTORY meshes DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(DIRECTORY urdf DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+catkin_package(
+  CATKIN_DEPENDS
+)
+
+foreach( dir pddl launch)
+   install( DIRECTORY ${dir}/
+         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir} )
+endforeach(dir)

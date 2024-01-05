@@ -176,7 +176,7 @@ To compile Voxblox, clone
 
     https://github.com/oleg-alexandrov/voxblox/
 
-(branch isaac, comitt 9098a0f). This fork differs from the main repository at
+(branch isaac). This fork differs from the main repository at
 https://github.com/ethz-asl/voxblox by the introduction of a small
 tool named batch_tsdf.cc that reads the clouds to fuse and the
 transforms from disk and writes the output mesh back to disk, instead
@@ -185,7 +185,7 @@ fusing the clouds, which is computed by the geometry mapper.
 
 Compile it using the instructions at:
 
-    https://github.com/oleg-alexandrov/voxblox/blob/master/docs/pages/Installation.rst
+    https://github.com/oleg-alexandrov/voxblox/blob/isaac/docs/pages/Installation.rst
 
 This should end up creating the program:
 
