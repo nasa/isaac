@@ -127,10 +127,11 @@ export MAST_PATH=${mast_source}
 ######################################################################
 
 files=" -f ${thisdir}/docker_compose/ros.docker-compose.yml"
+files+=" -f ${thisdir}/docker_compose/isaac.docker-compose.build.yml"
+files+=" -f ${thisdir}/docker_compose/isaac.docker-compose.yml"
 
 if [ $REMOTE == "" ]; then
   files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.build.yml"
-  files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.yml"
 fi
 
 if [ "$os" == "focal" ]; then
@@ -144,4 +145,4 @@ if [ $mast == 1 ]; then
 	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
 fi
 
-docker compose ${files} build
+docker compose ${files} -p isaac build
