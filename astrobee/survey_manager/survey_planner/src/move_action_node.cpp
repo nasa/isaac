@@ -21,6 +21,7 @@
 
 #include <plansys2_executor/ActionExecutorClient.hpp>
 
+#include <algorithm>
 #include <string>
 
 namespace plansys2_actions {
@@ -28,15 +29,39 @@ namespace plansys2_actions {
 class MoveAction : public plansys2::ActionExecutorClient {
  public:
   MoveAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate)
-      : ActionExecutorClient(nh, action, rate) {}
+      : ActionExecutorClient(nh, action, rate) {
+    progress_ = 0.0;
+  }
 
  protected:
   void do_work() {
-    ROS_ERROR_STREAM("Executing [MOVE]");
-    // std::string from, towards;
-    // from = get_arguments()[1];
-    // towards = get_arguments()[2];
+    std::string from, towards;
+
+    if (get_arguments().size() > 2) {
+      robot_name_ = get_arguments()[0];
+      from = get_arguments()[1];
+      towards = get_arguments()[2];
+    } else {
+      finish(false, 1.0, "Not enough arguments for [MOVE] command");
+    }
+
+    if (progress_ < 1.0) {
+      progress_ += 0.05;
+      send_feedback(progress_, "Move and Inspect running");
+    } else {
+      finish(true, 1.0, "Move and Inspect completed");
+
+      progress_ = 0.0;
+      std::cout << std::endl;
+    }
+
+    std::cout << "\t ** [Move and Inspect] Robot " << robot_name_ << " moving from " << from << " towards " << towards
+              << " ... [" << std::min(100.0, progress_ * 100.0) << "%]  " << std::flush;
   }
+
+
+  float progress_;
+  std::string robot_name_;
 };
 }  // namespace plansys2_actions
 
@@ -60,8 +85,6 @@ int main(int argc, char *argv[]) {
   // (https://github.com/Bckempa/ros2_planning_system/blob/noetic-devel/plansys2_bt_actions/src/bt_action_node.cpp#L41)
   auto action_node = std::make_shared<plansys2_actions::MoveAction>(nh, "move",  std::chrono::seconds(1));
   action_node->trigger_transition(ros::lifecycle::CONFIGURE);
-
-  ROS_ERROR_STREAM("Starting action");
 
   // Synchronous mode
   ros::spin();
