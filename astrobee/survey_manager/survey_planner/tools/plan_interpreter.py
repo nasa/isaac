@@ -46,7 +46,7 @@ from matplotlib import pyplot as plt
 from problem_generator import DATA_DIR, load_yaml, path_list
 
 DEFAULT_CONFIGS = [
-    DATA_DIR / "jem_survey_static.yaml",
+    DATA_DIR / "survey_static.yaml",
     # Dynamic config not needed for interpreting the plan
 ]
 

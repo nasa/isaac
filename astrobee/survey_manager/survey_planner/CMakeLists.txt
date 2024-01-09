@@ -59,7 +59,7 @@ catkin_install_python(PROGRAMS tools/command_astrobee tools/monitor_astrobee
 install(TARGETS move_action_node
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
-foreach( dir pddl launch)
+foreach( dir pddl launch data)
    install( DIRECTORY ${dir}/
          DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir} )
 endforeach(dir)

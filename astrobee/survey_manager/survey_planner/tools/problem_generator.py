@@ -56,7 +56,7 @@ CWD = pathlib.Path.cwd()
 DATA_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / "data").resolve()), CWD))
 PDDL_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / "pddl").resolve()), CWD))
 DEFAULT_CONFIGS = [
-    DATA_DIR / "jem_survey_static.yaml",
+    DATA_DIR / "survey_static.yaml",
     DATA_DIR / "jem_survey_dynamic.yaml",
 ]
 
