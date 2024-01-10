@@ -25,10 +25,11 @@ import sys
 import threading
 
 
+# Constants
+CHUNK_SIZE = 1024
+
 def thread_write_input(sock_input):
     print("starting thread_write_input...")
-    # Store commulative output
-    output_total = ""
     try:
         while True:
             # Get user input dynamically
@@ -38,20 +39,17 @@ def thread_write_input(sock_input):
             # Check if the user wants to exit
             if user_input.lower().strip() == 'exit':
                 break
-            sock_input.send(user_input.encode("utf-8")[:1024])
+            sock_input.send(user_input.encode("ascii", errors="replace")[:CHUNK_SIZE])
 
     except:
         print("exit output")
-    finally:
-        # Save total output into a log
-        print(output_total)
 
 def thread_read_output(sock_output):
     print("starting thread_read_output...")
     try:
         while True:
-            request = sock_output.recv(1024)
-            request = request.decode("utf-8")  # convert bytes tro str
+            request = sock_output.recv(CHUNK_SIZE)
+            request = request.decode("ascii", errors="replace")  # convert bytes to str
 
             print(request, end='')
     except:

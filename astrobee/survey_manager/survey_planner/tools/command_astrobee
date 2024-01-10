@@ -29,6 +29,7 @@ import threading
 from typing import Any, Dict, List
 
 import rospy
+import rospkg
 import yaml
 from ff_msgs.msg import (
     AckCompletedStatus,
@@ -39,11 +40,27 @@ from ff_msgs.msg import (
 )
 from std_msgs.msg import Header, String
 
-# Type alias
-YamlMapping = Dict[str, Any]
+# # Get the directory of the current script
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from problem_generator import load_yaml
 
 # Constants
 MAX_COUNTER = 3
+CHUNK_SIZE = 1024
+
+def get_stereo_traj(config_static, from_bay, to_bay):
+    # Get stereo trajectory
+    traj_matches = [
+        traj
+        for traj in config_static["stereo"].values()
+        if traj["base_location"] == from_bay and traj["bound_location"] == to_bay
+    ]
+    assert (
+        len(traj_matches) == 1
+    ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
+    fplan = traj_matches[0]["fplan"]
+    return fplan
+
 
 def exposure_change(bay_origin, bay_destination, value):
     # Going to JEM
@@ -115,55 +132,46 @@ class ProcessExecutor:
 
     def thread_write_output(self, process):
         print("starting thread_write_output...")
-        # Store cumulative output
+        # Store commulative output
         output_total = ""
         connected = False
         try:
             while True:
                 # Get output from process
-                char = process.stdout.read(1)
-                # output = process.stdout.readline()
-                if (char == '' and process.poll() is not None) or self._stop_event.is_set():
+                output = process.stdout.readline()
+                if (output == '' and process.poll() is not None) or self._stop_event.is_set():
                     break
-                if char:
-                    if char == '\r':
-                        print("got rrrr")
-                        last_newline_index = output_total.rfind('\n')
-                        output_total = output_total[:last_newline_index + 1] if last_newline_index != -1 else ""
-                    else:
-                        output_total += char
-                    # Check if output has \r
+                if output:
+                    output_total += output
 
-                # If socket is not connected try to connect
-                if not connected:
-                    try:
-                        # print("trying to connect output")
+                try:
+                    # If socket is not connected try to connect
+                    if not connected:
+                        print("trying to connect")
                         conn, addr = self.sock_output.accept()
                         conn.setblocking(False)
 
                         connected = True
-                        # Always send full history to each newly connecting client so history
-                        # is not lost if the connection is dropped
-                        print(output_total)
-                        conn.send(output_total.encode("utf-8")[:1024])
-                    except socket.timeout:
-                        continue
-                    except (socket.error, BrokenPipeError):
-                        print("Error sending data. Receiver may have disconnected.")
-                        connected = False
+                        encoded_message = output_total.encode("ascii", errors="replace")
 
-                # If socket is already connected, send output
-                elif connected:
-                    try:
-                        conn.send(char.encode("utf-8")[:1024])
-                    except (socket.error, BrokenPipeError):
-                        print("Error sending data. Receiver may have disconnected.")
-                        connected = False
+                        for i in range(0, len(encoded_message), CHUNK_SIZE):
+                            chunk = encoded_message[i:i + CHUNK_SIZE]
+                            conn.sendall(chunk)
+
+                    # If socket is already connected, send output
+                    elif connected:
+                        conn.send(output.encode("ascii", errors="replace")[:CHUNK_SIZE])
+                except socket.timeout:
+                    continue
+                except (socket.error, BrokenPipeError):
+                    print("Error sending data. Receiver may have disconnected.")
+                    connected = False
+
         except Exception as e:
             print("exit output:")
             print(e)
         # finally:
-        #     # Save total output into a log file
+        #     # Save total output into a log
         #     print(output_total)
 
     def thread_read_input(self, process):
@@ -171,7 +179,7 @@ class ProcessExecutor:
         try:
             while True:
                 while not self._stop_event.is_set():
-                    # print("waiting for connection")
+                    print("waiting for connection")
                     try:
                         client_socket, client_address = self.sock_input.accept()
                         break
@@ -189,7 +197,7 @@ class ProcessExecutor:
                     while not self._stop_event.is_set():
                         print("waiting to receive")
                         try:
-                            request = client_socket.recv(1024).decode("utf-8")
+                            request = client_socket.recv(CHUNK_SIZE).decode("ascii", errors="replace")
                             break
                         except socket.timeout:
                             continue
@@ -211,7 +219,7 @@ class ProcessExecutor:
 
     def send_command(self, command):
         print(command)
-        return_code = -1
+        return_code = 1
 
         try:
             # Start the process
@@ -240,26 +248,30 @@ class ProcessExecutor:
             if output_thread.is_alive():
                 output_thread.join()
 
-        # Get the final exit code
-        return return_code
-
+            # Get the final exit code
+            return return_code
 
     def recursive_command(self, command):
         while True:
             user_input = input("Do you want to continue? (y/n): ").lower().strip()
             if user_input == 'y':
-                if send_command_with_input(command) != 0:
-                    repeat_inspection()  # Continue recursively
-                break
+                exit_code = self.send_command(command)
+                if exit_code != 0:
+                    exit_code = recursive_command(command)  # Continue recursively
+                return exit_code
             elif user_input == 'n':
                 print("Exiting.")
-                break
+                return 1
             else:
                 print("Invalid input. Please enter 'y' or 'n'.")
 
     def send_command_recursive(self, command):
-        if self.send_command(command):
-            self.recursive_command(command)
+        print("Sending recursive command")
+        exit_code = self.send_command(command)
+        print("Exit code " + str(exit_code))
+        if (exit_code):
+            exit_code = self.recursive_command(command)
+        return exit_code
 
 
 # This class sends a command to the executor and waits to get a response
@@ -365,7 +377,6 @@ class CommandExecutor:
         while counter < MAX_COUNTER:
             # got message
             if self.ack_needed == False:
-                rospy.loginfo("GOT MSG.")
                 if self.ack_msg.completed_status.status == AckCompletedStatus.NOT:
                     rospy.loginfo("Command is being executed and has not completed.")
                     self.ack_needed = True
@@ -381,25 +392,6 @@ class CommandExecutor:
         return 1
 
 
-def load_yaml(yaml_path: pathlib.Path) -> YamlMapping:
-    """
-    Return the YAML parse result for the file at `yaml_path`.
-    """
-    with yaml_path.open(encoding="utf-8") as yaml_stream:
-        return yaml.safe_load(yaml_stream)
-
-def get_stereo_traj(config_static, from_bay, to_bay):
-    # Get stereo trajectory
-    traj_matches = [
-        traj
-        for traj in config_static["stereo"].values()
-        if traj["base_location"] == from_bay and traj["bound_location"] == to_bay
-    ]
-    assert (
-        len(traj_matches) == 1
-    ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
-    fplan = traj_matches[0]["fplan"]
-    return fplan
 
 def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_static_path: pathlib.Path):
 
@@ -434,23 +426,25 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
     exit_code = 0
 
     if goal == "dock":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop -dock" + ns)
+        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -dock" + ns)
 
     elif goal == "undock":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop -undock" + ns)
+        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -undock" + ns)
 
     elif goal == "move":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop -move " + bay + ns)
+        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -move " + config_static["bays_move"][to_bay] + ns)
         # Change exposure if needed
+        exposure_value = 0
         if exposure_change(from_bay, to_bay, exposure_value):
             exit_code += command_executor.change_exposure(exposure_value)
         # Change map if needed
+        map_name = ""
         if map_change(from_bay, to_bay, map_name):
             exit_code += command_executor.change_map(map_name)
 
     elif goal == "panorama":
         exit_code += command_executor.start_recording("pano_" + to_bay + "_" + run)
-        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -panorama -panorama_mode '5_mapper_and_hugin' " + config_static["bays"][to_bay] + ns)
+        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -panorama -panorama_mode '5_mapper_and_hugin' " + config_static["bays_move"][to_bay] + ns)
         exit_code += command_executor.stop_recording()
 
     elif goal == "stereo":
@@ -495,10 +489,10 @@ if __name__ == "__main__":
         help="Run number, increases as we add attempts.",
     )
     parser.add_argument(
-        "config_static",
+        "--config_static",
         help="Path to input static problem config YAML (module geometry, available stereo surveys, etc.)",
         type=pathlib.Path,
-        default="survey_constants.yaml",
+        default=os.path.join(rospkg.RosPack().get_path('survey_planner'), "data/survey_static.yaml"),
     )
     args = parser.parse_args()
 
