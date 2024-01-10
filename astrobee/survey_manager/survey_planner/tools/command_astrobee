@@ -131,13 +131,14 @@ class ProcessExecutor:
         self.sock_output.close()
 
     def thread_write_output(self, process):
-        print("starting thread_write_output...")
+        # print("starting thread_write_output...")
         # Store commulative output
         output_total = ""
         connected = False
         try:
             while True:
                 # Get output from process
+                # print("waiting for output")
                 output = process.stdout.readline()
                 if (output == '' and process.poll() is not None) or self._stop_event.is_set():
                     break
@@ -147,7 +148,7 @@ class ProcessExecutor:
                 try:
                     # If socket is not connected try to connect
                     if not connected:
-                        print("trying to connect")
+                        # print("trying to connect")
                         conn, addr = self.sock_output.accept()
                         conn.setblocking(False)
 
@@ -175,11 +176,11 @@ class ProcessExecutor:
         #     print(output_total)
 
     def thread_read_input(self, process):
-        print("starting thread_read_input...")
+        # print("starting thread_read_input...")
         try:
             while True:
                 while not self._stop_event.is_set():
-                    print("waiting for connection")
+                    # print("waiting for connection")
                     try:
                         client_socket, client_address = self.sock_input.accept()
                         break
@@ -191,11 +192,11 @@ class ProcessExecutor:
 
 
                 while True:
-                    print("accepted connection:")
+                    # print("accepted connection:")
                     print(client_address)
 
                     while not self._stop_event.is_set():
-                        print("waiting to receive")
+                        # print("waiting to receive")
                         try:
                             request = client_socket.recv(CHUNK_SIZE).decode("ascii", errors="replace")
                             break
@@ -231,6 +232,8 @@ class ProcessExecutor:
             output_thread = threading.Thread(target=self.thread_write_output, args=(process,))
             output_thread.start()
 
+            while output_thread.is_alive():
+                rospy.sleep(1)
             output_thread.join()
             # Get the return code of the process
             return_code = process.poll()
@@ -252,24 +255,25 @@ class ProcessExecutor:
             return return_code
 
     def recursive_command(self, command):
-        while True:
+        while not rospy.is_shutdown():
             user_input = input("Do you want to continue? (y/n): ").lower().strip()
             if user_input == 'y':
                 exit_code = self.send_command(command)
                 if exit_code != 0:
-                    exit_code = recursive_command(command)  # Continue recursively
+                    exit_code = self.recursive_command(command)  # Continue recursively
                 return exit_code
             elif user_input == 'n':
                 print("Exiting.")
                 return 1
             else:
                 print("Invalid input. Please enter 'y' or 'n'.")
+        return 1
 
     def send_command_recursive(self, command):
         print("Sending recursive command")
         exit_code = self.send_command(command)
         print("Exit code " + str(exit_code))
-        if (exit_code):
+        if (exit_code and not rospy.is_shutdown()):
             exit_code = self.recursive_command(command)
         return exit_code
 
@@ -367,7 +371,8 @@ class CommandExecutor:
             self.ack_needed = False
 
     def publish_and_wait_response(self, cmd):
-
+        if rospy.is_shutdown():
+            return 1
         # Publish the CommandStamped message
         self.ack_needed = True
         self.pub_command.publish(cmd)

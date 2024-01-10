@@ -29,11 +29,10 @@ import threading
 CHUNK_SIZE = 1024
 
 def thread_write_input(sock_input):
-    print("starting thread_write_input...")
+    # print("starting thread_write_input...")
     try:
         while True:
             # Get user input dynamically
-            print("get input")
             user_input = input()
             print("user input: " + user_input)
             # Check if the user wants to exit
@@ -45,7 +44,7 @@ def thread_write_input(sock_input):
         print("exit output")
 
 def thread_read_output(sock_output):
-    print("starting thread_read_output...")
+    # print("starting thread_read_output...")
     try:
         while True:
             request = sock_output.recv(CHUNK_SIZE)
