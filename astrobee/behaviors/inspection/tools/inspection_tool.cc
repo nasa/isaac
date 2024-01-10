@@ -113,6 +113,7 @@ DEFINE_double(deadline, -1.0, "Action deadline timeout");
 // Match the internal states and responses with the message definition
 using STATE = isaac_msgs::InspectionState;
 bool stopflag_ = false;
+std::string feedback_old = "";
 
 bool has_only_whitespace_or_comments(const std::string & str) {
   for (std::string::const_iterator it = str.begin(); it != str.end(); it++) {
@@ -209,6 +210,8 @@ void FeedbackCallback(isaac_msgs::InspectionFeedbackConstPtr const& feedback) {
     + " -> " + feedback->state.fsm_state
     + " (" + feedback->state.fsm_subevent
     + " -> " + feedback->state.fsm_substate + ")";
+  if (s == feedback_old) return;
+  feedback_old = s;
   if (s.size() < 70) s.append(70 - s.size(), ' ');
   std::cout << "\r" << s.substr(0, 70) << "|Input: " << std::flush;
 }
