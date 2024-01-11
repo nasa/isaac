@@ -171,13 +171,6 @@ class TemplateFiller:
         return self.params[param]
 
 
-def comment_for_pddl(text: str) -> str:
-    """
-    Return the result of commenting `text` using PDDL (Lisp-like) comment syntax.
-    """
-    return "\n".join([f";; {line}".strip() for line in text.splitlines()])
-
-
 class ProblemWriter(ABC):
     "Abstract class for writing a problem intance."
 
@@ -345,7 +338,6 @@ def problem_generator(
             header_lines += f";; Config {i + 1}: {config_path}\n"
             full_config += config_path.read_text()
         writer.set_param("header", header_lines)
-        writer.set_param("config", comment_for_pddl(full_config))
 
     bays = list(config["bays"].keys())
     bogus_bays = config["bogus_bays"]
