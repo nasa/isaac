@@ -846,7 +846,7 @@ def filter_none(seq: Iterable[Optional[T]]) -> List[T]:
 
 
 def get_objects_by_type(
-    problem: PddlExpression
+    problem: PddlExpression,
 ) -> Dict[PddlTypeName, List[PddlObjectName]]:
     "Return robot names parsed from PDDL problem instance."
     (objects_clause,) = [e for e in problem[2:] if e[0] == ":objects"]
