@@ -52,7 +52,10 @@ target_link_libraries(move_action_node ${catkin_LIBRARIES} )
 ## Install ##
 #############
 
-catkin_install_python(PROGRAMS tools/command_astrobee tools/monitor_astrobee
+catkin_install_python(PROGRAMS
+  tools/command_astrobee
+  tools/monitor_astrobee
+  tools/problem_generator.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # Install actions
