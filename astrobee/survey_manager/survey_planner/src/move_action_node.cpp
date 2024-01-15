@@ -21,8 +21,12 @@
 
 #include <plansys2_executor/ActionExecutorClient.hpp>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include <algorithm>
 #include <string>
+#include <iostream>
 
 namespace plansys2_actions {
 
@@ -31,6 +35,8 @@ class MoveAction : public plansys2::ActionExecutorClient {
   MoveAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate)
       : ActionExecutorClient(nh, action, rate) {
     progress_ = 0.0;
+    process_pipe_ = nullptr;
+    process_pid_ = -1;
   }
 
  protected:
@@ -45,14 +51,52 @@ class MoveAction : public plansys2::ActionExecutorClient {
       finish(false, 1.0, "Not enough arguments for [MOVE] command");
     }
 
-    if (progress_ < 1.0) {
-      progress_ += 0.05;
-      send_feedback(progress_, "Move and Inspect running");
-    } else {
-      finish(true, 1.0, "Move and Inspect completed");
+    // Start process if not started yet
+    if (progress_ == 0.0) {
+      std::string command =
+        "rosrun survey_planner command_astrobee " + robot_name_ + " move " + towards + " " + from + " run1";
 
-      progress_ = 0.0;
-      std::cout << std::endl;
+      std::cout << command << std::flush;
+      // Open a pipe to a command and get a FILE* for reading
+      process_pipe_ = popen(command.c_str(), "r");
+
+      if (!process_pipe_) {
+        perror("popen");
+        finish(false, 1.0, "Failed to start the process");
+        return;
+      }
+
+      // Get the process ID
+      process_pid_ = fileno(process_pipe_);
+      progress_ = 0.02;
+      return;
+    }
+
+    // Check if the process is still running
+    int status;
+    pid_t result = waitpid(process_pid_, &status, WNOHANG);
+
+    if (result == 0) {
+      // Process still running, do nothing
+    } else if (result > 0) {
+      // Process completed
+      if (status == 0) {
+        std::cout << "Command exited with status success " << std::endl;
+        finish(true, 1.0, "Move and Inspect completed");
+      } else {
+        std::cout << "Command terminated with status fail:  " << status << std::endl;
+        finish(false, 1.0, "Move and Inspect terminated by signal");
+      }
+    } else {
+      perror("waitpid");
+      finish(false, 1.0, "Error while waiting for process");
+    }
+
+
+
+    if (progress_ < 1.0) {
+      progress_ += 0.02;
+      send_feedback(progress_, "Move and Inspect running");
     }
 
     std::cout << "\t ** [Move and Inspect] Robot " << robot_name_ << " moving from " << from << " towards " << towards
@@ -62,6 +106,8 @@ class MoveAction : public plansys2::ActionExecutorClient {
 
   float progress_;
   std::string robot_name_;
+  FILE* process_pipe_;
+  pid_t process_pid_;
 };
 }  // namespace plansys2_actions
 
