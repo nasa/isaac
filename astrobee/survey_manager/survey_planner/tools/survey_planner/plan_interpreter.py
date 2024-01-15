@@ -42,7 +42,6 @@ import yaml
 from matplotlib import collections as mc
 from matplotlib import patches as mp
 from matplotlib import pyplot as plt
-
 from problem_generator import DATA_DIR, load_yaml, path_list
 
 DEFAULT_CONFIGS = [
