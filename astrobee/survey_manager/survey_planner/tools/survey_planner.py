@@ -16,7 +16,9 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     Iterable,
+    Iterator,
     List,
     NamedTuple,
     Optional,
@@ -47,7 +49,6 @@ PddlActionName = str  # Names PDDL action
 T = TypeVar("T")  # So we can assign parametric types below
 PddlTypeName = str  # Names PDDL object type
 PddlObjectName = str  # Names PDDL object
-PriorityQueue = List  # A list used as a priority queue, maintains the heap invariant
 
 UNREACHABLE_COST = 999
 
@@ -219,7 +220,7 @@ class Action(ABC):
         """
         end_time = sim_state.elapsed_time + self.get_duration()
         self.start(sim_state)
-        sim_state.push_event((end_time, self.end))
+        sim_state.events.push((end_time, self.end))
 
 
 @dataclass
@@ -243,6 +244,34 @@ class RobotState:
         return {"pos": self.pos, "action": repr(self.action), "reserved": self.reserved}
 
 
+class PriorityQueue(Generic[T], Iterable[T]):
+    "Priority queue implemented as a list that maintains the heap invariant."
+
+    def __init__(self, seq: Iterable[T] = None):
+        ":param seq: Initial contents of the queue (need not be ordered)."
+        if seq is None:
+            self._q: List[T] = []
+        else:
+            self._q = list(seq)
+            heapq.heapify(self._q)
+
+    def __iter__(self) -> Iterator[T]:
+        "Iterate through the queue in order non-destructively. (Not very efficient.)"
+        return iter(sorted(self._q))
+
+    def __bool__(self) -> bool:
+        "Return True if the queue is non-empty."
+        return bool(self._q)
+
+    def push(self, item: T) -> None:
+        "Push a new item onto the queue."
+        heapq.heappush(self._q, item)
+
+    def pop(self) -> T:
+        "Pop and return the head of the queue in priority order."
+        return heapq.heappop(self._q)
+
+
 @dataclass
 class SimState:
     "Represents the overall state of the multi-robot sim."
@@ -259,26 +288,8 @@ class SimState:
     completed: Dict[Any, bool] = field(default_factory=dict)
     "Tracks completion status for actions that subclass MarkCompleteAction."
 
-    def __post_init__(self):
-        self._events: PriorityQueue[PendingEvent] = []
-        # pylint: disable-next=pointless-string-statement  # doc string
-        "Pending events queued by earlier actions."
-
-    def get_events(self) -> List[PendingEvent]:
-        "Return pending events sorted by timestamp. (Non-destructive.)"
-        return sorted(self._events)
-
-    def has_event(self) -> bool:
-        "Return True if there is a pending event."
-        return bool(self._events)
-
-    def push_event(self, event: PendingEvent) -> None:
-        "Push a new pending event."
-        heapq.heappush(self._events, event)
-
-    def pop_event(self) -> PendingEvent:
-        "Pop and return the pending event with the earliest timestamp."
-        return heapq.heappop(self._events)
+    events: PriorityQueue[PendingEvent] = field(default_factory=PriorityQueue)
+    "Pending events queued by earlier actions."
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
@@ -288,7 +299,7 @@ class SimState:
                 robot: state.get_dump_dict()
                 for robot, state in self.robot_states.items()
             },
-            "events": self.get_events(),
+            "events": list(self.events),
             "trace": [e.get_dump_dict() for e in self.trace],
             "completed": self.completed,
         }
@@ -298,9 +309,9 @@ class SimState:
         Warp the simulation forward in time to the next queued event and apply its event callback.
         AKA "wait for something to happen".
         """
-        if not self.has_event():
+        if not self.events:
             return
-        event_time, event_func = self.pop_event()
+        event_time, event_func = self.events.pop()
         self.elapsed_time = event_time
         event_func(self)
 
