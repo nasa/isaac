@@ -42,6 +42,14 @@
   <!-- Actions -->
   <node name="move_action_node" pkg="survey_planner" type="move_action_node" output="screen">
   </node>
+  <node name="dock_action_node" pkg="survey_planner" type="dock_action_node" output="screen">
+  </node>
+  <node name="undock_action_node" pkg="survey_planner" type="undock_action_node" output="screen">
+  </node>
+  <node name="panorama_action_node" pkg="survey_planner" type="panorama_action_node" output="screen">
+  </node>
+  <node name="stereo_action_node" pkg="survey_planner" type="stereo_action_node" output="screen">
+  </node>
 
 </launch>
 

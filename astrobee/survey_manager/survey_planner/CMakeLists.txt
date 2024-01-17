@@ -44,9 +44,21 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-# Action for move_inspect
+# Action for move
 add_executable(move_action_node src/move_action_node.cpp)
 target_link_libraries(move_action_node ${catkin_LIBRARIES} )
+# Action for dock
+add_executable(dock_action_node src/dock_action_node.cpp)
+target_link_libraries(dock_action_node ${catkin_LIBRARIES} )
+# Action for undock
+add_executable(undock_action_node src/undock_action_node.cpp)
+target_link_libraries(undock_action_node ${catkin_LIBRARIES} )
+# Action for panorama
+add_executable(panorama_action_node src/panorama_action_node.cpp)
+target_link_libraries(panorama_action_node ${catkin_LIBRARIES} )
+# Action for stereo
+add_executable(stereo_action_node src/stereo_action_node.cpp)
+target_link_libraries(stereo_action_node ${catkin_LIBRARIES} )
 
 #############
 ## Install ##

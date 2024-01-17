@@ -30,9 +30,9 @@
 
 namespace plansys2_actions {
 
-class MoveAction : public plansys2::ActionExecutorClient {
+class UndockAction : public plansys2::ActionExecutorClient {
  public:
-  MoveAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate)
+  UndockAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate)
       : ActionExecutorClient(nh, action, rate) {
     progress_ = 0.0;
     process_pipe_ = nullptr;
@@ -53,7 +53,7 @@ class MoveAction : public plansys2::ActionExecutorClient {
     // Start process if not started yet
     if (progress_ == 0.0) {
       std::string command =
-        "rosrun survey_planner command_astrobee " + robot_name_ + " move " + towards + " " + from + " run1";
+        "rosrun survey_planner command_astrobee " + robot_name_ + " undock " + towards + " " + from + " run1";
 
       std::cout << command << std::endl;
       // Open a pipe to a command and get a FILE* for reading
@@ -76,20 +76,20 @@ class MoveAction : public plansys2::ActionExecutorClient {
       std::cout << buffer << std::endl;
       if (progress_ < 1.0) {
         progress_ += 0.02;
-        send_feedback(progress_, "Move and Inspect running");
+        send_feedback(progress_, "Undock running");
       }
 
-      std::cout << "\t ** [Move and Inspect] Robot " << robot_name_ << " moving from " << from << " towards " << towards
+      std::cout << "\t ** [Undock] Robot " << robot_name_ << " moving from " << from << " towards " << towards
                 << " ... [" << std::min(100.0, progress_ * 100.0) << "%]  " << std::endl;
     } else {
       int status = pclose(process_pipe_);
       std::cout << "Finished.\n" << std::endl;
       if (status == 0) {
         std::cout << "Command exited with status success " << std::endl;
-        finish(true, 1.0, "Move and Inspect completed");
+        finish(true, 1.0, "Undock completed");
       } else {
         std::cout << "Command terminated with status fail:  " << status << std::endl;
-        finish(false, 1.0, "Move and Inspect terminated by signal");
+        finish(false, 1.0, "Undock terminated by signal");
       }
     }
   }
@@ -104,7 +104,7 @@ class MoveAction : public plansys2::ActionExecutorClient {
 // Main entry point for application
 int main(int argc, char *argv[]) {
   // Initialize a ros node
-  ros::init(argc, argv, "move_action");
+  ros::init(argc, argv, "undock_action");
 
   std::string name = ros::this_node::getName();
   if (name.empty() || (name.size() == 1 && name[0] == '/'))
@@ -113,12 +113,12 @@ int main(int argc, char *argv[]) {
     name = name.substr(1);
 
   ros::NodeHandle nh("~");
-  nh.setParam("action_name", "move");
+  nh.setParam("action_name", "undock");
 
   // Start action node
   // We could actually add multiple action nodes here being aware that we might need a ros::AsyncSpinner
   // (https://github.com/Bckempa/ros2_planning_system/blob/noetic-devel/plansys2_bt_actions/src/bt_action_node.cpp#L41)
-  auto action_node = std::make_shared<plansys2_actions::MoveAction>(nh, "move",  std::chrono::seconds(1));
+  auto action_node = std::make_shared<plansys2_actions::UndockAction>(nh, "undock",  std::chrono::seconds(1));
   action_node->trigger_transition(ros::lifecycle::CONFIGURE);
 
   // Synchronous mode
