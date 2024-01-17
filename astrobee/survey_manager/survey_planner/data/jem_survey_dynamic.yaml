@@ -36,8 +36,10 @@ goals:
 # This let_other_robot_reach goal is effectively a very specific kind of between-robot ordering
 # constraint. It tells honey to let bumble get to bay 5 before taking its first panorama. Without
 # this constraint, POPF produces a very inefficient plan where bumble never leaves the dock until
-# after honey finishes all its tasks and returns to dock.
-- {type: let_other_robot_reach, robot: honey, order: 0, location: jem_bay5}
+# after honey finishes all its tasks and returns to dock. (It's safe to comment this out if the
+# planner doesn't need the hint.)
+# - {type: let_other_robot_reach, robot: honey, order: 0, location: jem_bay5}
+
 - {type: panorama, robot: honey, order: 1, location: jem_bay7}
 - {type: panorama, robot: honey, order: 2, location: jem_bay6}
 - {type: panorama, robot: honey, order: 3, location: jem_bay5}
