@@ -39,6 +39,7 @@ CostMap = List[Cost]  # Interpreted as mapping of LocationIndex -> Cost
 RobotStatus = str  # Options: ACTIVE, BLOCKED, DONE
 Timestamp = float  # Elapsed time since start of sim in seconds
 EventCallback = Callable[["SimState"], None]
+PendingEvent = Tuple[Timestamp, EventCallback]
 ExecutionTrace = List["TraceEvent"]
 OrderName = str  # Names PDDL object of type order
 PddlExpression = Any  # Actually a pp.ParseResults. But 'Any' satisfies mypy.
@@ -46,7 +47,7 @@ PddlActionName = str  # Names PDDL action
 T = TypeVar("T")  # So we can assign parametric types below
 PddlTypeName = str  # Names PDDL object type
 PddlObjectName = str  # Names PDDL object
-Heap = List  # A list that maintains the heap invariant
+PriorityQueue = List  # A list used as a priority queue, maintains the heap invariant
 
 UNREACHABLE_COST = 999
 
@@ -218,7 +219,7 @@ class Action(ABC):
         """
         end_time = sim_state.elapsed_time + self.get_duration()
         self.start(sim_state)
-        heapq.heappush(sim_state.events, (end_time, self.end))
+        sim_state.push_event((end_time, self.end))
 
 
 @dataclass
@@ -252,14 +253,32 @@ class SimState:
     elapsed_time: Timestamp = 0.0
     "Elapsed time since start of simulation (seconds)."
 
-    events: Heap[Tuple[Timestamp, EventCallback]] = field(default_factory=list)
-    "Pending events queued by earlier actions."
-
     trace: ExecutionTrace = field(default_factory=list)
     "Trace of timestamped actions executed so far in the sim."
 
     completed: Dict[Any, bool] = field(default_factory=dict)
     "Tracks completion status for actions that subclass MarkCompleteAction."
+
+    def __post_init__(self):
+        self._events: PriorityQueue[PendingEvent] = []
+        # pylint: disable-next=pointless-string-statement  # doc string
+        "Pending events queued by earlier actions."
+
+    def get_events(self) -> List[PendingEvent]:
+        "Return pending events sorted by timestamp. (Non-destructive.)"
+        return sorted(self._events)
+
+    def has_event(self) -> bool:
+        "Return True if there is a pending event."
+        return bool(self._events)
+
+    def push_event(self, event: PendingEvent) -> None:
+        "Push a new pending event."
+        heapq.heappush(self._events, event)
+
+    def pop_event(self) -> PendingEvent:
+        "Pop and return the pending event with the earliest timestamp."
+        return heapq.heappop(self._events)
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
@@ -269,7 +288,7 @@ class SimState:
                 robot: state.get_dump_dict()
                 for robot, state in self.robot_states.items()
             },
-            "events": sorted(self.events),
+            "events": self.get_events(),
             "trace": [e.get_dump_dict() for e in self.trace],
             "completed": self.completed,
         }
@@ -279,9 +298,9 @@ class SimState:
         Warp the simulation forward in time to the next queued event and apply its event callback.
         AKA "wait for something to happen".
         """
-        if not self.events:
+        if not self.has_event():
             return
-        event_time, event_func = heapq.heappop(self.events)
+        event_time, event_func = self.pop_event()
         self.elapsed_time = event_time
         event_func(self)
 
