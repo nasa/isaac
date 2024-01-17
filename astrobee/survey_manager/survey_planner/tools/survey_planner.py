@@ -244,10 +244,10 @@ class RobotState:
         return {"pos": self.pos, "action": repr(self.action), "reserved": self.reserved}
 
 
-class PriorityQueue(Generic[T], Iterable[T]):
+class PriorityQueue(Generic[T]):
     "Priority queue implemented as a list that maintains the heap invariant."
 
-    def __init__(self, seq: Iterable[T] = None):
+    def __init__(self, seq: Optional[Iterable[T]] = None):
         ":param seq: Initial contents of the queue (need not be ordered)."
         if seq is None:
             self._q: List[T] = []
@@ -256,7 +256,7 @@ class PriorityQueue(Generic[T], Iterable[T]):
             heapq.heapify(self._q)
 
     def __iter__(self) -> Iterator[T]:
-        "Iterate through the queue in order non-destructively. (Not very efficient.)"
+        "Iterate through the queue in order non-destructively. (Not optimized, for debugging.)"
         return iter(sorted(self._q))
 
     def __bool__(self) -> bool:
@@ -316,7 +316,7 @@ class SimState:
         event_func(self)
 
 
-@dataclass
+@dataclass(repr=False)
 class MarkCompleteAction(Action):
     """
     Represents an action that explicitly marks itself complete when it finishes executing.
@@ -373,7 +373,7 @@ def get_collision_reason(
     return ""  # ok
 
 
-@dataclass
+@dataclass(repr=False)
 class AbstractMoveAction(Action):
     "Represents a single-step move action."
 
@@ -478,7 +478,7 @@ class UndockAction(AbstractMoveAction):
         return ""  # ok
 
 
-@dataclass
+@dataclass(repr=False)
 class PanoramaAction(MarkCompleteAction):
     "Represents a panorama action."
 
@@ -495,7 +495,7 @@ class PanoramaAction(MarkCompleteAction):
         return ""  # ok
 
 
-@dataclass
+@dataclass(repr=False)
 class StereoAction(MarkCompleteAction):
     "Represents a stereo survey action."
 
