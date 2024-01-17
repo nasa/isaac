@@ -10,8 +10,20 @@ import io
 import itertools
 import pathlib
 import sys
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from abc import ABC
+from dataclasses import dataclass, field
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 import pyparsing as pp
 import yaml
@@ -27,42 +39,48 @@ CostMap = List[Cost]  # Interpreted as mapping of LocationIndex -> Cost
 RobotStatus = str  # Options: ACTIVE, BLOCKED, DONE
 Timestamp = float  # Elapsed time since start of sim in seconds
 EventCallback = Callable[["SimState"], None]
-ExecutionTrace = List[Tuple[Timestamp, "Action", Duration]]
+ExecutionTrace = List["TraceEvent"]
 OrderName = str  # Names PDDL object of type order
 PddlExpression = Any  # Actually a pp.ParseResults. But 'Any' satisfies mypy.
 PddlActionName = str  # Names PDDL action
 T = TypeVar("T")  # So we can assign parametric types below
 PddlTypeName = str  # Names PDDL object type
 PddlObjectName = str  # Names PDDL object
+Heap = List  # A list that maintains the heap invariant
 
 UNREACHABLE_COST = 999
 
 
+@dataclass
 class Config:
     "Container for custom planner config."
 
-    def __init__(
-        self,
-        robots: List[RobotName],
-        locations: List[LocationName],
-        neighbors: List[List[LocationIndex]],
-        action_durations: Dict[PddlActionName, Duration],
-    ):
-        """
-        :param robots: PDDL objects of type robot
-        :param locations: PDDL objects of type location
-        :param neighbors: Maps each LocationIndex to a list of neighbor indices.
-        :param action_durations: Maps each PDDL action to its duration in seconds.
-        """
-        self.robots = robots
-        self.locations = locations
-        self.neighbors = neighbors
-        self.action_durations = action_durations
-        self.location_lookup = {name: ind for ind, name in enumerate(locations)}
+    robots: List[RobotName] = field(default_factory=list)
+    "PDDL objects of type robot"
+
+    locations: List[LocationName] = field(default_factory=list)
+    "PDDL objects of type location"
+
+    neighbors: List[List[LocationIndex]] = field(default_factory=list)
+    "Maps each LocationIndex to a list of neighbor indices."
+
+    action_durations: Dict[PddlActionName, Duration] = field(default_factory=dict)
+    "Maps each PDDL action to its duration in seconds."
+
+    def __post_init__(self) -> None:
+        "Set `location_lookup` to match `locations`."
+
+        self.location_lookup = {name: ind for ind, name in enumerate(self.locations)}
+        # pylint: disable-next=pointless-string-statement  # doc string
+        "Maps each PDDL LocationName to its LocationIndex."
+
+    def update_location_lookup(self) -> None:
+        "Update `location_lookup` to match `locations`."
+        self.__post_init__()
 
 
-# Will override these empty placeholder values during PDDL parsing phase
-CONFIG = Config(robots=[], locations=[], neighbors=[], action_durations={})
+# Will override fields of this empty placeholder during PDDL parsing phase
+CONFIG = Config()
 
 
 def get_cost_to_goal(goal_region: Iterable[LocationIndex]) -> CostMap:
@@ -115,20 +133,33 @@ def is_location_flying(location: LocationName) -> bool:
     return "bay" in location
 
 
-class Action(ABC):
-    "Abstract class representing an action that can be invoked by the planner."
+class TraceEvent(NamedTuple):
+    "Represents an event in an execution trace."
+    timestamp: Timestamp
+    action: "Action"
+    duration: Duration
 
-    def __init__(self, robot: RobotName):
-        """
-        :param robot: The robot that is executing the action.
-        """
-        self.robot = robot
+    def get_dump_dict(self) -> Dict[str, Any]:
+        "Return a dict to dump for debugging."
+        return {
+            "timestamp": self.timestamp,
+            "action": self.action,
+            "duration": self.duration,
+        }
+
+
+@dataclass
+class Action(ABC):
+    "Represents an action that can be invoked by the planner."
+
+    robot: RobotName
+    "The robot that is executing the action."
 
     def get_duration(self) -> Duration:
         "Return the estimated duration of the action in seconds."
         return CONFIG.action_durations[self.get_pddl_name()]
 
-    def invalid_reason(  # pylint: disable=unused-argument,no-self-use
+    def invalid_reason(  # pylint: disable=unused-argument
         self, sim_state: "SimState"
     ) -> str:
         """
@@ -148,9 +179,9 @@ class Action(ABC):
         "Return the name of this action type in the PDDL model."
         return self.__class__.__name__.replace("Action", "").lower()
 
-    @abstractmethod
     def get_pddl_args(self) -> List[Any]:
         "Return the arguments of this action type in the PDDL model."
+        raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
 
     def __repr__(self):
         args_str = " ".join((str(arg) for arg in self.get_pddl_args()))
@@ -161,7 +192,9 @@ class Action(ABC):
         Modify `sim_state` as needed at the beginning of action execution. Derived classes that
         need to extend start() should typically invoke the parent method.
         """
-        sim_state.trace.append((sim_state.elapsed_time, self, self.get_duration()))
+        sim_state.trace.append(
+            TraceEvent(sim_state.elapsed_time, self, self.get_duration())
+        )
         robot_state = sim_state.robot_states[self.robot]
         robot_state.action = self
         # It seems to be a PDDL convention to separate events by an epsilon time difference
@@ -188,39 +221,45 @@ class Action(ABC):
         heapq.heappush(sim_state.events, (end_time, self.end))
 
 
+@dataclass
 class RobotState:
-    "Class representing the state of a robot."
+    "Represents the state of a robot."
 
-    def __init__(
-        self, pos: LocationName, action: Optional[Action], reserved: List[LocationName]
-    ):
-        """
-        :param pos: The current location of the robot.
-        :param action: The action the robot is currently executing (or None if it is idle).
-        :param reserved: A list of locations the robot currently has reserved. (Places the robot
-            is expected to move through given the action it is currently executing.)
-        """
-        self.pos = pos
-        self.action = action
-        self.reserved = reserved
+    pos: LocationName
+    "The current location of the robot."
+
+    action: Optional[Action]
+    "The action the robot is currently executing (or None if it is idle)."
+
+    reserved: List[LocationName]
+    """
+    A list of locations the robot currently has reserved. (Places the robot is expected to move
+    through given the action it is currently executing.)
+    """
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
         return {"pos": self.pos, "action": repr(self.action), "reserved": self.reserved}
 
 
+@dataclass
 class SimState:
-    "Class representing the overall state of the multi-robot sim."
+    "Represents the overall state of the multi-robot sim."
 
-    def __init__(self, robot_states: Dict[RobotName, RobotState]):
-        """
-        :param robot_states: Initial robot states.
-        """
-        self.elapsed_time = 0.0
-        self.robot_states = robot_states
-        self.events: List[Tuple[Timestamp, EventCallback]] = []
-        self.trace: ExecutionTrace = []
-        self.completed: Dict[Any, bool] = {}
+    robot_states: Dict[RobotName, RobotState]
+    "Initial robot states."
+
+    elapsed_time: Timestamp = 0.0
+    "Elapsed time since start of simulation (seconds)."
+
+    events: Heap[Tuple[Timestamp, EventCallback]] = field(default_factory=list)
+    "Pending events queued by earlier actions."
+
+    trace: ExecutionTrace = field(default_factory=list)
+    "Trace of timestamped actions executed so far in the sim."
+
+    completed: Dict[Any, bool] = field(default_factory=dict)
+    "Tracks completion status for actions that subclass MarkCompleteAction."
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
@@ -231,10 +270,7 @@ class SimState:
                 for robot, state in self.robot_states.items()
             },
             "events": sorted(self.events),
-            "trace": [
-                {"timestamp": t, "action": repr(a), "duration": d}
-                for t, a, d in self.trace
-            ],
+            "trace": [e.get_dump_dict() for e in self.trace],
             "completed": self.completed,
         }
 
@@ -250,12 +286,14 @@ class SimState:
         event_func(self)
 
 
-class MarkCompleteAction(
-    Action
-):  # pylint: disable=abstract-method # ok in abstract class
+@dataclass
+class MarkCompleteAction(Action):
     """
-    Class representing an action that explicitly marks itself complete when it finishes executing.
+    Represents an action that explicitly marks itself complete when it finishes executing.
     """
+
+    order: OrderName
+    "Propagates goal ordering constraint from problem instance. Required by PDDL model."
 
     def end(self, sim_state: SimState) -> None:
         super().end(sim_state)
@@ -298,22 +336,22 @@ def get_collision_reason(
     )
     reserved_check_locs = others_reserved.intersection(check_locs)
     if reserved_check_locs:
-        return f"Expected no collision check locations adjacent to `to_pos` {to_pos} to be reserved by other robots, but these are: {reserved_check_locs}"
+        return (
+            f"Expected no collision check locations adjacent to `to_pos` {to_pos} to be reserved by"
+            f" other robots, but these are: {reserved_check_locs}"
+        )
     return ""  # ok
 
 
+@dataclass
 class AbstractMoveAction(Action):
-    "Class representing a single-step move action."
+    "Represents a single-step move action."
 
-    def __init__(self, robot: RobotName, from_pos: LocationName, to: LocationName):
-        """
-        :param robot: The robot executing the action.
-        :param from_pos: The robot's starting location (only for compatibility with PDDL action).
-        :param to: The location the robot should move to.
-        """
-        super().__init__(robot)
-        self.from_pos = from_pos
-        self.to = to
+    from_pos: LocationName
+    "The robot's starting location."
+
+    to: LocationName
+    "The location the robot should move to."
 
     def get_collision_check_locations(self) -> List[str]:
         """
@@ -331,7 +369,7 @@ class AbstractMoveAction(Action):
 
         # The robot can only move to an immediate neighbor of its current location
         if to_ind not in CONFIG.neighbors[from_ind]:
-            return f"Expected `to` {self.to} to be an immediate neighbor of `from_pos` {self.from_pos}"
+            return f"Expected `to` {self.to} to be a neighbor of `from_pos` {self.from_pos}"
 
         # The robot can't move to a location reserved by another robot.
         for robot, robot_state in sim_state.robot_states.items():
@@ -361,7 +399,7 @@ class AbstractMoveAction(Action):
 
 
 class MoveAction(AbstractMoveAction):
-    "Class representing a move action from one flying location to another."
+    "Represents a move action from one flying location to another."
 
     def get_pddl_args(self) -> List[Any]:
         # One check location argument is required for move
@@ -379,7 +417,7 @@ class MoveAction(AbstractMoveAction):
 
 
 class DockAction(AbstractMoveAction):
-    "Class representing a dock action (from a flying location to a dock berth)."
+    "Represents a dock action (from a flying location to a dock berth)."
 
     def invalid_reason(self, sim_state: SimState) -> str:
         super_reason = super().invalid_reason(sim_state)
@@ -393,7 +431,7 @@ class DockAction(AbstractMoveAction):
 
 
 class UndockAction(AbstractMoveAction):
-    "Class representing an undock action (from a dock berth to a flying location)."
+    "Represents an undock action (from a dock berth to a flying location)."
 
     def get_pddl_args(self) -> List[Any]:
         # Two check location arguments are required for undock
@@ -410,13 +448,12 @@ class UndockAction(AbstractMoveAction):
         return ""  # ok
 
 
+@dataclass
 class PanoramaAction(MarkCompleteAction):
-    "Class representing a panorama action."
+    "Represents a panorama action."
 
-    def __init__(self, robot: RobotName, order: OrderName, location: LocationName):
-        super().__init__(robot)
-        self.order = order
-        self.location = location
+    location: LocationName
+    "Where to acquire the panorama."
 
     def get_pddl_args(self) -> List[Any]:
         return [self.robot, self.order, self.location]
@@ -424,24 +461,19 @@ class PanoramaAction(MarkCompleteAction):
     def invalid_reason(self, sim_state: SimState) -> str:
         robot_state = sim_state.robot_states[self.robot]
         if robot_state.pos != self.location:
-            return f"Expected robot position {robot_state.pos} to match desired panorama location {self.location}"
+            return f"Expected robot pos {robot_state.pos} to match panorama pos {self.location}"
         return ""  # ok
 
 
+@dataclass
 class StereoAction(MarkCompleteAction):
-    "Class representing a stereo survey action."
+    "Represents a stereo survey action."
 
-    def __init__(
-        self,
-        robot: RobotName,
-        order: OrderName,
-        base: LocationName,
-        bound: LocationName,
-    ):
-        super().__init__(robot)
-        self.order = order
-        self.base = base
-        self.bound = bound
+    base: LocationName
+    "The location where the stereo survey starts and ends."
+
+    bound: LocationName
+    "The other end of the interval of locations that the robot visits during the survey."
 
     def get_pddl_args(self) -> List[Any]:
         # Two collision check arguments are required for stereo action
@@ -451,7 +483,7 @@ class StereoAction(MarkCompleteAction):
     def invalid_reason(self, sim_state: SimState) -> str:
         robot_state = sim_state.robot_states[self.robot]
         if robot_state.pos != self.base:
-            return f"Expected robot position {robot_state.pos} to match stereo survey base {self.base}"
+            return f"Expected robot pos {robot_state.pos} to match stereo survey base {self.base}"
 
         # Collision check locations must not be reserved
         collision_reason = get_collision_reason(
@@ -473,37 +505,57 @@ class StereoAction(MarkCompleteAction):
         robot_state.reserved = [self.base]
 
 
+@dataclass
 class Goal(ABC):
-    "Class representing an abstract goal."
+    "Represents an abstract goal."
 
-    def __init__(self, robot: RobotName):
-        """
-        :param robot: The robot primarily responsible for achieving the goal.
-        """
-        self.robot = robot
+    robot: RobotName
+    "The robot primarily responsible for achieving the goal."
 
-    @abstractmethod
     def is_complete(self, exec_state: "ExecState") -> bool:
         "Return True if the goal has been completed in `exec_state`."
+        raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
 
-    @abstractmethod
     def get_next_action(self, exec_state: "ExecState") -> Action:
         "Return the next action to apply to achieve the goal given `exec_state`."
+        raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
 
 
+@dataclass
 class RobotExecState:
-    "Class representing the execution state of a robot."
+    "Represents the execution state of a robot."
 
-    def __init__(self, goals):
-        """
-        :param goals: The sequence of goals that the robot should achieve.
-        """
-        self.goals = goals
-        self.goal_index = 0
-        self.goal_start_time: Optional[Timestamp] = None
-        self.status = "INIT"
-        self.blocked_action: Optional[Action] = None
-        self.blocked_reason = ""
+    goals: List[Goal]
+    "Goals of the robot."
+
+    goal_index: int = 0
+    """
+    Number of goals that the robot has completed. If less than `len(goals)`, this can be
+    interpreted as the index of the current goal. (Or if all goals have been completed, there is no
+    current goal.)
+    """
+
+    goal_start_time: Timestamp = 0.0
+    """
+    When the most recently completed goal was completed. (Can be interpreted as when the current
+    goal became active.) Set to 0.0 if no goal has been completed yet.
+    """
+
+    status: RobotStatus = "INIT"
+    """
+    Execution states of the robot. DONE = completed all goals, BLOCKED = the next action to perform
+    is not (yet) valid, ACTIVE = robot is actively working on a goal.
+    """
+
+    blocked_action: Optional[Action] = None
+    """
+    If status is "BLOCKED", this is the next action that is currently invalid. Otherwise, None.
+    """
+
+    blocked_reason: str = ""
+    """
+    If status is "BLOCKED", this is the reason why `blocked_action` is invalid. Otherwise, "".
+    """
 
     def get_goal(self) -> Optional[Goal]:
         """
@@ -535,24 +587,21 @@ class RobotExecState:
         return result
 
 
+@dataclass
 class ExecState:
-    "Class representing the execution state of the multi-robot system."
+    "Represents the execution state of the multi-robot system."
 
-    def __init__(
-        self, sim_state: SimState, robot_exec_states: Dict[RobotName, RobotExecState]
-    ):
-        """
-        :param sim_state: The initial simulation state.
-        :param robot_states: The initial execution states of the robots in the multi-robot system.
-        """
-        self.sim_state = sim_state
-        self.robot_exec_states = robot_exec_states
+    sim_state: SimState
+    "The initial simulation state."
 
-    def is_any_robot_active(self):
+    robot_exec_states: Dict[RobotName, RobotExecState]
+    "The initial execution states of the robots in the multi-robot system."
+
+    def is_any_robot_active(self) -> bool:
         "Return True if any robot is actively working on a goal."
         return any((rstate.is_active() for rstate in self.robot_exec_states.values()))
 
-    def are_all_robots_done(self):
+    def are_all_robots_done(self) -> bool:
         "Return True if all robots have achieved all of their goals."
         return all((rstate.is_done() for rstate in self.robot_exec_states.values()))
 
@@ -585,8 +634,7 @@ class ExecState:
         """
         Iterate through goals, starting with the current goal, until reaching a goal that is not
         completed yet, and apply that goal's next action if it is valid in the current state.
-        Update the robot status: DONE = completed all goals, BLOCKED = the next action
-        to perform is not (yet) valid, ACTIVE = robot is actively working on a goal.
+        Update the robot execution status.
         """
         robot_exec_state = self.robot_exec_states[robot]
         robot_exec_state.status = self.call_next_action_internal(robot)
@@ -623,25 +671,20 @@ class ExecState:
             if self.are_all_robots_done():
                 break
             if not self.is_any_robot_active():
-                # print_trace(self.sim_state.trace)
                 print(self)
                 raise RuntimeError(
                     "Can't achieve all goals. Not done but no active robots!"
                 )
 
 
+@dataclass
 class MoveGoal(Goal):
-    "Class representing a move goal (may require multiple single-step move actions)."
+    "Represents a move goal (may require multiple single-step move actions)."
 
-    def __init__(self, robot: RobotName, to: LocationName):
-        """
-        :param robot: The robot executing the action.
-        :param to: The location the robot should move to.
-        """
-        super().__init__(robot)
-        self.to = to
+    to: LocationName
+    "The location the robot should move to."
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"(robot-at {self.robot} {self.to})"
 
     def is_complete(self, exec_state: ExecState) -> bool:
@@ -665,12 +708,16 @@ class MoveGoal(Goal):
         return action_type(robot=self.robot, from_pos=robot_state.pos, to=next_loc)
 
 
+@dataclass
 class MarkCompleteGoal(Goal):
-    "Class representing a goal that is complete when a corresponding MarkCompleteAction finishes."
+    "Represents a goal that is complete when a corresponding MarkCompleteAction finishes."
 
-    @abstractmethod
+    order: OrderName
+    "Propagates goal ordering constraint from problem instance. Required by PDDL model."
+
     def get_completing_action(self) -> MarkCompleteAction:
         "Return the MarkCompleteAction whose completion satisfies this MarkCompleteGoal."
+        raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
 
     def __repr__(self) -> str:
         return repr(self.get_completing_action()).replace("(", "(completed-", 1)
@@ -679,17 +726,12 @@ class MarkCompleteGoal(Goal):
         return self.get_completing_action().is_complete(exec_state.sim_state)
 
 
+@dataclass
 class PanoramaGoal(MarkCompleteGoal):
-    "Class representing a panorama goal."
+    "Represents a panorama goal."
 
-    def __init__(self, robot: RobotName, order: OrderName, location: LocationName):
-        """
-        :param order: Ordering constraint used by generic PDDL planners, ignored by this planner
-        :param location: The location where the panorama should be collected.
-        """
-        super().__init__(robot)
-        self.order = order
-        self.location = location
+    location: LocationName
+    "The location where the panorama should be acquired."
 
     def get_completing_action(self) -> MarkCompleteAction:
         return PanoramaAction(
@@ -707,25 +749,15 @@ class PanoramaGoal(MarkCompleteGoal):
         return self.get_completing_action()
 
 
+@dataclass
 class StereoGoal(MarkCompleteGoal):
-    "Class representing a stereo survey goal."
+    "Represents a stereo survey goal."
 
-    def __init__(
-        self,
-        robot: RobotName,
-        order: OrderName,
-        base: LocationName,
-        bound: LocationName,
-    ):
-        """
-        :param order: Ordering constraint used by generic PDDL planners, ignored by this planner
-        :param base: The location where the stereo survey starts and ends.
-        :param bound: The other end of the interval of locations that the robot visits during the survey.
-        """
-        super().__init__(robot)
-        self.order = order
-        self.base = base
-        self.bound = bound
+    base: LocationName
+    "The location where the stereo survey starts and ends."
+
+    bound: LocationName
+    "The other end of the interval of locations that the robot visits during the survey."
 
     def get_completing_action(self) -> MarkCompleteAction:
         return StereoAction(
@@ -743,11 +775,11 @@ class StereoGoal(MarkCompleteGoal):
         return self.get_completing_action()
 
 
-def get_trace(trace: ExecutionTrace) -> str:
+def format_trace(trace: ExecutionTrace) -> str:
     "Return `trace` formatted in the standard PDDL plan output format used by POPF."
     out = io.StringIO()
-    for timestamp, action, duration in trace:
-        print(f"{timestamp:.3f}: {action} [{duration:.3f}]", file=out)
+    for event in trace:
+        print(f"{event.timestamp:.3f}: {event.action} [{event.duration:.3f}]", file=out)
     return out.getvalue()
 
 
@@ -777,10 +809,10 @@ def get_action_durations(domain: PddlExpression) -> Dict[PddlActionName, Duratio
         ), f"Expected :duration arg to have the form (= ?duration ...), got {duration_arg}"
         try:
             duration = float(duration_str)
-        except ValueError:
+        except ValueError as exc:
             raise RuntimeError(
                 f"Expected duration value to be a float, got {repr(duration_str)}"
-            )
+            ) from exc
         action_durations[action_name] = duration
     return action_durations
 
@@ -834,7 +866,7 @@ def get_goal_from_pddl(goal_expr: PddlExpression) -> Optional[Goal]:
         return MoveGoal(robot=goal_expr[1], to=goal_expr[2])
 
     print(
-        f"WARNING: get_goal_from_pddl(): Can't map goal_type {goal_type} to a custom planner goal type, ignoring",
+        f"WARNING: Can't map PDDL goal_type {goal_type} to custom planner goal type, ignoring",
         file=sys.stderr,
     )
     return None
@@ -921,7 +953,7 @@ def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
     exec_state = ExecState(sim_state=sim_state, robot_exec_states=robot_exec_states)
 
     exec_state.run()
-    print(get_trace(exec_state.sim_state.trace))
+    print(format_trace(exec_state.sim_state.trace))
 
 
 class CustomFormatter(
