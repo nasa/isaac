@@ -24,7 +24,6 @@ import socket
 import sys
 import threading
 
-
 # Constants
 CHUNK_SIZE = 1024
 
