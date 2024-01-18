@@ -14,3 +14,7 @@
 	url = https://github.com/Bckempa/popf.git
 	branch = noetic-devel
 
+[submodule "astrobee/survey_manager/survey_dependencies/optic_planner"]
+	path = astrobee/survey_manager/survey_dependencies/optic_planner
+	url = https://github.com/Bckempa/optic_planner.git
+	branch = noetic-devel
