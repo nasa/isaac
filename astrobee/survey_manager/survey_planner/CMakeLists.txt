@@ -72,8 +72,13 @@ catkin_python_setup()
 catkin_package()
 
 # Install actions
-install(TARGETS move_action_node
-        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(TARGETS
+  move_action_node
+  dock_action_node
+  undock_action_node
+  panorama_action_node
+  stereo_action_node
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 foreach( dir pddl launch data)
    install( DIRECTORY ${dir}/
