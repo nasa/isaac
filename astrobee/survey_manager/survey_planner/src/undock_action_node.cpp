@@ -35,7 +35,7 @@ class UndockAction : public plansys2::ActionExecutorClient {
   UndockAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate)
       : ActionExecutorClient(nh, action, rate) {
     progress_ = 0.0;
-    process_pipe_ = nullptr;
+    pid_ = 0;
   }
 
  protected:
@@ -52,38 +52,44 @@ class UndockAction : public plansys2::ActionExecutorClient {
 
     // Start process if not started yet
     if (progress_ == 0.0) {
-      std::string command =
-        "rosrun survey_planner command_astrobee " + robot_name_ + " undock " + towards + " " + from + " run1";
-
-      std::cout << command << std::endl;
-      // Open a pipe to a command and get a FILE* for reading
-      process_pipe_ = popen(command.c_str(), "r");
-
-      if (!process_pipe_) {
-        perror("popen");
+      pid_ = fork();
+      if (pid_ < 0) {
+        perror("Fork failed.");
         finish(false, 1.0, "Failed to start the process");
+      } else if (pid_ == 0) {
+        printf("rosrun rosrun survey_planner command_astrobee %s undock %s %s run1\n", robot_name_.c_str(),
+               towards.c_str(), from.c_str());
+        const char* args[4];
+        args[0] = "sh";
+        args[1] = "-c";
+        args[2] =
+          ("rosrun survey_planner command_astrobee " + robot_name_ + " undock " + towards + " " + from + " run1")
+            .c_str();
+        args[3] = NULL;
+        execvpe("sh", (char* const*)args, environ);
+        perror("Failed to execute command.");
+        printf("EXITING FAILURE %d\n", getpid());
+        exit(-1);
+      } else {
+        progress_ = 0.02;
         return;
       }
-
-      // Get the process ID
-      progress_ = 0.02;
-      return;
     }
 
-    char buffer[1028];
+    if (progress_ < 1.0) {
+      progress_ += 0.02;
+      send_feedback(progress_, "Undock running");
+    }
 
-    if (fgets(buffer, 1028, process_pipe_) != NULL) {
-      std::cout << buffer << std::endl;
-      if (progress_ < 1.0) {
-        progress_ += 0.02;
-        send_feedback(progress_, "Undock running");
-      }
-
-      std::cout << "\t ** [Undock] Robot " << robot_name_ << " moving from " << from << " towards " << towards
-                << " ... [" << std::min(100.0, progress_ * 100.0) << "%]  " << std::endl;
-    } else {
-      int status = pclose(process_pipe_);
-      std::cout << "Finished.\n" << std::endl;
+    std::cout << "\t ** [Undock] Robot " << robot_name_ << " moving from " << from << " towards " << towards
+              << " ... [" << std::min(100.0, progress_ * 100.0) << "%]  " << std::endl;
+    int status;
+    int result = waitpid(-1, &status, WNOHANG);
+    printf("Result: %d %d %d\n", result, pid_, status);
+    if (result < 0) {
+      perror("Failed to wait for pid.");
+      finish(false, 1.0, "Unexpected error waiting for process.");
+    } else if (result == pid_) {
       if (status == 0) {
         std::cout << "Command exited with status success " << std::endl;
         finish(true, 1.0, "Undock completed");
@@ -96,7 +102,7 @@ class UndockAction : public plansys2::ActionExecutorClient {
 
   float progress_;
   std::string robot_name_;
-  FILE* process_pipe_;
+  int pid_;
 };
 }  // namespace plansys2_actions
 
