@@ -17,8 +17,30 @@
  * under the License.
  */
 
-#include <survey_planner/isaac_action_node.h>
+#ifndef SURVEY_PLANNER_ISAAC_ACTION_NODE_H_
+#define SURVEY_PLANNER_ISAAC_ACTION_NODE_H_
 
-int main(int argc, char *argv[]) {
-  return isaac_action_main(argc, argv, "undock");
-}
+#include <plansys2_executor/ActionExecutorClient.hpp>
+
+#include <string>
+
+namespace plansys2_actions {
+
+class IsaacAction : public plansys2::ActionExecutorClient {
+ public:
+  IsaacAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate);
+
+ protected:
+  void do_work();
+
+  float progress_;
+  std::string robot_name_, action_name_;
+  int pid_;
+};
+}  // namespace plansys2_actions
+
+
+// Main entry point for application
+int isaac_action_main(int argc, char *argv[], const char* action_name);
+
+#endif  // SURVEY_PLANNER_ISAAC_ACTION_NODE_H_
