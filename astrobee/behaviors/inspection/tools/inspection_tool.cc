@@ -66,6 +66,7 @@ DEFINE_bool(anomaly, false, "Send the inspection command");
 DEFINE_bool(geometry, false, "Send the inspection command");
 DEFINE_bool(panorama, false, "Send the inspection command");
 DEFINE_bool(volumetric, false, "Send the inspection command");
+DEFINE_bool(remote, false, "Whether target command is remote robot");
 
 // General parameters
 DEFINE_string(camera, "sci_cam", "Camera to use");
@@ -427,8 +428,11 @@ int main(int argc, char *argv[]) {
   // Create a node handle
   ros::NodeHandle nh(std::string("/") + FLAGS_ns);
   // Setup SWITCH action
-  client.SetConnectedTimeout(FLAGS_connect);
-  client.SetActiveTimeout(FLAGS_active);
+  if (!FLAGS_remote) {
+    client.SetConnectedTimeout(FLAGS_connect);
+    client.SetActiveTimeout(FLAGS_active);
+    client.SetConnectedCallback(std::bind(ConnectedCallback, &client));
+  }
   client.SetResponseTimeout(FLAGS_response);
   if (FLAGS_deadline > 0)
     client.SetDeadlineTimeout(FLAGS_deadline);
@@ -436,11 +440,10 @@ int main(int argc, char *argv[]) {
     std::placeholders::_1));
   client.SetResultCallback(std::bind(ResultCallback,
     std::placeholders::_1, std::placeholders::_2));
-  client.SetConnectedCallback(std::bind(ConnectedCallback, &client));
   client.Create(&nh, ACTION_BEHAVIORS_INSPECTION);
 
   // Configure panorama anomaly parameters
-  if (FLAGS_anomaly) {
+  if (FLAGS_anomaly && !FLAGS_remote) {
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
     cfg.Set<double>("target_distance", FLAGS_target_distance);
     cfg.Set<double>("min_distance", FLAGS_min_distance);
@@ -459,7 +462,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Configure panorama inspection parameters
-  if (FLAGS_panorama) {
+  if (FLAGS_panorama && !FLAGS_remote) {
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
 
     if (FLAGS_panorama_mode == "") {
@@ -506,6 +509,17 @@ int main(int argc, char *argv[]) {
 
   // Start input thread
   boost::thread inp(GetInput, &client);
+
+  if (FLAGS_remote) {
+    ros::Rate loop_rate(10);
+    ros::Time start_time = ros::Time::now();
+
+    // Spin for 3 seconds
+    while (ros::Time::now() - start_time < ros::Duration(3.0))
+        loop_rate.sleep();
+
+    SendGoal(&client);
+  }
   // Synchronous mode
   while (!stopflag_) {
     ros::spinOnce();
