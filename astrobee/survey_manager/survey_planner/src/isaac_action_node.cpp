@@ -57,7 +57,7 @@ void IsaacAction::do_work() {
       perror("Fork failed.");
       finish(false, 1.0, "Failed to start the process");
     } else if (pid_ == 0) {
-      printf("rosrun rosrun survey_planner command_astrobee %s %s %s %s run1\n",
+      printf("rosrun survey_planner command_astrobee %s %s %s %s run1\n",
              robot_name_.c_str(), action_name_.c_str(), towards.c_str(), from.c_str());
       const char* args[4];
       args[0] = "sh";
@@ -87,13 +87,16 @@ void IsaacAction::do_work() {
   printf("Result: %d %d %d\n", result, pid_, status);
   if (result < 0) {
     perror("Failed to wait for pid.");
+    progress_ = 0.0;
     finish(false, 1.0, "Unexpected error waiting for process.");
   } else if (result == pid_) {
     if (status == 0) {
       std::cout << "Command exited with status success " << std::endl;
+      progress_ = 0.0;
       finish(true, 1.0, action_name_ + " completed");
     } else {
       std::cout << "Command terminated with status fail:  " << status << std::endl;
+      progress_ = 0.0;
       finish(false, 1.0, action_name_ + " terminated by signal");
     }
   }
