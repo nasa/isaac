@@ -37,29 +37,16 @@ from ff_msgs.msg import (
     CommandArg,
     CommandConstants,
     CommandStamped,
+    PlanStatusStamped
 )
 from std_msgs.msg import Header, String
 
-# # Get the directory of the current script
-from survey_planner.problem_generator import load_yaml
+# Imports from survey_planner package
+from survey_planner.problem_generator import load_yaml, get_stereo_traj
 
 # Constants
 MAX_COUNTER = 10
 CHUNK_SIZE = 1024
-
-def get_stereo_traj(config_static, from_bay, to_bay):
-    # Get stereo trajectory
-    traj_matches = [
-        traj
-        for traj in config_static["stereo"].values()
-        if traj["base_location"] == from_bay and traj["bound_location"] == to_bay
-    ]
-    assert (
-        len(traj_matches) == 1
-    ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
-    fplan = traj_matches[0]["fplan"]
-    return fplan
-
 
 def exposure_change(config_static, bay_origin, bay_destination):
     # Going to JEM
@@ -94,6 +81,27 @@ def map_change(config_static, bay_origin, bay_destination):
         return config_static["maps"]["usl"]
     return ""
 
+def get_ops_plan_path():
+    # Check if the path /opt/astrobee/ops/gds/plans/ exists
+    if os.path.exists("/opt/astrobee/ops/gds/plans/"):
+        return "/opt/astrobee/ops/gds/plans/"
+
+    # Check if the environment variable $ASTROBEE_OPS exists
+    astrobee_ops_path = os.getenv("ASTROBEE_OPS")
+    if astrobee_ops_path:
+        return os.path.join(astrobee_ops_path, "gds/plans")
+
+    # Check if the symlink ~/gds/latest/ControlStationConfig/IssWorld exists
+    symlink_path = os.path.expanduser("~/gds/latest/ControlStationConfig/IssWorld")
+    if os.path.islink(symlink_path):
+        # Get the target of the symlink
+        target_path = os.path.realpath(symlink_path)
+        # Construct the relative path ../../plans
+        relative_path = os.path.join(target_path, "../../plans")
+        return relative_path
+
+    # Return None if none of the conditions are met
+    return None
 
 # This class starts a new process and lets you monitor the input and output
 # Mostly used for actions where user inteference might be required
@@ -293,6 +301,9 @@ class CommandExecutor:
         # Declare guest science command publisher
         self.sub_ack = rospy.Subscriber(self.ns + "/mgt/ack", AckStamped, self.ack_callback)
         self.ack_needed = False
+        self.sub_plan_status = rospy.Subscriber(self.ns + "/mgt/executive/plan_status", PlanStatusStamped, self.plan_status_callback)
+        self.plan_status_needed = False
+        self.plan_name = ""
         self.pub_command = rospy.Publisher(self.ns + "/command", CommandStamped, queue_size=5)
         while self.pub_command.get_num_connections() == 0:
             rospy.loginfo("Waiting for subscriber to connect")
@@ -341,39 +352,22 @@ class CommandExecutor:
         rospy.loginfo("Change map to " + map_name)
         return 0
 
-    def set_plan(self):
-        # TODO Add call to plan_pub.cc
-
-        cmd = CommandStamped()
-        cmd.header = Header(stamp=rospy.Time.now())
-        cmd.cmd_name = CommandConstants.CMD_NAME_SET_PLAN
-        cmd.cmd_id = "survey_manager" + str(rospy.Time.now().to_sec())
-        self.unique_cmd_id = cmd.cmd_id
-        cmd.cmd_src = "isaac fsw"
-        cmd.cmd_origin = "isaac fsw"
-        cmd.args = cmd_args
-
-        # Publish the CommandStamped message
-        result = self.publish_and_wait_response(cmd)
-        return result
-
-    def run_plan(self):
-        cmd = CommandStamped()
-        cmd.header = Header(stamp=rospy.Time.now())
-        cmd.cmd_name = CommandConstants.CMD_NAME_RUN_PLAN
-        cmd.cmd_id = "survey_manager" + str(rospy.Time.now().to_sec())
-        self.unique_cmd_id = cmd.cmd_id
-        cmd.cmd_src = "isaac fsw"
-        cmd.cmd_origin = "isaac fsw"
-
-        # Publish the CommandStamped message
-        result = self.publish_and_wait_response(cmd)
-        return result
-
     def ack_callback(self, msg):
         if self.ack_needed == True and msg.cmd_id == self.unique_cmd_id:
             self.ack_msg = msg
             self.ack_needed = False
+
+    def plan_status_callback(self, msg):
+        if self.plan_status_needed == True:
+            rospy.loginfo("plan_name" + self.plan_name + "; msg name " + msg.name)
+            if self.plan_name in msg.name:
+                rospy.loginfo("In point " + str(msg.point) + " status " + str(msg.status.status))
+                if msg.status.status == 3:
+                    self.plan_status_needed = False
+            else:
+                # Plan changed, and previous plan did not complete
+                rospy.loginfo("Plan changed, exiting.")
+                self.plan_status_needed = False
 
     def publish_and_wait_response(self, cmd):
         if rospy.is_shutdown():
@@ -401,6 +395,17 @@ class CommandExecutor:
                 counter += 1
         return 1
 
+    def wait_plan(self, plan_name):
+        if rospy.is_shutdown():
+            return 1
+        # Wait for ack
+        counter = 0
+        while counter < MAX_COUNTER:
+            # got message
+            if self.plan_status_needed == False:
+                return 0
+        return 1
+
 
 
 def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_static_path: pathlib.Path):
@@ -415,7 +420,7 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
     # Figure out robot name and whether we are in simulation or hardware
     current_robot = os.environ.get('ROBOTNAME')
     if not current_robot:
-        rospy.loginfo("We're in simulation. Let's get the robotname using the topic")
+        rospy.loginfo("ROBOTNAME not defined. Let's get the robotname using the topic")
         # This is a latching messge so it shouldn't take long
         try:
             data = rospy.wait_for_message('/robot_name', String, timeout=5)
@@ -457,13 +462,20 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
 
     elif goal == "panorama":
         exit_code += command_executor.start_recording("pano_" + to_bay + "_" + run)
-        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -panorama -panorama_mode '5_mapper_and_hugin' " + config_static["bays_move"][to_bay] + ns)
+        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -geometry -geometry_poses /resources/" + config_static["bays_pano"][to_bay] + ns)
         exit_code += command_executor.stop_recording()
 
     elif goal == "stereo":
-        exit_code += command_executor.start_recording("stereo_" + bay + "_" + run)
-        exit_code += command_executor.set_plan("plans/ISAAC/" + get_stereo_traj(from_bay, to_bay))
-        exit_code += command_executor.run_plan()
+        exit_code += command_executor.start_recording("stereo_" + to_bay + "_" + run)
+        # This starts the plan
+        plan_path = get_ops_plan_path()
+        plan_name = get_stereo_traj(config_static, to_bay, from_bay)
+
+        command_executor.plan_status_needed = True
+        command_executor.plan_name = plan_name
+        exit_code += process_executor.send_command_recursive("rosrun executive plan_pub " + os.path.join(plan_path, plan_name + ".fplan") + ns)
+        if exit_code == 0:
+            exit_code += command_executor.wait_plan(os.path.basename(plan_name))
         exit_code += command_executor.stop_recording()
 
     return exit_code
@@ -510,3 +522,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     exit_code = survey_manager_executor(args.robot_name, args.command_name, args.to_bay, args.from_bay, args.run, args.config_static)
+
+    print("Finished plan action with code " + str(exit_code))

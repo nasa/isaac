@@ -76,6 +76,19 @@ def load_yaml(yaml_path: pathlib.Path) -> YamlMapping:
         return yaml.safe_load(yaml_stream)
 
 
+def get_stereo_traj(static_config, base, bound):
+    traj_matches = [
+        traj
+        for traj in static_config["stereo"].values()
+        if traj["base_location"] == base and traj["bound_location"] == bound
+    ]
+    assert (
+        len(traj_matches) == 1
+    ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
+    fplan = traj_matches[0]["fplan"]
+    return fplan
+
+
 def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
     """
     Convert a YAML goal with named fields from the dynamic config into a PDDL goal predicate.

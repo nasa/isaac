@@ -42,7 +42,7 @@ import yaml
 from matplotlib import collections as mc
 from matplotlib import patches as mp
 from matplotlib import pyplot as plt
-from problem_generator import DATA_DIR, load_yaml, path_list
+from problem_generator import DATA_DIR, get_stereo_traj, load_yaml, path_list
 
 DEFAULT_CONFIGS = [
     DATA_DIR / "survey_static.yaml",
@@ -138,15 +138,8 @@ def yaml_action_from_pddl(
     if action_type == "stereo":
         robot, _order, base, bound, _check1, _check2 = action_args[1:]
         # Use base and bound to look up trajectory.
-        traj_matches = [
-            traj
-            for traj in static_config["stereo"].values()
-            if traj["base_location"] == base and traj["bound_location"] == bound
-        ]
-        assert (
-            len(traj_matches) == 1
-        ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
-        fplan = traj_matches[0]["fplan"]
+        fplan = get_stereo_traj(static_config, base, bound)
+
         # Can discard order check1, check2.
         return {
             "type": "stereo",

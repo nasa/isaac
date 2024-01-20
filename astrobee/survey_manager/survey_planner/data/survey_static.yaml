@@ -64,10 +64,32 @@ bays_move:
   usl_bay6: "-pos '-0.5 0 4.8'"
 
   # Granite testing
-  # jem_hatch_to_nod2:   "-move -pos '-0.3 -0.1 -0.68' -att '0 0 0'"
-  # jem_hatch_from_nod2: "-move -pos '-0.3 -0.1 -0.68' -att '0 0 180'"
-  # nod2_hatch_from_jem: "-move -pos '0.3  -0.1 -0.68' -att '0 0 0'"
-  # nod2_hatch_to_jem:   "-move -pos '0.3  -0.1 -0.68' -att '0 0 180'"
+  gra_p1_bsharp:   "-move -pos '-0.3 -0.1 -0.68'"
+  gra_p2_bsharp: "-move -pos '0.3 -0.1 -0.68'"
+  gra_p1_wannabee:   "-move -pos '-0.3 -0.1 -0.68' -att '1 0 0 180'"
+  gra_p2_wannabee: "-move -pos '0.3 -0.1 -0.68' -att '1 0 0 180'"
+
+bays_pano:
+  jem_bay1: "isaac9/jem_bay1_std_panorama.txt"
+  jem_bay2: "isaac9/jem_bay2_std_panorama.txt"
+  jem_bay3: "isaac9/jem_bay3_std_panorama.txt"
+  jem_bay4: "isaac9/jem_bay4_std_panorama.txt"
+  jem_bay5: "isaac9/jem_bay5_std_panorama.txt"
+  jem_bay6: "isaac9/jem_bay6_std_panorama.txt"
+  jem_bay7: "isaac9/jem_bay7_safe_std_panorama.txt"
+  nod2_bay2: "isaac10/nod2_bay2_std_panorama.txt"
+  nod2_bay3: "isaac10/nod2_bay3_std_panorama.txt"
+  nod2_bay4: "isaac10/nod2_bay4_std_panorama.txt"
+  usl_bay1: "isaac11/usl_bay1_std_panorama.txt"
+  usl_bay2: "isaac11/usl_bay2_std_panorama.txt"
+  usl_bay3: "isaac11/usl_bay3_std_panorama.txt"
+  usl_bay4: "isaac11/usl_bay4_std_panorama.txt"
+  usl_bay5: "isaac11/usl_bay5_std_panorama.txt"
+  usl_bay6: "isaac11/usl_bay6_std_panorama.txt"
+
+  # Granite testing
+  gra_bsharp: "panorama_granite.txt"
+  gra_wannabee: "panorama_granite_wannabee.txt"
 
 maps:
   jem: "iss.map"
@@ -91,13 +113,19 @@ stereo:
   jem_bay1_to_bay3:
     # fplan: Name of external fplan specification of trajectory in astrobee_ops/gds/plans/ISAAC/ . The
     # bay names are intended to indicate which bays are covered by the stereo survey.
-    fplan: "jem_stereo_mapping_bay1_to_bay3.fplan"
+    fplan: "ISAAC/jem_stereo_mapping_bay1_to_bay3"
     # base_location: Where trajectory starts and ends for planning purposes (rough location, not exact)
     base_location: jem_bay1
     # bound_location: The other end of the interval visited by the trajectory, for planner collision
     # check purposes.
     bound_location: jem_bay4  # The survey flies into bay4 even though it only covers up to bay3
   jem_bay4_to_bay7:
-    fplan: "jem_stereo_mapping_bay7_to_bay4.fplan"
+    fplan: "ISAAC/jem_stereo_mapping_bay7_to_bay4"
     base_location: jem_bay7
     bound_location: jem_bay4
+
+  # Granite testing
+  gra_p1_to_gra_p2:
+    fplan: "startup"
+    base_location: gra_p1
+    bound_location: gra_p2
