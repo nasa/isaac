@@ -29,7 +29,6 @@ from typing import (
 
 import pyparsing as pp
 import yaml
-
 from problem_generator import PDDL_DIR
 
 LocationName = str  # Names PDDL object of type location

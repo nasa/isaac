@@ -13,11 +13,14 @@
     ISAAC Flight Software
   </maintainer>
 
-  <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>roscpp</depend>
-  <depend>std_srvs</depend>
-  <depend>lifecycle_msgs</depend>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>lifecycle</build_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>lifecycle</build_export_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>lifecycle</exec_depend>
 
   <depend>plansys2_domain_expert</depend>
   <depend>plansys2_problem_expert</depend>

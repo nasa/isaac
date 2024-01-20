@@ -16,23 +16,83 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(survey_planner)
 
-add_compile_options(-std=c++17)
+set(CMAKE_CXX_STANDARD 17)
 
 find_package(catkin REQUIRED)
 SET(catkin2_DIR "${CMAKE_SOURCE_DIR}/../../../cmake")
 find_package(catkin2 REQUIRED COMPONENTS
   roscpp
   ff_msgs
+  lifecycle
+  plansys2_executor
 )
 
 catkin_package(
   CATKIN_DEPENDS
 )
 
-foreach( dir pddl launch)
+###########
+## Build ##
+###########
+
+# Specify additional locations of header files
+# Your package locations should be listed before other locations
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+)
+
+add_library(isaac_action_node src/isaac_action_node.cpp)
+# Action for move
+add_executable(move_action_node src/move_action_node.cpp)
+target_link_libraries(move_action_node isaac_action_node ${catkin_LIBRARIES} )
+# Action for dock
+add_executable(dock_action_node src/dock_action_node.cpp)
+target_link_libraries(dock_action_node isaac_action_node ${catkin_LIBRARIES} )
+# Action for undock
+add_executable(undock_action_node src/undock_action_node.cpp)
+target_link_libraries(undock_action_node isaac_action_node ${catkin_LIBRARIES} )
+# Action for panorama
+add_executable(panorama_action_node src/panorama_action_node.cpp)
+target_link_libraries(panorama_action_node isaac_action_node ${catkin_LIBRARIES} )
+# Action for stereo
+add_executable(stereo_action_node src/stereo_action_node.cpp)
+target_link_libraries(stereo_action_node isaac_action_node ${catkin_LIBRARIES} )
+
+#############
+## Install ##
+#############
+
+# Allow other packages to use python scripts from this package
+catkin_python_setup()
+
+catkin_package()
+
+catkin_install_python(PROGRAMS
+  tools/survey_planner/command_astrobee
+  tools/survey_planner/monitor_astrobee
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+# Mark executables and/or libraries for installation
+install(TARGETS isaac_action_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+# Install actions
+install(TARGETS
+  move_action_node
+  dock_action_node
+  undock_action_node
+  panorama_action_node
+  stereo_action_node
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+foreach( dir pddl launch data)
    install( DIRECTORY ${dir}/
          DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir} )
 endforeach(dir)

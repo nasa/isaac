@@ -2,7 +2,7 @@
 ;; Command was: ./tools/problem_generator.py
 ;; Working directory was: /home/vagrant/isaac/astrobee/survey_manager/survey_planner
 ;; Problem template: pddl/jem_survey_template.pddl
-;; Config 1: data/jem_survey_static.yaml
+;; Config 1: data/survey_static.yaml
 ;; Config 2: data/jem_survey_dynamic.yaml
 
 (define (problem jem-survey)

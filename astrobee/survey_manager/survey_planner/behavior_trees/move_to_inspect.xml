@@ -1,8 +1,0 @@
-<root BTCPP_format="4" main_tree_to_execute = "MainTree" >
-    <BehaviorTree ID="MainTree">
-       <Sequence name="root_sequence">                                                                 
-           <NavigateNode name="move_to_inspect" robot="${arg0}" pose_id="${arg2}" />
-           <!--<TakePictureNavCam robot="${arg0}" waypoint="${arg2}"/>-->
-       </Sequence>
-    </BehaviorTree>
-</root>
