@@ -37,7 +37,7 @@ from ff_msgs.msg import (
     CommandArg,
     CommandConstants,
     CommandStamped,
-    PlanStatusStamped
+    PlanStatusStamped,
 )
 from std_msgs.msg import Header, String
 
