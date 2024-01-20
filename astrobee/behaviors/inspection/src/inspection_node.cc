@@ -368,7 +368,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     ff_msgs::MotionResultConstPtr const& result) {
     // Check for invalid results
     if (result == nullptr) {
-      ROS_ERROR_STREAM("Invalid result received Motion");
+      ROS_INFO_STREAM("Invalid result received Motion");
       return fsm_.Update(MOTION_FAILED);
     }
 
@@ -607,7 +607,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     if (result != nullptr)
       result_.anomaly_result.push_back(result->anomaly_result);
     else
-      ROS_ERROR_STREAM("Invalid result received Image Analysis");
+      ROS_INFO_STREAM("Invalid result received Image Analysis");
     return fsm_.Update(NEXT_INSPECT);
   }
 
