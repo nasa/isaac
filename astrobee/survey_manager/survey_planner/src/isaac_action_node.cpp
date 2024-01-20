@@ -37,16 +37,13 @@ IsaacAction::IsaacAction(ros::NodeHandle nh, const std::string& action, const st
   action_name_ = action;
   progress_ = 0.0;
   pid_ = 0;
+  command_ = "";
 }
 
 void IsaacAction::do_work() {
   std::string from, towards;
 
-  if (get_arguments().size() > 2) {
-    robot_name_ = get_arguments()[0];
-    from = get_arguments()[1];
-    towards = get_arguments()[2];
-  } else {
+  if (get_arguments().size() < 3) {
     finish(false, 1.0, "Not enough arguments for [MOVE] command");
   }
 
@@ -57,14 +54,17 @@ void IsaacAction::do_work() {
       perror("Fork failed.");
       finish(false, 1.0, "Failed to start the process");
     } else if (pid_ == 0) {
-      printf("rosrun survey_planner command_astrobee %s %s %s %s run1\n",
-             robot_name_.c_str(), action_name_.c_str(), towards.c_str(), from.c_str());
       const char* args[4];
       args[0] = "sh";
       args[1] = "-c";
-      args[2] = ("rosrun survey_planner command_astrobee " + robot_name_ + " " +
-                 action_name_ + " " + towards + " " + from + " run1").c_str();
+      command_ = "rosrun survey_planner command_astrobee ";
+      for (const auto& arg : get_arguments()) {
+          command_ += arg + " ";
+      }
+      command_ += "run1";
+      args[2] = command_.c_str();
       args[3] = NULL;
+      printf("%s\n", args[2]);
       execvpe("sh", (char* const*)args, environ);
       perror("Failed to execute command.");
       printf("EXITING FAILURE %d\n", getpid());
@@ -80,8 +80,8 @@ void IsaacAction::do_work() {
     send_feedback(progress_, action_name_ + " running");
   }
 
-  std::cout << "\t ** [" << action_name_ << "] Robot " << robot_name_ << " moving from " << from << " towards "
-            << towards << " ... [" << std::min(100.0, progress_ * 100.0) << "%]  " << std::endl;
+  std::cout << "\t ** [" << action_name_ << "] " << command_ << " [" << std::min(100.0, progress_ * 100.0) << "%]  "
+            << std::endl;
   int status;
   int result = waitpid(-1, &status, WNOHANG);
   printf("Result: %d %d %d\n", result, pid_, status);

@@ -42,7 +42,7 @@ from ff_msgs.msg import (
 from std_msgs.msg import Header, String
 
 # Imports from survey_planner package
-from survey_planner.problem_generator import load_yaml, get_stereo_traj
+from survey_planner.problem_generator import load_yaml, yaml_action_from_pddl
 
 # Constants
 MAX_COUNTER = 10
@@ -120,14 +120,14 @@ class ProcessExecutor:
 
         # Declare socket for process input
         self.sock_input = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock_input.settimeout(1)  # Set a timeout for socket operations
+        self.sock_input.settimeout(0.05)  # Set a timeout for socket operations
         self.sock_input.bind(self.input_path)
         self.sock_input.listen(1)  # Listen for one connection
         self.sock_input_connected = False
 
         # Declare socket for process output
         self.sock_output = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock_output.settimeout(1)  # Set a timeout for socket operations
+        self.sock_output.settimeout(0.05)  # Set a timeout for socket operations
         self.sock_output.bind(self.output_path)
         self.sock_output.listen(1)  # Listen for one connection
         self.sock_output_connected = False
@@ -265,29 +265,18 @@ class ProcessExecutor:
             # Get the final exit code
             return return_code
 
-    def recursive_command(self, command):
-        while not rospy.is_shutdown():
-            user_input = input("Do you want to continue? (y/n): ").lower().strip()
-            if user_input == 'y':
-                exit_code = self.send_command(command)
-                if exit_code != 0:
-                    exit_code = self.recursive_command(command)  # Continue recursively
-                return exit_code
-            elif user_input == 'n':
-                print("Exiting.")
-                return 1
-            else:
-                print("Invalid input. Please enter 'y' or 'n'.")
-        return 1
-
     def send_command_recursive(self, command):
         print("Sending recursive command")
+
         exit_code = self.send_command(command)
         print("Exit code " + str(exit_code))
-        if (exit_code and not rospy.is_shutdown()):
-            exit_code = self.recursive_command(command)
-        return exit_code
 
+        if exit_code != 0 and not rospy.is_shutdown():
+            repeat = input("Do you want to repeat the command? (yes/no): ").lower()
+            print(repeat)
+            if repeat == "yes":
+                exit_code = exit_code = self.send_command_recursive(command)
+        return exit_code
 
 # This class sends a command to the executor and waits to get a response
 # Mostly used for short actions that should be immediate and require no feedback
@@ -395,7 +384,7 @@ class CommandExecutor:
                 counter += 1
         return 1
 
-    def wait_plan(self, plan_name):
+    def wait_plan(self):
         if rospy.is_shutdown():
             return 1
         # Wait for ack
@@ -408,13 +397,15 @@ class CommandExecutor:
 
 
 
-def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_static_path: pathlib.Path):
-
-    # Start ROS node
-    rospy.init_node("survey_namager_cmd_" + robot_name, anonymous=True)
+def survey_manager_executor(command_names, run, config_static_path: pathlib.Path):
 
     # Read the static configs that convert constants to values
     config_static = load_yaml(config_static_path)
+
+    args = yaml_action_from_pddl(f"[{' '.join(command_names)}]", config_static)
+
+    # Start ROS node
+    rospy.init_node("survey_namager_cmd_" + args["robot"], anonymous=True)
 
     sim = False
     # Figure out robot name and whether we are in simulation or hardware
@@ -431,55 +422,64 @@ def survey_manager_executor(robot_name, goal, to_bay, from_bay, run, config_stat
 
     ns = ""
     # If we're commanding a robot remotely
-    if current_robot != robot_name:
+    if current_robot != args["robot"]:
         rospy.loginfo("We're commanding a namespaced robot!")
-        ns = " -remote -ns " + robot_name
+        ns = " -remote -ns " + args["robot"]
         # Command executor will add namespace for bridge forwarding
-        command_executor = CommandExecutor(robot_name)
+        command_executor = CommandExecutor(args["robot"])
     else:
         command_executor = CommandExecutor("")
-    process_executor = ProcessExecutor(robot_name)
+    process_executor = ProcessExecutor(args["robot"])
 
     # Initialize exit code
     exit_code = 0
 
-    if goal == "dock":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -dock" + ns + " -berth " + config_static["berth"][to_bay])
+    if args["type"] == "dock":
+        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -dock" + ns + " -berth " + config_static["berth"][args["berth"]])
 
-    elif goal == "undock":
+    elif args["type"] == "undock":
         exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -undock" + ns)
 
-    elif goal == "move":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -move " + config_static["bays_move"][to_bay] + ns)
+    elif args["type"] == "move":
+        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -move " + config_static["bays_move"][args["to_name"]] + ns)
         # Change exposure if needed
-        exposure_value = exposure_change(config_static, from_bay, to_bay)
+        exposure_value = exposure_change(config_static, args["from_name"], args["to_name"])
         if exposure_value != 0:
             exit_code += command_executor.change_exposure(exposure_value)
         # Change map if needed
-        map_name = map_change(config_static, from_bay, to_bay)
+        map_name = map_change(config_static, args["from_name"], args["to_name"])
         if map_name != "":
             exit_code += command_executor.change_map(map_name)
 
-    elif goal == "panorama":
-        exit_code += command_executor.start_recording("pano_" + to_bay + "_" + run)
-        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -geometry -geometry_poses /resources/" + config_static["bays_pano"][to_bay] + ns)
+    elif args["type"] == "panorama":
+        exit_code += command_executor.start_recording("pano_" + args["location_name"] + "_" + run)
+        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -geometry -geometry_poses /resources/" + config_static["bays_pano"][args["location_name"]] + ns)
         exit_code += command_executor.stop_recording()
 
-    elif goal == "stereo":
-        exit_code += command_executor.start_recording("stereo_" + to_bay + "_" + run)
+    elif args["type"] == "stereo":
+        exit_code += command_executor.start_recording("stereo_" + os.path.basename(args["fplan"]) + "_" + run)
         # This starts the plan
         plan_path = get_ops_plan_path()
-        plan_name = get_stereo_traj(config_static, to_bay, from_bay)
 
         command_executor.plan_status_needed = True
-        command_executor.plan_name = plan_name
-        exit_code += process_executor.send_command_recursive("rosrun executive plan_pub " + os.path.join(plan_path, plan_name + ".fplan") + ns)
+        command_executor.plan_name = os.path.basename(args["fplan"])
+        exit_code += process_executor.send_command_recursive("rosrun executive plan_pub " + os.path.join(plan_path, args["fplan"] + ".fplan") + ns)
         if exit_code == 0:
-            exit_code += command_executor.wait_plan(os.path.basename(plan_name))
+            exit_code += command_executor.wait_plan()
         exit_code += command_executor.stop_recording()
 
     return exit_code
 
+def survey_manager_executor_recursive(command_names, run_number, config_static_path: pathlib.Path):
+    exit_code = survey_manager_executor(command_names, f"run{run_number}", config_static_path)
+
+    if exit_code != 0:
+        repeat = input("Do you want to repeat the survey? (yes/no): ").lower()
+        if repeat == "yes":
+            run_number += 1
+            exit_code = survey_manager_executor_recursive(command_names, run_number, config_static_path)
+
+    return exit_code
 
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
     pass
@@ -490,28 +490,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "robot_name",
-        default="",
-        help="Robot name executing the command.",
-    )
-    parser.add_argument(
-        "command_name",
-        help="Prefix for bagfiles to merge. Bags should all be in the current working directory.",
-    )
-    parser.add_argument(
-        "to_bay",
-        default="",
-        help="Target bay destination.",
-    )
-    parser.add_argument(
-        "from_bay",
-        default="",
-        help="Target bay start.",
-    )
-    parser.add_argument(
-        "run",
-        default="",
-        help="Run number, increases as we add attempts.",
+        "command_names",
+        nargs='*',
+        help="Prefixes for bagfiles to merge. Bags should all be in the current working directory.",
     )
     parser.add_argument(
         "--config_static",
@@ -521,6 +502,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    exit_code = survey_manager_executor(args.robot_name, args.command_name, args.to_bay, args.from_bay, args.run, args.config_static)
+    exit_code = survey_manager_executor_recursive(args.command_names, 1, args.config_static)
 
     print("Finished plan action with code " + str(exit_code))

@@ -36,6 +36,7 @@ class IsaacAction : public plansys2::ActionExecutorClient {
   float progress_;
   std::string robot_name_, action_name_;
   int pid_;
+  std::string command_;
 };
 }  // namespace plansys2_actions
 

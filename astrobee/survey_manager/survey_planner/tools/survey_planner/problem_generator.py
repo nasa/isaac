@@ -45,11 +45,30 @@ import re
 import shlex
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple, TypeVar
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+)
 
 import yaml
 
 GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at", "let_other_robot_reach")
+
+ACTION_TYPE_OPTIONS = (
+    "dock",
+    "undock",
+    "move",
+    "panorama",
+    "stereo",
+    "let-other-robot-reach",
+)
 
 THIS_DIR = pathlib.Path(__file__).resolve().parent
 CWD = pathlib.Path.cwd()
@@ -87,6 +106,71 @@ def get_stereo_traj(static_config, base, bound):
     ), f"Expected exactly 1 matching stereo trajectory with base {base} and bound {bound}, got {len(traj_matches)}"
     fplan = traj_matches[0]["fplan"]
     return fplan
+
+
+def yaml_action_from_pddl(
+    action: str, static_config: YamlMapping
+) -> Optional[YamlMapping]:
+    """
+    Return a YamlMapping representation of `action`. This is the only place
+    we really need domain-specific logic.
+    """
+    action_args = action[1:-1].split()
+    action_type = action_args[0]
+    assert (
+        action_type in ACTION_TYPE_OPTIONS
+    ), f"Expected action type in {ACTION_TYPE_OPTIONS}, got {action_type}"
+
+    if action_type == "dock":
+        robot, _from_bay, to_berth = action_args[1:]
+        # Can discard from_bay
+        return {"type": "dock", "robot": robot, "berth": to_berth}
+
+    if action_type == "undock":
+        robot, _from_berth, _to_bay, _check1, _check2 = action_args[1:]
+        # Can discard from_berth, to_bay, check1, check2
+        return {"type": "undock", "robot": robot}
+
+    if action_type == "move":
+        robot, from_bay, to_bay, _check_bay = action_args[1:]
+        # Can discard check_bay. Look up coordinates for to_bay.
+        return {
+            "type": "move",
+            "robot": robot,
+            "from_name": from_bay,
+            "to_name": to_bay,
+            "to_pos": static_config["bays"][to_bay],
+        }
+
+    if action_type == "panorama":
+        robot, _order, location = action_args[1:]
+        # Can discard order. Look up coordinates for location.
+        return {
+            "type": "panorama",
+            "robot": robot,
+            "location_name": location,
+            "location_pos": static_config["bays"][location],
+        }
+
+    if action_type == "stereo":
+        robot, _order, base, bound, _check1, _check2 = action_args[1:]
+        # Use base and bound to look up trajectory.
+        fplan = get_stereo_traj(static_config, base, bound)
+
+        # Can discard order check1, check2.
+        return {
+            "type": "stereo",
+            "robot": robot,
+            "fplan": fplan,
+            "base_name": base,
+            "bound_name": bound,
+        }
+
+    if action_type == "let-other-robot-reach":
+        return None  # Action is a no-op intended only to constrain the planner
+
+    assert False, "Never reach this point."
+    return {}  # Make pylint happy
 
 
 def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:

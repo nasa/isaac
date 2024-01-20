@@ -311,10 +311,37 @@ void SendGoal(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
   client->SendGoal(goal);
 }
 
+bool GetlineAsync(std::istream& is, std::string& str, char delim = '\n') {
+    static std::string linesofar;
+    char inchar;
+    int charsread = 0;
+    bool lineread = false;
+    str = "";
+
+    do {
+        charsread = is.readsome(&inchar, 1);
+        if (charsread == 1) {
+            // if the delimiter is read then return the string so far
+            if (inchar == delim) {
+                str = linesofar;
+                linesofar = "";
+                lineread = true;
+            } else {  // otherwise add it to the string so far
+                linesofar.append(1, inchar);
+            }
+        }
+    } while (charsread != 0 && !lineread && !!stopflag_);
+
+    return lineread;
+}
+
 void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
   while (!stopflag_ && ros::ok()) {
     std::string line, val;
-    std::getline(std::cin, line);
+
+    if (!GetlineAsync(std::cin, line))
+      continue;
+
     std::string s;
     try {
       switch (std::stoi(line)) {
@@ -331,7 +358,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         case 2:
           FLAGS_pause = false;
@@ -348,7 +375,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing and repeating pose (needs resume)";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         case 4:
           FLAGS_pause = false;
@@ -358,7 +385,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing and skipping pose (needs resume)";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         case 5:
           FLAGS_pause = false;
@@ -369,7 +396,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing and saving (needs resume)";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         default:
           s = "\r Input: " + line + ") Invalid option";
