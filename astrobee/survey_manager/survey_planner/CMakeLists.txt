@@ -71,6 +71,18 @@ catkin_python_setup()
 
 catkin_package()
 
+catkin_install_python(PROGRAMS
+  tools/survey_planner/command_astrobee
+  tools/survey_planner/monitor_astrobee
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+# Mark executables and/or libraries for installation
+install(TARGETS isaac_action_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 # Install actions
 install(TARGETS
   move_action_node
