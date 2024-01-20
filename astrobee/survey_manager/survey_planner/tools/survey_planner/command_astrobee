@@ -278,7 +278,7 @@ class ProcessExecutor:
                 exit_code = exit_code = self.send_command_recursive(command)
         return exit_code
 
-# This class sends a command to the executor and waits to get a response
+# This class sends a command to the astrobee executor and waits to get a response
 # Mostly used for short actions that should be immediate and require no feedback
 # This method is needed on actions that run remotely and are not controlled by topics
 class CommandExecutor:

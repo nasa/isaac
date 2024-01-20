@@ -119,7 +119,7 @@ stereo:
     # bound_location: The other end of the interval visited by the trajectory, for planner collision
     # check purposes.
     bound_location: jem_bay4  # The survey flies into bay4 even though it only covers up to bay3
-  jem_bay4_to_bay7:
+  jem_bay7_to_bay4:
     fplan: "ISAAC/jem_stereo_mapping_bay7_to_bay4"
     base_location: jem_bay7
     bound_location: jem_bay4
