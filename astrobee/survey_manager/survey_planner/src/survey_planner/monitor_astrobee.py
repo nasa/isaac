@@ -80,7 +80,7 @@ class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
     pass
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
@@ -92,3 +92,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     survey_monitor(args.robot_name)
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

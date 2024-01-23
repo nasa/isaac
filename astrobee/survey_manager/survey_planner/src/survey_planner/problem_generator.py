@@ -72,8 +72,8 @@ ACTION_TYPE_OPTIONS = (
 
 THIS_DIR = pathlib.Path(__file__).resolve().parent
 CWD = pathlib.Path.cwd()
-DATA_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / "data").resolve()), CWD))
-PDDL_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / "pddl").resolve()), CWD))
+DATA_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / ".." / "data").resolve()), CWD))
+PDDL_DIR = pathlib.Path(os.path.relpath(str((THIS_DIR / ".." / ".." / "pddl").resolve()), CWD))
 DEFAULT_CONFIGS = [
     DATA_DIR / "survey_static.yaml",
     DATA_DIR / "jem_survey_dynamic.yaml",
@@ -570,7 +570,7 @@ def main():
         command=shlex.join(sys.argv),
         terminal=args.terminal,
     )
-
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

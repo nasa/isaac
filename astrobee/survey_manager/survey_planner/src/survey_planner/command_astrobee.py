@@ -484,7 +484,7 @@ def survey_manager_executor_recursive(command_names, run_number, config_static_p
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
     pass
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
@@ -505,3 +505,7 @@ if __name__ == "__main__":
     exit_code = survey_manager_executor_recursive(args.command_names, 1, args.config_static)
 
     print("Finished plan action with code " + str(exit_code))
+    return exit_code
+
+if __name__ == "__main__":
+    sys.exit(main())

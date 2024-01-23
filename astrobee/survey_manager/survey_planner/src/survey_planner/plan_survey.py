@@ -1013,7 +1013,7 @@ def main():
     args = parser.parse_args()
 
     survey_planner(domain_path=args.domain, problem_path=args.problem)
-
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
