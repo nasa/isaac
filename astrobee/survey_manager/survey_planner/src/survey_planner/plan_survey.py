@@ -1015,5 +1015,6 @@ def main():
     survey_planner(domain_path=args.domain, problem_path=args.problem)
     return 0
 
+
 if __name__ == "__main__":
     sys.exit(main())
