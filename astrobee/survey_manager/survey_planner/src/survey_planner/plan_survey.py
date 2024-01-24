@@ -29,7 +29,7 @@ from typing import (
 
 import pyparsing as pp
 import yaml
-from problem_generator import PDDL_DIR
+from survey_planner.problem_generator import PDDL_DIR
 
 LocationName = str  # Names PDDL object of type location
 LocationIndex = int  # Index of location in CONFIG.locations

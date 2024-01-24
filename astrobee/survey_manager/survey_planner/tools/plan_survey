@@ -20,7 +20,7 @@
 
 import sys
 
-from survey_planner import survey_planner
+from survey_planner import plan_survey
 
 if __name__ == "__main__":
-    sys.exit(survey_planner.main())
+    sys.exit(plan_survey.main())

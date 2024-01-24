@@ -75,6 +75,7 @@ catkin_install_python(PROGRAMS
   tools/command_astrobee
   tools/monitor_astrobee
   tools/plan_interpreter
+  tools/plan_survey
   tools/problem_generator
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
