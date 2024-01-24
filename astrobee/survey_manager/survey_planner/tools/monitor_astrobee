@@ -18,8 +18,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from survey_planner import monitor_astrobee
 import sys
+
+from survey_planner import monitor_astrobee
 
 if __name__ == "__main__":
     sys.exit(monitor_astrobee.main())
