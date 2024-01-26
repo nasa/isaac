@@ -982,6 +982,7 @@ def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
     exec_state = ExecState(sim_state=sim_state, robot_exec_states=robot_exec_states)
 
     exec_state.run()
+    print("; Solution Found")
     print(format_trace(exec_state.sim_state.trace))
 
 
