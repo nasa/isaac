@@ -24,7 +24,7 @@ jobs:
 
     - name: Run black
       run: |
-        black . --diff --extend-exclude cmake --check
+        black . --diff --extend-exclude=cmake --extend-exclude=submodules --extend-exclude=astrobee/survey_manager/survey_dependencies --check
     - name: Run isort
       run: |
-        isort . --diff --extend-skip cmake --profile black --check-only
+        isort . --diff --extend-skip=cmake --extend-skip=submodules --extend-skip=astrobee/survey_manager/survey_dependencies --profile=black --check-only
