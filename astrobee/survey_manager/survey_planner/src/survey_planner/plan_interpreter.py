@@ -42,6 +42,7 @@ import yaml
 from matplotlib import collections as mc
 from matplotlib import patches as mp
 from matplotlib import pyplot as plt
+
 from survey_planner.problem_generator import (
     DATA_DIR,
     get_stereo_traj,
