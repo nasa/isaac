@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 #include <iostream>
 
 #include "survey_planner/isaac_action_node.h"
@@ -43,7 +44,8 @@ IsaacAction::IsaacAction(ros::NodeHandle nh, const std::string& action, const st
 void IsaacAction::do_work() {
   std::string from, towards;
 
-  if (get_arguments().size() < 3) {
+  const std::vector<std::string>& command_args = get_arguments();
+  if (command_args.size() < 3) {
     finish(false, 1.0, "Not enough arguments for [MOVE] command");
   }
 
@@ -58,10 +60,10 @@ void IsaacAction::do_work() {
       args[0] = "sh";
       args[1] = "-c";
       command_ = "rosrun survey_planner command_astrobee ";
-      for (const auto& arg : get_arguments()) {
-          command_ += arg + " ";
+      command_ += action_name_ + " ";
+      for (unsigned int i = 0; i < command_args.size(); i++) {
+          command_ += command_args[i] + " ";
       }
-      command_ += "run1";
       args[2] = command_.c_str();
       args[3] = NULL;
       printf("%s\n", args[2]);

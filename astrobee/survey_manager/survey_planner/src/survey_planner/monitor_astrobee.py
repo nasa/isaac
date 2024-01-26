@@ -2,16 +2,16 @@
 #
 # Copyright (c) 2021, United States Government, as represented by the
 # Administrator of the National Aeronautics and Space Administration.
-# 
+#
 # All rights reserved.
-# 
+#
 # The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
 # platform" software is licensed under the Apache License, Version 2.0
 # (the "License"); you may not use this file except in compliance with the
 # License. You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -27,6 +27,7 @@ import threading
 # Constants
 CHUNK_SIZE = 1024
 
+
 def thread_write_input(sock_input):
     # print("starting thread_write_input...")
     try:
@@ -35,12 +36,13 @@ def thread_write_input(sock_input):
             user_input = input()
             print("user input: " + user_input)
             # Check if the user wants to exit
-            if user_input.lower().strip() == 'exit':
+            if user_input.lower().strip() == "exit":
                 break
             sock_input.send(user_input.encode("ascii", errors="replace")[:CHUNK_SIZE])
 
     except:
         print("exit output")
+
 
 def thread_read_output(sock_output):
     # print("starting thread_read_output...")
@@ -49,13 +51,14 @@ def thread_read_output(sock_output):
             request = sock_output.recv(CHUNK_SIZE)
             request = request.decode("ascii", errors="replace")  # convert bytes to str
 
-            print(request, end='')
+            print(request, end="")
     except:
         print("exit input")
 
+
 def survey_monitor(robot_name):
-    input_path = '/tmp/input_' + robot_name
-    output_path = '/tmp/output_' + robot_name
+    input_path = "/tmp/input_" + robot_name
+    output_path = "/tmp/output_" + robot_name
 
     sock_client_input = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock_client_input.connect(input_path)
@@ -63,9 +66,13 @@ def survey_monitor(robot_name):
     sock_client_output.connect(output_path)
 
     # Start input and output threads
-    input_thread = threading.Thread(target=thread_write_input, args=(sock_client_input,))
+    input_thread = threading.Thread(
+        target=thread_write_input, args=(sock_client_input,)
+    )
     input_thread.start()
-    output_thread = threading.Thread(target=thread_read_output, args=(sock_client_output,))
+    output_thread = threading.Thread(
+        target=thread_read_output, args=(sock_client_output,)
+    )
     output_thread.start()
 
     # Wait for the thread
@@ -76,11 +83,12 @@ def survey_monitor(robot_name):
     sock_client_input.close()
     sock_client_output.close()
 
+
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
     pass
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
@@ -92,3 +100,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     survey_monitor(args.robot_name)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -2,16 +2,16 @@
 #
 # Copyright (c) 2021, United States Government, as represented by the
 # Administrator of the National Aeronautics and Space Administration.
-# 
+#
 # All rights reserved.
-# 
+#
 # The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
 # platform" software is licensed under the Apache License, Version 2.0
 # (the "License"); you may not use this file except in compliance with the
 # License. You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -48,6 +48,7 @@ from survey_planner.problem_generator import load_yaml, yaml_action_from_pddl
 MAX_COUNTER = 10
 CHUNK_SIZE = 1024
 
+
 def exposure_change(config_static, bay_origin, bay_destination):
     # Going to JEM
     if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
@@ -55,8 +56,12 @@ def exposure_change(config_static, bay_origin, bay_destination):
         return config_static["exposure"]["jem"]
 
     # Going  to NOD2
-    if (bay_origin == "jem_hatch_to_nod2" and bay_destination == "nod2_hatch_from_jem"
-        or bay_origin == "usl_hatch_to_nod2" and bay_destination == "nod2_hatch_from_usl"):
+    if (
+        bay_origin == "jem_hatch_to_nod2"
+        and bay_destination == "nod2_hatch_from_jem"
+        or bay_origin == "usl_hatch_to_nod2"
+        and bay_destination == "nod2_hatch_from_usl"
+    ):
         print("CHANGING EXPOSURE TO NOD2")
         return config_static["exposure"]["nod2"]
 
@@ -66,20 +71,26 @@ def exposure_change(config_static, bay_origin, bay_destination):
 
     return 0
 
+
 def map_change(config_static, bay_origin, bay_destination):
     # Going to JEM
     if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
         print("CHANGING MAP TO JEM")
         return config_static["maps"]["jem"]
     # Going  to NOD2
-    if (bay_origin == "jem_hatch_to_nod2" and bay_destination == "nod2_hatch_from_jem"
-        or bay_origin == "usl_hatch_to_nod2" and bay_destination == "nod2_hatch_from_usl"):
+    if (
+        bay_origin == "jem_hatch_to_nod2"
+        and bay_destination == "nod2_hatch_from_jem"
+        or bay_origin == "usl_hatch_to_nod2"
+        and bay_destination == "nod2_hatch_from_usl"
+    ):
         print("CHANGING MAP TO NOD2")
         return config_static["maps"]["nod2"]
     # Going to USL
     if bay_origin == "nod2_hatch_to_usl" and bay_destination == "usl_hatch_from_nod2":
         return config_static["maps"]["usl"]
     return ""
+
 
 def get_ops_plan_path():
     # Check if the path /opt/astrobee/ops/gds/plans/ exists
@@ -103,14 +114,13 @@ def get_ops_plan_path():
     # Return None if none of the conditions are met
     return None
 
+
 # This class starts a new process and lets you monitor the input and output
 # Mostly used for actions where user inteference might be required
 class ProcessExecutor:
-
     def __init__(self, robot_name):
-
-        self.input_path = '/tmp/input_' + robot_name
-        self.output_path = '/tmp/output_' + robot_name
+        self.input_path = "/tmp/input_" + robot_name
+        self.output_path = "/tmp/output_" + robot_name
 
         # Check if the file exists
         if os.path.exists(self.input_path):
@@ -135,9 +145,7 @@ class ProcessExecutor:
         # Declare event that will stop input thread
         self._stop_event = threading.Event()
 
-
     def __del__(self):
-
         self.sock_input.close()
         self.sock_output.close()
 
@@ -150,7 +158,9 @@ class ProcessExecutor:
                 # Get output from process
                 # print("waiting for output")
                 output = process.stdout.readline()
-                if (output == '' and process.poll() is not None) or self._stop_event.is_set():
+                if (
+                    output == "" and process.poll() is not None
+                ) or self._stop_event.is_set():
                     break
                 if output:
                     rospy.loginfo(output)
@@ -167,7 +177,7 @@ class ProcessExecutor:
                         encoded_message = output_total.encode("ascii", errors="replace")
 
                         for i in range(0, len(encoded_message), CHUNK_SIZE):
-                            chunk = encoded_message[i:i + CHUNK_SIZE]
+                            chunk = encoded_message[i : i + CHUNK_SIZE]
                             conn.sendall(chunk)
 
                     # If socket is already connected, send output
@@ -201,7 +211,6 @@ class ProcessExecutor:
                     break
                 client_socket.settimeout(1)  # Set a timeout for socket operations
 
-
                 while True:
                     # print("accepted connection:")
                     print(client_address)
@@ -209,7 +218,9 @@ class ProcessExecutor:
                     while not self._stop_event.is_set():
                         # print("waiting to receive")
                         try:
-                            request = client_socket.recv(CHUNK_SIZE).decode("ascii", errors="replace")
+                            request = client_socket.recv(CHUNK_SIZE).decode(
+                                "ascii", errors="replace"
+                            )
                             break
                         except socket.timeout:
                             continue
@@ -228,19 +239,29 @@ class ProcessExecutor:
             print("exit input:")
             print(e)
 
-
     def send_command(self, command):
         print(command)
         return_code = 1
 
         try:
             # Start the process
-            process = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
             # Start input and output threads
-            input_thread = threading.Thread(target=self.thread_read_input, args=(process,))
+            input_thread = threading.Thread(
+                target=self.thread_read_input, args=(process,)
+            )
             input_thread.start()
-            output_thread = threading.Thread(target=self.thread_write_output, args=(process,))
+            output_thread = threading.Thread(
+                target=self.thread_write_output, args=(process,)
+            )
             output_thread.start()
 
             while output_thread.is_alive():
@@ -278,22 +299,29 @@ class ProcessExecutor:
                 exit_code = exit_code = self.send_command_recursive(command)
         return exit_code
 
+
 # This class sends a command to the astrobee executor and waits to get a response
 # Mostly used for short actions that should be immediate and require no feedback
 # This method is needed on actions that run remotely and are not controlled by topics
 class CommandExecutor:
-
-
     def __init__(self, ns):
         self.ns = ns
         rospy.loginfo(self.ns + "/command")
         # Declare guest science command publisher
-        self.sub_ack = rospy.Subscriber(self.ns + "/mgt/ack", AckStamped, self.ack_callback)
+        self.sub_ack = rospy.Subscriber(
+            self.ns + "/mgt/ack", AckStamped, self.ack_callback
+        )
         self.ack_needed = False
-        self.sub_plan_status = rospy.Subscriber(self.ns + "/mgt/executive/plan_status", PlanStatusStamped, self.plan_status_callback)
+        self.sub_plan_status = rospy.Subscriber(
+            self.ns + "/mgt/executive/plan_status",
+            PlanStatusStamped,
+            self.plan_status_callback,
+        )
         self.plan_status_needed = False
         self.plan_name = ""
-        self.pub_command = rospy.Publisher(self.ns + "/command", CommandStamped, queue_size=5)
+        self.pub_command = rospy.Publisher(
+            self.ns + "/command", CommandStamped, queue_size=5
+        )
         while self.pub_command.get_num_connections() == 0:
             rospy.loginfo("Waiting for subscriber to connect")
             rospy.sleep(1)
@@ -332,12 +360,12 @@ class CommandExecutor:
         return result
 
     def change_exposure(self, val):
-        #TBD
+        # TBD
         rospy.loginfo("Change exposure to " + str(val))
         return 0
 
     def change_map(self, map_name):
-        #TBD
+        # TBD
         rospy.loginfo("Change map to " + map_name)
         return 0
 
@@ -350,7 +378,9 @@ class CommandExecutor:
         if self.plan_status_needed == True:
             rospy.loginfo("plan_name" + self.plan_name + "; msg name " + msg.name)
             if self.plan_name in msg.name:
-                rospy.loginfo("In point " + str(msg.point) + " status " + str(msg.status.status))
+                rospy.loginfo(
+                    "In point " + str(msg.point) + " status " + str(msg.status.status)
+                )
                 if msg.status.status == 3:
                     self.plan_status_needed = False
             else:
@@ -396,9 +426,7 @@ class CommandExecutor:
         return 1
 
 
-
 def survey_manager_executor(command_names, run, config_static_path: pathlib.Path):
-
     # Read the static configs that convert constants to values
     config_static = load_yaml(config_static_path)
 
@@ -409,12 +437,12 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
 
     sim = False
     # Figure out robot name and whether we are in simulation or hardware
-    current_robot = os.environ.get('ROBOTNAME')
+    current_robot = os.environ.get("ROBOTNAME")
     if not current_robot:
         rospy.loginfo("ROBOTNAME not defined. Let's get the robotname using the topic")
         # This is a latching messge so it shouldn't take long
         try:
-            data = rospy.wait_for_message('/robot_name', String, timeout=5)
+            data = rospy.wait_for_message("/robot_name", String, timeout=5)
             current_robot = data.data.lower()
         except:
             current_robot = ""
@@ -435,15 +463,28 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
     exit_code = 0
 
     if args["type"] == "dock":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -dock" + ns + " -berth " + config_static["berth"][args["berth"]])
+        exit_code += process_executor.send_command_recursive(
+            "rosrun executive teleop_tool -dock"
+            + ns
+            + " -berth "
+            + config_static["berth"][args["berth"]]
+        )
 
     elif args["type"] == "undock":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -undock" + ns)
+        exit_code += process_executor.send_command_recursive(
+            "rosrun executive teleop_tool -undock" + ns
+        )
 
     elif args["type"] == "move":
-        exit_code += process_executor.send_command_recursive("rosrun executive teleop_tool -move " + config_static["bays_move"][args["to_name"]] + ns)
+        exit_code += process_executor.send_command_recursive(
+            "rosrun executive teleop_tool -move "
+            + config_static["bays_move"][args["to_name"]]
+            + ns
+        )
         # Change exposure if needed
-        exposure_value = exposure_change(config_static, args["from_name"], args["to_name"])
+        exposure_value = exposure_change(
+            config_static, args["from_name"], args["to_name"]
+        )
         if exposure_value != 0:
             exit_code += command_executor.change_exposure(exposure_value)
         # Change map if needed
@@ -452,56 +493,86 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
             exit_code += command_executor.change_map(map_name)
 
     elif args["type"] == "panorama":
-        exit_code += command_executor.start_recording("pano_" + args["location_name"] + "_" + run)
-        exit_code += process_executor.send_command_recursive("rosrun inspection inspection_tool -geometry -geometry_poses /resources/" + config_static["bays_pano"][args["location_name"]] + ns)
+        exit_code += command_executor.start_recording(
+            "pano_" + args["location_name"] + "_" + run
+        )
+        exit_code += process_executor.send_command_recursive(
+            "rosrun inspection inspection_tool -geometry -geometry_poses /resources/"
+            + config_static["bays_pano"][args["location_name"]]
+            + ns
+        )
         exit_code += command_executor.stop_recording()
 
     elif args["type"] == "stereo":
-        exit_code += command_executor.start_recording("stereo_" + os.path.basename(args["fplan"]) + "_" + run)
+        exit_code += command_executor.start_recording(
+            "stereo_" + os.path.basename(args["fplan"]) + "_" + run
+        )
         # This starts the plan
         plan_path = get_ops_plan_path()
 
         command_executor.plan_status_needed = True
         command_executor.plan_name = os.path.basename(args["fplan"])
-        exit_code += process_executor.send_command_recursive("rosrun executive plan_pub " + os.path.join(plan_path, args["fplan"] + ".fplan") + ns)
+        exit_code += process_executor.send_command_recursive(
+            "rosrun executive plan_pub "
+            + os.path.join(plan_path, args["fplan"] + ".fplan")
+            + ns
+        )
         if exit_code == 0:
             exit_code += command_executor.wait_plan()
         exit_code += command_executor.stop_recording()
 
     return exit_code
 
-def survey_manager_executor_recursive(command_names, run_number, config_static_path: pathlib.Path):
-    exit_code = survey_manager_executor(command_names, f"run{run_number}", config_static_path)
+
+def survey_manager_executor_recursive(
+    command_names, run_number, config_static_path: pathlib.Path
+):
+    exit_code = survey_manager_executor(
+        command_names, f"run{run_number}", config_static_path
+    )
 
     if exit_code != 0:
         repeat = input("Do you want to repeat the survey? (yes/no): ").lower()
         if repeat == "yes":
             run_number += 1
-            exit_code = survey_manager_executor_recursive(command_names, run_number, config_static_path)
+            exit_code = survey_manager_executor_recursive(
+                command_names, run_number, config_static_path
+            )
 
     return exit_code
+
 
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
     pass
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
 
     parser.add_argument(
         "command_names",
-        nargs='*',
+        nargs="*",
         help="Prefixes for bagfiles to merge. Bags should all be in the current working directory.",
     )
     parser.add_argument(
         "--config_static",
         help="Path to input static problem config YAML (module geometry, available stereo surveys, etc.)",
         type=pathlib.Path,
-        default=os.path.join(rospkg.RosPack().get_path('survey_planner'), "data/survey_static.yaml"),
+        default=os.path.join(
+            rospkg.RosPack().get_path("survey_planner"), "data/survey_static.yaml"
+        ),
     )
     args = parser.parse_args()
 
-    exit_code = survey_manager_executor_recursive(args.command_names, 1, args.config_static)
+    exit_code = survey_manager_executor_recursive(
+        args.command_names, 1, args.config_static
+    )
 
     print("Finished plan action with code " + str(exit_code))
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

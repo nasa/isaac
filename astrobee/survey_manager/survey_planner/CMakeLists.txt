@@ -72,8 +72,11 @@ catkin_python_setup()
 catkin_package()
 
 catkin_install_python(PROGRAMS
-  tools/survey_planner/command_astrobee
-  tools/survey_planner/monitor_astrobee
+  tools/command_astrobee
+  tools/monitor_astrobee
+  tools/plan_interpreter
+  tools/plan_survey
+  tools/problem_generator
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 # Mark executables and/or libraries for installation

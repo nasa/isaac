@@ -319,7 +319,8 @@ def main():
         output_path=args.output,
         plot_path=args.plot,
     )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
