@@ -16,7 +16,7 @@ set instance o1 order
 set instance o2 order
 set instance o3 order
 set instance o4 order
-set goal (and (completed-panorama bumble o0 jem_bay4) (completed-panorama bumble o1 jem_bay3) (completed-panorama bumble o2 jem_bay2) (completed-panorama bumble o3 jem_bay1) (completed-stereo bumble o4 jem_bay1 jem_bay4) (completed-panorama honey o0 jem_bay7) (completed-panorama honey o1 jem_bay6) (completed-panorama honey o2 jem_bay5) (robot-at honey berth2))
+set goal (and (completed-panorama bumble o0 jem_bay4) (completed-panorama bumble o1 jem_bay3) (completed-panorama bumble o2 jem_bay2) (completed-panorama bumble o3 jem_bay1) (completed-stereo bumble o4 jem_bay1 jem_bay4) (robot-at bumble berth1) (completed-panorama honey o1 jem_bay7) (completed-panorama honey o2 jem_bay6) (completed-panorama honey o3 jem_bay5) (completed-stereo honey o4 jem_bay7 jem_bay4) (robot-at honey berth2))
 set predicate (move-connected jem_bay0 jem_bay1)
 set predicate (move-connected jem_bay1 jem_bay0)
 set predicate (move-connected jem_bay1 jem_bay2)
@@ -130,6 +130,7 @@ set predicate (location-available jem_bay6)
 set predicate (location-available jem_bay7)
 set predicate (location-available jem_bay8)
 set predicate (need-stereo bumble o4 jem_bay1 jem_bay4)
+set predicate (need-stereo honey o4 jem_bay7 jem_bay4)
 set function (= (order-identity o0) 0)
 set function (= (order-identity o1) 1)
 set function (= (order-identity o2) 2)

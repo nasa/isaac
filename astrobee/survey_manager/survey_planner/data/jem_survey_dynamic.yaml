@@ -44,7 +44,7 @@ goals:
 - {type: panorama, robot: honey, order: 2, location: jem_bay6}
 - {type: panorama, robot: honey, order: 3, location: jem_bay5}
 # This is the other objective we previously had to comment out for POPF to return a decent plan.
-- {type: stereo, robot: honey, order: 4, trajectory: jem_bay4_to_bay7}
+- {type: stereo, robot: honey, order: 4, trajectory: jem_bay7_to_bay4}
 - {type: robot_at, robot: honey, location: berth2}
 
 init:

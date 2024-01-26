@@ -192,7 +192,7 @@
   action:
     type: stereo
     robot: honey
-    fplan: jem_stereo_mapping_bay4_to_bay7.fplan
+    fplan: ISAAC/jem_stereo_mapping_bay7_to_bay4
     base_name: jem_bay7
     bound_name: jem_bay4
   duration_seconds: '600.000'
@@ -206,7 +206,7 @@
   action:
     type: stereo
     robot: bumble
-    fplan: jem_stereo_mapping_bay1_to_bay3.fplan
+    fplan: ISAAC/jem_stereo_mapping_bay1_to_bay3
     base_name: jem_bay1
     bound_name: jem_bay4
   duration_seconds: '600.000'
