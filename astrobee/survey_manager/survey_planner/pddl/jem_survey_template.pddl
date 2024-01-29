@@ -26,9 +26,3 @@
         {{ dynamic_fluents }}
     )  ;; end :init
 )  ;; end problem
-
-;; Include raw high-level config in problem in case an (ISAAC-custom) planner prefers to use it.
-
-;; BEGIN CONFIG
-{{ config }}
-;; END CONFIG

@@ -66,6 +66,7 @@ DEFINE_bool(anomaly, false, "Send the inspection command");
 DEFINE_bool(geometry, false, "Send the inspection command");
 DEFINE_bool(panorama, false, "Send the inspection command");
 DEFINE_bool(volumetric, false, "Send the inspection command");
+DEFINE_bool(remote, false, "Whether target command is remote robot");
 
 // General parameters
 DEFINE_string(camera, "sci_cam", "Camera to use");
@@ -113,6 +114,7 @@ DEFINE_double(deadline, -1.0, "Action deadline timeout");
 // Match the internal states and responses with the message definition
 using STATE = isaac_msgs::InspectionState;
 bool stopflag_ = false;
+std::string feedback_old = "";
 
 bool has_only_whitespace_or_comments(const std::string & str) {
   for (std::string::const_iterator it = str.begin(); it != str.end(); it++) {
@@ -185,7 +187,7 @@ geometry_msgs::PoseArray ReadPosesFile(std::string file) {
           quat_robot.setRPY(euler_roll * DEG2RAD, euler_pitch * DEG2RAD, euler_yaw * DEG2RAD);
 
         } else {
-          std::cout << "Ignoring invalid line: " << line  << std::endl;
+          // std::cout << "Ignoring invalid line: " << line  << std::endl;
           continue;
         }
       }
@@ -209,6 +211,8 @@ void FeedbackCallback(isaac_msgs::InspectionFeedbackConstPtr const& feedback) {
     + " -> " + feedback->state.fsm_state
     + " (" + feedback->state.fsm_subevent
     + " -> " + feedback->state.fsm_substate + ")";
+  if (s == feedback_old) return;
+  feedback_old = s;
   if (s.size() < 70) s.append(70 - s.size(), ' ');
   std::cout << "\r" << s.substr(0, 70) << "|Input: " << std::flush;
 }
@@ -307,10 +311,37 @@ void SendGoal(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
   client->SendGoal(goal);
 }
 
+bool GetlineAsync(std::istream& is, std::string& str, char delim = '\n') {
+    static std::string linesofar;
+    char inchar;
+    int charsread = 0;
+    bool lineread = false;
+    str = "";
+
+    do {
+        charsread = is.readsome(&inchar, 1);
+        if (charsread == 1) {
+            // if the delimiter is read then return the string so far
+            if (inchar == delim) {
+                str = linesofar;
+                linesofar = "";
+                lineread = true;
+            } else {  // otherwise add it to the string so far
+                linesofar.append(1, inchar);
+            }
+        }
+    } while (charsread != 0 && !lineread && !!stopflag_);
+
+    return lineread;
+}
+
 void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
   while (!stopflag_ && ros::ok()) {
     std::string line, val;
-    std::getline(std::cin, line);
+
+    if (!GetlineAsync(std::cin, line))
+      continue;
+
     std::string s;
     try {
       switch (std::stoi(line)) {
@@ -327,7 +358,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         case 2:
           FLAGS_pause = false;
@@ -344,7 +375,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing and repeating pose (needs resume)";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         case 4:
           FLAGS_pause = false;
@@ -354,7 +385,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing and skipping pose (needs resume)";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         case 5:
           FLAGS_pause = false;
@@ -365,7 +396,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           SendGoal(client);
           s = "\r Input: " + line + ") Pausing and saving (needs resume)";
           if (s.size() < 80) s.append(80 - s.size(), ' ');
-          std::cout << s << std::flush;
+          std::cout << s << std::endl;
           break;
         default:
           s = "\r Input: " + line + ") Invalid option";
@@ -424,8 +455,11 @@ int main(int argc, char *argv[]) {
   // Create a node handle
   ros::NodeHandle nh(std::string("/") + FLAGS_ns);
   // Setup SWITCH action
-  client.SetConnectedTimeout(FLAGS_connect);
-  client.SetActiveTimeout(FLAGS_active);
+  if (!FLAGS_remote) {
+    client.SetConnectedTimeout(FLAGS_connect);
+    client.SetActiveTimeout(FLAGS_active);
+    client.SetConnectedCallback(std::bind(ConnectedCallback, &client));
+  }
   client.SetResponseTimeout(FLAGS_response);
   if (FLAGS_deadline > 0)
     client.SetDeadlineTimeout(FLAGS_deadline);
@@ -433,11 +467,10 @@ int main(int argc, char *argv[]) {
     std::placeholders::_1));
   client.SetResultCallback(std::bind(ResultCallback,
     std::placeholders::_1, std::placeholders::_2));
-  client.SetConnectedCallback(std::bind(ConnectedCallback, &client));
   client.Create(&nh, ACTION_BEHAVIORS_INSPECTION);
 
   // Configure panorama anomaly parameters
-  if (FLAGS_anomaly) {
+  if (FLAGS_anomaly && !FLAGS_remote) {
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
     cfg.Set<double>("target_distance", FLAGS_target_distance);
     cfg.Set<double>("min_distance", FLAGS_min_distance);
@@ -456,7 +489,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Configure panorama inspection parameters
-  if (FLAGS_panorama) {
+  if (FLAGS_panorama && !FLAGS_remote) {
     ff_util::ConfigClient cfg(&nh, NODE_INSPECTION);
 
     if (FLAGS_panorama_mode == "") {
@@ -503,6 +536,17 @@ int main(int argc, char *argv[]) {
 
   // Start input thread
   boost::thread inp(GetInput, &client);
+
+  if (FLAGS_remote) {
+    ros::Rate loop_rate(10);
+    ros::Time start_time = ros::Time::now();
+
+    // Spin for 3 seconds
+    while (ros::Time::now() - start_time < ros::Duration(3.0))
+        loop_rate.sleep();
+
+    SendGoal(&client);
+  }
   // Synchronous mode
   while (!stopflag_) {
     ros::spinOnce();
