@@ -95,7 +95,7 @@ install(TARGETS
   stereo_action_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
-foreach( dir pddl launch data)
+foreach( dir params pddl launch data)
    install( DIRECTORY ${dir}/
          DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir} )
 endforeach(dir)
