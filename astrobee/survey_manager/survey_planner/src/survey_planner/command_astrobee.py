@@ -322,8 +322,7 @@ class CommandExecutor:
         self.pub_command = rospy.Publisher(
             self.ns + "/command", CommandStamped, queue_size=5
         )
-        while self.pub_command.get_num_connections() == 0:
-            rospy.loginfo("Waiting for subscriber to connect")
+        while self.pub_command.get_num_connections() == 0 and not rospy.is_shutdown():
             rospy.sleep(1)
         self.unique_cmd_id = ""
 
@@ -454,9 +453,9 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
         rospy.loginfo("We're commanding a namespaced robot!")
         ns = " -remote -ns " + args["robot"]
         # Command executor will add namespace for bridge forwarding
-        command_executor = CommandExecutor(args["robot"])
+        command_executor = CommandExecutor("/" + args["robot"])
     else:
-        command_executor = CommandExecutor("")
+        command_executor = CommandExecutor("/")
     process_executor = ProcessExecutor(args["robot"])
 
     # Initialize exit code

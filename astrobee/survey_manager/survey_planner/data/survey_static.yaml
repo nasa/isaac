@@ -64,10 +64,9 @@ bays_move:
   usl_bay6: "-pos '-0.5 0 4.8'"
 
   # Granite testing
-  gra_p1_bsharp:   "-move -pos '-0.3 -0.1 -0.68'"
-  gra_p2_bsharp: "-move -pos '0.3 -0.1 -0.68'"
-  gra_p1_wannabee:   "-move -pos '-0.3 -0.1 -0.68' -att '1 0 0 180'"
-  gra_p2_wannabee: "-move -pos '0.3 -0.1 -0.68' -att '1 0 0 180'"
+  gra_bay1: "-move -pos '0.1 0.3 -0.68'"
+  gra_bay2: "-move -pos '0.1 0 -0.68'"
+  gra_bay3: "-move -pos '0.1 -0.3 -0.68'"
 
 bays_pano:
   jem_bay1: "isaac9/jem_bay1_std_panorama.txt"
@@ -88,8 +87,8 @@ bays_pano:
   usl_bay6: "isaac11/usl_bay6_std_panorama.txt"
 
   # Granite testing
-  gra_bsharp: "panorama_granite.txt"
-  gra_wannabee: "panorama_granite_wannabee.txt"
+  gra_bay1: "panorama_granite_bsharp.txt"
+  gra_bay3: "panorama_granite_wannabee.txt"
 
 maps:
   jem: "iss.map"
@@ -125,7 +124,11 @@ stereo:
     bound_location: jem_bay4
 
   # Granite testing
-  gra_p1_to_gra_p2:
+  gra_bay1_to_bay1:
     fplan: "startup"
-    base_location: gra_p1
-    bound_location: gra_p2
+    base_location: gra_bay1
+    bound_location: gra_bay1
+  gra_bay3_to_bay3:
+    fplan: "startup"
+    base_location: gra_bay3
+    bound_location: gra_bay3

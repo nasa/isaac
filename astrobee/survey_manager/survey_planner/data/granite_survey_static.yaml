@@ -1,0 +1,56 @@
+# Copyright (c) 2023, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# Static configuration info used when generating a PDDL problem and also when executing actions in a
+# PDDL plan. This info should be static in the sense that it nominally doesn't change during an ISS
+# activity, so the survey manager doesn't have to modify it. However, an edge case is that an
+# operator might want to manually edit something in here (like add a new symbolic location or nudge
+# the position of a named bay away from an obstacle) and restart the survey manager. On the other
+# hand, info that is *expected* to change as part of the survey manager conops belongs in
+# jem_survey_dynamic.yaml.
+
+# Useful reference for positions and stereo survey trajectories:
+# https://babelfish.arc.nasa.gov/confluence/display/FFOPS/ISAAC+Phase+1X+Activity+9+Ground+Procedure
+
+bays:
+  # 3D coordinates for symbolic bays in ISS Analysis Coordinate System used by Astrobee
+  gra_bay1: [11.0, -4.0, 4.8]
+  gra_bay2: [11.0, -5.0, 4.8]
+  gra_bay3: [11.0, -6.0, 4.8]
+
+bays_pano:
+  # Granite testing
+  gra_bay1: "panorama_granite_bsharp.txt"
+  gra_bay3: "panorama_granite_wannabee.txt"
+
+
+bogus_bays: [jem_bay0, jem_bay8]
+berths: [berth1, berth2]
+robots: [bsharp, wannabee]
+
+stereo:
+
+  # Granite testing
+  gra_bay1_to_bay1:
+    fplan: "startup"
+    base_location: gra_bay1
+    bound_location: gra_bay1
+  gra_bay3_to_bay3:
+    fplan: "startup"
+    base_location: gra_bay3
+    bound_location: gra_bay3
