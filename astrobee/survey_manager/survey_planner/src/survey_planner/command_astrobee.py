@@ -323,6 +323,7 @@ class CommandExecutor:
             self.ns + "/command", CommandStamped, queue_size=5
         )
         while self.pub_command.get_num_connections() == 0 and not rospy.is_shutdown():
+            rospy.loginfo("Waiting for subscriber to connect")
             rospy.sleep(1)
         self.unique_cmd_id = ""
 
