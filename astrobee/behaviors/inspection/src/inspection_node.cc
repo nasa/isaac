@@ -227,7 +227,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       TOPIC_COMMAND, 1, true);
 
     // Subscribe to the sci camera info topic to make sure a picture was taken
-    sub_sci_cam_info_ = nh->subscribe("/hw/cam_sci_info", 1,
+    sub_sci_cam_info_ = nh->subscribe(TOPIC_HARDWARE_SCI_CAM_INFO, 1,
                       &InspectionNode::SciCamInfoCallback, this);
 
 
