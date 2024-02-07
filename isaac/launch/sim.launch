@@ -217,7 +217,7 @@
       <arg name="world" value="$(arg world)" />      <!-- Execution context  -->
       <arg name="ns" value="honey" />                <!-- Robot namespace    -->
       <arg name="output" value="$(arg output)" />    <!-- Output for logging -->
-      <arg name="pose" value="10.5 -6 4.8 0 0 0 1" />    <!-- Initial robot pose -->
+      <arg name="pose" value="9.817 -10.312 4.293 1 0 0 0" />    <!-- Initial robot pose -->
       <arg name="drivers" value="false" />           <!-- Start driver code  -->
       <arg name="spurn" value="$(arg spurn)" />      <!-- Prevent node       -->
       <arg name="nodes" value="$(arg nodes)" />      <!-- Launch node group  -->
