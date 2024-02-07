@@ -38,6 +38,8 @@ set -x
 for i in "${TEST_CASES[@]}"; do
     { echo -e "\n=== $i ==="; } 2> /dev/null
     rosrun survey_planner problem_generator.py "--config=${DATA_DIR}/survey_static.yaml,${CASES_DIR}/${i}_config.yaml" "--output=${CASES_DIR}/${i}_problem.pddl"
+    # Try to eliminate variation in problem.pddl due to embedding different local install paths in the output.
+    perl -i -ple "s:${SURVEY_PLANNER_DIR}/::g;" "${CASES_DIR}/${i}_problem.pddl"
     rosrun survey_planner plan_survey.py "${PDDL_DIR}/domain_survey.pddl" "${CASES_DIR}/${i}_problem.pddl" > "${CASES_DIR}/${i}_plan.pddl"
     { echo "[plan_survey.py stdout redirected to ${CASES_DIR}/${i}_plan.pddl]"; } 2> /dev/null
     rosrun survey_planner plan_interpreter.py "--plan=${CASES_DIR}/${i}_plan.pddl" "--plot=${CASES_DIR}/${i}_plot.png" "--output=${CASES_DIR}/${i}_plan.yaml"
