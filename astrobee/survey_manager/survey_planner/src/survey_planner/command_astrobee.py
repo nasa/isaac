@@ -146,6 +146,7 @@ class ProcessExecutor:
         self._stop_event = threading.Event()
 
     def __del__(self):
+        print("closing sockets!")
         self.sock_input.close()
         self.sock_output.close()
 
@@ -162,7 +163,7 @@ class ProcessExecutor:
                     output == "" and process.poll() is not None
                 ) or self._stop_event.is_set():
                     break
-                if output:
+                if output and not output.startswith("pos: x:"):
                     rospy.loginfo(output)
                     output_total += output
 
@@ -532,12 +533,14 @@ def survey_manager_executor_recursive(
     )
 
     if exit_code != 0:
-        repeat = input("Do you want to repeat the survey? (yes/no): ").lower()
+        repeat = input("Do you want to repeat the survey? (yes/no/skip): ").lower()
         if repeat == "yes":
             run_number += 1
             exit_code = survey_manager_executor_recursive(
                 command_names, run_number, config_static_path
             )
+        if repeat == "skip":
+            exit_code = 0
 
     return exit_code
 
