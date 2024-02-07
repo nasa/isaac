@@ -22,6 +22,7 @@ from typing import (
     List,
     NamedTuple,
     Optional,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -45,6 +46,7 @@ PendingEvent = Tuple[Timestamp, EventCallback]
 ExecutionTrace = List["TraceEvent"]
 OrderName = str  # Names PDDL object of type order
 PddlExpression = Any  # Actually a pp.ParseResults. But 'Any' satisfies mypy.
+PddlPredicate = Any  # More specific than PddlExpression, same from mypy perspective.
 PddlActionName = str  # Names PDDL action
 T = TypeVar("T")  # So we can assign parametric types below
 PddlTypeName = str  # Names PDDL object type
@@ -285,7 +287,7 @@ class SimState:
     trace: ExecutionTrace = field(default_factory=list)
     "Trace of timestamped actions executed so far in the sim."
 
-    completed: Dict[Any, bool] = field(default_factory=dict)
+    completed: Set[str] = field(default_factory=set)
     "Tracks completion status for actions that subclass MarkCompleteAction."
 
     events: PriorityQueue[PendingEvent] = field(default_factory=PriorityQueue)
@@ -325,29 +327,40 @@ class MarkCompleteAction(Action):
     order: OrderName
     "Propagates goal ordering constraint from problem instance. Required by PDDL model."
 
+    def get_completed_predicate(self) -> str:
+        "Return the completed-x predicate asserted when this action is completed."
+        return repr(self).replace("(", "(completed-", 1)
+
     def end(self, sim_state: SimState) -> None:
         super().end(sim_state)
-        sim_state.completed[repr(self)] = True
+        sim_state.completed.add(self.get_completed_predicate())
 
     def is_complete(self, sim_state: SimState) -> bool:
         """
         Return True if this action has been completed in `sim_state`.
         """
-        return sim_state.completed.get(repr(self), False)
+        return self.get_completed_predicate() in sim_state.completed
 
 
 def get_collision_check_locations(
-    from_pos: LocationName, to_pos: LocationName
+    from_pos: LocationName, to_pos: LocationName, include_to_pos: bool = True
 ) -> List[str]:
     """
-    Return neighbors of `to_pos` that are distinct from `from_pos` and are flying locations. A move
-    is invalid if one of these collision check locations is reserved by another robot. The PDDL
-    models of some actions also require collision check locations to be specified as arguments.
+    Return locations that need to be checked for collision avoidance purposes prior to moving to
+    `to_pos`. Locations include `to_pos` itself and neighbors of `to_pos` that are distinct from
+    `from_pos` and are flying locations. If another robot has reserved any of these locations the
+    move is invalid.
+
+    :param include_to_pos: If False, don't include `to_pos` in the result. This is handy
+      for filling in move action "check" arguments that conform to the PDDL planning model.
     """
     to_ind = CONFIG.location_lookup[to_pos]
     to_neighbors_ind = CONFIG.neighbors[to_ind]
     to_neighbors = [CONFIG.locations[n] for n in to_neighbors_ind]
-    return [n for n in to_neighbors if is_location_flying(n) and n != from_pos]
+    result = [n for n in to_neighbors if is_location_flying(n) and n != from_pos]
+    if include_to_pos:
+        result.append(to_pos)
+    return result
 
 
 def get_collision_reason(
@@ -383,11 +396,13 @@ class AbstractMoveAction(Action):
     to: LocationName
     "The location the robot should move to."
 
-    def get_collision_check_locations(self) -> List[str]:
+    def get_collision_check_locations(self, include_to_pos: bool = True) -> List[str]:
         """
         Return collision check locations for this move action.
         """
-        return get_collision_check_locations(self.from_pos, self.to)
+        return get_collision_check_locations(
+            self.from_pos, self.to, include_to_pos=include_to_pos
+        )
 
     def get_pddl_args(self) -> List[Any]:
         return [self.robot, self.from_pos, self.to]
@@ -433,7 +448,10 @@ class MoveAction(AbstractMoveAction):
 
     def get_pddl_args(self) -> List[Any]:
         # One check location argument is required for move
-        return super().get_pddl_args() + self.get_collision_check_locations()[:1]
+        return (
+            super().get_pddl_args()
+            + self.get_collision_check_locations(include_to_pos=False)[:1]
+        )
 
     def invalid_reason(self, sim_state: SimState) -> str:
         super_reason = super().invalid_reason(sim_state)
@@ -465,7 +483,10 @@ class UndockAction(AbstractMoveAction):
 
     def get_pddl_args(self) -> List[Any]:
         # Two check location arguments are required for undock
-        return super().get_pddl_args() + self.get_collision_check_locations()[:2]
+        return (
+            super().get_pddl_args()
+            + self.get_collision_check_locations(include_to_pos=False)[:2]
+        )
 
     def invalid_reason(self, sim_state: SimState) -> str:
         super_reason = super().invalid_reason(sim_state)
@@ -507,8 +528,19 @@ class StereoAction(MarkCompleteAction):
 
     def get_pddl_args(self) -> List[Any]:
         # Two collision check arguments are required for stereo action
-        check_locs = get_collision_check_locations(self.base, self.bound)[:2]
+        check_locs = get_collision_check_locations(
+            self.base, self.bound, include_to_pos=False
+        )[:2]
         return [self.robot, self.order, self.base, self.bound] + check_locs
+
+    def get_completed_predicate(self) -> str:
+        # Unlike the panorama action, where the completed-panorama predicate takes exactly the same
+        # arguments as the action, for the completed-stereo predicate we don't include the collision
+        # check arguments.
+        args_str = " ".join(
+            ["completed-stereo", self.robot, self.order, self.base, self.bound]
+        )
+        return f"({args_str})"
 
     def invalid_reason(self, sim_state: SimState) -> str:
         robot_state = sim_state.robot_states[self.robot]
@@ -573,7 +605,7 @@ class RobotExecState:
 
     status: RobotStatus = "INIT"
     """
-    Execution states of the robot. DONE = completed all goals, BLOCKED = the next action to perform
+    Execution status of the robot. DONE = completed all goals, BLOCKED = the next action to perform
     is not (yet) valid, ACTIVE = robot is actively working on a goal.
     """
 
@@ -750,7 +782,7 @@ class MarkCompleteGoal(Goal):
         raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
 
     def __repr__(self) -> str:
-        return repr(self.get_completing_action()).replace("(", "(completed-", 1)
+        return self.get_completing_action().get_completed_predicate()
 
     def is_complete(self, exec_state: ExecState) -> bool:
         return self.get_completing_action().is_complete(exec_state.sim_state)
@@ -910,7 +942,10 @@ def filter_none(seq: Iterable[Optional[T]]) -> List[T]:
 def get_objects_by_type(
     problem: PddlExpression,
 ) -> Dict[PddlTypeName, List[PddlObjectName]]:
-    "Return robot names parsed from PDDL problem instance."
+    """
+    Return mapping from PDDL type name to a list of object instances of that type, parsed from
+    `problem`.
+    """
     (objects_clause,) = [e for e in problem[2:] if e[0] == ":objects"]
     # object_decls example: ["foo", "bar", "-", "int", "baz", "-", "float"]
     object_decls = list(objects_clause[1:])
@@ -943,20 +978,42 @@ def get_robot_goals(problem: PddlExpression) -> Dict[RobotName, List[Goal]]:
     return robot_goals
 
 
+def get_init_predicates(problem: PddlExpression) -> List[PddlPredicate]:
+    "Return the predicates in the initial state of `problem`."
+    # Example problem snippet:
+    # (define (problem jem-survey)
+    #  ... other clauses ...
+    #  (:init (pred1 arg1 arg2) (pred2 arg1 arg2)))
+    #
+    # We want to return the list of predicates in the :init clause.
+    (init_clause,) = [e for e in problem[2:] if e[0] == ":init"]
+    return init_clause[1:]
+
+
 def get_robot_states(problem: PddlExpression) -> Dict[RobotName, RobotState]:
     """
-    Return a mapping of robot name to robot state parsed from `problem`.
+    Return a mapping of robot name to robot state extracted from `problem`.
     """
     robot_states = {
         robot: RobotState(pos="", action=None, reserved=[]) for robot in CONFIG.robots
     }
-    (init_clause,) = [e for e in problem[2:] if e[0] == ":init"]
-    init_predicates = init_clause[1:]
+    init_predicates = get_init_predicates(problem)
     robot_at_predicates = [p for p in init_predicates if p[0] == "robot-at"]
     for _, robot, pos in robot_at_predicates:
         robot_states[robot].pos = pos
         robot_states[robot].reserved = [pos]
     return robot_states
+
+
+def get_completed_predicates(problem: PddlExpression) -> List[PddlPredicate]:
+    "Return the completed action predicates in the initial state of `problem`."
+    return [p for p in get_init_predicates(problem) if p[0].startswith("completed-")]
+
+
+def string_from_predicate(expr: PddlPredicate) -> str:
+    "Return the PDDL string representation of `expr`."
+    space_list = " ".join((str(item) for item in expr))
+    return f"({space_list})"
 
 
 def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
@@ -975,8 +1032,10 @@ def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
 
     robot_goals = get_robot_goals(problem_expr)
     robot_states = get_robot_states(problem_expr)
+    completed_predicates = get_completed_predicates(problem_expr)
+    completed_set = {string_from_predicate(p) for p in completed_predicates}
 
-    sim_state = SimState(robot_states=robot_states)
+    sim_state = SimState(robot_states=robot_states, completed=completed_set)
     robot_exec_states = {
         robot: RobotExecState(robot_goals[robot]) for robot in CONFIG.robots
     }
