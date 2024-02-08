@@ -449,7 +449,7 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
             current_robot = ""
         sim = True
 
-    ns = ""
+    ns = " -remote"
     # If we're commanding a robot remotely
     if current_robot != args["robot"]:
         rospy.loginfo("We're commanding a namespaced robot!")
@@ -457,7 +457,7 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
         # Command executor will add namespace for bridge forwarding
         command_executor = CommandExecutor("/" + args["robot"])
     else:
-        command_executor = CommandExecutor("/")
+        command_executor = CommandExecutor("")
     process_executor = ProcessExecutor(args["robot"])
 
     # Initialize exit code
