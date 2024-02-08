@@ -1,0 +1,38 @@
+# Copyright (c) 2023, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# Test case for marking goals completed. For goals with completed: true, we should see completed-x
+# and need-x predicates asserted in the problem_generator.py output, and those goals should not
+# result in any actions in the plan. This is a fairly minimal test case verifying we can mark both
+# panoramas and stereos as completed.
+
+goals:
+
+- {type: panorama, robot: bumble, order: 0, location: jem_bay4, completed: true}
+- {type: panorama, robot: bumble, order: 1, location: jem_bay3}
+- {type: stereo, robot: bumble, order: 4, trajectory: jem_bay1_to_bay3}
+
+- {type: panorama, robot: honey, order: 1, location: jem_bay7, completed: true}
+- {type: panorama, robot: honey, order: 2, location: jem_bay6}
+- {type: stereo, robot: honey, order: 4, trajectory: jem_bay7_to_bay4, completed: true}
+
+init:
+  bumble:
+    location: berth1
+  honey:
+    location: berth2

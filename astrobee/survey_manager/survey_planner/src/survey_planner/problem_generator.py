@@ -99,10 +99,14 @@ def load_yaml(yaml_path: pathlib.Path) -> YamlMapping:
         return yaml.safe_load(yaml_stream)
 
 
-def get_stereo_traj(static_config, base, bound):
+def get_stereo_traj(config: YamlMapping, base: str, bound: str) -> str:
+    """
+    Return the name of the fplan file that specifies the trajectory for the stereo action with
+    arguments `base` and `bound`, as looked up in `config`.
+    """
     traj_matches = [
         traj
-        for traj in static_config["stereo"].values()
+        for traj in config["stereo"].values()
         if traj["base_location"] == base and traj["bound_location"] == bound
     ]
     assert (
@@ -112,9 +116,7 @@ def get_stereo_traj(static_config, base, bound):
     return fplan
 
 
-def yaml_action_from_pddl(
-    action: str, static_config: YamlMapping
-) -> Optional[YamlMapping]:
+def yaml_action_from_pddl(action: str, config: YamlMapping) -> Optional[YamlMapping]:
     """
     Return a YamlMapping representation of `action`. This is the only place
     we really need domain-specific logic.
@@ -143,7 +145,7 @@ def yaml_action_from_pddl(
             "robot": robot,
             "from_name": from_bay,
             "to_name": to_bay,
-            "to_pos": static_config["bays"][to_bay],
+            "to_pos": config["bays"][to_bay],
         }
 
     if action_type == "panorama":
@@ -153,13 +155,13 @@ def yaml_action_from_pddl(
             "type": "panorama",
             "robot": robot,
             "location_name": location,
-            "location_pos": static_config["bays"][location],
+            "location_pos": config["bays"][location],
         }
 
     if action_type == "stereo":
         robot, _order, base, bound, _check1, _check2 = action_args[1:]
         # Use base and bound to look up trajectory.
-        fplan = get_stereo_traj(static_config, base, bound)
+        fplan = get_stereo_traj(config, base, bound)
 
         # Can discard order check1, check2.
         return {
@@ -177,9 +179,10 @@ def yaml_action_from_pddl(
     return {}  # Make pylint happy
 
 
-def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
+def pddl_goal_from_yaml(goal: YamlMapping, config: YamlMapping) -> str:
     """
-    Convert a YAML goal with named fields from the dynamic config into a PDDL goal predicate.
+    Return the result of converting `goal` from a YAML object with named fields to a PDDL goal
+    predicate, looking up info in `config` as needed.
     """
     goal_type = goal["type"]
     assert (
@@ -196,7 +199,7 @@ def pddl_goal_from_yaml(goal: YamlMapping, config_static: YamlMapping) -> str:
         robot = goal["robot"]
         order = goal["order"]
         trajectory = goal["trajectory"]
-        traj_info = config_static["stereo"][trajectory]
+        traj_info = config["stereo"][trajectory]
         base = traj_info["base_location"]
         bound = traj_info["bound_location"]
         return f"(completed-stereo {robot} o{order} {base} {bound})"
@@ -451,7 +454,7 @@ def problem_generator(
     robots = config["robots"]
     writer.declare_instances(robots, "robot")
 
-    max_order = max([goal.get("order", -1) for goal in config["goals"]])
+    max_order = max((goal.get("order", -1) for goal in config["goals"]))
     num_orders = max_order + 1
     orders = [f"o{i}" for i in range(num_orders)]
     writer.declare_instances(orders, "order")
@@ -503,10 +506,17 @@ def problem_generator(
     ]
     writer.declare_predicates(location_available_lines, "dynamic_predicates")
 
+    completed_goals = [
+        pddl_goal_from_yaml(goal, config)
+        for goal in yaml_goals
+        if goal.get("completed", False)
+    ]
+    writer.declare_predicates(completed_goals, "dynamic_predicates")
+
     need_stereo_lines = [
-        goal.replace("completed-stereo", "need-stereo")
-        for goal in pddl_goals
-        if "completed-stereo" in goal
+        pddl_goal_from_yaml(goal, config).replace("completed-stereo", "need-stereo")
+        for goal in yaml_goals
+        if goal["type"] == "stereo" and not goal.get("completed", False)
     ]
     writer.declare_predicates(need_stereo_lines, "dynamic_predicates")
 
@@ -519,7 +529,7 @@ def problem_generator(
     output_path = pathlib.Path(
         str(output_path_template).replace("{ext}", writer.get_extension())
     )
-    output_path.write_text(writer.getvalue())
+    output_path.write_text(writer.getvalue(), encoding="utf-8")
     print(f"Wrote to {output_path}", file=sys.stderr)
 
 
