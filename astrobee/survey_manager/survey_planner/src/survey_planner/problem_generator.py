@@ -468,7 +468,12 @@ def problem_generator(
     location_real_lines = [f"(location-real {bay})" for bay in bays]
     writer.declare_predicates(location_real_lines, "static_predicates")
 
-    candidates = (("jem_bay7", "berth1"), ("jem_bay7", "berth2"))
+    candidates = (
+        ("jem_bay7", "berth1"),
+        ("jem_bay7", "berth2"),
+        ("gra_bay1", "berth1"),
+        ("gra_bay3", "berth2"),
+    )
     dock_connected_lines = [
         f"(dock-connected {bay} {berth})"
         for bay, berth in candidates
