@@ -32,7 +32,7 @@ DATA_DIR="${SURVEY_PLANNER_DIR}/data"
 CASES_DIR="${DATA_DIR}/test_cases"
 cd "${THIS_DIR}"
 
-TEST_CASES=(completed1 completed2)
+TEST_CASES=(completed1 completed2 proactive1 proactive2)
 
 set -x
 for i in "${TEST_CASES[@]}"; do

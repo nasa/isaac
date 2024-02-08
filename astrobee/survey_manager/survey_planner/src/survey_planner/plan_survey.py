@@ -39,7 +39,7 @@ RobotName = str  # Names PDDL object of type robot
 Duration = float  # Time duration in seconds
 Cost = int  # Count of moves
 CostMap = List[Cost]  # Interpreted as mapping of LocationIndex -> Cost
-RobotStatus = str  # Options: ACTIVE, BLOCKED, DONE
+RobotStatus = str  # Options: INIT, DONE, VETOED, BLOCKED, ACTIVE
 Timestamp = float  # Elapsed time since start of sim in seconds
 EventCallback = Callable[["SimState"], None]
 PendingEvent = Tuple[Timestamp, EventCallback]
@@ -87,15 +87,24 @@ class Config:
 CONFIG = Config()
 
 
-def get_cost_to_goal(goal_region: Iterable[LocationIndex]) -> CostMap:
+def get_cost_to_goal(
+    goal_region: Iterable[LocationIndex],
+    blocked_region: Optional[List[LocationIndex]] = None,
+) -> CostMap:
     """
     Return a cost array that maps each location index to its cost to the nearest goal location in
     `goal_region` (measured in number of moves).
+
+    :param blocked_region: If other than None, specifies locations that a robot can't move through
+      on its way to `goal_region`.
     """
     result = [UNREACHABLE_COST] * len(CONFIG.locations)
     opens = [(g, 0) for g in goal_region]
     while opens:
         curr, curr_cost = opens.pop(0)
+        if blocked_region is not None and curr in blocked_region:
+            # blocked locations always stay at UNREACHABLE_COST
+            continue
         if curr_cost < result[curr]:
             result[curr] = curr_cost
             next_cost = curr_cost + 1
@@ -117,14 +126,67 @@ def get_best_neighbor(cost_map: CostMap, current_pos: LocationIndex) -> Location
 
 
 def get_move_location(
-    goal_region: Iterable[LocationIndex], current_pos: LocationIndex
+    goal_region: Iterable[LocationIndex],
+    current_pos: LocationIndex,
+    blocked_region: Optional[List[LocationIndex]] = None,
 ) -> LocationIndex:
     """
     Return the neighbor of `current_pos` that is closest to `goal_region` (the logical target
     location of the next move). Raise RuntimeError if `goal_region` is unreachable  from
     `current_pos`.
     """
-    return get_best_neighbor(get_cost_to_goal(goal_region), current_pos)
+    return get_best_neighbor(get_cost_to_goal(goal_region, blocked_region), current_pos)
+
+
+def get_visited(
+    from_pos: LocationIndex,
+    to_region: List[LocationIndex],
+    blocked_region: Optional[List[LocationIndex]] = None,
+) -> List[LocationIndex]:
+    """
+    Return the list of locations visited while moving from `from_pos` to `to_region` along a
+    shortest path, including both endpoints.
+    """
+    cost_map = get_cost_to_goal(to_region, blocked_region)
+    assert cost_map[from_pos] != UNREACHABLE_COST
+    current_pos = from_pos
+    result = []
+    while True:
+        result.append(current_pos)
+        if current_pos in to_region:
+            break
+        current_pos = get_best_neighbor(cost_map, current_pos)
+    return result
+
+
+def get_collision_radius(loc_ind: LocationIndex) -> List[LocationIndex]:
+    "Return the locations that would be unsafe for robot A if robot B has `loc_ind` reserved."
+    loc_name = CONFIG.locations[loc_ind]
+    result = [loc_ind]
+    # Include neighbors if *both* neighbors are flying locations
+    if is_location_flying(loc_name):
+        result += [
+            n
+            for n in CONFIG.neighbors[loc_ind]
+            if is_location_flying(CONFIG.locations[n])
+        ]
+    return result
+
+
+def invert_region(region: List[LocationIndex]) -> List[LocationIndex]:
+    "Return locations not in `region`."
+    return list(set(range(len(CONFIG.locations))).difference(region))
+
+
+def get_safe_from(avoid_region: List[LocationIndex]) -> List[LocationIndex]:
+    """
+    Return the list of locations that would be safe for robot A if robot B is visiting
+    all locations in `avoid_region`. (Flying locations need to be at least two steps apart.)
+    """
+    avoid_dilated: List[LocationIndex] = list(
+        set().union(*(get_collision_radius(loc) for loc in avoid_region))  # type:ignore
+    )
+    return invert_region(avoid_dilated)
 
 
 def is_location_berth(location: LocationName) -> bool:
@@ -363,6 +425,19 @@ def get_collision_check_locations(
     return result
 
 
+def get_reserved_by_other_robots(
+    sim_state: SimState, robot: RobotName
+) -> List[LocationName]:
+    "Return the list of locations reserved by robots other than `robot` in `sim_state`."
+    other_robots = [r for r in CONFIG.robots if r != robot]
+    others_reserved: Set[LocationName] = set().union(
+        *(
+            sim_state.robot_states[robot].reserved for robot in other_robots
+        )  # type:ignore
+    )
+    return list(others_reserved)
+
+
 def get_collision_reason(
     from_pos: LocationName, to_pos: LocationName, robot: RobotName, sim_state: SimState
 ) -> str:
@@ -371,13 +446,8 @@ def get_collision_reason(
     collision checking. Return an empty string if the move passes the collision check.
     """
     check_locs = get_collision_check_locations(from_pos, to_pos)
-    other_robots = [r for r in CONFIG.robots if r != robot]
-    others_reserved = set(
-        itertools.chain(
-            *(sim_state.robot_states[robot].reserved for robot in other_robots)
-        )
-    )
-    reserved_check_locs = others_reserved.intersection(check_locs)
+    others_reserved = get_reserved_by_other_robots(sim_state, robot)
+    reserved_check_locs = set(others_reserved).intersection(check_locs)
     if reserved_check_locs:
         return (
             f"Expected no collision check locations adjacent to `to_pos` {to_pos} to be reserved by"
@@ -579,8 +649,37 @@ class Goal(ABC):
         raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
 
     def get_next_action(self, exec_state: "ExecState") -> Action:
-        "Return the next action to apply to achieve the goal given `exec_state`."
+        "Return the next action for this robot to apply to achieve the goal given `exec_state`."
         raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
+
+    def get_visited(self, exec_state: "ExecState") -> List[LocationIndex]:
+        "Return the locations to be visited while achieving this goal given `exec_state`."
+        raise NotImplementedError()  # Note: Can't mark as @abstractmethod due to mypy limitation
+
+    def get_other_robot_action(
+        self, exec_state: "ExecState", robot: RobotName
+    ) -> Optional[Action]:
+        """
+        Return the next action for other `robot` to apply in `exec_state` to proactively avoid
+        interfering with achieving this goal. Return None if no proactive action is needed.
+        """
+        safe_region = get_safe_from(self.get_visited(exec_state))
+        safe_goal = MoveToRegionGoal(robot=robot, region=safe_region)
+        if safe_goal.is_complete(exec_state):
+            return None
+        return safe_goal.get_next_action(exec_state)
+
+    def get_other_robot_action_vetoed(  # pylint: disable=unused-argument
+        self, exec_state: "ExecState", robot: RobotName, action: Action
+    ) -> bool:
+        """
+        Return True if other `robot` applying `action` is vetoed (becaues it will interfere with
+        achieving this goal).
+        """
+        if isinstance(action, AbstractMoveAction):
+            to_ind = CONFIG.location_lookup[action.to]
+            return to_ind not in get_safe_from(self.get_visited(exec_state))
+        return False
 
 
 @dataclass
@@ -605,8 +704,10 @@ class RobotExecState:
 
     status: RobotStatus = "INIT"
     """
-    Execution status of the robot. DONE = completed all goals, BLOCKED = the next action to perform
-    is not (yet) valid, ACTIVE = robot is actively working on a goal.
+    Execution status of the robot. INIT = execution not started yet, DONE = completed all goals,
+    VETOED = idle because the robot's selected action has been vetoed by a higher priority goal from
+    another robot, BLOCKED = idle because the robot's selected action is not legal given the current
+    sim state, ACTIVE = actively executing an action.
     """
 
     blocked_action: Optional[Action] = None
@@ -618,6 +719,9 @@ class RobotExecState:
     """
     If status is "BLOCKED", this is the reason why `blocked_action` is invalid. Otherwise, "".
     """
+
+    priority: int = 0
+    "Robots with lower priority (larger value) defer to robots with higher priority."
 
     def get_goal(self) -> Optional[Goal]:
         """
@@ -642,11 +746,26 @@ class RobotExecState:
             "goal_index": self.goal_index,
             "goal_start_time": self.goal_start_time,
             "status": self.status,
+            "priority": self.priority,
         }
         if self.status == "BLOCKED":
             result["blocked_action"] = repr(self.blocked_action)
             result["blocked_reason"] = repr(self.blocked_reason)
         return result
+
+
+def filter_none(seq: Iterable[Optional[T]]) -> List[T]:
+    "Return the result of filtering None entries out of `seq`."
+    return [elt for elt in seq if elt is not None]
+
+
+@dataclass
+class RobotActionInfo:
+    "Represents information about a robot's chosen next action."
+    robot: RobotName
+    status: RobotStatus
+    action: Optional[Action] = None
+    blocked_reason: str = ""
 
 
 @dataclass
@@ -667,48 +786,112 @@ class ExecState:
         "Return True if all robots have achieved all of their goals."
         return all((rstate.is_done() for rstate in self.robot_exec_states.values()))
 
-    def call_next_action_internal(self, robot: RobotName) -> RobotStatus:
-        "Helper for call_next_action() that returns the updated robot status."
-        robot_exec_state = self.robot_exec_states[robot]
-        while True:
-            robot_goal = robot_exec_state.get_goal()
-            if robot_goal is None:
-                return "DONE"
-            if robot_goal.is_complete(self):
-                robot_exec_state.goal_index += 1
-                robot_exec_state.goal_start_time = self.sim_state.elapsed_time
-                continue
-            break
-        action = robot_goal.get_next_action(self)
+    def skip_completed_goals(self) -> None:
+        "Advance robot goal indices past completed goals."
+        for robot in CONFIG.robots:
+            robot_exec_state = self.robot_exec_states[robot]
+            while True:
+                robot_goal = robot_exec_state.get_goal()
+                if robot_goal is None:
+                    break  # Already at end of goals
+                if robot_goal.is_complete(self):
+                    robot_exec_state.goal_index += 1
+                    robot_exec_state.goal_start_time = self.sim_state.elapsed_time
+                    continue
+                break  # Stop at incomplete goal
 
-        invalid_reason = action.invalid_reason(self.sim_state)
-        if invalid_reason:
-            robot_exec_state.blocked_action = action
-            robot_exec_state.blocked_reason = invalid_reason
-            return "BLOCKED"
-        robot_exec_state.blocked_action = None
-        robot_exec_state.blocked_reason = ""
-
-        action.apply(self.sim_state)
-        return "ACTIVE"
-
-    def call_next_action(self, robot: RobotName) -> None:
+    def get_prioritized_goals(self) -> List[Goal]:
         """
-        Iterate through goals, starting with the current goal, until reaching a goal that is not
-        completed yet, and apply that goal's next action if it is valid in the current state.
-        Update the robot execution status.
+        Return a list of active goals, sorted from highest to lowest priority based on the
+        priority of the robot that owns the goal.
         """
-        robot_exec_state = self.robot_exec_states[robot]
-        robot_exec_state.status = self.call_next_action_internal(robot)
+        prio_robot_pairs = [
+            (self.robot_exec_states[robot].priority, robot) for robot in CONFIG.robots
+        ]
+        prioritized_robots = [robot for _, robot in sorted(prio_robot_pairs)]
+        return filter_none(
+            (self.robot_exec_states[robot].get_goal() for robot in prioritized_robots)
+        )
+
+    def is_action_vetoed(
+        self, robot: RobotName, action: Action, higher_priority_goals: List[Goal]
+    ):
+        """
+        Return True if `robot` can't execute `action` because a goal in `higher_priority_goals`
+        vetoes it.
+        """
+        return any(
+            (
+                goal.get_other_robot_action_vetoed(self, robot, action)
+                for goal in higher_priority_goals
+            )
+        )
+
+    def get_next_action(
+        self, prioritized_goals: List[Goal], robot: RobotName
+    ) -> RobotActionInfo:
+        """
+        Return info about the chosen next action for `robot` given `prioritized_goals`.
+        """
+        action: Optional[Action] = None
+        for goal_index, goal in enumerate(prioritized_goals):
+            if goal.robot == robot:
+                action = goal.get_next_action(self)
+            else:
+                action = goal.get_other_robot_action(self, robot)
+            if action is not None:
+                break
+
+        if action is None:
+            return RobotActionInfo(robot, "DONE")
+
+        # pylint: disable-next=undefined-loop-variable
+        higher_priority_goals = prioritized_goals[:goal_index]
+        if self.is_action_vetoed(robot, action, higher_priority_goals):
+            return RobotActionInfo(robot, "VETOED", action)
+
+        blocked_reason = action.invalid_reason(self.sim_state)
+        if blocked_reason:
+            return RobotActionInfo(
+                robot, "BLOCKED", action, blocked_reason=blocked_reason
+            )
+
+        return RobotActionInfo(robot, "ACTIVE", action)
+
+    def get_next_actions(self, prioritized_goals: List[Goal]) -> List[RobotActionInfo]:
+        """
+        Return info about chosen next actions for robots not currently executing an action, given
+        `prioritized_goals`.
+        """
+        return [
+            self.get_next_action(prioritized_goals, robot)
+            for robot in CONFIG.robots
+            if self.sim_state.robot_states[robot].action is None
+        ]
+
+    def apply_next_actions(self, next_actions: List[RobotActionInfo]) -> None:
+        """
+        Apply chosen next actions and update robot execution states.
+        """
+        for action_info in next_actions:
+            robot_exec_state = self.robot_exec_states[action_info.robot]
+            robot_exec_state.status = action_info.status
+            if action_info.status == "ACTIVE":
+                assert action_info.action is not None
+                action_info.action.apply(self.sim_state)
+            if action_info.status == "BLOCKED":
+                robot_exec_state.blocked_action = action_info.action
+                robot_exec_state.blocked_reason = action_info.blocked_reason
+            else:
+                robot_exec_state.blocked_action = None
+                robot_exec_state.blocked_reason = ""
 
     def run_step(self) -> None:
-        """
-        Try to apply each robot's next action if it is idle.
-        """
-        for robot in CONFIG.robots:
-            robot_state = self.sim_state.robot_states[robot]
-            if robot_state.action is None:
-                self.call_next_action(robot)
+        "Try to apply each robot's next action if it is idle."
+        self.skip_completed_goals()
+        prioritized_goals = self.get_prioritized_goals()
+        next_actions = self.get_next_actions(prioritized_goals)
+        self.apply_next_actions(next_actions)
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
@@ -739,6 +922,64 @@ class ExecState:
                 )
 
 
+def get_move_action(
+    robot: RobotName, from_pos: LocationName, to_pos: LocationName
+) -> AbstractMoveAction:
+    "Return the single-step move action required to move `robot` from `from_pos` to `to_pos`."
+    if is_location_berth(to_pos):
+        action_type: Type[AbstractMoveAction] = DockAction
+    elif is_location_berth(from_pos):
+        action_type = UndockAction
+    else:
+        action_type = MoveAction
+    return action_type(robot=robot, from_pos=from_pos, to=to_pos)
+
+
+@dataclass
+class MoveToRegionGoal(Goal):
+    "Represents a goal of moving to any location in the specified region."
+
+    region: List[LocationIndex]
+    "The region the robot should move to."
+
+    def __repr__(self) -> str:
+        space_str = " ".join((CONFIG.locations[l] for l in self.region))
+        return f"(move-region {self.robot} [{space_str}])"
+
+    def is_complete(self, exec_state: ExecState) -> bool:
+        "Return True if the robot is already in the desired region in `exec_state`."
+        robot_state = exec_state.sim_state.robot_states[self.robot]
+        pos_ind = CONFIG.location_lookup[robot_state.pos]
+        return pos_ind in self.region
+
+    def get_next_action(self, exec_state: ExecState) -> Action:
+        "Return a single-step move action toward the desired region from `exec_state`."
+        robot_state = exec_state.sim_state.robot_states[self.robot]
+        pos_ind = CONFIG.location_lookup[robot_state.pos]
+        blocked_region = [
+            CONFIG.location_lookup[loc]
+            for loc in get_reserved_by_other_robots(exec_state.sim_state, self.robot)
+        ]
+        next_ind = get_move_location(
+            goal_region=self.region,
+            blocked_region=blocked_region,
+            current_pos=pos_ind,
+        )
+        next_loc = CONFIG.locations[next_ind]
+        return get_move_action(self.robot, robot_state.pos, next_loc)
+
+    def get_visited(self, exec_state: ExecState) -> List[LocationIndex]:
+        robot_state = exec_state.sim_state.robot_states[self.robot]
+        pos_ind = CONFIG.location_lookup[robot_state.pos]
+        blocked_region = [
+            CONFIG.location_lookup[loc]
+            for loc in get_reserved_by_other_robots(exec_state.sim_state, self.robot)
+        ]
+        return get_visited(
+            from_pos=pos_ind, to_region=self.region, blocked_region=blocked_region
+        )
+
+
 @dataclass
 class MoveGoal(Goal):
     "Represents a move goal (may require multiple single-step move actions)."
@@ -761,13 +1002,13 @@ class MoveGoal(Goal):
         pos_ind = CONFIG.location_lookup[robot_state.pos]
         next_ind = get_move_location(goal_region=[to_ind], current_pos=pos_ind)
         next_loc = CONFIG.locations[next_ind]
-        if is_location_berth(next_loc):
-            action_type: Type[AbstractMoveAction] = DockAction
-        elif is_location_berth(robot_state.pos):
-            action_type = UndockAction
-        else:
-            action_type = MoveAction
-        return action_type(robot=self.robot, from_pos=robot_state.pos, to=next_loc)
+        return get_move_action(self.robot, robot_state.pos, next_loc)
+
+    def get_visited(self, exec_state: ExecState) -> List[LocationIndex]:
+        robot_state = exec_state.sim_state.robot_states[self.robot]
+        pos_ind = CONFIG.location_lookup[robot_state.pos]
+        to_ind = CONFIG.location_lookup[self.to]
+        return get_visited(from_pos=pos_ind, to_region=[to_ind])
 
 
 @dataclass
@@ -810,6 +1051,12 @@ class PanoramaGoal(MarkCompleteGoal):
             return move_goal.get_next_action(exec_state)
         return self.get_completing_action()
 
+    def get_visited(self, exec_state: ExecState) -> List[LocationIndex]:
+        robot_state = exec_state.sim_state.robot_states[self.robot]
+        pos_ind = CONFIG.location_lookup[robot_state.pos]
+        to_ind = CONFIG.location_lookup[self.location]
+        return get_visited(from_pos=pos_ind, to_region=[to_ind])
+
 
 @dataclass
 class StereoGoal(MarkCompleteGoal):
@@ -835,6 +1082,16 @@ class StereoGoal(MarkCompleteGoal):
         if not move_goal.is_complete(exec_state):
             return move_goal.get_next_action(exec_state)
         return self.get_completing_action()
+
+    def get_visited(self, exec_state: ExecState) -> List[LocationIndex]:
+        robot_state = exec_state.sim_state.robot_states[self.robot]
+        pos_ind = CONFIG.location_lookup[robot_state.pos]
+        base_ind = CONFIG.location_lookup[self.base]
+        bound_ind = CONFIG.location_lookup[self.bound]
+        result = set()
+        result.update(get_visited(from_pos=pos_ind, to_region=[base_ind]))
+        result.update(get_visited(from_pos=base_ind, to_region=[bound_ind]))
+        return list(result)
 
 
 def format_trace(trace: ExecutionTrace) -> str:
@@ -934,11 +1191,6 @@ def get_goal_from_pddl(goal_expr: PddlExpression) -> Optional[Goal]:
     return None
 
 
-def filter_none(seq: Iterable[Optional[T]]) -> List[T]:
-    "Return `seq` with None elements filtered out."
-    return [elt for elt in seq if elt is not None]
-
-
 def get_objects_by_type(
     problem: PddlExpression,
 ) -> Dict[PddlTypeName, List[PddlObjectName]]:
@@ -961,9 +1213,20 @@ def get_objects_by_type(
     return objects_of_type
 
 
-def get_robot_goals(problem: PddlExpression) -> Dict[RobotName, List[Goal]]:
+@dataclass
+class RobotGoalInfo:
     """
-    Return a mapping of robot name to robot goals parsed from `problem`.
+    Represents information about a robot extracted from PDDL problem instance goals. These fields
+    will be copied into RobotExecState; look for field documentation there.
+    """
+
+    goals: List[Goal]
+    priority: int
+
+
+def get_robot_goals(problem: PddlExpression) -> Dict[RobotName, RobotGoalInfo]:
+    """
+    Return a mapping of robot name to robot goal info parsed from `problem`.
     """
     (goal_clause,) = [e for e in problem[2:] if e[0] == ":goal"]
     compound_expr = goal_clause[1]
@@ -972,10 +1235,18 @@ def get_robot_goals(problem: PddlExpression) -> Dict[RobotName, List[Goal]]:
     else:
         goal_exprs = [compound_expr]
     goals = filter_none([get_goal_from_pddl(goal_expr) for goal_expr in goal_exprs])
-    robot_goals = {
-        robot: [g for g in goals if g.robot == robot] for robot in CONFIG.robots
-    }
-    return robot_goals
+
+    robot_first_mention: Dict[RobotName, int] = {}
+    for goal_index, goal in enumerate(goals):
+        robot_first_mention.setdefault(goal.robot, goal_index)
+    lowest_priority = len(goals)
+
+    result = {}
+    for robot in CONFIG.robots:
+        robot_goals = [g for g in goals if g.robot == robot]
+        priority = robot_first_mention.get(robot, lowest_priority)
+        result[robot] = RobotGoalInfo(robot_goals, priority)
+    return result
 
 
 def get_init_predicates(problem: PddlExpression) -> List[PddlPredicate]:
@@ -1036,9 +1307,12 @@ def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
     completed_set = {string_from_predicate(p) for p in completed_predicates}
 
     sim_state = SimState(robot_states=robot_states, completed=completed_set)
-    robot_exec_states = {
-        robot: RobotExecState(robot_goals[robot]) for robot in CONFIG.robots
-    }
+    robot_exec_states = {}
+    for robot in CONFIG.robots:
+        ginfo = robot_goals[robot]
+        robot_exec_states[robot] = RobotExecState(
+            goals=ginfo.goals, priority=ginfo.priority
+        )
     exec_state = ExecState(sim_state=sim_state, robot_exec_states=robot_exec_states)
 
     exec_state.run()
