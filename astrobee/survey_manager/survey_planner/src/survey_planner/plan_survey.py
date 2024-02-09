@@ -282,8 +282,10 @@ class Action(ABC):
         """
         Apply the action, modifying `sim_state`.
         """
+        after_start_time = sim_state.elapsed_time + 0.001
         end_time = sim_state.elapsed_time + self.get_duration()
         self.start(sim_state)
+        sim_state.events.push((after_start_time, lambda _: None))
         sim_state.events.push((end_time, self.end))
 
 
@@ -858,15 +860,26 @@ class ExecState:
         Return info about chosen next actions for robots not currently executing an action, given
         `prioritized_goals`.
         """
-        return [
+        next_actions = [
             self.get_next_action(prioritized_goals, robot)
             for robot in self.robots
             if self.sim_state.robot_states[robot].action is None
         ]
 
-    def apply_next_actions(self, next_actions: List[RobotActionInfo]) -> None:
+        already_applied_action = False
+        for next_action in next_actions:
+            if next_action.status == "ACTIVE":
+                if already_applied_action:
+                    next_action.status = "BLOCKED"
+                    next_action.blocked_reason = "PDDL temporal logic rules forbid starting multiple actions at the same moment"
+                else:
+                    already_applied_action = True
+
+        return next_actions
+
+    def apply_next_action(self, next_actions: List[RobotActionInfo]) -> None:
         """
-        Apply chosen next actions and update robot execution states.
+        Apply chosen next action for one robot and update robot execution states.
         """
         for action_info in next_actions:
             robot_exec_state = self.robot_exec_states[action_info.robot]
@@ -886,7 +899,7 @@ class ExecState:
         self.skip_completed_goals()
         prioritized_goals = self.get_prioritized_goals()
         next_actions = self.get_next_actions(prioritized_goals)
-        self.apply_next_actions(next_actions)
+        self.apply_next_action(next_actions)
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
@@ -1289,7 +1302,7 @@ def string_from_predicate(expr: PddlPredicate) -> str:
     return f"({space_list})"
 
 
-def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
+def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path) -> None:
     "Primary driver function for custom planning."
 
     domain_expr = parse_pddl(domain_path)
@@ -1329,7 +1342,7 @@ class CustomFormatter(
     "Custom formatter for argparse that combines mixins."
 
 
-def main():
+def main() -> int:
     "Parse command-line arguments and invoke survey_planner()."
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
