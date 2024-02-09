@@ -45,6 +45,6 @@ for i in "${TEST_CASES[@]}"; do
     perl -i -ple "s:${SURVEY_PLANNER_DIR}/::g;" "${PROBLEM}"
     rosrun survey_planner plan_survey.py "${DOMAIN}" "${PROBLEM}" > "${PLAN}"
     { echo "[plan_survey.py stdout redirected to ${PLAN}]"; } 2> /dev/null
-    rosrun popf validate -e "${DOMAIN}" "${PROBLEM}" "${PLAN}"
+    rosrun popf validate -t 0.0001 -e "${DOMAIN}" "${PROBLEM}" "${PLAN}"
     rosrun survey_planner plan_interpreter.py "--plan=${PLAN}" "--plot=${CASES_DIR}/${i}_plot.png" "--output=${CASES_DIR}/${i}_plan.yaml"
 done
