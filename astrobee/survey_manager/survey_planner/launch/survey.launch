@@ -3,7 +3,7 @@
 
   <!-- arguments -->
   <arg name="planner" default="trey" />  <!-- either optic or trey -->
-  <arg name="lifecycle" default="true" />  <!-- lifecycle node -->
+  <arg name="lifecycle" default="false" />  <!-- lifecycle node -->
   <arg name="robot1" default="" />  <!-- lifecycle node -->
   <arg name="robot2" default="honey" />  <!-- lifecycle node -->
 

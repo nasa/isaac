@@ -19,6 +19,7 @@
 # under the License.
 
 import argparse
+import fcntl
 import os
 import pathlib
 import select
@@ -26,6 +27,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time  # Add time module for waiting
 from typing import Any, Dict, List
 
 import rospkg
@@ -134,6 +136,7 @@ class ProcessExecutor:
         self.sock_input.bind(self.input_path)
         self.sock_input.listen(1)  # Listen for one connection
         self.sock_input_connected = False
+        self.sock_input_conn = None
 
         # Declare socket for process output
         self.sock_output = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -141,6 +144,7 @@ class ProcessExecutor:
         self.sock_output.bind(self.output_path)
         self.sock_output.listen(1)  # Listen for one connection
         self.sock_output_connected = False
+        self.sock_output_conn = None
 
         # Declare event that will stop input thread
         self._stop_event = threading.Event()
@@ -150,19 +154,41 @@ class ProcessExecutor:
         self.sock_input.close()
         self.sock_output.close()
 
+    def write_output_once(self, output):
+        while not self.sock_output_connected:
+            try:
+                # If socket is not connected try to connect
+                self.sock_output_conn, addr = self.sock_output.accept()
+                self.sock_output_conn.setblocking(False)
+
+                self.sock_output_connected = True
+            except socket.timeout:
+                continue
+
+        try:
+            if self.sock_output_connected:
+                encoded_message = output.encode("ascii", errors="replace")
+                for i in range(0, len(encoded_message), CHUNK_SIZE):
+                    chunk = encoded_message[i : i + CHUNK_SIZE]
+                    self.sock_output_conn.sendall(chunk)
+
+        except (socket.error, BrokenPipeError):
+            print("Error sending data. Receiver may have disconnected.")
+            self.sock_output_connected = False
+
     def thread_write_output(self, process):
         # print("starting thread_write_output...")
         # Store cumulative output
         output_total = ""
         try:
-            while True:
+            while not self._stop_event.is_set() and process.poll() is None:
                 # Get output from process
                 # print("waiting for output")
                 output = process.stdout.readline()
-                if (
-                    output == "" and process.poll() is not None
-                ) or self._stop_event.is_set():
+                if process.poll() is not None or self._stop_event.is_set():
                     break
+                if output == "":
+                    continue
                 if output and not output.startswith("pos: x:"):
                     rospy.loginfo(output)
                     output_total += output
@@ -171,23 +197,26 @@ class ProcessExecutor:
                     # If socket is not connected try to connect
                     if not self.sock_output_connected:
                         # print("trying to connect")
-                        conn, addr = self.sock_output.accept()
-                        conn.setblocking(False)
+                        self.sock_output_conn, addr = self.sock_output.accept()
+                        self.sock_output_conn.setblocking(False)
 
                         self.sock_output_connected = True
                         encoded_message = output_total.encode("ascii", errors="replace")
 
                         for i in range(0, len(encoded_message), CHUNK_SIZE):
                             chunk = encoded_message[i : i + CHUNK_SIZE]
-                            conn.sendall(chunk)
+                            self.sock_output_conn.sendall(chunk)
 
                     # If socket is already connected, send output
                     elif self.sock_output_connected:
-                        conn.send(output.encode("ascii", errors="replace")[:CHUNK_SIZE])
+                        self.sock_output_conn.send(
+                            output.encode("ascii", errors="replace")[:CHUNK_SIZE]
+                        )
                 except socket.timeout:
                     continue
                 except (socket.error, BrokenPipeError):
                     print("Error sending data. Receiver may have disconnected.")
+                    time.sleep(2)
                     self.sock_output_connected = False
 
         except Exception as e:
@@ -197,45 +226,68 @@ class ProcessExecutor:
         #     # Save total output into a log
         #     rospy.loginfo(output_total)
 
+    def read_input_once(self):
+        while not (self.sock_input_connected or self._stop_event.is_set()):
+            # print("waiting for connection")
+            try:
+                self.sock_input_conn, addr = self.sock_input.accept()
+                self.sock_input_conn.settimeout(
+                    1
+                )  # Set a timeout for socket operations
+                self.sock_input_connected = True
+                break
+            except socket.timeout:
+                continue
+        while not self._stop_event.is_set():
+            try:
+                request = self.sock_input_conn.recv(CHUNK_SIZE).decode(
+                    "ascii", errors="replace"
+                )
+                return request
+            except socket.timeout:
+                continue
+            except ConnectionResetError:
+                # Connection was reset, set sock_input_connected to False
+                self.sock_input_connected = False
+                break
+
     def thread_read_input(self, process):
         # print("starting thread_read_input...")
         try:
-            while True:
-                while not self._stop_event.is_set():
+            while not self._stop_event.is_set():
+                while not (self.sock_input_connected or self._stop_event.is_set()):
                     # print("waiting for connection")
                     try:
-                        client_socket, client_address = self.sock_input.accept()
+                        self.sock_input_conn, addr = self.sock_input.accept()
+                        self.sock_input_conn.settimeout(1)
+                        self.sock_input_connected = True
                         break
                     except socket.timeout:
                         continue
+
+                while not self._stop_event.is_set():
+                    try:
+                        request = self.sock_input_conn.recv(CHUNK_SIZE).decode(
+                            "ascii", errors="replace"
+                        )
+                        break
+                    except socket.timeout:
+                        continue
+                    except ConnectionResetError:
+                        # Connection was reset, set sock_input_connected to False
+                        self.sock_input_connected = False
+                        break
                 if self._stop_event.is_set():
                     break
-                client_socket.settimeout(1)  # Set a timeout for socket operations
 
-                while True:
-                    # print("accepted connection:")
-                    print(client_address)
+                # If broken pipe connect
+                if not request:
+                    break
+                print("got: " + request)
 
-                    while not self._stop_event.is_set():
-                        # print("waiting to receive")
-                        try:
-                            request = client_socket.recv(CHUNK_SIZE).decode(
-                                "ascii", errors="replace"
-                            )
-                            break
-                        except socket.timeout:
-                            continue
-                    if self._stop_event.is_set():
-                        break
-
-                    # If broken pipe connect again
-                    if not request:
-                        break
-                    print("got: " + request)
-
-                    print(request)
-                    process.stdin.write(request + "\n")
-                    process.stdin.flush()
+                print(request)
+                process.stdin.write(request + "\n")
+                process.stdin.flush()
         except Exception as e:
             print("exit input:")
             print(e)
@@ -254,6 +306,8 @@ class ProcessExecutor:
                 stderr=subprocess.PIPE,
                 text=True,
             )
+            # Set the stdout stream to non-blocking
+            fcntl.fcntl(process.stdout, fcntl.F_SETFL, os.O_NONBLOCK)
 
             # Start input and output threads
             input_thread = threading.Thread(
@@ -265,9 +319,9 @@ class ProcessExecutor:
             )
             output_thread.start()
 
-            while output_thread.is_alive():
+            # When the process finishes, te output thread automatically closes
+            while output_thread.is_alive() and process.poll() is None:
                 rospy.sleep(1)
-            output_thread.join()
             # Get the return code of the process
             return_code = process.poll()
 
@@ -280,11 +334,12 @@ class ProcessExecutor:
             # Forcefully stop the thread (not recommended)
             print("Killing input thread...")
             self._stop_event.set()
-            input_thread.join()
             if output_thread.is_alive():
                 output_thread.join()
+            input_thread.join()
 
             # Get the final exit code
+            self._stop_event.clear()
             return return_code
 
     def send_command_recursive(self, command):
@@ -293,11 +348,20 @@ class ProcessExecutor:
         exit_code = self.send_command(command)
         print("Exit code " + str(exit_code))
 
-        if exit_code != 0 and not rospy.is_shutdown():
-            repeat = input("Do you want to repeat the command? (yes/no): ").lower()
+        while exit_code != 0 and not rospy.is_shutdown():
+            self.write_output_once(
+                "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): "
+            )
+            repeat = self.read_input_once().lower()
             print(repeat)
             if repeat == "yes":
                 exit_code = exit_code = self.send_command_recursive(command)
+                break
+            if repeat == "no":
+                break
+            if repeat == "skip":
+                exit_code = 0
+                break
         return exit_code
 
 
@@ -427,12 +491,7 @@ class CommandExecutor:
         return 1
 
 
-def survey_manager_executor(command_names, run, config_static_path: pathlib.Path):
-    # Read the static configs that convert constants to values
-    config_static = load_yaml(config_static_path)
-
-    args = yaml_action_from_pddl(f"[{' '.join(command_names)}]", config_static)
-
+def survey_manager_executor(args, run, config_static, process_executor):
     # Start ROS node
     rospy.init_node("survey_namager_cmd_" + args["robot"], anonymous=True)
 
@@ -452,13 +511,17 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
     ns = " -remote"
     # If we're commanding a robot remotely
     if current_robot != args["robot"]:
-        rospy.loginfo("We're commanding a namespaced robot!")
+        rospy.loginfo(
+            "We're commanding a namespaced robot! From "
+            + current_robot
+            + " to "
+            + args["robot"]
+        )
         ns = " -remote -ns " + args["robot"]
         # Command executor will add namespace for bridge forwarding
         command_executor = CommandExecutor("/" + args["robot"])
     else:
         command_executor = CommandExecutor("")
-    process_executor = ProcessExecutor(args["robot"])
 
     # Initialize exit code
     exit_code = 0
@@ -497,6 +560,10 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
         exit_code += command_executor.start_recording(
             "pano_" + args["location_name"] + "_" + run
         )
+        if exit_code != 0:
+            print("Didn't start recording, no point on starting the panorama")
+            return exit_code
+
         exit_code += process_executor.send_command_recursive(
             "rosrun inspection inspection_tool -geometry -geometry_poses /resources/"
             + config_static["bays_pano"][args["location_name"]]
@@ -508,6 +575,10 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
         exit_code += command_executor.start_recording(
             "stereo_" + os.path.basename(args["fplan"]) + "_" + run
         )
+        if exit_code != 0:
+            print("Didn't start recording, no point on starting the stereo")
+            return exit_code
+
         # This starts the plan
         plan_path = get_ops_plan_path()
 
@@ -526,22 +597,46 @@ def survey_manager_executor(command_names, run, config_static_path: pathlib.Path
 
 
 def survey_manager_executor_recursive(
-    command_names, run_number, config_static_path: pathlib.Path
+    command_names, run_number, config_static, process_executor
 ):
     exit_code = survey_manager_executor(
-        command_names, f"run{run_number}", config_static_path
+        command_names, f"run{run_number}", config_static, process_executor
     )
 
-    if exit_code != 0:
-        repeat = input("Do you want to repeat the survey? (yes/no/skip): ").lower()
+    while exit_code != 0 and not rospy.is_shutdown():
+        process_executor.write_output_once(
+            "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): "
+        )
+        repeat = process_executor.read_input_once().lower()
+
         if repeat == "yes":
             run_number += 1
             exit_code = survey_manager_executor_recursive(
-                command_names, run_number, config_static_path
+                command_names, run_number, config_static, process_executor
             )
+            break
+        if repeat == "no":
+            break
         if repeat == "skip":
             exit_code = 0
+            break
 
+    return exit_code
+
+
+def command_astrobee(command_names, config_static_path: pathlib.Path):
+    # Read the static configs that convert constants to values
+    config_static = load_yaml(config_static_path)
+
+    args = yaml_action_from_pddl(f"[{' '.join(command_names)}]", config_static)
+
+    process_executor = ProcessExecutor(args["robot"])
+
+    exit_code = survey_manager_executor_recursive(
+        args, 1, config_static, process_executor
+    )
+
+    print("Finished plan action with code " + str(exit_code))
     return exit_code
 
 
@@ -569,12 +664,7 @@ def main():
     )
     args = parser.parse_args()
 
-    exit_code = survey_manager_executor_recursive(
-        args.command_names, 1, args.config_static
-    )
-
-    print("Finished plan action with code " + str(exit_code))
-    return exit_code
+    return command_astrobee(args.command_names, args.config_static)
 
 
 if __name__ == "__main__":
