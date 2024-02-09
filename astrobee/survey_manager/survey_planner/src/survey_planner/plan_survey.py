@@ -720,9 +720,6 @@ class RobotExecState:
     If status is "BLOCKED", this is the reason why `blocked_action` is invalid. Otherwise, "".
     """
 
-    priority: int = 0
-    "Robots with lower priority (larger value) defer to robots with higher priority."
-
     def get_goal(self) -> Optional[Goal]:
         """
         Return the currently active goal, or None if all goals have been achieved.
@@ -746,7 +743,6 @@ class RobotExecState:
             "goal_index": self.goal_index,
             "goal_start_time": self.goal_start_time,
             "status": self.status,
-            "priority": self.priority,
         }
         if self.status == "BLOCKED":
             result["blocked_action"] = repr(self.blocked_action)
@@ -778,6 +774,9 @@ class ExecState:
     robot_exec_states: Dict[RobotName, RobotExecState]
     "The initial execution states of the robots in the multi-robot system."
 
+    robots: List[RobotName]
+    "The list of robots in priority order."
+
     def is_any_robot_active(self) -> bool:
         "Return True if any robot is actively working on a goal."
         return any((rstate.is_active() for rstate in self.robot_exec_states.values()))
@@ -805,17 +804,13 @@ class ExecState:
         Return a list of active goals, sorted from highest to lowest priority based on the
         priority of the robot that owns the goal.
         """
-        prio_robot_pairs = [
-            (self.robot_exec_states[robot].priority, robot) for robot in CONFIG.robots
-        ]
-        prioritized_robots = [robot for _, robot in sorted(prio_robot_pairs)]
         return filter_none(
-            (self.robot_exec_states[robot].get_goal() for robot in prioritized_robots)
+            (self.robot_exec_states[robot].get_goal() for robot in self.robots)
         )
 
     def is_action_vetoed(
         self, robot: RobotName, action: Action, higher_priority_goals: List[Goal]
-    ):
+    ) -> bool:
         """
         Return True if `robot` can't execute `action` because a goal in `higher_priority_goals`
         vetoes it.
@@ -865,7 +860,7 @@ class ExecState:
         """
         return [
             self.get_next_action(prioritized_goals, robot)
-            for robot in CONFIG.robots
+            for robot in self.robots
             if self.sim_state.robot_states[robot].action is None
         ]
 
@@ -901,6 +896,7 @@ class ExecState:
                 robot: state.get_dump_dict()
                 for robot, state in self.robot_exec_states.items()
             },
+            "robots": self.robots,
         }
 
     def __repr__(self) -> str:
@@ -1214,17 +1210,19 @@ def get_objects_by_type(
 
 
 @dataclass
-class RobotGoalInfo:
+class RobotGoalsPrio:
     """
-    Represents information about a robot extracted from PDDL problem instance goals. These fields
-    will be copied into RobotExecState; look for field documentation there.
+    Represents information from PDDL problem instance goals.
     """
 
-    goals: List[Goal]
-    priority: int
+    robot_goals: Dict[RobotName, List[Goal]]
+    "Maps robot name to its goals."
+
+    robots: List[RobotName]
+    "List of robots prioritized from highest to lowest."
 
 
-def get_robot_goals(problem: PddlExpression) -> Dict[RobotName, RobotGoalInfo]:
+def get_robot_goals_prio(problem: PddlExpression) -> RobotGoalsPrio:
     """
     Return a mapping of robot name to robot goal info parsed from `problem`.
     """
@@ -1241,12 +1239,16 @@ def get_robot_goals(problem: PddlExpression) -> Dict[RobotName, RobotGoalInfo]:
         robot_first_mention.setdefault(goal.robot, goal_index)
     lowest_priority = len(goals)
 
-    result = {}
-    for robot in CONFIG.robots:
-        robot_goals = [g for g in goals if g.robot == robot]
-        priority = robot_first_mention.get(robot, lowest_priority)
-        result[robot] = RobotGoalInfo(robot_goals, priority)
-    return result
+    prio_robot_pairs = [
+        (robot_first_mention.get(robot, lowest_priority), robot)
+        for robot in CONFIG.robots
+    ]
+    prioritized_robots = [robot for _, robot in sorted(prio_robot_pairs)]
+
+    robot_goals = {
+        robot: [g for g in goals if g.robot == robot] for robot in prioritized_robots
+    }
+    return RobotGoalsPrio(robot_goals, prioritized_robots)
 
 
 def get_init_predicates(problem: PddlExpression) -> List[PddlPredicate]:
@@ -1301,7 +1303,7 @@ def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
     CONFIG.location_lookup = location_config["location_lookup"]
     CONFIG.neighbors = location_config["neighbors"]
 
-    robot_goals = get_robot_goals(problem_expr)
+    goals_prio = get_robot_goals_prio(problem_expr)
     robot_states = get_robot_states(problem_expr)
     completed_predicates = get_completed_predicates(problem_expr)
     completed_set = {string_from_predicate(p) for p in completed_predicates}
@@ -1309,11 +1311,12 @@ def survey_planner(domain_path: pathlib.Path, problem_path: pathlib.Path):
     sim_state = SimState(robot_states=robot_states, completed=completed_set)
     robot_exec_states = {}
     for robot in CONFIG.robots:
-        ginfo = robot_goals[robot]
-        robot_exec_states[robot] = RobotExecState(
-            goals=ginfo.goals, priority=ginfo.priority
-        )
-    exec_state = ExecState(sim_state=sim_state, robot_exec_states=robot_exec_states)
+        robot_exec_states[robot] = RobotExecState(goals=goals_prio.robot_goals[robot])
+    exec_state = ExecState(
+        sim_state=sim_state,
+        robot_exec_states=robot_exec_states,
+        robots=goals_prio.robots,
+    )
 
     exec_state.run()
     print("; Solution Found")
