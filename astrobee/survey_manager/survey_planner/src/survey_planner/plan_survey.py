@@ -681,6 +681,9 @@ class Goal(ABC):
         if isinstance(action, AbstractMoveAction):
             to_ind = CONFIG.location_lookup[action.to]
             return to_ind not in get_safe_from(self.get_visited(exec_state))
+        if isinstance(action, StereoAction):
+            bound_ind = CONFIG.location_lookup[action.bound]
+            return bound_ind not in get_safe_from(self.get_visited(exec_state))
         return False
 
 
@@ -798,7 +801,7 @@ class ExecState:
     "The initial execution states of the robots in the multi-robot system."
 
     robots: List[RobotName]
-    "The list of robots in priority order."
+    "The list of robots in priority order from highest to lowest."
 
     def is_any_robot_active(self) -> bool:
         "Return True if any robot is actively working on a goal."
