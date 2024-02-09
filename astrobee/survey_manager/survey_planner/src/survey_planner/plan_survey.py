@@ -5,6 +5,7 @@ Custom planner for JEM survey domain.
 """
 
 import argparse
+import enum
 import heapq
 import io
 import itertools
@@ -39,7 +40,6 @@ RobotName = str  # Names PDDL object of type robot
 Duration = float  # Time duration in seconds
 Cost = int  # Count of moves
 CostMap = List[Cost]  # Interpreted as mapping of LocationIndex -> Cost
-RobotStatus = str  # Options: INIT, DONE, VETOED, BLOCKED, ACTIVE
 Timestamp = float  # Elapsed time since start of sim in seconds
 EventCallback = Callable[["SimState"], None]
 PendingEvent = Tuple[Timestamp, EventCallback]
@@ -684,6 +684,30 @@ class Goal(ABC):
         return False
 
 
+@enum.unique
+class RobotStatus(enum.IntEnum):
+    "Represents execution status of a robot."
+
+    INIT = enum.auto()
+    "Robot has not started execution yet."
+
+    DONE = enum.auto()
+    "Idle because robot has completed all of its goals."
+
+    VETOED = enum.auto()
+    "Idle because robot's selected action has been vetoed by a higher priority goal from another robot."
+
+    BLOCKED = enum.auto()
+    "Idle because robot's selected action is not legal given the current sim state."
+
+    ACTIVE = enum.auto()
+    "Actively executing an action."
+
+
+# Convenience alias so we can write R.DONE instead of RobotStatus.DONE
+R = RobotStatus
+
+
 @dataclass
 class RobotExecState:
     "Represents the execution state of a robot."
@@ -704,22 +728,19 @@ class RobotExecState:
     goal became active.) Set to 0.0 if no goal has been completed yet.
     """
 
-    status: RobotStatus = "INIT"
+    status: RobotStatus = R.INIT
     """
-    Execution status of the robot. INIT = execution not started yet, DONE = completed all goals,
-    VETOED = idle because the robot's selected action has been vetoed by a higher priority goal from
-    another robot, BLOCKED = idle because the robot's selected action is not legal given the current
-    sim state, ACTIVE = actively executing an action.
+    Execution status of the robot.
     """
 
     blocked_action: Optional[Action] = None
     """
-    If status is "BLOCKED", this is the next action that is currently invalid. Otherwise, None.
+    If status is R.BLOCKED, this is the next action that is currently invalid. Otherwise, None.
     """
 
     blocked_reason: str = ""
     """
-    If status is "BLOCKED", this is the reason why `blocked_action` is invalid. Otherwise, "".
+    If status is R.BLOCKED, this is the reason why `blocked_action` is invalid. Otherwise, "".
     """
 
     def get_goal(self) -> Optional[Goal]:
@@ -732,11 +753,11 @@ class RobotExecState:
 
     def is_active(self) -> bool:
         "Return True if the robot is actively working on a goal."
-        return self.status == "ACTIVE"
+        return self.status == R.ACTIVE
 
     def is_done(self) -> bool:
         "Return True if the robot has achieved all of its goals."
-        return self.status == "DONE"
+        return self.status == R.DONE
 
     def get_dump_dict(self) -> Dict[str, Any]:
         "Return a dict to dump for debugging."
@@ -746,7 +767,7 @@ class RobotExecState:
             "goal_start_time": self.goal_start_time,
             "status": self.status,
         }
-        if self.status == "BLOCKED":
+        if self.status == R.BLOCKED:
             result["blocked_action"] = repr(self.blocked_action)
             result["blocked_reason"] = repr(self.blocked_reason)
         return result
@@ -840,20 +861,20 @@ class ExecState:
                 break
 
         if action is None:
-            return RobotActionInfo(robot, "DONE")
+            return RobotActionInfo(robot, R.DONE)
 
         # pylint: disable-next=undefined-loop-variable
         higher_priority_goals = prioritized_goals[:goal_index]
         if self.is_action_vetoed(robot, action, higher_priority_goals):
-            return RobotActionInfo(robot, "VETOED", action)
+            return RobotActionInfo(robot, R.VETOED, action)
 
         blocked_reason = action.invalid_reason(self.sim_state)
         if blocked_reason:
             return RobotActionInfo(
-                robot, "BLOCKED", action, blocked_reason=blocked_reason
+                robot, R.BLOCKED, action, blocked_reason=blocked_reason
             )
 
-        return RobotActionInfo(robot, "ACTIVE", action)
+        return RobotActionInfo(robot, R.ACTIVE, action)
 
     def get_next_actions(self, prioritized_goals: List[Goal]) -> List[RobotActionInfo]:
         """
@@ -868,9 +889,9 @@ class ExecState:
 
         already_applied_action = False
         for next_action in next_actions:
-            if next_action.status == "ACTIVE":
+            if next_action.status == R.ACTIVE:
                 if already_applied_action:
-                    next_action.status = "BLOCKED"
+                    next_action.status = R.BLOCKED
                     next_action.blocked_reason = "PDDL temporal logic rules forbid starting multiple actions at the same moment"
                 else:
                     already_applied_action = True
@@ -879,15 +900,15 @@ class ExecState:
 
     def apply_next_action(self, next_actions: List[RobotActionInfo]) -> None:
         """
-        Apply chosen next action for one robot and update robot execution states.
+        Apply chosen next action for one robot and update all robot execution states as needed.
         """
         for action_info in next_actions:
             robot_exec_state = self.robot_exec_states[action_info.robot]
             robot_exec_state.status = action_info.status
-            if action_info.status == "ACTIVE":
+            if action_info.status == R.ACTIVE:
                 assert action_info.action is not None
                 action_info.action.apply(self.sim_state)
-            if action_info.status == "BLOCKED":
+            if action_info.status == R.BLOCKED:
                 robot_exec_state.blocked_action = action_info.action
                 robot_exec_state.blocked_reason = action_info.blocked_reason
             else:
