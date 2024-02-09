@@ -57,10 +57,13 @@ jobs:
                           --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04
 
-    - name: Build analyst image isaac/isaac:msgs-ubuntu20.04
-      run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
+    # Temp disabling the analyst build because it has a version conflict issue. Re-enable once
+    # #136 is fixed.
+    # *** Remember to uncomment the push below, as well!
+    #- name: Build analyst image isaac/isaac:msgs-ubuntu20.04
+    #  run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
+    #                      --build-arg REMOTE=ghcr.io/nasa
+    #                      -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
 
 
     - name: Log in to registry
@@ -72,4 +75,5 @@ jobs:
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu20.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu20.04; fi;
         if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest; fi;
+        # Re-enable once #136 is fixed.
+        # if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest; fi;
