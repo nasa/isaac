@@ -43,7 +43,7 @@ bays_pano:
   gra_bay1: "panorama_granite_bsharp.txt"
   gra_bay3: "panorama_granite_wannabee.txt"
 
-bogus_bays: [jem_bay0, jem_bay8]
+bogus_bays: [gra_bay0, gra_bay4]
 berths: [berth1, berth2]
 robots: [bsharp, wannabee]
 
