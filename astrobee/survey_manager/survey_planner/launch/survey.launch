@@ -48,29 +48,29 @@
   </group>
 
   <!-- Actions -->
-  <group ns="/$(arg robot1)">
-    <node name="move_action_node" pkg="survey_planner" type="move_action_node" output="screen">
-    </node>
-    <node name="dock_action_node" pkg="survey_planner" type="dock_action_node" output="screen">
-    </node>
-    <node name="undock_action_node" pkg="survey_planner" type="undock_action_node" output="screen">
-    </node>
-    <node name="panorama_action_node" pkg="survey_planner" type="panorama_action_node" output="screen">
-    </node>
-    <node name="stereo_action_node" pkg="survey_planner" type="stereo_action_node" output="screen">
-    </node>
-  </group>
-  <group ns="/$(arg robot2)">
-    <node name="move_action_node" pkg="survey_planner" type="move_action_node" output="screen">
-    </node>
-    <node name="dock_action_node" pkg="survey_planner" type="dock_action_node" output="screen">
-    </node>
-    <node name="undock_action_node" pkg="survey_planner" type="undock_action_node" output="screen">
-    </node>
-    <node name="panorama_action_node" pkg="survey_planner" type="panorama_action_node" output="screen">
-    </node>
-    <node name="stereo_action_node" pkg="survey_planner" type="stereo_action_node" output="screen">
-    </node>
-  </group>
+  <node name="move_action_node1" pkg="survey_planner" type="move_action_node" output="screen">
+  </node>
+  <node name="move_action_node2" pkg="survey_planner" type="move_action_node" output="screen">
+  </node>
+
+  <node name="dock_action_node1" pkg="survey_planner" type="dock_action_node" output="screen">
+  </node>
+  <node name="dock_action_node2" pkg="survey_planner" type="dock_action_node" output="screen">
+  </node>
+
+  <node name="undock_action_node1" pkg="survey_planner" type="undock_action_node" output="screen">
+  </node>
+  <node name="undock_action_node2" pkg="survey_planner" type="undock_action_node" output="screen">
+  </node>
+
+  <node name="panorama_action_node1" pkg="survey_planner" type="panorama_action_node" output="screen">
+  </node>
+  <node name="panorama_action_node2" pkg="survey_planner" type="panorama_action_node" output="screen">
+  </node>
+
+  <node name="stereo_action_node1" pkg="survey_planner" type="stereo_action_node" output="screen">
+  </node>
+  <node name="stereo_action_node2" pkg="survey_planner" type="stereo_action_node" output="screen">
+  </node>
 </launch>
 
