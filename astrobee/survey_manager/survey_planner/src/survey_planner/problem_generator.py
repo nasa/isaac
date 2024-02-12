@@ -143,7 +143,7 @@ def yaml_action_from_pddl(
             "robot": robot,
             "from_name": from_bay,
             "to_name": to_bay,
-            "to_pos": static_config["bays"][to_bay],
+            # "to_pos": static_config["bays"][to_bay],
         }
 
     if action_type == "panorama":
@@ -153,7 +153,7 @@ def yaml_action_from_pddl(
             "type": "panorama",
             "robot": robot,
             "location_name": location,
-            "location_pos": static_config["bays"][location],
+            # "location_pos": static_config["bays"][location],
         }
 
     if action_type == "stereo":
