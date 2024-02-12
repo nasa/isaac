@@ -25,7 +25,7 @@
 goals:
 
 - {type: panorama, robot: bsharp, order: 0, location: gra_bay1}
-- {type: stereo, robot: bsharp, order: 1, trajectory: gra_bay1_to_bay1}
+- {type: stereo, robot: bsharp, order: 1, trajectory: gra_bay1_to_bay3}
 # This is one of the goals we previously had to comment out for POPF to return a halfway decent
 # plan. Adding a let_other_robot_reach goal mostly fixed the problem.
 - {type: robot_at, robot: bsharp, location: berth1}
@@ -37,9 +37,9 @@ goals:
 # planner doesn't need the hint.)
 # - {type: let_other_robot_reach, robot: honey, order: 0, location: jem_bay5}
 
-- {type: panorama, robot: wannabee, order: 1, location: gra_bay3}
+- {type: panorama, robot: wannabee, order: 1, location: gra_bay5}
 # This is the other objective we previously had to comment out for POPF to return a decent plan.
-- {type: stereo, robot: wannabee, order: 4, trajectory: gra_bay3_to_bay3}
+- {type: stereo, robot: wannabee, order: 4, trajectory: gra_bay5_to_bay7}
 - {type: robot_at, robot: wannabee, location: berth2}
 
 init:
