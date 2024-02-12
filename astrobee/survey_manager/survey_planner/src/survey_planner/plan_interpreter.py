@@ -204,12 +204,20 @@ def plot_plan(plot_path: pathlib.Path, yaml_actions: List[YamlMapping]) -> None:
             ]
         elif action["type"] == "panorama":
             bay_number = int(action["location_name"][-1])
+            robot_time_pos[robot] += [
+                (start_time_seconds, bay_number),
+                (end_time_seconds, bay_number),
+            ]
             robot_pano_lines[robot].append(
                 ((start_time_seconds, bay_number), (end_time_seconds, bay_number))
             )
         elif action["type"] == "stereo":
             base_bay = int(action["base_name"][-1])
             bound_bay = int(action["bound_name"][-1])
+            robot_time_pos[robot] += [
+                (start_time_seconds, base_bay),
+                (end_time_seconds, base_bay),
+            ]
             bay1, bay2 = sorted((base_bay, bound_bay))
             padding = 0.5
             robot_stereo_rects[robot].append(
