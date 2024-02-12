@@ -52,7 +52,7 @@ from survey_planner.problem_generator import (
 )
 
 DEFAULT_CONFIGS = [
-    DATA_DIR / "survey_static.yaml",
+    DATA_DIR / "jem_survey_static.yaml",
     # Dynamic config not needed for interpreting the plan
 ]
 

@@ -624,9 +624,21 @@ def survey_manager_executor_recursive(
     return exit_code
 
 
-def command_astrobee(command_names, config_static_path: pathlib.Path):
+def command_astrobee(command_names, config_static_paths: List[pathlib.Path]):
     # Read the static configs that convert constants to values
-    config_static = load_yaml(config_static_path)
+    config_static = {}
+    for config_static_path in config_static_paths:
+        print(config_static_path)
+        yaml_dict = load_yaml(config_static_path)
+        for key, value in yaml_dict.items():
+            if key not in config_static:
+                config_static[key] = value
+            elif isinstance(value, dict):  # Merge nested dictionaries
+                config_static[key].update(value)
+            elif isinstance(value, list):  # Extend lists
+                config_static[key].extend(value)
+            else:  # Overwrite scalar values
+                config_static[key] = value
 
     args = yaml_action_from_pddl(f"[{' '.join(command_names)}]", config_static)
 
@@ -645,6 +657,16 @@ class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
 
 def main():
+    default_config_paths = [
+        os.path.join(
+            rospkg.RosPack().get_path("survey_planner"), "data/jem_survey_static.yaml"
+        ),
+        os.path.join(
+            rospkg.RosPack().get_path("survey_planner"),
+            "data/granite_survey_static.yaml",
+        ),
+    ]
+
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=CustomFormatter
     )
@@ -658,9 +680,8 @@ def main():
         "--config_static",
         help="Path to input static problem config YAML (module geometry, available stereo surveys, etc.)",
         type=pathlib.Path,
-        default=os.path.join(
-            rospkg.RosPack().get_path("survey_planner"), "data/survey_static.yaml"
-        ),
+        nargs="+",
+        default=[pathlib.Path(path) for path in default_config_paths],
     )
     args = parser.parse_args()
 
