@@ -16,7 +16,7 @@ set instance o1 order
 set instance o2 order
 set instance o3 order
 set instance o4 order
-set goal (and (completed-panorama bsharp o0 gra_bay1) (completed-stereo bsharp o1 gra_bay1 gra_bay3) (robot-at bsharp berth1) (completed-panorama wannabee o1 gra_bay5) (completed-stereo wannabee o4 gra_bay5 gra_bay7) (robot-at wannabee berth2))
+set goal (and (completed-panorama bsharp o0 gra_bay2) (completed-stereo bsharp o1 gra_bay1 gra_bay3) (robot-at bsharp berth1) (completed-panorama wannabee o1 gra_bay6) (completed-stereo wannabee o4 gra_bay5 gra_bay7) (robot-at wannabee berth2))
 set predicate (move-connected gra_bay0 gra_bay1)
 set predicate (move-connected gra_bay1 gra_bay0)
 set predicate (move-connected gra_bay1 gra_bay2)
@@ -40,8 +40,8 @@ set predicate (location-real gra_bay4)
 set predicate (location-real gra_bay5)
 set predicate (location-real gra_bay6)
 set predicate (location-real gra_bay7)
-set predicate (dock-connected gra_bay1 berth1)
-set predicate (dock-connected gra_bay3 berth2)
+set predicate (dock-connected gra_bay3 berth1)
+set predicate (dock-connected gra_bay5 berth2)
 set predicate (robots-different bsharp wannabee)
 set predicate (robots-different wannabee bsharp)
 set predicate (locations-different gra_bay0 gra_bay1)

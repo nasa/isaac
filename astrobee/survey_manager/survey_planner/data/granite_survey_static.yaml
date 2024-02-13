@@ -29,27 +29,27 @@
 
 bays:
   # 3D coordinates for symbolic bays in ISS Analysis Coordinate System used by Astrobee
-  gra_bay1: [11.0, -4.0, 4.8]
-  gra_bay2: [11.0, -4.5, 4.8]
-  gra_bay3: [11.0, -5.0, 4.8]
-  gra_bay4: [11.0, -5.5, 4.8]
-  gra_bay5: [11.0, -6.0, 4.8]
-  gra_bay6: [11.0, -6.5, 4.8]
-  gra_bay7: [11.0, -7.0, 4.8]
+  gra_bay1: [0.1, 0.7, -0.68]
+  gra_bay2: [0.1, 0.6, -0.68]
+  gra_bay3: [0.1, 0.5, -0.68]
+  gra_bay4: [0.1, 0.3, -0.68]
+  gra_bay5: [0.1, 0.1, -0.68]
+  gra_bay6: [0.1, -0.3, -0.68]
+  gra_bay7: [0.1, -0.5, -0.68]
 
 bays_move:
-  gra_bay1: "-move -pos '0.1 0.3 -0.68'"
-  gra_bay2: "-move -pos '0.1 0.15 -0.68'"
-  gra_bay3: "-move -pos '0.1 0 -0.68'"
-  gra_bay4: "-move -pos '0.1 -0.15 -0.68'"
-  gra_bay5: "-move -pos '0.1 -0.3 -0.68'"
-  gra_bay6: "-move -pos '0.1 -0.35 -0.68'"
-  gra_bay7: "-move -pos '0.1 -0.4 -0.68'"
+  gra_bay1: "-move -pos '0.1 0.7 -0.68'"
+  gra_bay2: "-move -pos '0.1 0.6 -0.68'"
+  gra_bay3: "-move -pos '0.1 0.5 -0.68'"
+  gra_bay4: "-move -pos '0.1 0.3 -0.68'"
+  gra_bay5: "-move -pos '0.1 0.1 -0.68' -att '3.14 1 0 0'"
+  gra_bay6: "-move -pos '0.1 -0.3 -0.68' -att '3.14 1 0 0'"
+  gra_bay7: "-move -pos '0.1 -0.5 -0.68' -att '3.14 1 0 0'"
 
 
 bays_pano:
-  gra_bay1: "panorama_granite_bsharp.txt"
-  gra_bay5: "panorama_granite_wannabee.txt"
+  gra_bay2: "panorama_granite_bsharp.txt"
+  gra_bay6: "panorama_granite_wannabee.txt"
 
 bogus_bays: [gra_bay0, gra_bay8]
 berths: [berth1, berth2]
