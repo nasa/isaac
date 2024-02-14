@@ -22,17 +22,15 @@ import argparse
 import fcntl
 import os
 import pathlib
-import select
 import socket
 import subprocess
 import sys
 import threading
 import time  # Add time module for waiting
-from typing import Any, Dict, List
+from typing import List
 
 import rospkg
 import rospy
-import yaml
 from ff_msgs.msg import (
     AckCompletedStatus,
     AckStamped,
@@ -50,11 +48,19 @@ from survey_planner.problem_generator import load_yaml, yaml_action_from_pddl
 MAX_COUNTER = 10
 CHUNK_SIZE = 1024
 
+# Note: INFO_CONTEXT may get extended below during arg parsing
+INFO_CONTEXT = "command_astrobee"
+
+
+def loginfo(msg: str) -> None:
+    "Call rospy.loginfo() with context."
+    rospy.loginfo(f"{INFO_CONTEXT}: {msg}")
+
 
 def exposure_change(config_static, bay_origin, bay_destination):
     # Going to JEM
     if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
-        print("CHANGING EXPOSURE TO JEM")
+        loginfo("CHANGING EXPOSURE TO JEM")
         return config_static["exposure"]["jem"]
 
     # Going  to NOD2
@@ -64,7 +70,7 @@ def exposure_change(config_static, bay_origin, bay_destination):
         or bay_origin == "usl_hatch_to_nod2"
         and bay_destination == "nod2_hatch_from_usl"
     ):
-        print("CHANGING EXPOSURE TO NOD2")
+        loginfo("CHANGING EXPOSURE TO NOD2")
         return config_static["exposure"]["nod2"]
 
     # Going to USL
@@ -77,7 +83,7 @@ def exposure_change(config_static, bay_origin, bay_destination):
 def map_change(config_static, bay_origin, bay_destination):
     # Going to JEM
     if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
-        print("CHANGING MAP TO JEM")
+        loginfo("CHANGING MAP TO JEM")
         return config_static["maps"]["jem"]
     # Going  to NOD2
     if (
@@ -86,7 +92,7 @@ def map_change(config_static, bay_origin, bay_destination):
         or bay_origin == "usl_hatch_to_nod2"
         and bay_destination == "nod2_hatch_from_usl"
     ):
-        print("CHANGING MAP TO NOD2")
+        loginfo("CHANGING MAP TO NOD2")
         return config_static["maps"]["nod2"]
     # Going to USL
     if bay_origin == "nod2_hatch_to_usl" and bay_destination == "usl_hatch_from_nod2":
@@ -150,7 +156,7 @@ class ProcessExecutor:
         self._stop_event = threading.Event()
 
     def __del__(self):
-        print("closing sockets!")
+        loginfo("closing sockets!")
         self.sock_input.close()
         self.sock_output.close()
 
@@ -173,30 +179,30 @@ class ProcessExecutor:
                     self.sock_output_conn.sendall(chunk)
 
         except (socket.error, BrokenPipeError):
-            print("Error sending data. Receiver may have disconnected.")
+            loginfo("Error sending data. Receiver may have disconnected.")
             self.sock_output_connected = False
 
     def thread_write_output(self, process):
-        # print("starting thread_write_output...")
+        # loginfo("starting thread_write_output...")
         # Store cumulative output
         output_total = ""
         try:
             while not self._stop_event.is_set() and process.poll() is None:
                 # Get output from process
-                # print("waiting for output")
+                # loginfo("waiting for output")
                 output = process.stdout.readline()
                 if process.poll() is not None or self._stop_event.is_set():
                     break
                 if output == "":
                     continue
                 if output and not output.startswith("pos: x:"):
-                    rospy.loginfo(output)
+                    loginfo(f"writer received: {output}")
                     output_total += output
 
                 try:
                     # If socket is not connected try to connect
                     if not self.sock_output_connected:
-                        # print("trying to connect")
+                        # loginfo("trying to connect")
                         self.sock_output_conn, addr = self.sock_output.accept()
                         self.sock_output_conn.setblocking(False)
 
@@ -215,20 +221,19 @@ class ProcessExecutor:
                 except socket.timeout:
                     continue
                 except (socket.error, BrokenPipeError):
-                    print("Error sending data. Receiver may have disconnected.")
+                    loginfo("writer can't send data. Receiver may have disconnected.")
                     time.sleep(2)
                     self.sock_output_connected = False
 
         except Exception as e:
-            print("exit output:")
-            print(e)
+            loginfo(f"writer exiting on exception: {e}")
         # finally:
         #     # Save total output into a log
-        #     rospy.loginfo(output_total)
+        #     loginfo(output_total)
 
-    def read_input_once(self):
+    def read_input_once(self) -> str:
         while not (self.sock_input_connected or self._stop_event.is_set()):
-            # print("waiting for connection")
+            # loginfo("waiting for connection")
             try:
                 self.sock_input_conn, addr = self.sock_input.accept()
                 self.sock_input_conn.settimeout(
@@ -250,13 +255,14 @@ class ProcessExecutor:
                 # Connection was reset, set sock_input_connected to False
                 self.sock_input_connected = False
                 break
+        return ""
 
     def thread_read_input(self, process):
-        # print("starting thread_read_input...")
+        # loginfo("starting thread_read_input...")
         try:
             while not self._stop_event.is_set():
                 while not (self.sock_input_connected or self._stop_event.is_set()):
-                    # print("waiting for connection")
+                    # loginfo("waiting for connection")
                     try:
                         self.sock_input_conn, addr = self.sock_input.accept()
                         self.sock_input_conn.settimeout(1)
@@ -283,17 +289,14 @@ class ProcessExecutor:
                 # If broken pipe connect
                 if not request:
                     break
-                print("got: " + request)
-
-                print(request)
+                loginfo("reader sending: " + request)
                 process.stdin.write(request + "\n")
                 process.stdin.flush()
         except Exception as e:
-            print("exit input:")
-            print(e)
+            loginfo(f"reader exiting on exception: {e}")
 
     def send_command(self, command):
-        print(command)
+        loginfo(f"send_command: {command}")
         return_code = 1
 
         try:
@@ -326,13 +329,12 @@ class ProcessExecutor:
             return_code = process.poll()
 
         except Exception as e:
-            print("exit main:")
-            print(e)
+            loginfo(f"send_command exiting on exception: {e}")
             # Get the return code of the process
             process.kill()
         finally:
             # Forcefully stop the thread (not recommended)
-            print("Killing input thread...")
+            loginfo("send_command killing input thread...")
             self._stop_event.set()
             if output_thread.is_alive():
                 output_thread.join()
@@ -343,17 +345,17 @@ class ProcessExecutor:
             return return_code
 
     def send_command_recursive(self, command):
-        print("Sending recursive command")
+        loginfo(f"Sending recursive command: {command}")
 
         exit_code = self.send_command(command)
-        print("Exit code " + str(exit_code))
+        loginfo("send_command exit code " + str(exit_code))
 
         while exit_code != 0 and not rospy.is_shutdown():
             self.write_output_once(
                 "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): "
             )
             repeat = self.read_input_once().lower()
-            print(repeat)
+            loginfo(f"user input: {repeat}")
             if repeat == "yes":
                 exit_code = exit_code = self.send_command_recursive(command)
                 break
@@ -371,12 +373,13 @@ class ProcessExecutor:
 class CommandExecutor:
     def __init__(self, ns):
         self.ns = ns
-        rospy.loginfo(self.ns + "/command")
+        loginfo(f"command topic: {self.ns}/command")
         # Declare guest science command publisher
         self.sub_ack = rospy.Subscriber(
             self.ns + "/mgt/ack", AckStamped, self.ack_callback
         )
         self.ack_needed = False
+        self.ack_msg = None
         self.sub_plan_status = rospy.Subscriber(
             self.ns + "/mgt/executive/plan_status",
             PlanStatusStamped,
@@ -388,7 +391,9 @@ class CommandExecutor:
             self.ns + "/command", CommandStamped, queue_size=5
         )
         while self.pub_command.get_num_connections() == 0 and not rospy.is_shutdown():
-            rospy.loginfo("Waiting for subscriber to connect")
+            loginfo(
+                f"Waiting for an astrobee executive to subscribe to {self.ns}/command"
+            )
             rospy.sleep(1)
         self.unique_cmd_id = ""
 
@@ -408,6 +413,7 @@ class CommandExecutor:
         cmd.args = [arg1]
 
         # Publish the CommandStamped message
+        loginfo(f"bag recording: Starting with description {bag_description}")
         result = self.publish_and_wait_response(cmd)
         return result
 
@@ -421,36 +427,35 @@ class CommandExecutor:
         cmd.cmd_origin = "isaac fsw"
 
         # Publish the CommandStamped message
+        loginfo("bag recording: stopping recording")
         result = self.publish_and_wait_response(cmd)
         return result
 
     def change_exposure(self, val):
         # TBD
-        rospy.loginfo("Change exposure to " + str(val))
+        loginfo("Change exposure to " + str(val))
         return 0
 
     def change_map(self, map_name):
         # TBD
-        rospy.loginfo("Change map to " + map_name)
+        loginfo("Change map to " + map_name)
         return 0
 
     def ack_callback(self, msg):
-        if self.ack_needed == True and msg.cmd_id == self.unique_cmd_id:
+        if self.ack_needed is True and msg.cmd_id == self.unique_cmd_id:
             self.ack_msg = msg
             self.ack_needed = False
 
     def plan_status_callback(self, msg):
-        if self.plan_status_needed == True:
-            rospy.loginfo("plan_name" + self.plan_name + "; msg name " + msg.name)
+        if self.plan_status_needed is True:
+            loginfo(f"plan_name {self.plan_name}; msg name {msg.name}")
             if self.plan_name in msg.name:
-                rospy.loginfo(
-                    "In point " + str(msg.point) + " status " + str(msg.status.status)
-                )
+                loginfo(f"In point {msg.point} status {msg.status.status}")
                 if msg.status.status == 3:
                     self.plan_status_needed = False
             else:
                 # Plan changed, and previous plan did not complete
-                rospy.loginfo("Plan changed, exiting.")
+                loginfo("Plan changed, exiting.")
                 self.plan_status_needed = False
 
     def publish_and_wait_response(self, cmd):
@@ -464,15 +469,15 @@ class CommandExecutor:
         counter = 0
         while counter < MAX_COUNTER:
             # got message
-            if self.ack_needed == False:
+            if self.ack_needed is False:
                 if self.ack_msg.completed_status.status == AckCompletedStatus.NOT:
-                    rospy.loginfo("Command is being executed and has not completed.")
+                    loginfo("Command is being executed and has not completed.")
                     self.ack_needed = True
                 elif self.ack_msg.completed_status.status == AckCompletedStatus.OK:
-                    rospy.loginfo("Command completed successfully!")
+                    loginfo("Command completed successfully!")
                     return 0
                 else:
-                    rospy.loginfo("Command failed! Message: " + self.ack_msg.message)
+                    loginfo("Command failed! Message: " + self.ack_msg.message)
                     return 1
             else:
                 rospy.sleep(1)
@@ -486,7 +491,7 @@ class CommandExecutor:
         counter = 0
         while counter < MAX_COUNTER:
             # got message
-            if self.plan_status_needed == False:
+            if self.plan_status_needed is False:
                 return 0
         return 1
 
@@ -499,7 +504,7 @@ def survey_manager_executor(args, run, config_static, process_executor):
     # Figure out robot name and whether we are in simulation or hardware
     current_robot = os.environ.get("ROBOTNAME")
     if not current_robot:
-        rospy.loginfo("ROBOTNAME not defined. Let's get the robotname using the topic")
+        loginfo("ROBOTNAME was not defined. Inferring robot from ROS topic /robot_name")
         # This is a latching messge so it shouldn't take long
         try:
             data = rospy.wait_for_message("/robot_name", String, timeout=5)
@@ -511,11 +516,8 @@ def survey_manager_executor(args, run, config_static, process_executor):
     ns = " -remote"
     # If we're commanding a robot remotely
     if current_robot != args["robot"]:
-        rospy.loginfo(
-            "We're commanding a namespaced robot! From "
-            + current_robot
-            + " to "
-            + args["robot"]
+        loginfo(
+            f"We're commanding a namespaced robot! From '{current_robot}' to '{args['robot']}'"
         )
         ns = " -remote -ns " + args["robot"]
         # Command executor will add namespace for bridge forwarding
@@ -561,7 +563,9 @@ def survey_manager_executor(args, run, config_static, process_executor):
             "pano_" + args["location_name"] + "_" + run
         )
         if exit_code != 0:
-            print("Didn't start recording, no point on starting the panorama")
+            loginfo(
+                "panorama: Failed to start recording, no point in starting the panorama"
+            )
             return exit_code
 
         exit_code += process_executor.send_command_recursive(
@@ -576,7 +580,9 @@ def survey_manager_executor(args, run, config_static, process_executor):
             "stereo_" + os.path.basename(args["fplan"]) + "_" + run
         )
         if exit_code != 0:
-            print("Didn't start recording, no point on starting the stereo")
+            loginfo(
+                "stereo: Failed to start recording, no point in starting the stereo"
+            )
             return exit_code
 
         # This starts the plan
@@ -624,11 +630,11 @@ def survey_manager_executor_recursive(
     return exit_code
 
 
-def command_astrobee(command_names, config_static_paths: List[pathlib.Path]):
+def command_astrobee(action_args, config_static_paths: List[pathlib.Path]):
     # Read the static configs that convert constants to values
     config_static = {}
     for config_static_path in config_static_paths:
-        print(config_static_path)
+        loginfo(f"reading config: {config_static_path}")
         yaml_dict = load_yaml(config_static_path)
         for key, value in yaml_dict.items():
             if key not in config_static:
@@ -640,7 +646,10 @@ def command_astrobee(command_names, config_static_paths: List[pathlib.Path]):
             else:  # Overwrite scalar values
                 config_static[key] = value
 
-    args = yaml_action_from_pddl(f"[{' '.join(command_names)}]", config_static)
+    pddl_action = f"({' '.join(action_args)})"
+    args = yaml_action_from_pddl(pddl_action, config_static)
+    global INFO_CONTEXT
+    INFO_CONTEXT = f"command_astrobee {pddl_action}"
 
     process_executor = ProcessExecutor(args["robot"])
 
@@ -648,7 +657,7 @@ def command_astrobee(command_names, config_static_paths: List[pathlib.Path]):
         args, 1, config_static, process_executor
     )
 
-    print("Finished plan action with code " + str(exit_code))
+    loginfo(f"Finished plan action with code {exit_code}")
     return exit_code
 
 
@@ -672,9 +681,9 @@ def main():
     )
 
     parser.add_argument(
-        "command_names",
+        "action_args",
         nargs="*",
-        help="Prefixes for bagfiles to merge. Bags should all be in the current working directory.",
+        help="PDDL action name and its arguments",
     )
     parser.add_argument(
         "--config_static",
@@ -685,7 +694,7 @@ def main():
     )
     args = parser.parse_args()
 
-    return command_astrobee(args.command_names, args.config_static)
+    return command_astrobee(args.action_args, args.config_static)
 
 
 if __name__ == "__main__":
