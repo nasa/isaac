@@ -103,6 +103,13 @@ void IsaacAction::do_work() {
     }
   }
 }
+
+IsaacAction::~IsaacAction() {
+  if (pid_ != 0) {
+    // Kill the child process
+    kill(pid_, SIGKILL);
+  }
+}
 }  // namespace plansys2_actions
 
 
