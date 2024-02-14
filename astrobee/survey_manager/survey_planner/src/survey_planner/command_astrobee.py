@@ -130,7 +130,10 @@ class ProcessExecutor:
         if os.path.exists(self.output_path):
             os.remove(self.output_path)
 
-        # Declare socket for process input
+        # Declare socket for monitor to process input
+        # This socket is used for getting input from the monitor into the process running
+        # or to the current program. This is how the user can control the execution since
+        # this program can be assumed to run on the background
         self.sock_input = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock_input.settimeout(0.05)  # Set a timeout for socket operations
         self.sock_input.bind(self.input_path)
@@ -138,7 +141,10 @@ class ProcessExecutor:
         self.sock_input_connected = False
         self.sock_input_conn = None
 
-        # Declare socket for process output
+        # Declare socket for process to monitor output
+        # This socket takes output from both the process running and this program
+        # and publishes it to the monitor. This allows the user to have some situational
+        # awareness of what's going on.
         self.sock_output = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock_output.settimeout(0.05)  # Set a timeout for socket operations
         self.sock_output.bind(self.output_path)
