@@ -70,7 +70,7 @@ bays_pano:
   jem_bay4: "isaac9/jem_bay4_std_panorama.txt"
   jem_bay5: "isaac9/jem_bay5_std_panorama.txt"
   jem_bay6: "isaac9/jem_bay6_std_panorama.txt"
-  jem_bay7: "isaac9/jem_bay7_safe_std_panorama.txt"
+  jem_bay7: "isaac9/jem_bay7_std_panorama.txt"
   nod2_bay2: "isaac10/nod2_bay2_std_panorama.txt"
   nod2_bay3: "isaac10/nod2_bay3_std_panorama.txt"
   nod2_bay4: "isaac10/nod2_bay4_std_panorama.txt"
