@@ -103,6 +103,13 @@ void IsaacAction::do_work() {
     }
   }
 }
+
+IsaacAction::~IsaacAction() {
+  if (pid_ != 0) {
+    // Kill the child process
+    kill(pid_, SIGKILL);
+  }
+}
 }  // namespace plansys2_actions
 
 
@@ -123,7 +130,7 @@ int isaac_action_main(int argc, char *argv[], const char* action_name) {
   // Start action node
   // We could actually add multiple action nodes here being aware that we might need a ros::AsyncSpinner
   // (https://github.com/Bckempa/ros2_planning_system/blob/noetic-devel/plansys2_bt_actions/src/bt_action_node.cpp#L41)
-  auto action_node = std::make_shared<plansys2_actions::IsaacAction>(nh, action_name,  std::chrono::seconds(1));
+  auto action_node = std::make_shared<plansys2_actions::IsaacAction>(nh, action_name,  std::chrono::seconds(2));
   action_node->trigger_transition(ros::lifecycle::CONFIGURE);
 
   // Synchronous mode

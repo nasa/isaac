@@ -29,6 +29,7 @@ namespace plansys2_actions {
 class IsaacAction : public plansys2::ActionExecutorClient {
  public:
   IsaacAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate);
+  ~IsaacAction();
 
  protected:
   void do_work();

@@ -79,7 +79,7 @@ PDDL_DIR = pathlib.Path(
     os.path.relpath(str((THIS_DIR / ".." / ".." / "pddl").resolve()), CWD)
 )
 DEFAULT_CONFIGS = [
-    DATA_DIR / "survey_static.yaml",
+    DATA_DIR / "jem_survey_static.yaml",
     DATA_DIR / "jem_survey_dynamic.yaml",
 ]
 
@@ -471,7 +471,12 @@ def problem_generator(
     location_real_lines = [f"(location-real {bay})" for bay in bays]
     writer.declare_predicates(location_real_lines, "static_predicates")
 
-    candidates = (("jem_bay7", "berth1"), ("jem_bay7", "berth2"))
+    candidates = (
+        ("jem_bay7", "berth1"),
+        ("jem_bay7", "berth2"),
+        ("gra_bay3", "berth1"),
+        ("gra_bay5", "berth2"),
+    )
     dock_connected_lines = [
         f"(dock-connected {bay} {berth})"
         for bay, berth in candidates

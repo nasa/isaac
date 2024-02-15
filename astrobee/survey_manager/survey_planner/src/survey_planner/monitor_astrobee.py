@@ -23,65 +23,95 @@ import os
 import socket
 import sys
 import threading
+import time  # Add time module for waiting
 
 # Constants
 CHUNK_SIZE = 1024
+# Declare event that will stop input thread
+stop_event = threading.Event()
 
 
-def thread_write_input(sock_input):
-    # print("starting thread_write_input...")
-    try:
-        while True:
-            # Get user input dynamically
-            user_input = input()
-            print("user input: " + user_input)
-            # Check if the user wants to exit
-            if user_input.lower().strip() == "exit":
-                break
-            sock_input.send(user_input.encode("ascii", errors="replace")[:CHUNK_SIZE])
+def thread_write_input(input_path):
+    print("Start thread_write_input")
 
-    except:
-        print("exit output")
+    while not stop_event.is_set():
+        try:
+            # Attempt to connect to the server
+            sock_client_input = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock_client_input.connect(input_path)
+        except ConnectionRefusedError:
+            print("Input Connection refused. Retrying in 5 seconds...")
+            time.sleep(5)
+            continue
+
+        try:
+            while not stop_event.is_set():
+                user_input = input()
+                print("user input: " + user_input)
+                if user_input.lower().strip() == "exit":
+                    stop_event.set()
+                    break
+                sock_client_input.send(
+                    user_input.encode("ascii", errors="replace")[:CHUNK_SIZE]
+                )
+        except Exception as e:
+            print("Exception in thread_write_input:", e)
+
+        # Close the sockets
+        sock_client_input.close()
 
 
-def thread_read_output(sock_output):
-    # print("starting thread_read_output...")
-    try:
-        while True:
-            request = sock_output.recv(CHUNK_SIZE)
-            request = request.decode("ascii", errors="replace")  # convert bytes to str
+def thread_read_output(output_path):
+    print("Start thread_read_output")
 
-            print(request, end="")
-    except:
-        print("exit input")
+    while not stop_event.is_set():
+        try:
+            # Attempt to connect to the server
+            sock_client_output = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock_client_output.connect(output_path)
+
+        except ConnectionRefusedError:
+            print("Output Connection refused. Retrying in 5 seconds...")
+            time.sleep(5)
+            continue
+
+        print("connected")
+
+        try:
+            while not stop_event.is_set():
+                print("get data")
+                request = sock_client_output.recv(CHUNK_SIZE)
+                request = request.decode("ascii", errors="replace")
+                print(request, end="")
+                if not request:  # If no data received, it means the server disconnected
+                    print("Server disconnected")
+                    break
+        except Exception as e:
+            print("Exception in thread_read_output:", e)
+
+        # Close the sockets
+        sock_client_output.close()
 
 
 def survey_monitor(robot_name):
     input_path = "/tmp/input_" + robot_name
     output_path = "/tmp/output_" + robot_name
 
-    sock_client_input = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock_client_input.connect(input_path)
-    sock_client_output = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock_client_output.connect(output_path)
+    while not (os.path.exists(input_path) and os.path.exists(output_path)):
+        print("Files don't exist yet. Waiting for 5 seconds...")
+        time.sleep(5)
+        continue
 
     # Start input and output threads
-    input_thread = threading.Thread(
-        target=thread_write_input, args=(sock_client_input,)
-    )
+    input_thread = threading.Thread(target=thread_write_input, args=(input_path,))
     input_thread.start()
-    output_thread = threading.Thread(
-        target=thread_read_output, args=(sock_client_output,)
-    )
+    output_thread = threading.Thread(target=thread_read_output, args=(output_path,))
     output_thread.start()
 
-    # Wait for the thread
+    # Wait for the threads to finish
     input_thread.join()
-    output_thread.join()
 
-    # Close the sockets
-    sock_client_input.close()
-    sock_client_output.close()
+    output_thread.join()
 
 
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
