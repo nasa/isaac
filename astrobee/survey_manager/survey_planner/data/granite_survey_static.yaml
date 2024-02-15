@@ -38,13 +38,13 @@ bays:
   gra_bay7: [0.1, -0.5, -0.68]
 
 bays_move:
-  gra_bay1: "-move -pos '0.1 0.7 -0.68'"
-  gra_bay2: "-move -pos '0.1 0.6 -0.68'"
-  gra_bay3: "-move -pos '0.1 0.5 -0.68'"
-  gra_bay4: "-move -pos '0.1 0.3 -0.68'"
-  gra_bay5: "-move -pos '0.1 0.1 -0.68' -att '3.14 1 0 0'"
-  gra_bay6: "-move -pos '0.1 -0.3 -0.68' -att '3.14 1 0 0'"
-  gra_bay7: "-move -pos '0.1 -0.5 -0.68' -att '3.14 1 0 0'"
+  gra_bay1: ["-pos", "0.1 0.7 -0.68"]
+  gra_bay2: ["-pos", "0.1 0.6 -0.68"]
+  gra_bay3: ["-pos", "0.1 0.5 -0.68"]
+  gra_bay4: ["-pos", "0.1 0.3 -0.68"]
+  gra_bay5: ["-pos", "0.1 0.1 -0.68", "-att", "3.14 1 0 0"]
+  gra_bay6: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
+  gra_bay7: ["-pos", "0.1 -0.5 -0.68", "-att", "3.14 1 0 0"]
 
 
 bays_pano:

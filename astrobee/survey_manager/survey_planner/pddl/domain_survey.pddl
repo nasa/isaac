@@ -143,7 +143,7 @@
             ?from ?to - location  ;; from berth1 or berth2 to bay7
             ?check1 ?check2 - location  ;; neighbors of ?to to check for collision avoidance
         )
-        :duration (= ?duration 30)
+        :duration (= ?duration 45)
         :condition
             (and
                 ;; Check robot mutex
