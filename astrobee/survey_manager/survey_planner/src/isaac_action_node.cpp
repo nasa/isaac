@@ -154,6 +154,9 @@ IsaacAction::IsaacAction(ros::NodeHandle nh, const std::string& action, const st
   progress_ = 0.0;
   pid_ = 0;
   command_ = "";
+
+  // Get estimated action duration
+  action_duration_ = get_action_duration(action_name_);
 }
 
 void IsaacAction::do_work() {
@@ -165,9 +168,6 @@ void IsaacAction::do_work() {
     if (command_args.size() < 3) {
       finish(false, 1.0, "Not enough arguments for [MOVE] command");
     }
-
-    // Get estimated action duration
-    action_duration_ = get_action_duration(action_name_);
 
     std::string args_str = action_name_;
     for (auto arg : command_args) {
