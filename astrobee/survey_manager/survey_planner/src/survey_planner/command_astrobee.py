@@ -309,7 +309,6 @@ class ProcessExecutor:
             # Start the process
             process = subprocess.Popen(
                 command,
-                shell=True,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -337,6 +336,7 @@ class ProcessExecutor:
         except Exception as e:
             loginfo(f"send_command exiting on exception: {e}")
             # Get the return code of the process
+
             process.kill()
         finally:
             # Forcefully stop the thread (not recommended)
@@ -348,7 +348,15 @@ class ProcessExecutor:
 
             # Get the final exit code
             self._stop_event.clear()
-            return return_code
+        print("check if process running ")
+        if process.poll() is None:
+            print("process is still opened, closing ")
+            # Try sending SIGTERM
+            os.kill(process.pid, signal.SIGTERM)
+            if process.poll() is None:
+                os.kill(process.pid, signal.SIGKILL)
+
+        return return_code
 
     def send_command_recursive(self, command):
         loginfo(f"Sending recursive command: {command}")
@@ -519,13 +527,13 @@ def survey_manager_executor(args, run, config_static, process_executor):
             current_robot = ""
         sim = True
 
-    ns = " -remote"
+    ns = []
     # If we're commanding a robot remotely
     if current_robot != args["robot"]:
         loginfo(
             f"We're commanding a namespaced robot! From '{current_robot}' to '{args['robot']}'"
         )
-        ns = " -remote -ns " + args["robot"]
+        ns = ["-ns", args["robot"]]
         # Command executor will add namespace for bridge forwarding
         command_executor = CommandExecutor("/" + args["robot"])
     else:
@@ -535,24 +543,32 @@ def survey_manager_executor(args, run, config_static, process_executor):
     exit_code = 0
 
     if args["type"] == "dock":
-        exit_code += process_executor.send_command_recursive(
-            "rosrun executive teleop_tool -dock"
-            + ns
-            + " -berth "
-            + config_static["berth"][args["berth"]]
-        )
+        cmd = [
+            "rosrun",
+            "executive",
+            "teleop_tool",
+            "-dock",
+            "-remote",
+            "-berth",
+            config_static["berth"][args["berth"]],
+        ]
+        cmd.extend(ns) if ns else None
+
+        exit_code += process_executor.send_command_recursive(cmd)
 
     elif args["type"] == "undock":
-        exit_code += process_executor.send_command_recursive(
-            "rosrun executive teleop_tool -undock" + ns
-        )
+        cmd = ["rosrun", "executive", "teleop_tool", "-undock", "-remote"]
+        cmd.extend(ns) if ns else None
+
+        exit_code += process_executor.send_command_recursive(cmd)
 
     elif args["type"] == "move":
-        exit_code += process_executor.send_command_recursive(
-            "rosrun executive teleop_tool -move "
-            + config_static["bays_move"][args["to_name"]]
-            + ns
-        )
+        cmd = ["rosrun", "executive", "teleop_tool", "-remote", "-move"]
+        cmd.extend(config_static["bays_move"][args["to_name"]])
+        cmd.extend(ns) if ns else None
+
+        exit_code += process_executor.send_command_recursive(cmd)
+
         # Change exposure if needed
         exposure_value = exposure_change(
             config_static, args["from_name"], args["to_name"]
@@ -574,11 +590,19 @@ def survey_manager_executor(args, run, config_static, process_executor):
             )
             return exit_code
 
-        exit_code += process_executor.send_command_recursive(
-            "rosrun inspection inspection_tool -geometry -geometry_poses /resources/"
-            + config_static["bays_pano"][args["location_name"]]
-            + ns
-        )
+        cmd = [
+            "rosrun",
+            "inspection",
+            "inspection_tool",
+            "-geometry",
+            "-geometry_poses",
+            "/resources/" + config_static["bays_pano"][args["location_name"]],
+            "-remote",
+        ]
+        cmd.extend(ns) if ns else None
+
+        exit_code += process_executor.send_command_recursive(cmd)
+        print("STOP RECORDING")
         exit_code += command_executor.stop_recording()
 
     elif args["type"] == "stereo":
@@ -596,11 +620,18 @@ def survey_manager_executor(args, run, config_static, process_executor):
 
         command_executor.plan_status_needed = True
         command_executor.plan_name = os.path.basename(args["fplan"])
-        exit_code += process_executor.send_command_recursive(
-            "rosrun executive plan_pub "
-            + os.path.join(plan_path, args["fplan"] + ".fplan")
-            + ns
-        )
+
+        cmd = [
+            "rosrun",
+            "executive",
+            "plan_pub",
+            os.path.join(plan_path, args["fplan"] + ".fplan"),
+            "-remote",
+        ]
+        cmd.extend(ns) if ns else None
+
+        exit_code += process_executor.send_command_recursive(cmd)
+
         if exit_code == 0:
             exit_code += command_executor.wait_plan()
         exit_code += command_executor.stop_recording()
