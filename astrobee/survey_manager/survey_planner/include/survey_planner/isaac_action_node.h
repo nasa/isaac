@@ -34,6 +34,8 @@ class IsaacAction : public plansys2::ActionExecutorClient {
  protected:
   void do_work();
 
+  double action_duration_;
+  ros::Time start_time_;
   float progress_;
   std::string robot_name_, action_name_;
   int pid_;

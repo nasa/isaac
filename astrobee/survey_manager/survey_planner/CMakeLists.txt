@@ -74,6 +74,7 @@ catkin_package()
 catkin_install_python(PROGRAMS
   tools/command_astrobee
   tools/monitor_astrobee
+  tools/pddl_query
   tools/plan_interpreter
   tools/plan_survey
   tools/problem_generator
