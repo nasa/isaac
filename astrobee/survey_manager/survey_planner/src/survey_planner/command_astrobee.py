@@ -366,7 +366,7 @@ class ProcessExecutor:
 
         while exit_code != 0 and not rospy.is_shutdown():
             self.write_output_once(
-                "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): "
+                "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): \n"
             )
             repeat = self.read_input_once().lower()
             loginfo(f"user input: {repeat}")
@@ -394,12 +394,12 @@ class CommandExecutor:
         )
         self.ack_needed = False
         self.ack_msg = None
+        self.plan_status_needed = False
         self.sub_plan_status = rospy.Subscriber(
             self.ns + "/mgt/executive/plan_status",
             PlanStatusStamped,
             self.plan_status_callback,
         )
-        self.plan_status_needed = False
         self.plan_name = ""
         self.pub_command = rospy.Publisher(
             self.ns + "/command", CommandStamped, queue_size=5
@@ -648,7 +648,7 @@ def survey_manager_executor_recursive(
 
     while exit_code != 0 and not rospy.is_shutdown():
         process_executor.write_output_once(
-            "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): "
+            "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): \n"
         )
         repeat = process_executor.read_input_once().lower()
 

@@ -27,6 +27,7 @@ import time  # Add time module for waiting
 
 # Constants
 CHUNK_SIZE = 1024
+
 # Declare event that will stop input thread
 stop_event = threading.Event()
 
@@ -34,28 +35,32 @@ stop_event = threading.Event()
 def thread_write_input(input_path):
     print("Start thread_write_input")
 
+    user_input = ""
     while not stop_event.is_set():
         try:
             # Attempt to connect to the server
             sock_client_input = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock_client_input.connect(input_path)
         except ConnectionRefusedError:
-            print("Input Connection refused. Retrying in 5 seconds...")
+            # print("Input Connection refused. Retrying in 5 seconds...")
             time.sleep(5)
             continue
 
         try:
             while not stop_event.is_set():
-                user_input = input()
-                print("user input: " + user_input)
+                if user_input == "":
+                    user_input = input()
+                # print("user input: " + user_input)
                 if user_input.lower().strip() == "exit":
                     stop_event.set()
                     break
                 sock_client_input.send(
                     user_input.encode("ascii", errors="replace")[:CHUNK_SIZE]
                 )
+                user_input = ""
         except Exception as e:
-            print("Exception in thread_write_input:", e)
+            # print("Exception in thread_write_input:", e)
+            pass
 
         # Close the sockets
         sock_client_input.close()
@@ -71,7 +76,7 @@ def thread_read_output(output_path):
             sock_client_output.connect(output_path)
 
         except ConnectionRefusedError:
-            print("Output Connection refused. Retrying in 5 seconds...")
+            # print("Output Connection refused. Retrying in 5 seconds...")
             time.sleep(5)
             continue
 
@@ -79,7 +84,7 @@ def thread_read_output(output_path):
 
         try:
             while not stop_event.is_set():
-                print("get data")
+                # print("get data")
                 request = sock_client_output.recv(CHUNK_SIZE)
                 request = request.decode("ascii", errors="replace")
                 print(request, end="")
@@ -87,7 +92,8 @@ def thread_read_output(output_path):
                     print("Server disconnected")
                     break
         except Exception as e:
-            print("Exception in thread_read_output:", e)
+            # print("Exception in thread_read_output:", e)
+            pass
 
         # Close the sockets
         sock_client_output.close()
