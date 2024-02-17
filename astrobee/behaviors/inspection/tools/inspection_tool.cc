@@ -515,7 +515,7 @@ int main(int argc, char *argv[]) {
     SendGoal(&client);
   }
   // Synchronous mode
-  while (ros::ok()) {
+  while (ros::ok() && !stopflag_) {
     ros::spinOnce();
   }
   // Finish commandline flags
@@ -531,5 +531,5 @@ int main(int argc, char *argv[]) {
   inp.join();
 
   // Make for great success
-  return 0;
+  return 1;
 }
