@@ -51,6 +51,7 @@
   <arg name="wifi" default="false" />            <!-- Enable Wifi                 -->
   <arg name="streaming_mapper" default="false" /><!-- Enable the streaming mapper -->
   <arg name="acoustics_cam" default="false" />   <!-- Enable the acoustics cam    -->
+  <arg name="vol_mapper" default="false" />      <!-- Enable volume mappers       -->
   <arg name="agent1" default="Bsharp"/>          <!-- GDS Agent1                  -->
   <arg name="agent2" default="Bumble"/>          <!-- GDS Agent2                  -->
   <arg name="agent3" default="Honey"/>           <!-- GDS Agent3                  -->
@@ -209,6 +210,7 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
 
     <!-- Default call initialize bias so config file is created if not already present -->
@@ -241,6 +243,7 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
 
     <!-- Default call initialize bias so config file is created if not already present -->
@@ -273,6 +276,7 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
 
     <!-- Default call initialize bias so config file is created if not already present -->
@@ -305,6 +309,7 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
 
     <!-- Default call initialize bias so config file is created if not already present -->
