@@ -115,8 +115,9 @@ source "${ISAAC_WS}/devel/setup.bash"
 4. Start the survey manager:
    ```bash
    # === In terminal 2 ===
-   roslaunch survey_planner survey.launch
+   roslaunch survey_planner survey.launch quick:=true
    # roslaunch will run indefinitely. Press Ctrl-C to shut down the system.
+   # The quick:=true flag speeds up longer actions (for sim use only).
 
    # Note: This launch is fairly unreliable at startup so it's purposefully
    # kept separate from the main roslaunch, allowing us to manually
