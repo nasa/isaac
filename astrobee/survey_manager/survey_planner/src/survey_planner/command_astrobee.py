@@ -62,6 +62,13 @@ def loginfo(msg: str) -> None:
     rospy.loginfo(f"{INFO_CONTEXT}: {msg}")
 
 
+def first_non_zero(a: int, b: int) -> int:
+    "Return the first non-zero between `a` and `b`, or zero if both are zero."
+    if a != 0:
+        return a
+    return b
+
+
 def exposure_change(config_static, bay_origin, bay_destination):
     # Going to JEM
     if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
@@ -335,14 +342,9 @@ class ProcessExecutor:
             # When the process finishes, te output thread automatically closes
             while output_thread.is_alive() and process.poll() is None:
                 rospy.sleep(1)
-            # Get the return code of the process
-            return_code = process.poll()
 
         except Exception as e:
             loginfo(f"send_command exiting on exception: {e}")
-            # Get the return code of the process
-
-            process.kill()
         finally:
             # Forcefully stop the thread (not recommended)
             loginfo("send_command killing input thread...")
@@ -351,17 +353,32 @@ class ProcessExecutor:
                 output_thread.join()
             input_thread.join()
 
-            # Get the final exit code
+            # Reset for subsequent send_command() call
             self._stop_event.clear()
-        print("check if process running ")
-        if process.poll() is None:
-            print("process is still opened, closing ")
-            # Try sending SIGTERM
-            os.kill(process.pid, signal.SIGTERM)
-            if process.poll() is None:
-                os.kill(process.pid, signal.SIGKILL)
 
-        return return_code
+        loginfo(f"Check if child process {process.pid} running ")
+        return_code = process.poll()
+        if return_code is not None:
+            loginfo(f"Child exited with exit status {return_code}")
+            return return_code
+
+        kill_time = 2.0
+        loginfo(
+            f"Child process {process.pid} is still running, kill -TERM then wait up to {kill_time} seconds"
+        )
+        process.terminate()
+        try:
+            return_code = process.wait(timeout=kill_time)
+            loginfo(f"Child exited with exit status {return_code}")
+            return return_code
+        except subprocess.TimeoutExpired:
+            loginfo(
+                f"Child process {process.pid} is still running after {kill_time} seconds, kill -KILL"
+            )
+            process.send_signal(signal.SIGKILL)
+            return_code = 1
+            loginfo(f"Child killed, returning exit status {return_code}")
+            return return_code
 
     def send_command_recursive(self, command):
         loginfo(f"Sending recursive command: {command}")
@@ -376,7 +393,7 @@ class ProcessExecutor:
             repeat = self.read_input_once().lower()
             loginfo(f"user input: {repeat}")
             if repeat == "yes":
-                exit_code = exit_code = self.send_command_recursive(command)
+                exit_code = self.send_command_recursive(command)
                 break
             if repeat == "no":
                 break
@@ -573,6 +590,8 @@ class SurveyManagerExecutor:
             + self.fsw_ns_args
         )
         exit_code = self.process_executor.send_command_recursive(cmd)
+        if exit_code != 0:
+            return exit_code
 
         # Change exposure if needed
         exposure_value = exposure_change(
@@ -582,13 +601,13 @@ class SurveyManagerExecutor:
         )
         if exposure_value != 0:
             cexec = CommandExecutor(cmd_exec_ns)
-            exit_code += cexec.change_exposure(exposure_value)
+            exit_code = first_non_zero(exit_code, cexec.change_exposure(exposure_value))
 
         # Change map if needed
         map_name = map_change(self.config_static, from_name, to_name)
         if map_name != "":
             cexec = CommandExecutor(cmd_exec_ns)
-            exit_code += cexec.change_map(map_name)
+            exit_code = first_non_zero(exit_code, cexec.change_map(map_name))
 
         return exit_code
 
@@ -630,7 +649,9 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
     if args["type"] == "dock":
         # Avoid "Executive: Command failed with message: Dock goal failed with
         # response: Too far from dock"
-        sm_exec.move(args["from_name"], args["berth"])
+        exit_code = sm_exec.move(args["from_name"], args["berth"])
+        if exit_code != 0:
+            return exit_code
 
         cmd = [
             "rosrun",
@@ -643,20 +664,27 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         ]
         cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
 
     elif args["type"] == "undock":
         cmd = ["rosrun", "executive", "teleop_tool", "-undock", "-remote"]
         cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
 
     elif args["type"] == "move":
         exit_code = sm_exec.move(args["from_name"], args["to_name"])
 
     elif args["type"] == "panorama":
-        exit_code += command_executor.start_recording(
-            "pano_" + args["location_name"] + "_" + run
+        exit_code = first_non_zero(
+            exit_code,
+            command_executor.start_recording(
+                "pano_" + args["location_name"] + "_" + run
+            ),
         )
         if exit_code != 0:
             loginfo(
@@ -684,20 +712,27 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         ]
         cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
-        print("STOP RECORDING")
-        exit_code += command_executor.stop_recording()
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
+        loginfo("STOP RECORDING")
+        exit_code = first_non_zero(exit_code, command_executor.stop_recording())
 
         # Sometimes the plan has a robot idle for an extended period after
         # completing a panorama. By default, when the inspection tool finishes
         # a panorama, the robot will be left in the pose it had for the final pano
         # frame, which might not be ideal for localization. This final move should
         # ensure the robot ends in the preferred attitude.
-        exit_code += sm_exec.move(args["location_name"], args["location_name"])
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["location_name"], args["location_name"])
+        )
 
     elif args["type"] == "stereo":
-        exit_code += command_executor.start_recording(
-            "stereo_" + os.path.basename(args["fplan"]) + "_" + run
+        exit_code = first_non_zero(
+            exit_code,
+            command_executor.start_recording(
+                "stereo_" + os.path.basename(args["fplan"]) + "_" + run
+            ),
         )
         if exit_code != 0:
             loginfo(
@@ -724,14 +759,18 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         ]
         cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
 
         if exit_code == 0:
-            exit_code += command_executor.wait_plan()
-        exit_code += command_executor.stop_recording()
+            exit_code = first_non_zero(exit_code, command_executor.wait_plan())
+        exit_code = first_non_zero(exit_code, command_executor.stop_recording())
 
         # Ensure robot ends in preferred attitude for its bay.
-        exit_code += sm_exec.move(args["base_name"], args["base_name"])
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["base_name"], args["base_name"])
+        )
 
     return exit_code
 
