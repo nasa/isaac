@@ -6,6 +6,7 @@
   <arg name="lifecycle" default="false" />  <!-- lifecycle node -->
   <arg name="robot1" default="" />  <!-- lifecycle node -->
   <arg name="robot2" default="honey" />  <!-- lifecycle node -->
+  <arg name="quick" default="false" /> <!-- abbreviate longer actions for faster testing -->
 
 
   <arg name="model_file" default="$(find survey_planner)/pddl/domain_survey.pddl"/>
@@ -48,29 +49,29 @@
   </group>
 
   <!-- Actions -->
-  <node name="move_action_node1" pkg="survey_planner" type="move_action_node" output="screen">
+  <node name="move_action_node1" pkg="survey_planner" type="move_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
   </node>
-  <node name="move_action_node2" pkg="survey_planner" type="move_action_node" output="screen">
-  </node>
-
-  <node name="dock_action_node1" pkg="survey_planner" type="dock_action_node" output="screen">
-  </node>
-  <node name="dock_action_node2" pkg="survey_planner" type="dock_action_node" output="screen">
+  <node name="move_action_node2" pkg="survey_planner" type="move_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
   </node>
 
-  <node name="undock_action_node1" pkg="survey_planner" type="undock_action_node" output="screen">
+  <node name="dock_action_node1" pkg="survey_planner" type="dock_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
   </node>
-  <node name="undock_action_node2" pkg="survey_planner" type="undock_action_node" output="screen">
-  </node>
-
-  <node name="panorama_action_node1" pkg="survey_planner" type="panorama_action_node" output="screen">
-  </node>
-  <node name="panorama_action_node2" pkg="survey_planner" type="panorama_action_node" output="screen">
+  <node name="dock_action_node2" pkg="survey_planner" type="dock_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
   </node>
 
-  <node name="stereo_action_node1" pkg="survey_planner" type="stereo_action_node" output="screen">
+  <node name="undock_action_node1" pkg="survey_planner" type="undock_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
   </node>
-  <node name="stereo_action_node2" pkg="survey_planner" type="stereo_action_node" output="screen">
+  <node name="undock_action_node2" pkg="survey_planner" type="undock_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
+  </node>
+
+  <node name="panorama_action_node1" pkg="survey_planner" type="panorama_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
+  </node>
+  <node name="panorama_action_node2" pkg="survey_planner" type="panorama_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
+  </node>
+
+  <node name="stereo_action_node1" pkg="survey_planner" type="stereo_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
+  </node>
+  <node name="stereo_action_node2" pkg="survey_planner" type="stereo_action_node" output="screen" args="$(eval '--quick' if arg('quick') else '')">
   </node>
 </launch>
 

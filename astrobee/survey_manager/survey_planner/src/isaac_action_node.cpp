@@ -148,8 +148,9 @@ double get_action_duration(const std::string& action_name) {
   return duration;
 }
 
-IsaacAction::IsaacAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate)
-    : ActionExecutorClient(nh, action, rate) {
+IsaacAction::IsaacAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate,
+                         bool quick)
+    : ActionExecutorClient(nh, action, rate), quick_(quick) {
   action_name_ = action;
   progress_ = 0.0;
   pid_ = 0;
@@ -174,7 +175,8 @@ void IsaacAction::do_work() {
       args_str += " " + arg;
     }
     command_ = std::string("(") + args_str + ")";
-    std::string command_astrobee_call = std::string("rosrun survey_planner command_astrobee ") + args_str;
+    std::string quick_str = quick_ ? "--quick " : "";
+    std::string command_astrobee_call = std::string("rosrun survey_planner command_astrobee ") + quick_str + args_str;
 
     start_time_ = ros::Time::now();
     pid_ = fork();
@@ -241,6 +243,12 @@ int isaac_action_main(int argc, char *argv[], const char* action_name) {
   // Initialize a ros node
   ros::init(argc, argv, (std::string(action_name) + "_action").c_str());
 
+  bool quick = false;
+  if (argc == 2 && std::string(argv[1]) == "--quick") {
+    printf("isaac_action_node[%s]: Got --quick; running longer actions in quick mode\n", action_name);
+    quick = true;
+  }
+
   std::string name = ros::this_node::getName();
   if (name.empty() || (name.size() == 1 && name[0] == '/'))
     name = "default";
@@ -253,7 +261,7 @@ int isaac_action_main(int argc, char *argv[], const char* action_name) {
   // Start action node
   // We could actually add multiple action nodes here being aware that we might need a ros::AsyncSpinner
   // (https://github.com/Bckempa/ros2_planning_system/blob/noetic-devel/plansys2_bt_actions/src/bt_action_node.cpp#L41)
-  auto action_node = std::make_shared<plansys2_actions::IsaacAction>(nh, action_name,  std::chrono::seconds(2));
+  auto action_node = std::make_shared<plansys2_actions::IsaacAction>(nh, action_name,  std::chrono::seconds(2), quick);
   action_node->trigger_transition(ros::lifecycle::CONFIGURE);
 
   // Synchronous mode
