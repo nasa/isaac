@@ -272,7 +272,8 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
   teardown:
     std::cout << std::endl;
     ros::shutdown();
-    exit(code);
+    bool success = (code == ff_util::FreeFlyerActionState::Enum::SUCCESS);
+    exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 // Send the inspection goal to the server
@@ -521,9 +522,11 @@ int main(int argc, char *argv[]) {
   // Finish commandline flags
   google::ShutDownCommandLineFlags();
 
-  // Clen up threads and flush streams
+  // Clean up threads and flush streams
   if (!stopflag_) {
-    ROS_ERROR("exiting here");
+    const char* msg = "inspection_tool: Exiting when stopflag not set, exit code 1";
+    ROS_ERROR("%s", msg);
+    fprintf(stderr, "%s\n", msg);
     exit(1);
   }
 
@@ -531,5 +534,5 @@ int main(int argc, char *argv[]) {
   inp.join();
 
   // Make for great success
-  return 1;
+  return 0;
 }
