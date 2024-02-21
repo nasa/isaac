@@ -131,14 +131,20 @@ source "${ISAAC_WS}/devel/setup.bash"
    ```bash
    # === In terminal 3 ===
    cat <<EOF >/tmp/term_commands.txt
-   source $ISAAC_WS/src/astrobee/survey_manager/survey_planner/pddl/problem_jem_survey.ps2.pddl
+   source /tmp/problem.ps2.pddl
    get plan
    run
    EOF
 
-   # Note: On repeated runs you can just run this command again; the
-   # temp file doesn't change.
+   cat <<EOF >/tmp/plan_and_run.bash
+   data="${ISAAC_WS}/src/astrobee/survey_manager/survey_planner/data"
+   rosrun survey_planner problem_generator --terminal "--config=\${data}/jem_survey_static.yaml,\${data}/jem_survey_dynamic.yaml" --output=/tmp/problem.ps2.pddl
    cat /tmp/term_commands.txt | rosrun plansys2_terminal plansys2_terminal
+   EOF
+
+   # Note: On repeated runs you can just run this command again; the
+   # temp files don't change.
+   source /tmp/plan_and_run.bash
    # The plansys2_terminal will run until the plan completes, providing status
    # feedback. You can exit the terminal by pressing Ctrl-C and execution will
    # continue.
