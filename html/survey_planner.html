@@ -103,7 +103,110 @@ Running actions manually</h2>
 <p>There are 5 different actions at the moment 'move', 'dock', 'undock', 'panorama', 'stereo'. To run each action individually through the survey_planner you must add the correct predicates before sending the action command or else the plansys2 executor will crash. Also, if you want to re-send the action you'll want to re-send the predicates too.</p>
 <p>Don't forget to change the commands to use the target robot's name (bumble is what is used in simulation)</p>
 <p>If the survey_planner crashes sometimes the simulation has to be restarted for it to restart in a good state.</p>
-<p><a class="el" href="action_testing.html">Action Testing</a> </p>
+<p><a class="el" href="action_testing.html">Action Testing</a></p>
+<h2><a class="anchor" id="autotoc_md92"></a>
+Running a full JEM survey scenario in multi-robot simulation</h2>
+<p>Unfortunately, this scenario is currently only available for NASA-internal users because it requires access to configuration files stored in the non-public <code>astrobee_ops</code> repo.</p>
+<h3><a class="anchor" id="autotoc_md93"></a>
+Set up ops configuration</h3>
+<p>These instructions assume you've followed the native install instructions for NASA-internal users both for <a href="https://github.com/nasa/astrobee/blob/develop/doc/general_documentation/NASA_INSTALL.md"><code>astrobee</code></a> and <a href="https://github.com/nasa/isaac/blob/develop/INSTALL.md"><code>isaac</code></a>.</p>
+<p>Set up GDS and <code>astrobee_ops</code> per <a href="https://babelfish.arc.nasa.gov/confluence/display/FFFSW/Running+GDS+in+Linux">this NASA-internal wiki page</a>. You can stop when you get to the "Setup Sci Cam Streaming" section.</p>
+<h3><a class="anchor" id="autotoc_md94"></a>
+Environment variables to define in all terminals below</h3>
+<p>These could be added to <code>~/.bashrc</code> if you prefer: </p><div class="fragment"><div class="line">OPS_REPO=&quot;${HOME}/astrobee/ops&quot;  # Or wherever you put this</div>
+<div class="line">ISAAC_WS=&quot;${HOME}/isaac&quot;  # Or wherever you put this</div>
+<div class="line">source &quot;${ISAAC_WS}/devel/setup.bash&quot;</div>
+</div><!-- fragment --><h3><a class="anchor" id="autotoc_md95"></a>
+Running the scenario</h3>
+<ol type="1">
+<li>Clean up any lingering processes from previous runs: <div class="fragment"><div class="line"># === In terminal 1 ===</div>
+<div class="line">ps auxww | grep -P &#39;ros|survey|astrobee|gzserver|gazebo|inspection_tool&#39;</div>
+<div class="line"># If you see processes that look relevant, you can kill them with</div>
+<div class="line"># &#39;killall &lt;name&gt;&#39; or &#39;killall -9 &lt;name&gt;&#39; if needed. Failing to clean</div>
+<div class="line"># up any lingering processes seems to cause unpredictable faults like</div>
+<div class="line"># robots not moving when commanded.</div>
+</div><!-- fragment --></li>
+<li>Start the simulator: <div class="fragment"><div class="line"># === In terminal 1 ===</div>
+<div class="line">roslaunch isaac sim.launch honey:=true dds:=true gds:=true robot:=sim_pub</div>
+<div class="line"># roslaunch will run indefinitely. Press Ctrl-C to shut down the system.</div>
+</div><!-- fragment --></li>
+<li>Configure the Astrobees, using one of these options:<ol type="a">
+<li>Using the Astrobee Workbench (a.k.a. "GDS") graphical interface:<ol type="i">
+<li>Configure the recording profile. Go to the "Engineering" tab and do the following for each robot:<ol type="A">
+<li>Use the "Select Bee..." menu at the top left to select the robot.</li>
+<li>Click "Grab Control".</li>
+<li>In the "Data to Disk" panel, select "SurveyNoDepth.json" in the leftmost drop-down menu. If this option is not available, review the "Setup GDS" section of the wiki page referenced above and restart.</li>
+<li>Click the leftmost "Configure Data" button next to the menu.</li>
+</ol>
+</li>
+<li>Turn off face-forward motion. Go to the "Teleoperate" tab and do the following for each robot:<ol type="A">
+<li>Use the "Select Bee..." menu at the top left to select the robot.</li>
+<li>Click "Grab Control".</li>
+<li>In the "Bee Commanding" tab, in the "Options" column, uncheck the purple checkmark to the left of "Face Forward"</li>
+<li>Click "Apply Options". You should see the green checkmark to the right of "Face Forward" turn into a black "X".</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>Using command-line tools: ```bash </li>
+</ol>
+</li>
+</ol>
+<h1><a class="anchor" id="autotoc_md96"></a>
+=== In terminal 2 ===</h1>
+<p>cat &lt;&lt;EOF &gt;/tmp/configure_cmds.txt </p>
+<h1><a class="anchor" id="autotoc_md97"></a>
+Configure the recording profile</h1>
+<p>for prefix in "" "/honey"; do TOPIC_PREFIX="\${prefix}" "${OPS_REPO}/dock_scripts/hsc/cmd" -c bagger -config "${OPS_REPO}/gds/ControlStationConfig/DataToDisk-ISAAC/SurveyNoDepth.json" done </p>
+<h1><a class="anchor" id="autotoc_md98"></a>
+Turn off face-forward motion</h1>
+<p>for ns in "" "-ns honey"; do rosrun executive teleop_tool $ns -set_face_forward off done EOF</p>
+<h1><a class="anchor" id="autotoc_md99"></a>
+Note: On repeated runs you can just run this command again; the</h1>
+<h1><a class="anchor" id="autotoc_md100"></a>
+temp file doesn't change.</h1>
+<p>source /tmp/configure_cmds.txt ```</p>
+<ol type="1">
+<li>Start the survey manager: <div class="fragment"><div class="line"># === In terminal 2 ===</div>
+<div class="line">roslaunch survey_planner survey.launch quick:=true</div>
+<div class="line"># roslaunch will run indefinitely. Press Ctrl-C to shut down the system.</div>
+<div class="line"># The quick:=true flag speeds up longer actions (for sim use only).</div>
+<div class="line"> </div>
+<div class="line"># Note: This launch is fairly unreliable at startup so it&#39;s purposefully</div>
+<div class="line"># kept separate from the main roslaunch, allowing us to manually</div>
+<div class="line"># restart as needed without impacting the other ROS nodes.  To add</div>
+<div class="line"># here when it&#39;s better understood: how can an operator check that</div>
+<div class="line"># this startup succeeded? It pretty much always raises lots of</div>
+<div class="line"># errors, but some of them seem benign.</div>
+</div><!-- fragment --></li>
+<li>Generate and run a plan using the PlanSys2 terminal: <div class="fragment"><div class="line"># === In terminal 3 ===</div>
+<div class="line">cat &lt;&lt;EOF &gt;/tmp/term_commands.txt</div>
+<div class="line">source /tmp/problem.ps2.pddl</div>
+<div class="line">get plan</div>
+<div class="line">run</div>
+<div class="line">EOF</div>
+<div class="line"> </div>
+<div class="line">cat &lt;&lt;EOF &gt;/tmp/plan_and_run.bash</div>
+<div class="line">data=&quot;${ISAAC_WS}/src/astrobee/survey_manager/survey_planner/data&quot;</div>
+<div class="line">rosrun survey_planner problem_generator --terminal &quot;--config=\${data}/jem_survey_static.yaml,\${data}/jem_survey_dynamic.yaml&quot; --output=/tmp/problem.ps2.pddl</div>
+<div class="line">cat /tmp/term_commands.txt | rosrun plansys2_terminal plansys2_terminal</div>
+<div class="line">EOF</div>
+<div class="line"> </div>
+<div class="line"># Note: On repeated runs you can just run this command again; the</div>
+<div class="line"># temp files don&#39;t change.</div>
+<div class="line">source /tmp/plan_and_run.bash</div>
+<div class="line"># The plansys2_terminal will run until the plan completes, providing status</div>
+<div class="line"># feedback. You can exit the terminal by pressing Ctrl-C and execution will</div>
+<div class="line"># continue.</div>
+</div><!-- fragment --></li>
+<li>Wait for the scenario to complete. Some execution monitoring tips:<ul>
+<li>Use the Astrobee Workbench window "Overview" tab for a graphical view of robot state and progress.</li>
+<li>The <code>plansys2_terminal</code> should display which survey manager actions are currently executing, along with how long they have taken so far relative to their estimated duration. Example: If an action was supposed to take 10 minutes but has taken 15 minutes so far, it is marked as "150%".</li>
+<li>The survey manager <code>roslaunch</code> terminal should display more detailed console output. Note that this is interleaved console output from several processes running in parallel, so it can be confusing to interpret.</li>
+<li>You can interact with the terminal interfaces of individual commands that are currently executing. This allows retrying or skipping failed actions without triggering overall plan failure, as well as more detailed management of the <code>inspection_tool</code> that executes panoramas, like retrying or skipping individual panorama frames. To connect to the action running on a robot, choose the robot and run like this: ```bash rosrun survey_planner monitor_astrobee bumble # or honey ``` </li>
+</ul>
+</li>
+</ol>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->
