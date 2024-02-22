@@ -512,7 +512,8 @@ int main(int argc, char *argv[]) {
   boost::thread inp(GetInput, &client);
 
   if (FLAGS_remote) {
-    ros::Duration(3.0).sleep();
+    // Allow time before publisher and publish in absence of the connection callback
+    ros::Duration(1.0).sleep();
     SendGoal(&client);
   }
   // Synchronous mode
