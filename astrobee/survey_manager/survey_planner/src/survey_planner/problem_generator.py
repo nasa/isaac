@@ -128,9 +128,13 @@ def yaml_action_from_pddl(action: str, config: YamlMapping) -> Optional[YamlMapp
     ), f"Expected action type in {ACTION_TYPE_OPTIONS}, got {action_type}"
 
     if action_type == "dock":
-        robot, _from_bay, to_berth = action_args[1:]
-        # Can discard from_bay
-        return {"type": "dock", "robot": robot, "berth": to_berth}
+        robot, from_bay, to_berth = action_args[1:]
+        return {
+            "type": "dock",
+            "robot": robot,
+            "from_name": from_bay,
+            "berth": to_berth,
+        }
 
     if action_type == "undock":
         robot, _from_berth, _to_bay, _check1, _check2 = action_args[1:]

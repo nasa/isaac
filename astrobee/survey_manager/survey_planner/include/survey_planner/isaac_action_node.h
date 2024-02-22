@@ -28,16 +28,19 @@ namespace plansys2_actions {
 
 class IsaacAction : public plansys2::ActionExecutorClient {
  public:
-  IsaacAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate);
+  IsaacAction(ros::NodeHandle nh, const std::string& action, const std::chrono::nanoseconds& rate, bool quick);
   ~IsaacAction();
 
  protected:
   void do_work();
 
+  double action_duration_;
+  ros::Time start_time_;
   float progress_;
   std::string robot_name_, action_name_;
   int pid_;
   std::string command_;
+  bool quick_;
 };
 }  // namespace plansys2_actions
 

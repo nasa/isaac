@@ -53,15 +53,18 @@ bays_move:
   nod2_bay3: ["-pos", "10 0 4.8", "-att", "0 0 0 1"]
   nod2_bay4: ["-pos", "9 0 4.8", "-att", "0 0 0 1"]
   nod2_hatch_to_usl: ["-pos", "7.8 -3.5 4.8", "-att", "3.14 0 0 1"]
-  nod2_hatch_from_usl: ["-pos", "7.8 -3.5 4.8", "-att", "0 0 1 0"]
+  nod2_hatch_from_usl: ["-pos", "7.8 -3.5 4.8", "-att", "0 0 0 1"]
   usl_hatch_from_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "3.14 0 0 1"]
-  usl_hatch_to_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "0 0 1 0"]
+  usl_hatch_to_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "0 0 0 1"]
   usl_bay1: ["-pos", "4.7 0 4.8", "-att", "0 0 0 1"]
   usl_bay2: ["-pos", "3.65 0 4.8", "-att", "0 0 0 1"]
   usl_bay3: ["-pos", "2.6 0 4.8", "-att", "0 0 0 1"]
   usl_bay4: ["-pos", "1.55 0 4.8", "-att", "0 0 0 1"]
   usl_bay5: ["-pos", "0.5 0 4.8", "-att", "0 0 0 1"]
   usl_bay6: ["-pos", "-0.5 0 4.8", "-att", "0 0 0 1"]
+  # berth approach points from gds_configs/IssWorld/BookmarksList.json
+  berth1: ["-pos", "10.5 -9.25 4.5", "-att", "0 0 0 1"]
+  berth2: ["-pos", "10.5 -9.75 4.5", "-att", "3.14 1 0 0"]
 
 bays_pano:
   jem_bay1: "isaac9/jem_bay1_std_panorama.txt"

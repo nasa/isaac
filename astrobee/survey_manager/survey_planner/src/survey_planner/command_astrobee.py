@@ -27,6 +27,7 @@ import subprocess
 import sys
 import threading
 import time  # Add time module for waiting
+from dataclasses import dataclass
 from typing import List
 
 import rospkg
@@ -42,7 +43,11 @@ from ff_msgs.msg import (
 from std_msgs.msg import Header, String
 
 # Imports from survey_planner package
-from survey_planner.problem_generator import load_yaml, yaml_action_from_pddl
+from survey_planner.problem_generator import (
+    YamlMapping,
+    load_yaml,
+    yaml_action_from_pddl,
+)
 
 # Constants
 MAX_COUNTER = 10
@@ -55,6 +60,13 @@ INFO_CONTEXT = "command_astrobee"
 def loginfo(msg: str) -> None:
     "Call rospy.loginfo() with context."
     rospy.loginfo(f"{INFO_CONTEXT}: {msg}")
+
+
+def first_non_zero(a: int, b: int) -> int:
+    "Return the first non-zero between `a` and `b`, or zero if both are zero."
+    if a != 0:
+        return a
+    return b
 
 
 def exposure_change(config_static, bay_origin, bay_destination):
@@ -121,6 +133,10 @@ def get_ops_plan_path():
 
     # Return None if none of the conditions are met
     return None
+
+
+def get_ops_path() -> pathlib.Path:
+    return pathlib.Path(get_ops_plan_path()).parent.parent.resolve()
 
 
 # This class starts a new process and lets you monitor the input and output
@@ -330,14 +346,9 @@ class ProcessExecutor:
             # When the process finishes, te output thread automatically closes
             while output_thread.is_alive() and process.poll() is None:
                 rospy.sleep(1)
-            # Get the return code of the process
-            return_code = process.poll()
 
         except Exception as e:
             loginfo(f"send_command exiting on exception: {e}")
-            # Get the return code of the process
-
-            process.kill()
         finally:
             # Forcefully stop the thread (not recommended)
             loginfo("send_command killing input thread...")
@@ -346,17 +357,32 @@ class ProcessExecutor:
                 output_thread.join()
             input_thread.join()
 
-            # Get the final exit code
+            # Reset for subsequent send_command() call
             self._stop_event.clear()
-        print("check if process running ")
-        if process.poll() is None:
-            print("process is still opened, closing ")
-            # Try sending SIGTERM
-            os.kill(process.pid, signal.SIGTERM)
-            if process.poll() is None:
-                os.kill(process.pid, signal.SIGKILL)
 
-        return return_code
+        loginfo(f"Check if child process {process.pid} running ")
+        return_code = process.poll()
+        if return_code is not None:
+            loginfo(f"Child exited with exit status {return_code}")
+            return return_code
+
+        kill_time = 2.0
+        loginfo(
+            f"Child process {process.pid} is still running, kill -TERM then wait up to {kill_time} seconds"
+        )
+        process.terminate()
+        try:
+            return_code = process.wait(timeout=kill_time)
+            loginfo(f"Child exited with exit status {return_code}")
+            return return_code
+        except subprocess.TimeoutExpired:
+            loginfo(
+                f"Child process {process.pid} is still running after {kill_time} seconds, kill -KILL"
+            )
+            process.send_signal(signal.SIGKILL)
+            return_code = 1
+            loginfo(f"Child killed, returning exit status {return_code}")
+            return return_code
 
     def send_command_recursive(self, command):
         loginfo(f"Sending recursive command: {command}")
@@ -371,7 +397,7 @@ class ProcessExecutor:
             repeat = self.read_input_once().lower()
             loginfo(f"user input: {repeat}")
             if repeat == "yes":
-                exit_code = exit_code = self.send_command_recursive(command)
+                exit_code = self.send_command_recursive(command)
                 break
             if repeat == "no":
                 break
@@ -385,7 +411,7 @@ class ProcessExecutor:
 # Mostly used for short actions that should be immediate and require no feedback
 # This method is needed on actions that run remotely and are not controlled by topics
 class CommandExecutor:
-    def __init__(self, ns):
+    def __init__(self, ns: str):
         self.ns = ns
         loginfo(f"command topic: {self.ns}/command")
         # Declare guest science command publisher
@@ -510,7 +536,87 @@ class CommandExecutor:
         return 1
 
 
-def survey_manager_executor(args, run, config_static, process_executor):
+def write_quick_pano(pano_path: pathlib.Path) -> pathlib.Path:
+    """
+    Return path to abbreviated version of `pano_path`. Generate the abbreviated version if it
+    doesn't already exist.
+    """
+    # Example: "foo.txt" -> "foo-quick.txt"
+    quick_path = pano_path.parent / (pano_path.stem + "-quick" + pano_path.suffix)
+    if False:  # quick_path.exists():  # May be smarter to write every time
+        loginfo(f"write_quick_pano: using existing quick target list {quick_path}")
+        return quick_path
+
+    # A bit arbitrary how to generate a "quick" version of a pano. Let's take
+    # two frames.
+    input_lines = pano_path.read_text(encoding="utf-8").splitlines()
+    if len(input_lines) >= 39:
+        # For our usual JEM panos, frames 37-38 should have pitch near zero and
+        # require a bit less rotation than some others.
+        output_lines = input_lines[37:39]
+    else:
+        # Must be some different pano type, best effort.
+        output_lines = input_lines[:2]
+    output_text = "".join([line + "\n" for line in output_lines])
+    quick_path.write_text(output_text, encoding="utf-8")
+    loginfo(f"write_quick_pano: wrote quick target list {quick_path}")
+    return quick_path
+
+
+def get_quick_stereo_survey(fplan_path: pathlib.Path) -> pathlib.Path:
+    """
+    Return path to abbreviated version of `fplan_path`, if it exists. These fplans are generated by
+    manually editing the full fplan using the GDS plan editor.
+    """
+    # Example: "foo.fplan" -> "foo-quick.fplan"
+    quick_path = fplan_path.parent / (fplan_path.stem + "-quick" + fplan_path.suffix)
+    if quick_path.exists():
+        loginfo(f"get_quick_stereo_survey: found quick survey {quick_path}")
+        return quick_path
+
+    loginfo(f"get_quick_stereo_survey: no quick survey available, using {fplan_path}")
+    return fplan_path
+
+
+@dataclass
+class SurveyManagerExecutor:
+    process_executor: ProcessExecutor
+    config_static: YamlMapping
+    fsw_ns_args: List[str]
+    cmd_exec_ns: str
+
+    def move(self, from_name: str, to_name: str) -> int:
+        # Execute actual move
+        move_args = self.config_static["bays_move"][to_name]
+        cmd = (
+            ["rosrun", "executive", "teleop_tool", "-remote", "-move"]
+            + move_args
+            + self.fsw_ns_args
+        )
+        exit_code = self.process_executor.send_command_recursive(cmd)
+        if exit_code != 0:
+            return exit_code
+
+        # Change exposure if needed
+        exposure_value = exposure_change(
+            self.config_static,
+            from_name,
+            to_name,
+        )
+        if exposure_value != 0:
+            cexec = CommandExecutor(self.cmd_exec_ns)
+            exit_code = first_non_zero(exit_code, cexec.change_exposure(exposure_value))
+
+        # Change map if needed
+        map_name = map_change(self.config_static, from_name, to_name)
+        if map_name != "":
+            cexec = CommandExecutor(self.cmd_exec_ns)
+            exit_code = first_non_zero(exit_code, cexec.change_map(map_name))
+
+        return exit_code
+
+
+def survey_manager_executor(args, run, config_static, process_executor, quick: bool):
     # Start ROS node
     rospy.init_node("survey_namager_cmd_" + args["robot"], anonymous=True)
 
@@ -528,6 +634,7 @@ def survey_manager_executor(args, run, config_static, process_executor):
         sim = True
 
     ns = []
+    cmd_exec_ns = ""
     # If we're commanding a robot remotely
     if current_robot != args["robot"]:
         loginfo(
@@ -535,14 +642,21 @@ def survey_manager_executor(args, run, config_static, process_executor):
         )
         ns = ["-ns", args["robot"]]
         # Command executor will add namespace for bridge forwarding
-        command_executor = CommandExecutor("/" + args["robot"])
-    else:
-        command_executor = CommandExecutor("")
+        cmd_exec_ns = "/" + args["robot"]
+    command_executor = CommandExecutor(cmd_exec_ns)
+
+    sm_exec = SurveyManagerExecutor(process_executor, config_static, ns, cmd_exec_ns)
 
     # Initialize exit code
     exit_code = 0
 
     if args["type"] == "dock":
+        # Avoid "Executive: Command failed with message: Dock goal failed with
+        # response: Too far from dock"
+        exit_code = sm_exec.move(args["from_name"], args["berth"])
+        if exit_code != 0:
+            return exit_code
+
         cmd = [
             "rosrun",
             "executive",
@@ -552,37 +666,29 @@ def survey_manager_executor(args, run, config_static, process_executor):
             "-berth",
             config_static["berth"][args["berth"]],
         ]
-        cmd.extend(ns) if ns else None
+        cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
 
     elif args["type"] == "undock":
         cmd = ["rosrun", "executive", "teleop_tool", "-undock", "-remote"]
-        cmd.extend(ns) if ns else None
+        cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
 
     elif args["type"] == "move":
-        cmd = ["rosrun", "executive", "teleop_tool", "-remote", "-move"]
-        cmd.extend(config_static["bays_move"][args["to_name"]])
-        cmd.extend(ns) if ns else None
-
-        exit_code += process_executor.send_command_recursive(cmd)
-
-        # Change exposure if needed
-        exposure_value = exposure_change(
-            config_static, args["from_name"], args["to_name"]
-        )
-        if exposure_value != 0:
-            exit_code += command_executor.change_exposure(exposure_value)
-        # Change map if needed
-        map_name = map_change(config_static, args["from_name"], args["to_name"])
-        if map_name != "":
-            exit_code += command_executor.change_map(map_name)
+        exit_code = sm_exec.move(args["from_name"], args["to_name"])
 
     elif args["type"] == "panorama":
-        exit_code += command_executor.start_recording(
-            "pano_" + args["location_name"] + "_" + run
+        exit_code = first_non_zero(
+            exit_code,
+            command_executor.start_recording(
+                "pano_" + args["location_name"] + "_" + run
+            ),
         )
         if exit_code != 0:
             loginfo(
@@ -590,24 +696,47 @@ def survey_manager_executor(args, run, config_static, process_executor):
             )
             return exit_code
 
+        pano_path = pathlib.Path("resources") / pathlib.Path(
+            config_static["bays_pano"][args["location_name"]]
+        )
+        if quick:
+            inspection_path = pathlib.Path(rospkg.RosPack().get_path("inspection"))
+            pano_path = write_quick_pano(inspection_path / pano_path).relative_to(
+                inspection_path
+            )
+
         cmd = [
             "rosrun",
             "inspection",
             "inspection_tool",
             "-geometry",
             "-geometry_poses",
-            "/resources/" + config_static["bays_pano"][args["location_name"]],
+            "/" + str(pano_path),
             "-remote",
         ]
-        cmd.extend(ns) if ns else None
+        cmd.extend(ns)
 
-        exit_code += process_executor.send_command_recursive(cmd)
-        print("STOP RECORDING")
-        exit_code += command_executor.stop_recording()
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
+        loginfo("STOP RECORDING")
+        exit_code = first_non_zero(exit_code, command_executor.stop_recording())
+
+        # Sometimes the plan has a robot idle for an extended period after
+        # completing a panorama. By default, when the inspection tool finishes
+        # a panorama, the robot will be left in the pose it had for the final pano
+        # frame, which might not be ideal for localization. This final move should
+        # ensure the robot ends in the preferred attitude.
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["location_name"], args["location_name"])
+        )
 
     elif args["type"] == "stereo":
-        exit_code += command_executor.start_recording(
-            "stereo_" + os.path.basename(args["fplan"]) + "_" + run
+        exit_code = first_non_zero(
+            exit_code,
+            command_executor.start_recording(
+                "stereo_" + os.path.basename(args["fplan"]) + "_" + run
+            ),
         )
         if exit_code != 0:
             loginfo(
@@ -616,34 +745,69 @@ def survey_manager_executor(args, run, config_static, process_executor):
             return exit_code
 
         # This starts the plan
-        plan_path = get_ops_plan_path()
+        plan_path = pathlib.Path(get_ops_plan_path())
+        fplan_path = plan_path / pathlib.Path(args["fplan"] + ".fplan")
+
+        if quick:
+            fplan_path = get_quick_stereo_survey(fplan_path)
 
         command_executor.plan_status_needed = True
-        command_executor.plan_name = os.path.basename(args["fplan"])
+        command_executor.plan_name = fplan_path.stem
 
-        cmd = [
-            "rosrun",
-            "executive",
-            "plan_pub",
-            os.path.join(plan_path, args["fplan"] + ".fplan"),
-            "-remote",
-        ]
-        cmd.extend(ns) if ns else None
+        use_astrobee_ops = True
+        if use_astrobee_ops:
+            # Use astrobee_ops tool which provides for user interaction
+            ops_path = get_ops_path()
+            cmd_path = ops_path / "dock_scripts" / "hsc" / "cmd"
+            old_env = os.environ.copy()
+            try:
+                os.environ["TOPIC_PREFIX"] = cmd_exec_ns
 
-        exit_code += process_executor.send_command_recursive(cmd)
+                cmd = [str(cmd_path), "-c", "plan", "-load", str(fplan_path)]
+                exit_code = first_non_zero(
+                    exit_code, process_executor.send_command_recursive(cmd)
+                )
 
-        if exit_code == 0:
-            exit_code += command_executor.wait_plan()
-        exit_code += command_executor.stop_recording()
+                cmd = [str(cmd_path), "-c", "plan", "-run"]
+                exit_code = first_non_zero(
+                    exit_code, process_executor.send_command_recursive(cmd)
+                )
+            finally:
+                os.environ.clear()
+                os.environ.update(old_env)
+        else:
+            # Use FSW tools
+            cmd = [
+                "rosrun",
+                "executive",
+                "plan_pub",
+                str(fplan_path),
+                "-remote",
+            ]
+            cmd.extend(ns)
+
+            exit_code = first_non_zero(
+                exit_code, process_executor.send_command_recursive(cmd)
+            )
+
+            if exit_code == 0:
+                exit_code = first_non_zero(exit_code, command_executor.wait_plan())
+
+        exit_code = first_non_zero(exit_code, command_executor.stop_recording())
+
+        # Ensure robot ends in preferred attitude for its bay.
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["base_name"], args["base_name"])
+        )
 
     return exit_code
 
 
 def survey_manager_executor_recursive(
-    command_names, run_number, config_static, process_executor
+    command_names, run_number, config_static, process_executor, quick: bool
 ):
     exit_code = survey_manager_executor(
-        command_names, f"run{run_number}", config_static, process_executor
+        command_names, f"run{run_number}", config_static, process_executor, quick
     )
 
     while exit_code != 0 and not rospy.is_shutdown():
@@ -655,7 +819,7 @@ def survey_manager_executor_recursive(
         if repeat == "yes":
             run_number += 1
             exit_code = survey_manager_executor_recursive(
-                command_names, run_number, config_static, process_executor
+                command_names, run_number, config_static, process_executor, quick
             )
             break
         if repeat == "no":
@@ -667,9 +831,11 @@ def survey_manager_executor_recursive(
     return exit_code
 
 
-def command_astrobee(action_args, config_static_paths: List[pathlib.Path]):
+def command_astrobee(
+    action_args, config_static_paths: List[pathlib.Path], quick: bool
+) -> int:
     # Read the static configs that convert constants to values
-    config_static = {}
+    config_static: YamlMapping = {}
     for config_static_path in config_static_paths:
         loginfo(f"reading config: {config_static_path}")
         yaml_dict = load_yaml(config_static_path)
@@ -691,7 +857,7 @@ def command_astrobee(action_args, config_static_paths: List[pathlib.Path]):
     process_executor = ProcessExecutor(args["robot"])
 
     exit_code = survey_manager_executor_recursive(
-        args, 1, config_static, process_executor
+        args, 1, config_static, process_executor, quick
     )
 
     loginfo(f"Finished plan action with code {exit_code}")
@@ -729,9 +895,15 @@ def main():
         nargs="+",
         default=[pathlib.Path(path) for path in default_config_paths],
     )
+    parser.add_argument(
+        "--quick",
+        help="use quick versions of longer actions",
+        action="store_true",
+        default=False,
+    )
     args = parser.parse_args()
 
-    return command_astrobee(args.action_args, args.config_static)
+    return command_astrobee(args.action_args, args.config_static, args.quick)
 
 
 if __name__ == "__main__":
