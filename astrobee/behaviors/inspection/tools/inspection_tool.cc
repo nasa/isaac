@@ -271,8 +271,9 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
 
   teardown:
     std::cout << std::endl;
-    stopflag_ = true;
     ros::shutdown();
+    bool success = (code == ff_util::FreeFlyerActionState::Enum::SUCCESS);
+    exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 // Send the inspection goal to the server
@@ -311,37 +312,10 @@ void SendGoal(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
   client->SendGoal(goal);
 }
 
-bool GetlineAsync(std::istream& is, std::string& str, char delim = '\n') {
-    static std::string linesofar;
-    char inchar;
-    int charsread = 0;
-    bool lineread = false;
-    str = "";
-
-    do {
-        charsread = is.readsome(&inchar, 1);
-        if (charsread == 1) {
-            // if the delimiter is read then return the string so far
-            if (inchar == delim) {
-                str = linesofar;
-                linesofar = "";
-                lineread = true;
-            } else {  // otherwise add it to the string so far
-                linesofar.append(1, inchar);
-            }
-        }
-    } while (charsread != 0 && !lineread && !!stopflag_);
-
-    return lineread;
-}
-
 void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *client) {
-  while (!stopflag_ && ros::ok()) {
+  while (ros::ok()) {
     std::string line, val;
-
-    if (!GetlineAsync(std::cin, line))
-      continue;
-
+    std::getline(std::cin, line);
     std::string s;
     try {
       switch (std::stoi(line)) {
@@ -352,7 +326,7 @@ void GetInput(ff_util::FreeFlyerActionClient<isaac_msgs::InspectionAction> *clie
           if (s.size() < 80) s.append(80 - s.size(), ' ');
           std::cout << s << std::endl;
           stopflag_ = true;
-          break;
+          return;
         case 1:
           FLAGS_pause = true;
           SendGoal(client);
@@ -538,24 +512,27 @@ int main(int argc, char *argv[]) {
   boost::thread inp(GetInput, &client);
 
   if (FLAGS_remote) {
-    ros::Rate loop_rate(10);
-    ros::Time start_time = ros::Time::now();
-
-    // Spin for 3 seconds
-    while (ros::Time::now() - start_time < ros::Duration(3.0))
-        loop_rate.sleep();
-
+    ros::Duration(3.0).sleep();
     SendGoal(&client);
   }
   // Synchronous mode
-  while (!stopflag_) {
+  while (ros::ok() && !stopflag_) {
     ros::spinOnce();
   }
+  // Finish commandline flags
+  google::ShutDownCommandLineFlags();
+
+  // Clean up threads and flush streams
+  if (!stopflag_) {
+    const char* msg = "inspection_tool: Exiting when stopflag not set, exit code 1";
+    ROS_ERROR("%s", msg);
+    fprintf(stderr, "%s\n", msg);
+    exit(1);
+  }
+
   // Wait for thread to exit
   inp.join();
 
-  // Finish commandline flags
-  google::ShutDownCommandLineFlags();
   // Make for great success
   return 0;
 }
