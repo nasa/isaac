@@ -120,7 +120,7 @@ def get_ops_plan_path():
     # Check if the environment variable $ASTROBEE_OPS exists
     astrobee_ops_path = os.getenv("ASTROBEE_OPS")
     if astrobee_ops_path:
-        return os.path.join(astrobee_ops_path, "gds/plans")
+        return os.path.join(astrobee_ops_path, "dock_scripts/hsc/gds/plans")
 
     # Check if the symlink ~/gds/latest/ControlStationConfig/IssWorld exists
     symlink_path = os.path.expanduser("~/gds/latest/ControlStationConfig/IssWorld")
@@ -128,7 +128,7 @@ def get_ops_plan_path():
         # Get the target of the symlink
         target_path = os.path.realpath(symlink_path)
         # Construct the relative path ../../plans
-        relative_path = os.path.join(target_path, "../../plans")
+        relative_path = os.path.join(target_path, "../../dock_scripts/hsc/gds/plans")
         return relative_path
 
     # Return None if none of the conditions are met
@@ -392,7 +392,7 @@ class ProcessExecutor:
 
         while exit_code != 0 and not rospy.is_shutdown():
             self.write_output_once(
-                "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): \n"
+                "Exit code non-zero: Do you want to repeat the send command? (yes/no/skip): \n"
             )
             repeat = self.read_input_once().lower()
             loginfo(f"user input: {repeat}")
@@ -581,6 +581,7 @@ def get_quick_stereo_survey(fplan_path: pathlib.Path) -> pathlib.Path:
 @dataclass
 class SurveyManagerExecutor:
     process_executor: ProcessExecutor
+    command_executor: CommandExecutor
     config_static: YamlMapping
     fsw_ns_args: List[str]
     cmd_exec_ns: str
@@ -604,14 +605,16 @@ class SurveyManagerExecutor:
             to_name,
         )
         if exposure_value != 0:
-            cexec = CommandExecutor(self.cmd_exec_ns)
-            exit_code = first_non_zero(exit_code, cexec.change_exposure(exposure_value))
+            exit_code = first_non_zero(
+                exit_code, self.command_executor.change_exposure(exposure_value)
+            )
 
         # Change map if needed
         map_name = map_change(self.config_static, from_name, to_name)
         if map_name != "":
-            cexec = CommandExecutor(self.cmd_exec_ns)
-            exit_code = first_non_zero(exit_code, cexec.change_map(map_name))
+            exit_code = first_non_zero(
+                exit_code, self.command_executor.change_map(map_name)
+            )
 
         return exit_code
 
@@ -645,7 +648,9 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         cmd_exec_ns = "/" + args["robot"]
     command_executor = CommandExecutor(cmd_exec_ns)
 
-    sm_exec = SurveyManagerExecutor(process_executor, config_static, ns, cmd_exec_ns)
+    sm_exec = SurveyManagerExecutor(
+        process_executor, command_executor, config_static, ns, cmd_exec_ns
+    )
 
     # Initialize exit code
     exit_code = 0
@@ -758,7 +763,7 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         if use_astrobee_ops:
             # Use astrobee_ops tool which provides for user interaction
             ops_path = get_ops_path()
-            cmd_path = ops_path / "dock_scripts" / "hsc" / "cmd"
+            cmd_path = ops_path / "cmd"
             old_env = os.environ.copy()
             try:
                 os.environ["TOPIC_PREFIX"] = cmd_exec_ns
