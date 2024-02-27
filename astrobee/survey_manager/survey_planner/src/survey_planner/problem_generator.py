@@ -74,14 +74,10 @@ ACTION_TYPE_OPTIONS = (
 CWD = pathlib.Path.cwd()
 rospack = rospkg.RosPack()
 DATA_DIR = pathlib.Path(
-    os.path.relpath(
-        pathlib.Path(rospack.get_path("survey_planner")).joinpath("data"), CWD
-    )
+    os.path.relpath(pathlib.Path(rospack.get_path("survey_planner")) / "data", CWD)
 )
 PDDL_DIR = pathlib.Path(
-    os.path.relpath(
-        pathlib.Path(rospack.get_path("survey_planner")).joinpath("pddl"), CWD
-    )
+    os.path.relpath(pathlib.Path(rospack.get_path("survey_planner")) / "pddl", CWD)
 )
 DEFAULT_CONFIGS = [
     DATA_DIR / "jem_survey_static.yaml",

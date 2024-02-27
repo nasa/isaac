@@ -128,7 +128,7 @@ def get_ops_plan_path():
         # Get the target of the symlink
         target_path = os.path.realpath(symlink_path)
         # Construct the relative path ../../plans
-        relative_path = os.path.join(target_path, "../../dock_scripts/hsc/gds/plans")
+        relative_path = os.path.join(target_path, "../../../dock_scripts/hsc/gds/plans")
         return relative_path
 
     # Return None if none of the conditions are met
@@ -758,7 +758,6 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
 
         command_executor.plan_status_needed = True
         command_executor.plan_name = fplan_path.stem
-
 
         cmd = [
             "rosrun",
