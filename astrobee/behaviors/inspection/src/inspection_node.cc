@@ -522,6 +522,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       goal.type = isaac_msgs::ImageInspectionGoal::VENT;
       client_i_.SendGoal(goal);
     }
+    finished_anomaly_ = false;
 
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
@@ -531,7 +532,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     flashlight_intensity_current_ = 0.0;
 
     // Signal an imminent sci cam image
-    sci_cam_req_ = sci_cam_req_ + 1;
+    sci_cam_req_ += 1;
 
     // Send the command
     SendPicture(focus_distance_calculated_);
@@ -546,12 +547,16 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Clear local variables
       sci_cam_timeout_.stop();
       sci_cam_req_ = 0;
+
+      // If the action was cancelled stop taking more pictures
+      if (fsm_.GetState() == STATE::WAITING) return;
+
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
       ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
-        ROS_DEBUG_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
+        ROS_INFO_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
                       << ", Focus distance (m): " << focus_distance_current_
                       << ", Focal distance : " << 1.6 * std::pow(focus_distance_current_, -1.41)
                       << ", Flashlight: " << flashlight_intensity_current_);
@@ -568,9 +573,13 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           } else if (focus_distance_current_ <
                        cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range") - EPS) {
             focus_distance_current_ += cfg_.Get<double>("focus_distance_step");
-          } else {
-            // Finish inspection
+          } else if (!ground_active_ || finished_anomaly_) {
+            // If no anomaly detectiuon active or if anomaly detection finished, go to next inspection
+            finished_anomaly_ = false;
             return fsm_.Update(NEXT_INSPECT);
+          } else {
+            // When the anomaly detection returns a result it will go to the next inspection
+            finished_anomaly_ = true;
           }
         }
         sci_cam_req_ = 1;
@@ -608,7 +617,16 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       result_.anomaly_result.push_back(result->anomaly_result);
     else
       ROS_INFO_STREAM("Invalid result received Image Analysis");
-    return fsm_.Update(NEXT_INSPECT);
+
+    // If we finished taking pictures, go to next inspection
+    // If not, return and when the pictures are all taken, it go to the next inspection
+    if (finished_anomaly_) {
+      finished_anomaly_ = false;
+      return fsm_.Update(NEXT_INSPECT);
+    } else {
+      finished_anomaly_ = true;
+      return;
+    }
   }
 
   // INSPECTION ACTION SERVER
@@ -886,6 +904,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   int sci_cam_req_ = 0;
   bool ground_active_ = false;
   bool sim_mode_ = false;
+  bool finished_anomaly_ = false;
 
   // Inspection library
   Inspection* inspection_;

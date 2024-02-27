@@ -108,7 +108,7 @@ DEFINE_string(volumetric_poses, "/resources/volumetric_iss.txt", "Wifi poses lis
 // Timeout values for action
 DEFINE_double(connect, 10.0, "Action connect timeout");
 DEFINE_double(active, 10.0, "Action active timeout");
-DEFINE_double(response, 200.0, "Action response timeout");
+DEFINE_double(response, 500.0, "Action response timeout");
 DEFINE_double(deadline, -1.0, "Action deadline timeout");
 
 // Match the internal states and responses with the message definition

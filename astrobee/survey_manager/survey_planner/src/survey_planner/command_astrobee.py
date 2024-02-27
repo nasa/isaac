@@ -759,44 +759,24 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         command_executor.plan_status_needed = True
         command_executor.plan_name = fplan_path.stem
 
-        use_astrobee_ops = True
-        if use_astrobee_ops:
-            # Use astrobee_ops tool which provides for user interaction
-            ops_path = get_ops_path()
-            cmd_path = ops_path / "cmd"
-            old_env = os.environ.copy()
-            try:
-                os.environ["TOPIC_PREFIX"] = cmd_exec_ns
 
-                cmd = [str(cmd_path), "-c", "plan", "-load", str(fplan_path)]
-                exit_code = first_non_zero(
-                    exit_code, process_executor.send_command_recursive(cmd)
-                )
+        cmd = [
+            "rosrun",
+            "executive",
+            "plan_pub",
+            "-compression",
+            "deflate",
+            str(fplan_path),
+            "-remote",
+        ]
+        cmd.extend(ns)
 
-                cmd = [str(cmd_path), "-c", "plan", "-run"]
-                exit_code = first_non_zero(
-                    exit_code, process_executor.send_command_recursive(cmd)
-                )
-            finally:
-                os.environ.clear()
-                os.environ.update(old_env)
-        else:
-            # Use FSW tools
-            cmd = [
-                "rosrun",
-                "executive",
-                "plan_pub",
-                str(fplan_path),
-                "-remote",
-            ]
-            cmd.extend(ns)
+        exit_code = first_non_zero(
+            exit_code, process_executor.send_command_recursive(cmd)
+        )
 
-            exit_code = first_non_zero(
-                exit_code, process_executor.send_command_recursive(cmd)
-            )
-
-            if exit_code == 0:
-                exit_code = first_non_zero(exit_code, command_executor.wait_plan())
+        if exit_code == 0:
+            exit_code = first_non_zero(exit_code, command_executor.wait_plan())
 
         exit_code = first_non_zero(exit_code, command_executor.stop_recording())
 
