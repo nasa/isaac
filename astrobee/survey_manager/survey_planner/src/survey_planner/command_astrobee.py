@@ -772,12 +772,12 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         if exit_code == 0:
             exit_code = first_non_zero(exit_code, command_executor.wait_plan())
 
-    exit_code = first_non_zero(exit_code, command_executor.stop_recording())
+        exit_code = first_non_zero(exit_code, command_executor.stop_recording())
 
-    # Ensure robot ends in preferred attitude for its bay.
-    exit_code = first_non_zero(
-        exit_code, sm_exec.move(args["base_name"], args["base_name"])
-    )
+        # Ensure robot ends in preferred attitude for its bay.
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["base_name"], args["base_name"])
+        )
 
     return exit_code
 
