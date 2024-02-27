@@ -118,7 +118,7 @@ def get_ops_plan_path():
         return "/opt/astrobee/ops/gds/plans/"
 
     # Check if the environment variable $ASTROBEE_OPS exists
-    astrobee_ops_path = os.getenv("ASTROBEE_OPS")
+    astrobee_ops_path = os.getenv("OPS_REPO")
     if astrobee_ops_path:
         return os.path.join(astrobee_ops_path, "dock_scripts/hsc/gds/plans")
 
