@@ -48,30 +48,8 @@ from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
 # See https://stackoverflow.com/questions/39772424
 def convert_pc2_pcl(data):
-
-    # # Convert the PointCloud2 message to a list of points
-    # points = list(sensor_msgs.read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
-
-    # data.__class__ = sensor_msgs.msg._PointCloud2.PointCloud2
-    # offset_sorted = {f.offset: f for f in data.fields}
-    # data.fields = [f for (_, f) in sorted(offset_sorted.items())]
     # Conversion from PointCloud2 msg to np array.
     np_points = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(data, remove_nans=True)
-    # np_points=np.zeros((pc.shape[0],3))
-
-    # height = pc.shape[0]
-    # if len(pc.shape) == 1:  # Unordered PC2 structure
-    #     np_points = np.zeros((height, 3), dtype=np.float32)
-    #     np_points[:, 0] = np.resize(pc["x"], height)
-    #     np_points[:, 1] = np.resize(pc["y"], height)
-    #     np_points[:, 2] = np.resize(pc["z"], height)
-
-    # else:  # Ordered PC2 structure
-    #     width = pc.shape[1]
-    #     np_points = np.zeros((height * width, 3), dtype=np.float32)
-    #     np_points[:, 0] = np.resize(pc["x"], height * width)
-    #     np_points[:, 1] = np.resize(pc["y"], height * width)
-    #     np_points[:, 2] = np.resize(pc["z"], height * width)
 
     return np_points
 
@@ -189,29 +167,6 @@ def read_pc2_msgs(bagfile):
     p = pyntcloud.PyntCloud(pd.DataFrame(merged_pcl, columns=["x", "y", "z"]))
     p.to_file("ground_truth_run5.ply")
     return merged_pcl
-
-
-# # Process data from bagfile
-# def read_pc2_msgs(bagfile):
-
-
-#     for topic, msg, t in rosbag.Bag(bagfile).read_messages():
-#         if topic == "/hw/depth_haz/extended/amplitude_int":
-#             np_im = ros_numpy.image.image_to_numpy(msg)
-#             data = Image.fromarray(np_im)
-
-#         if (
-#             topic == "/hw/depth_haz/points"
-#             or topic == "/hw/depth_haz/points/ground_truth"
-#         ):
-#             p = convert_pc2_pcl(msg)
-#             np_arr = filter_pcl(p)
-
-#             if "data" in locals():
-#                 data.show()
-#                 data.save("image.png")
-#                 return np_arr
-#     return np_arr
 
 
 # Process PCD point cloud directly
