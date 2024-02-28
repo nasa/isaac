@@ -47,30 +47,6 @@ def gmm_change_detection(
     n_appearances=0,
 ):
 
-    # Path to input data (.pk for pickled GMMs, PCL file,
-    # or bag files cropped to same positions at different times)
-
-    # input1 = './data/ground_truth/ground_truth_run5.pcd'
-    # input2 = './data/ground_truth/ground_truth_run4.pcd'
-
-    # input2 = "./data/single_frame_bags/20230313_1901_survey_no_bag_panorama_precut.bag"
-    # input1 = "./data/single_frame_bags/20230313_1908_survey_bag_panorama_precut.bag"
-
-    # input1 = './data/single_frame_bags/run5_astrobee.bag'
-    # input2 = './data/single_frame_bags/run1_astrobee.bag'
-
-    # input1 = './data/image_reconstruction/run5.pcd'
-    # input2 = './data/image_reconstruction/run2.pcd'
-
-    # input1 = './saved_models/fake_data_t0_1.pk'
-    # input2 = './saved_models/fake_data_t1_1.pk'
-
-    # input1 = './saved_models/20230313_1901_survey_no_bag_panorama_precut_1.pk'
-    # input2 = './saved_models/20230313_1908_survey_bag_panorama_precut_1.pk'
-
-    # input1 = 'data/image_reconstruction/run5.pcd'
-    # input2 = 'data/image_reconstruction/run4.pcd'
-
     # Get file extension
     ext = os.path.splitext(os.path.basename(input1))[1]
     current_dir = os.getcwd()
