@@ -57,13 +57,10 @@ jobs:
                           --build-arg REMOTE=ghcr.io/nasa
                           -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04
 
-    # Temp disabling the analyst build because it has a version conflict issue. Re-enable once
-    # #136 is fixed.
-    # *** Remember to uncomment the push below, as well!
-    #- name: Build analyst image isaac/isaac:msgs-ubuntu20.04
-    #  run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
-    #                      --build-arg REMOTE=ghcr.io/nasa
-    #                      -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
+    - name: Build analyst image isaac/isaac:msgs-ubuntu20.04
+     run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
+                         --build-arg REMOTE=ghcr.io/nasa
+                         -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
 
 
     - name: Log in to registry
