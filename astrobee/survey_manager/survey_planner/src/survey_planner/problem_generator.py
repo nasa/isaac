@@ -57,6 +57,7 @@ from typing import (
     TypeVar,
 )
 
+import rospkg
 import yaml
 
 GOAL_TYPE_OPTIONS = ("panorama", "stereo", "robot_at", "let_other_robot_reach")
@@ -70,13 +71,13 @@ ACTION_TYPE_OPTIONS = (
     "let-other-robot-reach",
 )
 
-THIS_DIR = pathlib.Path(__file__).resolve().parent
 CWD = pathlib.Path.cwd()
+rospack = rospkg.RosPack()
 DATA_DIR = pathlib.Path(
-    os.path.relpath(str((THIS_DIR / ".." / ".." / "data").resolve()), CWD)
+    os.path.relpath(pathlib.Path(rospack.get_path("survey_planner")) / "data", CWD)
 )
 PDDL_DIR = pathlib.Path(
-    os.path.relpath(str((THIS_DIR / ".." / ".." / "pddl").resolve()), CWD)
+    os.path.relpath(pathlib.Path(rospack.get_path("survey_planner")) / "pddl", CWD)
 )
 DEFAULT_CONFIGS = [
     DATA_DIR / "jem_survey_static.yaml",
