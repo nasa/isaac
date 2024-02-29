@@ -75,7 +75,7 @@ echo "  Analysing python code style with 'isort'."
 isort_args=(
     "--extend-skip=cmake"
     "--extend-skip=submodules"
-    "--extend-skip=astrobee/survey_manager/survey_dependencies"
+    "--extend-skip=astrobee/survey/survey_dependencies"
     "--profile=black"
 )
 if $(isort . "${isort_args[@]}" --diff --check-only --quiet >/dev/null); then

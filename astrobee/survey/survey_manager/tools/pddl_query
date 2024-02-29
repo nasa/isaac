@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env python3
 #
 # Copyright (c) 2021, United States Government, as represented by the
 # Administrator of the National Aeronautics and Space Administration.
@@ -18,24 +18,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-# Updates the src_paths setting in the .isort.cfg file at the top
-# level. See that file for more details.
+import sys
 
-thisdir=$(dirname "$0")
-srcdir=$(cd $thisdir/../.. && pwd)
+from survey_manager import pddl_query
 
-cd $srcdir
-
-# Generate a comma-separated list of folders containing *.py files
-pydirs=$( \
-    find . -name "*.py" -print0 \
-    | xargs -0 dirname \
-    | cut -c3- \
-    | grep -Pv "^cmake|^submodules|^astrobee/survey/survey_dependencies|^scripts/setup/dependencies" \
-    | sort \
-    | uniq \
-    | paste -sd "," - \
-)
-
-# Overwrite the src_paths line in the config file to use the list
-perl -i -ple "if (/^src_paths = /) { \$_ = 'src_paths = $pydirs'; }" .isort.cfg
+if __name__ == "__main__":
+    pddl_query.main()
