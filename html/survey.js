@@ -1,4 +1,4 @@
 var survey =
 [
-    [ "Survey Planner", "survey_planner.html", "survey_planner" ]
+    [ "Survey Planner", "survey_manager.html", "survey_manager" ]
 ];

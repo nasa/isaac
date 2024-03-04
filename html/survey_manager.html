@@ -67,7 +67,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:cf05388f2679ee054f2beb29a391d25f4e673ac3&amp;dn=gpl-2.0.txt GPL-v2 */
-$(document).ready(function(){initNavTree('survey_planner.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('survey_manager.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -94,15 +94,15 @@ $(document).ready(function(){initNavTree('survey_planner.html',''); initResizabl
 <p>Based on <a href="https://github.com/traclabs/astrobee_task_planning_ws">preliminary work</a> by <a href="https://github.com/ana-GT">Ana</a> at <a href="https://traclabs.com">Traclabs</a>.</p>
 <h2><a class="anchor" id="autotoc_md90"></a>
 Starting survey planner</h2>
-<p>The survey_planner as of now starts separately from the isaac fsw. This is necessary because the planner crashes very easily, so having the ability to easily restart this component is necessary.</p>
-<p>To start the planner and the terminal interface (in the robot, add the prefix <code>/opt/isaac/env_wrapper.sh</code>): </p><pre class="fragment">roslaunch survey_planner survey_domain.launch
+<p>The survey_manager as of now starts separately from the isaac fsw. This is necessary because the planner crashes very easily, so having the ability to easily restart this component is necessary.</p>
+<p>To start the planner and the terminal interface (in the robot, add the prefix <code>/opt/isaac/env_wrapper.sh</code>): </p><pre class="fragment">roslaunch survey_manager survey_domain.launch
 rosrun plansys2_terminal plansys2_terminal
-</pre><p>To monitor an execution and to input commands to the execution: </p><pre class="fragment">rosrun survey_planner monitor_astrobee $ROBOTNAME
+</pre><p>To monitor an execution and to input commands to the execution: </p><pre class="fragment">rosrun survey_manager monitor_astrobee $ROBOTNAME
 </pre><h2><a class="anchor" id="autotoc_md91"></a>
 Running actions manually</h2>
-<p>There are 5 different actions at the moment 'move', 'dock', 'undock', 'panorama', 'stereo'. To run each action individually through the survey_planner you must add the correct predicates before sending the action command or else the plansys2 executor will crash. Also, if you want to re-send the action you'll want to re-send the predicates too.</p>
+<p>There are 5 different actions at the moment 'move', 'dock', 'undock', 'panorama', 'stereo'. To run each action individually through the survey_manager you must add the correct predicates before sending the action command or else the plansys2 executor will crash. Also, if you want to re-send the action you'll want to re-send the predicates too.</p>
 <p>Don't forget to change the commands to use the target robot's name (bumble is what is used in simulation)</p>
-<p>If the survey_planner crashes sometimes the simulation has to be restarted for it to restart in a good state.</p>
+<p>If the survey_manager crashes sometimes the simulation has to be restarted for it to restart in a good state.</p>
 <p><a class="el" href="action_testing.html">Action Testing</a></p>
 <h2><a class="anchor" id="autotoc_md92"></a>
 Running a full JEM survey scenario in multi-robot simulation</h2>
@@ -168,7 +168,7 @@ temp file doesn't change.</h1>
 <p>source /tmp/configure_cmds.txt ```</p>
 <ol type="1">
 <li>Start the survey manager: <div class="fragment"><div class="line"># === In terminal 2 ===</div>
-<div class="line">roslaunch survey_planner survey.launch quick:=true</div>
+<div class="line">roslaunch survey_manager survey.launch quick:=true</div>
 <div class="line"># roslaunch will run indefinitely. Press Ctrl-C to shut down the system.</div>
 <div class="line"># The quick:=true flag speeds up longer actions (for sim use only).</div>
 <div class="line"> </div>
@@ -187,8 +187,8 @@ temp file doesn't change.</h1>
 <div class="line">EOF</div>
 <div class="line"> </div>
 <div class="line">cat &lt;&lt;EOF &gt;/tmp/plan_and_run.bash</div>
-<div class="line">data=&quot;${ISAAC_WS}/src/astrobee/survey_manager/survey_planner/data&quot;</div>
-<div class="line">rosrun survey_planner problem_generator --terminal &quot;--config=\${data}/jem_survey_static.yaml,\${data}/jem_survey_dynamic.yaml&quot; --output=/tmp/problem.ps2.pddl</div>
+<div class="line">data=&quot;${ISAAC_WS}/src/astrobee/survey_manager/survey_manager/data&quot;</div>
+<div class="line">rosrun survey_manager problem_generator --terminal &quot;--config=\${data}/jem_survey_static.yaml,\${data}/jem_survey_dynamic.yaml&quot; --output=/tmp/problem.ps2.pddl</div>
 <div class="line">cat /tmp/term_commands.txt | rosrun plansys2_terminal plansys2_terminal</div>
 <div class="line">EOF</div>
 <div class="line"> </div>
@@ -203,7 +203,7 @@ temp file doesn't change.</h1>
 <li>Use the Astrobee Workbench window "Overview" tab for a graphical view of robot state and progress.</li>
 <li>The <code>plansys2_terminal</code> should display which survey manager actions are currently executing, along with how long they have taken so far relative to their estimated duration. Example: If an action was supposed to take 10 minutes but has taken 15 minutes so far, it is marked as "150%".</li>
 <li>The survey manager <code>roslaunch</code> terminal should display more detailed console output. Note that this is interleaved console output from several processes running in parallel, so it can be confusing to interpret.</li>
-<li>You can interact with the terminal interfaces of individual commands that are currently executing. This allows retrying or skipping failed actions without triggering overall plan failure, as well as more detailed management of the <code>inspection_tool</code> that executes panoramas, like retrying or skipping individual panorama frames. To connect to the action running on a robot, choose the robot and run like this: ```bash rosrun survey_planner monitor_astrobee bumble # or honey ``` </li>
+<li>You can interact with the terminal interfaces of individual commands that are currently executing. This allows retrying or skipping failed actions without triggering overall plan failure, as well as more detailed management of the <code>inspection_tool</code> that executes panoramas, like retrying or skipping individual panorama frames. To connect to the action running on a robot, choose the robot and run like this: ```bash rosrun survey_manager monitor_astrobee bumble # or honey ``` </li>
 </ul>
 </li>
 </ol>

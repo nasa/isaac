@@ -12,6 +12,6 @@ var searchData=
   ['station_5finfo_126',['station_info',['../structwifi_1_1station__info.html',1,'wifi']]],
   ['streamingmapper_127',['StreamingMapper',['../classdense__map_1_1StreamingMapper.html',1,'dense_map']]],
   ['subsystems_128',['Subsystems',['../subsystems.html',1,'']]],
-  ['survey_20manager_129',['Survey Manager',['../survey.html',1,'astrobee']]],
-  ['survey_20planner_130',['Survey Planner',['../survey_planner.html',1,'survey']]]
+  ['survey_129',['Survey',['../survey.html',1,'astrobee']]],
+  ['survey_20planner_130',['Survey Planner',['../survey_manager.html',1,'survey']]]
 ];
