@@ -689,6 +689,12 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         exit_code = sm_exec.move(args["from_name"], args["to_name"])
 
     elif args["type"] == "panorama":
+        # In some cases if the robot is not at the module position
+        # it might not perform a localization maneuver
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["location_name"], args["location_name"])
+        )
+
         exit_code = first_non_zero(
             exit_code,
             command_executor.start_recording(

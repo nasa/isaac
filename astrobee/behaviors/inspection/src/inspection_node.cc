@@ -549,7 +549,14 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       sci_cam_req_ = 0;
 
       // If the action was cancelled stop taking more pictures
-      if (fsm_.GetState() == STATE::WAITING) return;
+      if (fsm_.GetState() == STATE::WAITING) {
+        // If we stopped inspection while the flashlight was on, turn it off
+        if (flashlight_intensity_current_ != 0) {
+          flashlight_intensity_current_ = 0.0;
+          Flashlight(flashlight_intensity_current_);
+        }
+        return;
+      }
 
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
@@ -844,7 +851,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case STATE::INIT_INSPECTION:
       msg.fsm_state = "INIT_INSPECTION";                   break;
     case STATE::MOVING_TO_APPROACH_POSE:
-      msg.fsm_state = "MOVING_TO_APPROACH_POSE";           break;
+      msg.fsm_state = "MOVING_TO_APPROACH_POSE ";
+      msg.fsm_state += std::to_string(inspection_->GetCurrentCounter());
+      msg.fsm_state += "/";
+      msg.fsm_state += std::to_string(inspection_->GetSurveySize());
+                                                           break;
     case STATE::VISUAL_INSPECTION:
       msg.fsm_state = "VISUAL_INSPECTION";                 break;
     case STATE::RETURN_INSPECTION:
