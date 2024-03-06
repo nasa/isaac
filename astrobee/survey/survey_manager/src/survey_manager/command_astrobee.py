@@ -318,7 +318,10 @@ class ProcessExecutor:
             loginfo(f"reader exiting on exception: {e}")
 
     def send_command(self, command):
-        loginfo(f"send_command: {command}")
+        formatted_command = " ".join(
+            f'"{arg}"' if " " in arg else arg for arg in command
+        )
+        loginfo(f"send_command: {formatted_command}")
         return_code = 1
 
         try:
@@ -385,8 +388,6 @@ class ProcessExecutor:
             return return_code
 
     def send_command_recursive(self, command):
-        loginfo(f"Sending recursive command: {command}")
-
         exit_code = self.send_command(command)
         loginfo("send_command exit code " + str(exit_code))
 
