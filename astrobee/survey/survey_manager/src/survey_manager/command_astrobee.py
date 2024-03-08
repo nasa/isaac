@@ -318,7 +318,10 @@ class ProcessExecutor:
             loginfo(f"reader exiting on exception: {e}")
 
     def send_command(self, command):
-        loginfo(f"send_command: {command}")
+        formatted_command = " ".join(
+            f'"{arg}"' if " " in arg else arg for arg in command
+        )
+        loginfo(f"send_command: {formatted_command}")
         return_code = 1
 
         try:
@@ -385,8 +388,6 @@ class ProcessExecutor:
             return return_code
 
     def send_command_recursive(self, command):
-        loginfo(f"Sending recursive command: {command}")
-
         exit_code = self.send_command(command)
         loginfo("send_command exit code " + str(exit_code))
 
@@ -689,6 +690,12 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
         exit_code = sm_exec.move(args["from_name"], args["to_name"])
 
     elif args["type"] == "panorama":
+        # In some cases if the robot is not at the module position
+        # it might not perform a localization maneuver
+        exit_code = first_non_zero(
+            exit_code, sm_exec.move(args["location_name"], args["location_name"])
+        )
+
         exit_code = first_non_zero(
             exit_code,
             command_executor.start_recording(

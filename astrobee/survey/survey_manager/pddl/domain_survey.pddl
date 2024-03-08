@@ -107,7 +107,7 @@
 
     (:durative-action dock
         :parameters (?robot - robot ?from ?to - location)  ;; from bay7 to berth1 or berth2
-        :duration (= ?duration 30)
+        :duration (= ?duration 90)
         :condition
             (and
                 ;; Check robot mutex
