@@ -1,3 +1,13 @@
+isaac (0.2.7) testing; urgency=medium
+
+  * Survey manager
+  * Multiple fixes to inspection
+  * GMM anomaly detection
+  * Ubuntu 20 only supported now
+  * Others
+
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov> Thu, 07 Mar 2024 16:04:57 -0800
+
 isaac (0.2.6) testing; urgency=medium
 
   * Upgrades on inspection tool

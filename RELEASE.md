@@ -1,5 +1,13 @@
 # Releases
 
+## Release 0.2.7
+
+  * Survey manager
+  * Multiple fixes to inspection
+  * GMM anomaly detection
+  * Ubuntu 20 only supported now
+  * Others
+
 ## Release 0.2.6
 
   * Upgrades on inspection tool
