@@ -177,7 +177,7 @@ double Inspection::GetDistanceToTarget() {
                                                               depth_cam_, target_size_x_, target_size_y_);
     }
   }
-  return 1.0;
+  return -1;
 }
 
 // Checks the given points agains whether the target is visible
