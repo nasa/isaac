@@ -1,0 +1,866 @@
+<?xml version="1.0" ?>
+<!--
+  Demo world with a widget displaying images coming from a camera sensor.
+-->
+<sdf version="1.6">
+  <world name="camera_sensor">
+    <physics name='default_physics' default='0' type='ode'>
+      <max_step_size>0.008</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>125</real_time_update_rate>
+    </physics>
+
+    <plugin
+      filename="ignition-gazebo-physics-system"
+      name="ignition::gazebo::systems::Physics">
+    </plugin>
+    <plugin
+      filename="ignition-gazebo-sensors-system"
+      name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin
+      filename="ignition-gazebo-user-commands-system"
+      name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+    <plugin
+      filename="ignition-gazebo-scene-broadcaster-system"
+      name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+
+    <scene>
+      <ambient>1.0 1.0 1.0</ambient>
+      <background>0.8 0.8 0.8</background>
+      <grid>true</grid>
+    </scene>
+
+    <gui fullscreen="0">
+
+      <!-- 3D scene -->
+      <plugin filename="MinimalScene" name="3D View">
+        <ignition-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="string" key="state">docked</property>
+        </ignition-gui>
+
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <ambient_light>0.4 0.4 0.4</ambient_light>
+        <background_color>0.8 0.8 0.8</background_color>
+        <camera_pose>-6 0 6 0 0.5 0</camera_pose>
+      </plugin>
+
+      <!-- Plugins that add functionality to the scene -->
+      <plugin filename="EntityContextMenuPlugin" name="Entity context menu">
+        <ignition-gui>
+          <property key="state" type="string">floating</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </ignition-gui>
+      </plugin>
+      <plugin filename="GzSceneManager" name="Scene Manager">
+        <ignition-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </ignition-gui>
+      </plugin>
+      <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <ignition-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </ignition-gui>
+      </plugin>
+      <plugin filename="CameraTracking" name="Camera Tracking">
+        <ignition-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </ignition-gui>
+      </plugin>
+      <!-- World control -->
+      <plugin filename="WorldControl" name="World control">
+        <ignition-gui>
+          <title>World control</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">72</property>
+          <property type="double" key="width">121</property>
+          <property type="double" key="z">1</property>
+
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="left" target="left"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </ignition-gui>
+
+        <play_pause>true</play_pause>
+        <step>true</step>
+        <start_paused>false</start_paused>
+        <use_event>true</use_event>
+
+      </plugin>
+
+      <!-- World statistics -->
+      <plugin filename="WorldStats" name="World stats">
+        <ignition-gui>
+          <title>World stats</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="bool" key="resizable">false</property>
+          <property type="double" key="height">110</property>
+          <property type="double" key="width">290</property>
+          <property type="double" key="z">1</property>
+
+          <property type="string" key="state">floating</property>
+          <anchors target="3D View">
+            <line own="right" target="right"/>
+            <line own="bottom" target="bottom"/>
+          </anchors>
+        </ignition-gui>
+
+        <sim_time>true</sim_time>
+        <real_time>true</real_time>
+        <real_time_factor>true</real_time_factor>
+        <iterations>true</iterations>
+      </plugin>
+
+      <plugin filename="ImageDisplay" name="Image Display">
+        <ignition-gui>
+          <property key="state" type="string">docked</property>
+        </ignition-gui>
+      </plugin>
+
+      <!-- Inspector -->
+      <plugin filename="ComponentInspector" name="Component inspector">
+        <ignition-gui>
+          <property type="string" key="state">docked</property>
+        </ignition-gui>
+      </plugin>
+
+      <!-- Entity tree -->
+      <plugin filename="EntityTree" name="Entity tree">
+        <ignition-gui>
+          <property type="string" key="state">docked</property>
+        </ignition-gui>
+      </plugin>
+    </gui>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.8 0.8 0.8 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+
+    <gravity>0 0 0</gravity>
+    <magnetic_field>0 0 0</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>0</latitude_deg>
+      <longitude_deg>0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
+
+    <model name="camera">
+      <pose>4.01 0.5 4.6 0 1.57 0</pose>
+      <link name="camera_link">
+        <inertial>
+          <inertia>
+            <ixx>0.16666</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.16666</iyy>
+            <iyz>0</iyz>
+            <izz>0.16666</izz>
+          </inertia>
+          <mass>1.0</mass>
+        </inertial>
+        <collision name="box_collision">
+          <geometry>
+            <box>
+              <size>0.2 0.2 0.2</size>
+            </box>
+          </geometry>
+        </collision>
+
+        <visual name="box_visual">
+          <geometry>
+            <box>
+              <size>0.2 0.2 0.2</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+            <specular>1 0 0 1</specular>
+          </material>
+        </visual>
+      <sensor name="camera" type="camera">
+        <camera>
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>1280</width>
+            <height>800</height>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>20</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>1</update_rate>
+        <visualize>true</visualize>
+        <topic>camera</topic>
+      </sensor>
+      <sensor name="segmentation_camera" type="segmentation">
+        <topic>segmentation</topic>
+        <camera>
+          <segmentation_type>semantic</segmentation_type>
+          <horizontal_fov>1.57</horizontal_fov>
+          <image>
+            <width>320</width>
+            <height>240</height>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>20</far>
+          </clip>
+          <save enabled="true">
+            <path>__OUTPUT_DIR__</path>
+          </save>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>1</update_rate>
+        <visualize>true</visualize>
+      </sensor>
+      </link>
+      <plugin name="data_generation::DataGeneration" filename="libDataGeneration.so"/>
+    </model>
+
+    <model name="JEM">
+			<pose>0 0 5 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 2">
+      <pose>0 0 10 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 3">
+			<pose>0 0 15 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 4">
+      <pose>0 0 20 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 5">
+			<pose>0 0 25 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 6">
+      <pose>0 0 30 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 7">
+			<pose>0 0 35 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 8">
+      <pose>0 0 40 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="JEM 9">
+			<pose>0 0 45 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 10">
+      <pose>0 0 50 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 11">
+			<pose>0 0 55 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 12">
+      <pose>0 0 60 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="JEM 13">
+			<pose>0 0 65 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 14">
+      <pose>0 0 70 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 15">
+			<pose>0 0 75 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 16">
+      <pose>0 0 80 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="JEM 17">
+			<pose>0 0 85 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 18">
+      <pose>0 0 90 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 19">
+			<pose>0 0 95 0 0 0</pose>
+			<static>true</static>
+			<link name="up">
+				<visual name="visual">
+					<geometry>
+						<mesh><uri>models://jem.dae</uri></mesh>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+
+    <model name="JEM 20">
+      <pose>0 0 100 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 21">
+      <pose>0 0 105 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 22">
+      <pose>0 0 110 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 23">
+      <pose>0 0 115 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="JEM 24">
+      <pose>0 0 120 0 0 0</pose>
+      <static>true</static>
+      <link name="up">
+        <visual name="visual">
+          <geometry>
+            <mesh><uri>models://jem.dae</uri></mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="handrail 8.5 (1)">
+      <pose>4.01 0.5 3.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (1)">
+      <pose>4.01 -0.5 8.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 41.5 (1)">
+      <pose>5.02 0 13.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_41_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>180</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 30 (1)">
+      <pose>6.09 0.5 18.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_30</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>140</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 8.5 (2)">
+      <pose>6.09 0.5 23.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 8.5 (3)">
+      <pose>2.94 0.4 28.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 8.5 (4)">
+      <pose>2.94 -0.4 33.95 1.57 -1.57 0</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 41.5 (2)">
+      <pose>1.3 -0.5 38.95 1.57 -1.57 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_41_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>180</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 41.5 (3)">
+      <pose>1.3 0 43.95 1.57 -1.57 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_41_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>180</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 41.5 (4)">
+      <pose>2.94 -1.08 50 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_41_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>180</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (2)">
+      <pose>6.09 -1.08 55.6 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 8.5 (5)">
+      <pose>6.09 -1.08 59.6 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 30 (2)">
+      <pose>5.02 -1.08 64.6 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_30</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>140</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (3)">
+      <pose>5.02 -1.08 70.65 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 30 (3)">
+      <pose>7.16 -1.08 74.6 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_30</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>140</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 8.5 (6)">
+      <pose>7.16 -1.08 80.5 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 8.5 (7)">
+      <pose>7.16 -1.08 85.8 0 0 1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_8_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>100</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 30 (4)">
+      <pose>2.94 1.08 90 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_30</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>140</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 30 (5)">
+      <pose>1.87 1.08 95.5 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_30</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>140</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 30 (6)">
+      <pose>7.16 1.08 100.4 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_30</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>140</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (4)">
+      <pose>7.16 1.08 104.5 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (5)">
+      <pose>5.02 1.08 109.8 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (6)">
+      <pose>5.02 1.08 115.6 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <model name="handrail 21.5 (7)">
+      <pose>1.87 1.08 119.43 0 0 -1.57</pose>
+      <include>
+        <uri>model://astrobee_handrail_21_5</uri>
+        <plugin filename="ignition-gazebo-label-system" name="ignition::gazebo::systems::Label">
+          <label>120</label>
+        </plugin>
+      </include>
+    </model>
+
+    <light name='user_point_light_px' type='point'>
+      <pose frame=''>30 0 0 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>0.1</constant>
+        <linear>0.001</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>0</cast_shadows>
+      <direction>0 0 -1</direction>
+    </light>
+    <light name='user_point_light_nx' type='point'>
+      <pose frame=''>-30 0 0 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>0.1</constant>
+        <linear>0.001</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>0</cast_shadows>
+      <direction>0 0 -1</direction>
+    </light>
+    <light name='user_point_light_py' type='point'>
+      <pose frame=''>0 30 0 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>0.1</constant>
+        <linear>0.001</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>0</cast_shadows>
+      <direction>0 0 -1</direction>
+    </light>
+    <light name='user_point_light_ny' type='point'>
+      <pose frame=''>0 -30 0 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>0.1</constant>
+        <linear>0.001</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>0</cast_shadows>
+      <direction>0 0 -1</direction>
+    </light>
+    <light name='user_point_light_pz' type='point'>
+      <pose frame=''>0 0 30 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>0.1</constant>
+        <linear>0.001</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>0</cast_shadows>
+      <direction>0 0 -1</direction>
+    </light>
+    <light name='user_point_light_nz' type='point'>
+      <pose frame=''>0 0 -30 0 -0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>0.1</constant>
+        <linear>0.001</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>0</cast_shadows>
+      <direction>0 0 -1</direction>
+    </light>
+  </world>
+
+</sdf>

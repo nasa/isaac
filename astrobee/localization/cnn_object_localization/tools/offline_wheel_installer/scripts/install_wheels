@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+# =============================================================================
+# CONFIG
+# =============================================================================
+
+PYTHON_PLATFORMS=("manylinux2014_armv7l")
+PYTHON_VERSIONS=("38")
+PYTHON_IMPLEMENTATIONS=("cp")
+PYTHON_ABIS=("abi3" "cp38" "cp38m")
+
+# =============================================================================
+# FUNCTION DEFINITIONS
+# =============================================================================
+
+function confirm_or_continue {
+
+    while true; do
+        read -p "Do you wish to continue? [y/n] " yn
+        case $yn in
+            [Yy]* ) return 0;;
+            [Nn]* ) exit;;
+            * ) echo "Please answer yes (y) or no (n).";;
+        esac
+    done
+
+}
+
+# =============================================================================
+# SETUP
+# =============================================================================
+
+# Base paths
+echo "Please enter the directory on Astrobee to copy to (in the form user@address:/path/to/target):"
+read astrobee_address_and_dir
+ASTROBEE_ADDRESS=${astrobee_address_and_dir%%:*}
+ASTROBEE_TOOL_DIR=${astrobee_address_and_dir#*:}
+SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+LOCAL_TOOL_DIR=$(dirname "$SCRIPTS_DIR")
+
+# Relative file/directory paths
+REQUIREMENTS_DIR_REL="requirements"
+PACKAGE_LIST_REL="${REQUIREMENTS_DIR_REL}/wheel_requirements.txt"
+TEMP_DIR_REL="temp"
+PIP_FREEZE_REL="${TEMP_DIR_REL}/astrobee_initial_freeze.txt"
+WHEEL_DIR_REL="${TEMP_DIR_REL}/wheels"
+INSTALL_DIR_REL="lib/python3/dist-packages"
+
+# Check pip version >= 20.3
+pip_version=$(pip3 --version | awk '{print $2}')
+IFS='.' read -ra version_parts <<< "$pip_version"
+if [ "${version_parts[0]}" -lt 20 ] || ([ "${version_parts[0]}" -eq 20 ] && [ "${version_parts[1]}" -lt 3 ]); then
+    echo "Error: pip3 version must be at least 20.3"
+    exit 1
+fi
+
+# Ensure temporary directory on the local machine and target directory on Astrobee don't already exist, then create them
+if [ -d "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}" ]; then
+    echo "Warning: Temporary directory found on local system. Deleting."
+    rm -r "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}" 
+fi
+if ssh $ASTROBEE_ADDRESS "[ -d $ASTROBEE_TOOL_DIR ]"; then
+    echo "Error: Install target directory already exists on Astrobee. Please ensure things were cleaned up after the last time this tool was used."
+    exit 1
+fi
+mkdir "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}"
+scp -r $LOCAL_TOOL_DIR "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}"
+
+# User confirmation
+echo "Local system and Astrobee in a clean state. About to get pip freeze of Astrobee environment."
+confirm_or_continue
+
+# =============================================================================
+# PIP FREEZE ASTROBEE ENVIRONMENT
+# =============================================================================
+
+# Pip freeze the Astrobee Python environment
+ssh ${ASTROBEE_ADDRESS} <<EOT
+pip3 freeze > "${ASTROBEE_TOOL_DIR}/${PIP_FREEZE_REL}"
+EOT
+
+# Transfer the pip freeze to Astrobee
+scp -r "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}/${PIP_FREEZE_REL}" "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}" 
+
+# User confirmation
+echo "Pip freeze of Astrobee environment obtained. About to download wheels on local system." 
+confirm_or_continue
+
+# =============================================================================
+# DOWNLOAD PYTHON PACKAGES
+# =============================================================================
+
+# Download all wheels
+PYTHON_CONSTRAINTS=""
+for PLATFORM in "${PYTHON_PLATFORMS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --platform ${PLATFORM}"
+done
+for VERSION in "${PYTHON_VERSIONS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --python-version ${VERSION}"
+done
+for IMPLEMENTATION in "${PYTHON_IMPLEMENTATIONS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --implementation ${IMPLEMENTATION}"
+done
+for ABI in "${PYTHON_ABIS[@]}"; do
+  PYTHON_CONSTRAINTS="${PYTHON_CONSTRAINTS} --abi ${ABI}"
+done
+pip3 download \
+    ${PYTHON_CONSTRAINTS} \
+    --only-binary=:all: \
+    -d "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" \
+    -r "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}" \
+    -c "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}" \
+
+# pip3 wheel \
+#     -w "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" \
+#     -r "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}" \
+#     -c "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}"
+
+# Cull wheels for packages already installed on Astrobee
+while IFS= read -r line; do
+    package_name=$(echo $line | awk -F'[==,>=,<=]' '{print $1}' | awk '{$1=$1};1' | tr '[:upper:]' '[:lower:]')
+    rm -f "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}/${package_name}"*.whl
+done < "${LOCAL_TOOL_DIR}/${PIP_FREEZE_REL}"
+
+# User confirmation
+echo "Python packages downloaded on local system. About to copy to Astrobee."
+confirm_or_continue
+
+# =============================================================================
+# TRANSFER PYTHON PACKAGES
+# =============================================================================
+
+# Transfer the downloaded wheels to Astrobee
+scp -r "${LOCAL_TOOL_DIR}/${WHEEL_DIR_REL}" "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}/${WHEEL_DIR_REL}"
+
+# User confirmation
+echo "Python packages transferred to Astrobee. About to install on Astrobee."
+confirm_or_continue
+
+# =============================================================================
+# INSTALL PYTHON PACKAGES
+# =============================================================================
+
+# Install the downloaded wheels in order on Astrobee
+ssh ${ASTROBEE_ADDRESS} <<EOF
+pip3 install --no-index -f "${ASTROBEE_TOOL_DIR}/${WHEEL_DIR_REL}" --target "${ASTROBEE_TOOL_DIR}/${INSTALL_DIR_REL}" -r "${ASTROBEE_TOOL_DIR}/${PACKAGE_LIST_REL}"
+EOF
+
+# User confirmation
+echo "Python packages installed on Astrobee. All done."
+echo ""
+echo "Remember to run the following on Astrobee:"
+echo "export PYTHONPATH=${ASTROBEE_TOOL_DIR}/${INSTALL_DIR_REL}:\$PYTHONPATH"
+echo ""
+echo "Delete wheels on Astrobee?"
+confirm_or_continue
+
+# Delete wheels on Astrobee
+ssh ${ASTROBEE_ADDRESS} <<EOF
+rm -r "${ASTROBEE_TOOL_DIR}/${WHEEL_DIR_REL}"
+EOF

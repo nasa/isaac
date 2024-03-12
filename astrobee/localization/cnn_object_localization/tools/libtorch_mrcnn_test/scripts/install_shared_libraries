@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Parse command line arguments
+for arg in "$@"
+do
+    case $arg in
+        --root=*)
+        ROOT="${arg#*=}"
+        shift
+        ;;
+        --output=*)
+        OUTPUT="${arg#*=}"
+        shift
+        ;;
+        --libs=*)
+        LIBS="${arg#*=}"
+        shift
+        ;;
+        *)
+        # unknown option
+        ;;
+    esac
+done
+
+# Split the LIBS argument into an array
+IFS=',' read -ra LIBARRAY <<< "$LIBS"
+
+# Process each library
+for lib in "${LIBARRAY[@]}"; do
+    # Remove leading/trailing whitespace
+    lib=$(echo $lib | xargs)
+    # Find all files matching the library name
+    files=$(find $ROOT -name $lib -type f)
+    buildid=""
+    selected_file=""
+    for file in $files; do
+        # Get the build id for this file
+        this_buildid=$(file $file | grep -o 'BuildID\[sha1\]=\S\+')
+        if [ -z "$buildid" ]; then
+            # If we haven't seen any files yet, remember this one
+            buildid=$this_buildid
+            selected_file=$file
+        elif [ "$this_buildid" != "$buildid" ]; then
+            # If this file has a different build id, print a warning
+            echo "Warning: Multiple BuildIDs found for $lib. Choosing arbitrarily."
+        fi
+    done
+    if [ -z "$buildid" ]; then
+        # Not found
+        echo "Warning: $lib not found."
+    else
+        # Copy the selected file to the output directory
+        cp $selected_file $OUTPUT
+        echo "$lib copied successfully."
+    fi
+done

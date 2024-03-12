@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Base paths
+SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+ASTROBEE_TOOL_DIR=$(dirname "$SCRIPTS_DIR")
+TEMP_DIR_REL="temp"
+DEPS_LIST_FILTERED_REL="${TEMP_DIR_REL}/debian_dependencies_list_filtered.txt"
+
+# Read each package from the filtered deps file in reverse order and uninstall
+tac "${ASTROBEE_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}" | while read package; do
+  sudo dpkg --purge "$package"
+done
+
