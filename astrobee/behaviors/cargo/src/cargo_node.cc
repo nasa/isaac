@@ -391,46 +391,6 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
     server_.SetCancelCallback(std::bind(
       &CargoNode::CancelCallback, this));
     server_.Create(nh, ACTION_BEHAVIORS_CARGO);
-
-
-    geometry_msgs::TransformStamped tf;
-    tf.header.stamp = ros::Time::now();
-
-    // Trasform from cargo/berth to cargo/body
-    tf.transform.translation =
-      msg_conversions::eigen_to_ros_vector(Eigen::Vector3d(0, 0.255, 0));
-    tf.transform.rotation =
-      msg_conversions::eigen_to_ros_quat(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0));
-    tf.header.frame_id = std::string("cargo/berth");
-    tf.child_frame_id = std::string("cargo/body");
-    bc_.sendTransform(tf);
-    tf.header.frame_id = std::string("cargo_goal/berth");
-    tf.child_frame_id = std::string("cargo_goal/body");
-    bc_.sendTransform(tf);
-
-    // Trasform from cargo/body to cargo/approach
-    tf.transform.translation =
-      msg_conversions::eigen_to_ros_vector(Eigen::Vector3d(0.1, 1.1, 0.15));
-    tf.transform.rotation =
-      msg_conversions::eigen_to_ros_quat(Eigen::Quaterniond(0.707, 0, 0, 0.707));
-    tf.header.frame_id = std::string("cargo/body");
-    tf.child_frame_id = std::string("cargo/approach");
-    bc_.sendTransform(tf);
-    tf.header.frame_id = std::string("cargo_goal/body");
-    tf.child_frame_id = std::string("cargo_goal/approach");
-    bc_.sendTransform(tf);
-
-    // Trasform from cargo/body to cargo/complete
-    tf.transform.translation =
-      msg_conversions::eigen_to_ros_vector(Eigen::Vector3d(0.1, 0.6, 0.15));
-    tf.transform.rotation =
-      msg_conversions::eigen_to_ros_quat(Eigen::Quaterniond(0.707, 0, 0, 0.707));
-    tf.header.frame_id = std::string("cargo/body");
-    tf.child_frame_id = std::string("cargo/complete");
-    bc_.sendTransform(tf);
-    tf.header.frame_id = std::string("cargo_goal/body");
-    tf.child_frame_id = std::string("cargo_goal/complete");
-    bc_.sendTransform(tf);
   }
 
   // Ensure all clients are connected

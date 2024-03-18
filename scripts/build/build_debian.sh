@@ -27,6 +27,11 @@ if [ -n "$(git status --porcelain)" ]; then
   exit -1
 fi
 
+# package `devscripts` is required in 20.04 to provide `debuild`
+if [ ${DIST} == "focal" ] && [ "$(dpkg -l | awk '/devscripts/ {print }'|wc -l)" -lt 1 ]; then
+  sudo apt install -y devscripts
+fi
+
 EXTRA_FLAGS="-b -aarmhf"
 
 # In some cases we may want to build for amd64 (e.g. astrobee-comms for users)

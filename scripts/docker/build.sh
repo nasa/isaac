@@ -29,7 +29,6 @@ print_help()
   echo -e "define the docker files variables UBUNTU_VERSION, ROS_VERSION, and PYTHON accordingly."
   echo -e "Options:"
   echo -e "\t-x | --xenial\t\t\tBuild images for Ubuntu 16.04"
-  echo -e "\t-b | --bionic\t\t\tBuild images for Ubuntu 18.04"
   echo -e "\t-f | --focal\t\t\tBuild images for Ubuntu 20.04"
   echo -e "\t-a | --astrobee-source-path\tSpecify the astrobee source directory to use"
   echo -e "\t\t\t\tdefault=isaac_source/../../astrobee"
@@ -58,8 +57,6 @@ export REMOTE=""
 while [ "$1" != "" ]; do
     case $1 in
         -x | --xenial )               os="xenial"
-                                      ;;
-        -b | --bionic )               os="bionic"
                                       ;;
         -f | --focal )                os="focal"
                                       ;;
@@ -110,10 +107,6 @@ if [ "$os" == "xenial" ]; then
   export UBUNTU_VERSION=16.04
   export ROS_VERSION=kinetic
   export PYTHON=''
-elif [ "$os" == "bionic" ]; then
-  export UBUNTU_VERSION=18.04
-  export ROS_VERSION=melodic
-  export PYTHON=''
 elif [ "$os" == "focal" ]; then
   export UBUNTU_VERSION=20.04
   export ROS_VERSION=noetic
@@ -134,10 +127,11 @@ export MAST_PATH=${mast_source}
 ######################################################################
 
 files=" -f ${thisdir}/docker_compose/ros.docker-compose.yml"
+files+=" -f ${thisdir}/docker_compose/isaac.docker-compose.build.yml"
+files+=" -f ${thisdir}/docker_compose/isaac.docker-compose.yml"
 
 if [ $REMOTE == "" ]; then
   files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.build.yml"
-  files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.yml"
 fi
 
 if [ "$os" == "focal" ]; then
@@ -151,4 +145,4 @@ if [ $mast == 1 ]; then
 	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
 fi
 
-docker compose ${files} build
+docker compose ${files} -p isaac build

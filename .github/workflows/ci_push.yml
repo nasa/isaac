@@ -8,124 +8,6 @@ on:
 
 jobs:
 
-  build-xenial:
-
-    runs-on: ubuntu-20.04
-
-    steps:
-
-    - name: Checkout Astrobee
-      uses: actions/checkout@v3
-      with:
-        repository: nasa/astrobee
-        path: astrobee/
-
-    - name: Checkout ISAAC
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-        path: isaac/
-
-    - name: Build code for isaac:astrobee Ubuntu 16
-      run: docker build isaac -f isaac/scripts/docker/isaac_astrobee.Dockerfile
-                          --build-arg UBUNTU_VERSION=16.04
-                          --build-arg ROS_VERSION=kinetic
-                          --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu16.04
-
-    - name: Build code for isaac:latest Ubuntu 16
-      run: docker build isaac -f isaac/scripts/docker/isaac.Dockerfile
-                          --build-arg UBUNTU_VERSION=16.04
-                          --build-arg ROS_VERSION=kinetic
-                          --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu16.04
-
-    - name: Build messages dockers for Ubuntu 16 (astrobee)
-      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
-                          --build-arg UBUNTU_VERSION=16.04
-                          --build-arg ROS_VERSION=kinetic
-                          --build-arg PYTHON=''
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu16.04
-
-    - name: Build messages dockers for Ubuntu 16 (isaac)
-      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
-                          --build-arg UBUNTU_VERSION=16.04
-                          --build-arg ROS_VERSION=kinetic
-                          --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu16.04
-
-    - name: Log in to registry
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-
-    - name: Push Docker image
-      run: |
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu16.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu16.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu16.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu16.04; fi;
-
-  build-bionic:
-
-    runs-on: ubuntu-20.04
-
-    steps:
-
-    - name: Checkout Astrobee
-      uses: actions/checkout@v3
-      with:
-        repository: nasa/astrobee
-        path: astrobee/
-
-    - name: Checkout ISAAC
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-        path: isaac/
-
-    - name: Build code for isaac:astrobee Ubuntu 18
-      run: docker build isaac -f isaac/scripts/docker/isaac_astrobee.Dockerfile
-                          --build-arg UBUNTU_VERSION=18.04
-                          --build-arg ROS_VERSION=melodic
-                          --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu18.04
-
-    - name: Build code for isaac:latest Ubuntu 18
-      run: docker build isaac -f isaac/scripts/docker/isaac.Dockerfile
-                          --build-arg UBUNTU_VERSION=18.04
-                          --build-arg ROS_VERSION=melodic
-                          --build-arg PYTHON=3
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu18.04
-
-    - name: Build messages dockers for Ubuntu 18 (astrobee)
-      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
-                          --build-arg UBUNTU_VERSION=18.04
-                          --build-arg ROS_VERSION=melodic
-                          --build-arg PYTHON=''
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu18.04
-
-    - name: Build messages dockers for Ubuntu 18 (isaac)
-      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
-                          --build-arg UBUNTU_VERSION=18.04
-                          --build-arg ROS_VERSION=melodic
-                          --build-arg PYTHON=''
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu18.04
-
-    - name: Log in to registry
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-
-    - name: Push Docker image
-      run: |
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu18.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu18.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu18.04; fi;
-        if [ "${{ github.repository_owner }}" = "nasa" ]; then docker push ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu18.04; fi;
-
   build-focal:
 
     runs-on: ubuntu-20.04
@@ -177,8 +59,8 @@ jobs:
 
     - name: Build analyst image isaac/isaac:msgs-ubuntu20.04
       run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
-                          --build-arg REMOTE=ghcr.io/nasa
-                          -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
+                         --build-arg REMOTE=ghcr.io/nasa
+                         -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest
 
 
     - name: Log in to registry

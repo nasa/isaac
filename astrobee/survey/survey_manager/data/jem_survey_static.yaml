@@ -1,0 +1,118 @@
+# Copyright (c) 2023, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# Static configuration info used when generating a PDDL problem and also when executing actions in a
+# PDDL plan. This info should be static in the sense that it nominally doesn't change during an ISS
+# activity, so the survey manager doesn't have to modify it. However, an edge case is that an
+# operator might want to manually edit something in here (like add a new symbolic location or nudge
+# the position of a named bay away from an obstacle) and restart the survey manager. On the other
+# hand, info that is *expected* to change as part of the survey manager conops belongs in
+# jem_survey_dynamic.yaml.
+
+# Useful reference for positions and stereo survey trajectories:
+# https://babelfish.arc.nasa.gov/confluence/display/FFOPS/ISAAC+Phase+1X+Activity+9+Ground+Procedure
+
+bays:
+  # 3D coordinates for symbolic bays in ISS Analysis Coordinate System used by Astrobee
+  jem_bay1: [11.0, -4.0, 4.8]
+  jem_bay2: [11.0, -5.0, 4.8]
+  jem_bay3: [11.0, -6.0, 4.8]
+  jem_bay4: [11.0, -7.0, 4.8]
+  jem_bay5: [11.0, -8.0, 4.8]
+  jem_bay6: [11.0, -9.0, 4.8]
+  jem_bay7: [11.0, -9.7, 4.8]
+
+bays_move:
+  jem_bay1: ["-pos", "11 -4 4.8", "-att", "1.5708 0 0 1"]
+  jem_bay2: ["-pos", "11 -5 4.8", "-att", "1.5708 0 0 1"]
+  jem_bay3: ["-pos", "11 -6 4.8", "-att", "1.5708 0 0 1"]
+  jem_bay4: ["-pos", "11 -7 4.8", "-att", "-1.5708 0 0 1"]
+  jem_bay5: ["-pos", "11 -8 4.8", "-att", "-1.5708 0 0 1"]
+  jem_bay6: ["-pos", "11 -9 4.8", "-att", "-1.5708 0 0 1"]
+  jem_bay7: ["-pos", "11 -9.7 4.8", "-att", "-1.5708 0 0 1"]
+  jem_hatch_to_nod2: ["-pos", "11 -3.5 4.8", "-att", "1.5708 0 0 1"]
+  jem_hatch_from_nod2: ["-pos", "11 -3.5 4.8", "-att", "-1.5708 0 0 1"]
+  nod2_hatch_from_jem: ["-pos", "11 -1.0 4.8", "-att", "1.5708 0 0 1"]
+  nod2_hatch_to_jem: ["-pos", "11 -1.0 4.8", "-att", "-1.5708 0 0 1"]
+  nod2_bay2: ["-pos", "11 0 4.8", "-att", "0 0 0 1"]
+  nod2_bay3: ["-pos", "10 0 4.8", "-att", "0 0 0 1"]
+  nod2_bay4: ["-pos", "9 0 4.8", "-att", "0 0 0 1"]
+  nod2_hatch_to_usl: ["-pos", "7.8 -3.5 4.8", "-att", "3.14 0 0 1"]
+  nod2_hatch_from_usl: ["-pos", "7.8 -3.5 4.8", "-att", "0 0 0 1"]
+  usl_hatch_from_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "3.14 0 0 1"]
+  usl_hatch_to_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "0 0 0 1"]
+  usl_bay1: ["-pos", "4.7 0 4.8", "-att", "0 0 0 1"]
+  usl_bay2: ["-pos", "3.65 0 4.8", "-att", "0 0 0 1"]
+  usl_bay3: ["-pos", "2.6 0 4.8", "-att", "0 0 0 1"]
+  usl_bay4: ["-pos", "1.55 0 4.8", "-att", "0 0 0 1"]
+  usl_bay5: ["-pos", "0.5 0 4.8", "-att", "0 0 0 1"]
+  usl_bay6: ["-pos", "-0.5 0 4.8", "-att", "0 0 0 1"]
+  # berth approach points from gds_configs/IssWorld/BookmarksList.json
+  berth1: ["-pos", "10.5 -9.25 4.5", "-att", "0 0 0 1"]
+  berth2: ["-pos", "10.5 -9.75 4.5", "-att", "3.14 1 0 0"]
+
+bays_pano:
+  jem_bay1: "isaac9/jem_bay1_std_panorama.txt"
+  jem_bay2: "isaac9/jem_bay2_std_panorama.txt"
+  jem_bay3: "isaac9/jem_bay3_std_panorama.txt"
+  jem_bay4: "isaac9/jem_bay4_std_panorama.txt"
+  jem_bay5: "isaac9/jem_bay5_std_panorama.txt"
+  jem_bay6: "isaac9/jem_bay6_std_panorama.txt"
+  jem_bay7: "isaac9/jem_bay7_safe_panorama.txt"
+  nod2_bay2: "isaac10/nod2_bay2_std_panorama.txt"
+  nod2_bay3: "isaac10/nod2_bay3_std_panorama.txt"
+  nod2_bay4: "isaac10/nod2_bay4_std_panorama.txt"
+  usl_bay1: "isaac11/usl_bay1_std_panorama.txt"
+  usl_bay2: "isaac11/usl_bay2_std_panorama.txt"
+  usl_bay3: "isaac11/usl_bay3_std_panorama.txt"
+  usl_bay4: "isaac11/usl_bay4_std_panorama.txt"
+  usl_bay5: "isaac11/usl_bay5_std_panorama.txt"
+  usl_bay6: "isaac11/usl_bay6_std_panorama.txt"
+
+maps:
+  jem: "iss.map"
+  nod2: "isaac.map"
+  usl: "usl_only.map"
+
+exposure:
+  jem: 175
+  nod2: 300
+  usl: 300
+berth:
+  berth1: "1"
+  berth2: "2"
+
+bogus_bays: [jem_bay0, jem_bay8]
+berths: [berth1, berth2]
+robots: [bumble, honey]
+
+stereo:
+  # Meta-data about stereo survey options
+  jem_bay1_to_bay3:
+    # fplan: Name of external fplan specification of trajectory in astrobee_ops/gds/plans/ISAAC/ . The
+    # bay names are intended to indicate which bays are covered by the stereo survey.
+    fplan: "ISAAC/jem_stereo_mapping_bay1_to_bay3"
+    # base_location: Where trajectory starts and ends for planning purposes (rough location, not exact)
+    base_location: jem_bay1
+    # bound_location: The other end of the interval visited by the trajectory, for planner collision
+    # check purposes.
+    bound_location: jem_bay4  # The survey flies into bay4 even though it only covers up to bay3
+  jem_bay7_to_bay4:
+    fplan: "ISAAC/jem_stereo_mapping_bay7_to_bay4"
+    base_location: jem_bay7
+    bound_location: jem_bay4

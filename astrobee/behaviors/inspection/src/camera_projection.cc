@@ -34,10 +34,11 @@ namespace inspection {
   the camera frame and the other way around. It automatically reads the camera parameters
   from the config files based on the camera name, such that no setup is necessary.
 */
-CameraView::CameraView(const camera::CameraParameters & params, const float f, const float n,
-                       const geometry_msgs::Transform::ConstPtr cam_transform)
-    : camera::CameraModel(params), f_(f), n_(n) {
-
+CameraView::CameraView(const std::string& cam_name, const camera::CameraParameters& params, const float f,
+                       const float n, const geometry_msgs::Transform::ConstPtr cam_transform)
+    : cam_name_(cam_name), camera::CameraModel(params), f_(f), n_(n) {
+  cfg_cam_.AddFile("cameras.config");
+  if (!cfg_cam_.ReadFiles()) ROS_FATAL("Failed to read config files.");
   // Get relative camera position
   if (cam_transform == NULL) {
     // Create a transform buffer to listen for transforms
@@ -59,18 +60,22 @@ bool CameraView::GetCamXYFromPoint(const Eigen::Affine3d robot_pose, const Eigen
   // Initialize x,y
   x = 0; y = 0;
   // Set Camera transform to current position
-  SetTransform(robot_pose * tf_body_to_cam_);
+  SetTransform((robot_pose * tf_body_to_cam_).inverse());
+
+  Eigen::Vector2d undistorted, distorted;
+  undistorted = ImageCoordinates(point);
+  GetParameters().Convert<camera::UNDISTORTED_C, camera::DISTORTED_C>(undistorted, &distorted);
+
+  // Convert back to the 0->size format
+  x = distorted[0] + GetParameters().GetDistortedHalfSize()[0];
+  y = distorted[1] + GetParameters().GetDistortedHalfSize()[1];
+
   // Check if target is in the fov
   if (IsInFov(point)) {
-    Eigen::Vector2d c;
-    GetParameters().Convert<camera::UNDISTORTED, camera::DISTORTED>(ImageCoordinates(point), &c);
-    // Convert back to the 0->size format
-    c = c + (GetParameters().GetUndistortedHalfSize()).cast<double>();
-    x = c[0] ; y = c[1];
+    return true;
   } else {
     return false;
   }
-  return true;
 }
 
 // Gets the points x y where the point is in the image. If outside the image, then it will return false
@@ -143,7 +148,7 @@ bool CameraView::InsideTarget(std::vector<int> vert_x, std::vector<int> vert_y, 
                                            double size_y) {
     // Create depth cam camera model
     static camera::CameraParameters depth_cam_params(&cfg_cam_, (depth_cam_name + "_cam").c_str());
-    CameraView depth_cam(depth_cam_params, f_, n_);
+    CameraView depth_cam(depth_cam_name + "_cam", depth_cam_params, f_, n_);
 
     // Get most recent depth message
     std::string cam_prefix = TOPIC_HARDWARE_PICOFLEXX_PREFIX;

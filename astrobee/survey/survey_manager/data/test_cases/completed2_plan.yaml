@@ -1,0 +1,179 @@
+- start_time_seconds: '0.000'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay3
+    to_name: jem_bay2
+    to_pos:
+    - 11.0
+    - -5.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '0.001'
+  action:
+    type: move
+    robot: honey
+    from_name: jem_bay6
+    to_name: jem_bay5
+    to_pos:
+    - 11.0
+    - -8.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '20.001'
+  action:
+    type: panorama
+    robot: bumble
+    location_name: jem_bay2
+    location_pos:
+    - 11.0
+    - -5.0
+    - 4.8
+  duration_seconds: '780.000'
+- start_time_seconds: '20.002'
+  action:
+    type: panorama
+    robot: honey
+    location_name: jem_bay5
+    location_pos:
+    - 11.0
+    - -8.0
+    - 4.8
+  duration_seconds: '780.000'
+- start_time_seconds: '800.002'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay2
+    to_name: jem_bay1
+    to_pos:
+    - 11.0
+    - -4.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '800.003'
+  action:
+    type: move
+    robot: honey
+    from_name: jem_bay5
+    to_name: jem_bay6
+    to_pos:
+    - 11.0
+    - -9.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '820.003'
+  action:
+    type: panorama
+    robot: bumble
+    location_name: jem_bay1
+    location_pos:
+    - 11.0
+    - -4.0
+    - 4.8
+  duration_seconds: '780.000'
+- start_time_seconds: '820.004'
+  action:
+    type: move
+    robot: honey
+    from_name: jem_bay6
+    to_name: jem_bay7
+    to_pos:
+    - 11.0
+    - -9.7
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '840.005'
+  action:
+    type: stereo
+    robot: honey
+    fplan: ISAAC/jem_stereo_mapping_bay7_to_bay4
+    base_name: jem_bay7
+    bound_name: jem_bay4
+  duration_seconds: '600.000'
+- start_time_seconds: '1440.006'
+  action:
+    type: dock
+    robot: honey
+    berth: berth2
+  duration_seconds: '30.000'
+- start_time_seconds: '1600.004'
+  action:
+    type: stereo
+    robot: bumble
+    fplan: ISAAC/jem_stereo_mapping_bay1_to_bay3
+    base_name: jem_bay1
+    bound_name: jem_bay4
+  duration_seconds: '600.000'
+- start_time_seconds: '2200.005'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay1
+    to_name: jem_bay2
+    to_pos:
+    - 11.0
+    - -5.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2220.006'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay2
+    to_name: jem_bay3
+    to_pos:
+    - 11.0
+    - -6.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2240.007'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay3
+    to_name: jem_bay4
+    to_pos:
+    - 11.0
+    - -7.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2260.008'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay4
+    to_name: jem_bay5
+    to_pos:
+    - 11.0
+    - -8.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2280.009'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay5
+    to_name: jem_bay6
+    to_pos:
+    - 11.0
+    - -9.0
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2300.010'
+  action:
+    type: move
+    robot: bumble
+    from_name: jem_bay6
+    to_name: jem_bay7
+    to_pos:
+    - 11.0
+    - -9.7
+    - 4.8
+  duration_seconds: '20.000'
+- start_time_seconds: '2320.011'
+  action:
+    type: dock
+    robot: bumble
+    berth: berth1
+  duration_seconds: '30.000'

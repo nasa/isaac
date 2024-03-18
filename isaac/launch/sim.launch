@@ -51,6 +51,7 @@
   <arg name="wifi" default="false" />            <!-- Enable Wifi                 -->
   <arg name="streaming_mapper" default="false" /><!-- Enable the streaming mapper -->
   <arg name="acoustics_cam" default="false" />   <!-- Enable the acoustics cam    -->
+  <arg name="vol_mapper" default="false" />      <!-- Enable volume mappers       -->
   <arg name="agent1" default="Bsharp"/>          <!-- GDS Agent1                  -->
   <arg name="agent2" default="Bumble"/>          <!-- GDS Agent2                  -->
   <arg name="agent3" default="Honey"/>           <!-- GDS Agent3                  -->
@@ -75,12 +76,14 @@
        name="pose"
        default="0 0 -0.7 0 0 0 1" />                         <!-- granite: perch position -->
 
-  <arg name="bumble_pose" default="" />         <!-- Use to overide bumble's pose -->
-
   <!-- Multi-robot simulation -->
   <arg name="honey" default="false" />          <!-- Insert a honey robot    -->
   <arg name="bumble" default="false" />         <!-- Insert a bumble robot   -->
   <arg name="queen" default="false" />          <!-- Insert a queen robot    -->
+
+  <arg name="honey_pose" default="" />          <!-- Use to overide honey's pose  -->
+  <arg name="bumble_pose" default="" />         <!-- Use to overide bumble's pose -->
+  <arg name="queen_pose" default="" />          <!-- Use to overide queen's pose  -->
 
   <!-- Make sure all environment variables are set for controller           -->
   <!-- Override the robot and world environment variables all the time. The -->
@@ -207,7 +210,11 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
+
+    <!-- Default call initialize bias so config file is created if not already present -->
+    <node pkg="rosservice" type="rosservice" name="imu_calibration_default" args="call --wait $(arg ns)/gnc/ekf/init_bias" />
   </group>
 
   <!-- Auto-insert honey at a canned location -->
@@ -217,7 +224,10 @@
       <arg name="world" value="$(arg world)" />      <!-- Execution context  -->
       <arg name="ns" value="honey" />                <!-- Robot namespace    -->
       <arg name="output" value="$(arg output)" />    <!-- Output for logging -->
-      <arg name="pose" value="10.5 -6 4.8 0 0 0 1" />    <!-- Initial robot pose -->
+      <arg if="$(eval arg('honey_pose') == '')"
+           name="pose"  value="9.817 -10.312 4.293 1 0 0 0" />   <!-- Initial robot pose -->
+      <arg unless="$(eval arg('honey_pose') == '')"
+           name="pose"  value="$(arg honey_pose)" />
       <arg name="drivers" value="false" />           <!-- Start driver code  -->
       <arg name="spurn" value="$(arg spurn)" />      <!-- Prevent node       -->
       <arg name="nodes" value="$(arg nodes)" />      <!-- Launch node group  -->
@@ -233,7 +243,11 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
+
+    <!-- Default call initialize bias so config file is created if not already present -->
+    <node pkg="rosservice" type="rosservice" name="imu_calibration_honey" args="call --wait /honey/gnc/ekf/init_bias" />
   </group>
 
   <!-- Auto-insert bumble at a canned location -->
@@ -243,9 +257,9 @@
       <arg name="world" value="$(arg world)" />      <!-- Execution context  -->
       <arg name="ns" value="bumble" />               <!-- Robot namespace    -->
       <arg name="output" value="$(arg output)" />    <!-- Output for logging -->
-      <arg if="$(eval arg('bumble_pose') == '')" 
-           name="pose"  value="10.5 -7 4.8 0 0 0 1" />   <!-- Initial robot pose -->
-      <arg unless="$(eval arg('bumble_pose') == '')" 
+      <arg if="$(eval arg('bumble_pose') == '')"
+           name="pose"  value="11 -4 4.8 0 0 0 1" />   <!-- Initial robot pose -->
+      <arg unless="$(eval arg('bumble_pose') == '')"
            name="pose"  value="$(arg bumble_pose)" />
       <arg name="drivers" value="false" />           <!-- Start driver code  -->
       <arg name="spurn" value="$(arg spurn)" />      <!-- Prevent node       -->
@@ -262,7 +276,11 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
+
+    <!-- Default call initialize bias so config file is created if not already present -->
+    <node pkg="rosservice" type="rosservice" name="imu_calibration_bumble" args="call --wait /bumble/gnc/ekf/init_bias" />
   </group>
 
   <!-- Auto-insert queen at a canned location -->
@@ -272,7 +290,10 @@
       <arg name="world" value="$(arg world)" />      <!-- Execution context  -->
       <arg name="ns" value="queen" />                <!-- Robot namespace    -->
       <arg name="output" value="$(arg output)" />    <!-- Output for logging -->
-      <arg name="pose" value="10.5 -8 4.8 0 0 0 1" />    <!-- Initial robot pose -->
+      <arg if="$(eval arg('queen_pose') == '')"
+           name="pose"  value="11 -10 4.8 0 0 0 1" />   <!-- Initial robot pose -->
+      <arg unless="$(eval arg('queen_pose') == '')"
+           name="pose"  value="$(arg queen_pose)" />
       <arg name="drivers" value="false" />           <!-- Start driver code  -->
       <arg name="spurn" value="$(arg spurn)" />      <!-- Prevent node       -->
       <arg name="nodes" value="$(arg nodes)" />      <!-- Launch node group  -->
@@ -288,10 +309,11 @@
       <arg name="wifi" value="$(arg wifi)" />        <!-- Enable wifi        -->
       <arg name="streaming_mapper" value="$(arg streaming_mapper)" /><!-- Enable the isaac streaming mapper -->
       <arg name="acoustics_cam" value="$(arg acoustics_cam)" /><!-- Enable the isaac acoustics cam -->
+      <arg name="vol_mapper" value="$(arg vol_mapper)" />      <!-- Enable volume mappers       -->
     </include>
-  </group>
 
-  <!-- Default call initialize bias so config file is created if not already present -->
-  <node pkg="rosservice" type="rosservice" name="imu_calibration" args="call --wait /gnc/ekf/init_bias" />
+    <!-- Default call initialize bias so config file is created if not already present -->
+    <node pkg="rosservice" type="rosservice" name="imu_calibration_queen" args="call --wait /queen/gnc/ekf/init_bias" />
+  </group>
 
 </launch>

@@ -32,6 +32,7 @@ RUN apt-get update \
 
 RUN pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
+    && pip3 install networkx==3.1 \
     && pip3 install matplotlib opencv-python numpy-quaternion pandas scikit-image \
     && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 

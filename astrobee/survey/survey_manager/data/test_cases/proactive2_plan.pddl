@@ -1,0 +1,16 @@
+; Solution Found
+0.000: (move honey jem_bay3 jem_bay2 jem_bay1) [20.000]
+20.001: (move bumble jem_bay5 jem_bay4 jem_bay3) [20.000]
+20.002: (move honey jem_bay2 jem_bay1 jem_bay0) [20.000]
+40.003: (move bumble jem_bay4 jem_bay3 jem_bay2) [20.000]
+60.004: (panorama bumble o0 jem_bay3) [780.000]
+840.005: (move bumble jem_bay3 jem_bay4 jem_bay5) [20.000]
+860.006: (move bumble jem_bay4 jem_bay5 jem_bay6) [20.000]
+860.007: (move honey jem_bay1 jem_bay2 jem_bay3) [20.000]
+880.007: (move bumble jem_bay5 jem_bay6 jem_bay7) [20.000]
+880.008: (move honey jem_bay2 jem_bay3 jem_bay4) [20.000]
+900.008: (move bumble jem_bay6 jem_bay7 jem_bay8) [20.000]
+900.009: (move honey jem_bay3 jem_bay4 jem_bay5) [20.000]
+920.010: (move honey jem_bay4 jem_bay5 jem_bay6) [20.000]
+940.011: (panorama honey o0 jem_bay5) [780.000]
+
