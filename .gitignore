@@ -60,6 +60,8 @@ analyst/workspace/.local
 analyst/workspace/.ipynb_checkpoints
 analyst/workspace/scripts/.ipynb_checkpoints
 analyst/workspace/.cache
+analyst/workspace/results/
+analyst/workspace/craft_mlt_25k.pth
 analyst/workspace/data
 
 # vscode

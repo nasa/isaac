@@ -34,7 +34,10 @@ RUN pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
     && pip3 install networkx==3.1 \
     && pip3 install matplotlib opencv-python numpy-quaternion pandas scikit-image \
-    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
+    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu \
+    && pip3 install scikit-image jellyfish lmdb numpy==1.24.4 \
+    && pip3 install ipympl gdown timm nltk pytorch_lightning==1.6.5 \
+    && pip3 install --upgrade ipywidgets
 
 EXPOSE 8888
 

@@ -1,0 +1,9 @@
+**/scripts/craft/
+**/scripts/parseq/
+**/image_str/result/
+**/image_str/images/
+*.json
+craft_mlt_25k.pth
+**/image_str/models/
+**/image_str/test_images/
+**/image_str/tests/
