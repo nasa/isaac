@@ -3,10 +3,12 @@
 if [ "$1" = "configure" ]; then
   chmod -R g+rwx /opt/isaac/env_wrapper.sh
   chmod -R g+rwx /opt/isaac/share/inspection/resources
-  chmod -R g+rwx /opt/isaac/share/survey_manager/data/
+  chmod -R g+rwx /opt/isaac/share/survey_manager/data
+  chmod -R g+rwx /opt/isaac/share/survey_manager/pddl
   if [ $(getent group users) ]; then
     chgrp -R users /opt/isaac/env_wrapper.sh
     chgrp -R users /opt/isaac/share/inspection/resources
     chgrp -R users /opt/isaac/share/survey_manager/data/
+    chgrp -R users /opt/isaac/share/survey_manager/pddl
   fi
 fi
