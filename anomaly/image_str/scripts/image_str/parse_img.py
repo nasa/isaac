@@ -29,8 +29,8 @@ import torch.nn as nn
 from craft.craft import CRAFT
 from IPython.display import HTML
 from IPython.display import display as idisplay
-from parseq.strhub.data.module import SceneTextDataModule
 from PIL import Image
+from strhub.data.module import SceneTextDataModule
 from torch.autograd import Variable
 from tqdm import tqdm
 

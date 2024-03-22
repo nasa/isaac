@@ -18,11 +18,11 @@ libraries and build them as Python packages.
 
 CRAFT-Pytorch
 
-	https://github.com/clovaai/CRAFT-pytorch
+    pip install https://github.com/marinagmoreira/CRAFT-pytorch.git#egg=craft
 
 PARSeq
 
-	https://github.com/baudm/parseq
+	pip install https://github.com/marinagmoreira/parseq.git@focal#egg=parseq
 
 The Image STR package also contains a requirements file with all the other necessary Python packages. 
 
