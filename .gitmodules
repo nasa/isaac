@@ -1,9 +1,6 @@
 [submodule "isaac_msgs"]
 	path = communications/isaac_msgs
 	url = https://github.com/nasa/isaac_msgs.git
-[submodule "craft"]
-	path = anomaly/str/craft
-	url = git@github.com:clovaai/CRAFT-pytorch.git
 [submodule "ros2_planning_system"]
 	path = astrobee/survey/survey_dependencies/ros2_planning_system
 	url = https://github.com/bckempa/ros2_planning_system
