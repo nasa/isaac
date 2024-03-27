@@ -219,13 +219,12 @@ class ProcessExecutor:
                 if output == "":
                     continue
                 if output and not output.startswith("pos: x:"):
-                    loginfo(f"writer received: {output}")
                     output_total += output
 
                 try:
                     # If socket is not connected try to connect
                     if not self.sock_output_connected:
-                        # loginfo("trying to connect")
+                        loginfo(f"writer received: {output}")
                         self.sock_output_conn, addr = self.sock_output.accept()
                         self.sock_output_conn.setblocking(False)
 
@@ -316,6 +315,8 @@ class ProcessExecutor:
                 # If broken pipe connect
                 if not request:
                     break
+                if request == "stop":
+                    return
                 loginfo("reader sending: " + request)
                 process.stdin.write(request + "\n")
                 process.stdin.flush()
@@ -352,7 +353,11 @@ class ProcessExecutor:
             output_thread.start()
 
             # When the process finishes, te output thread automatically closes
-            while output_thread.is_alive() and process.poll() is None:
+            while (
+                output_thread.is_alive()
+                and input_thread.is_alive()
+                and process.poll() is None
+            ):
                 rospy.sleep(1)
 
         except Exception as e:
