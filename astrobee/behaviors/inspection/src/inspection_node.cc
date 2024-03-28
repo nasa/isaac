@@ -755,14 +755,18 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_DEBUG("Received Goal Geometry");
-      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses))
+      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses)) {
+        // Reset the focus distance
+        SendSciCamCommand("{\"name\": \"setFocusDistance\", \"distance\": " +
+                          std::to_string(cfg_.Get<double>("sci_cam_startup_focus")) + "}");
         return fsm_.Update(GOAL_INSPECT);
+      }
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
       NODELET_DEBUG("Received Goal Panorama");
       if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses)) {
-        // Reet the focus distance
+        // Reset the focus distance
         SendSciCamCommand("{\"name\": \"setFocusDistance\", \"distance\": " +
                           std::to_string(cfg_.Get<double>("sci_cam_startup_focus")) + "}");
         return fsm_.Update(GOAL_INSPECT);
