@@ -1,5 +1,10 @@
 # Releases
 
+## Release 0.2.8
+
+  * Improvements to survey_manager output
+  * Bug fixes
+
 ## Release 0.2.7
 
   * Survey manager
