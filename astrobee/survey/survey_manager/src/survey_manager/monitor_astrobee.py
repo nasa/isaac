@@ -83,7 +83,13 @@ def thread_read_output(output_path):
                     if not data:
                         print("Server disconnected")
                         break
-                    print(data.decode("ascii", errors="replace"), end="")
+
+                    data_decoded = data.decode("ascii", errors="replace")
+                    if not data_decoded.startswith("pos: x:"):
+                        print(data_decoded, end="")
+                    else:
+                        print(data_decoded.replace("\n", ""), end="\r", flush=True)
+
                 except socket.timeout:
                     continue  # Timeout reached, check stop event and try again
                 except Exception as e:

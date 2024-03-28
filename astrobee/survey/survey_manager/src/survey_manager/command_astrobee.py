@@ -224,7 +224,8 @@ class ProcessExecutor:
                 try:
                     # If socket is not connected try to connect
                     if not self.sock_output_connected:
-                        loginfo(f"writer received: {output}")
+                        if not output.startswith("pos: x:"):
+                            loginfo(f"writer received: {output}")
                         self.sock_output_conn, addr = self.sock_output.accept()
                         self.sock_output_conn.setblocking(False)
 
