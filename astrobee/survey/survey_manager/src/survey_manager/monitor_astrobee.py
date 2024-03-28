@@ -88,7 +88,9 @@ def thread_read_output(output_path):
                     if not data_decoded.startswith("pos: x:"):
                         print(data_decoded, end="")
                     else:
-                        print(data_decoded.replace("\n", ""), end="\r", flush=True)
+                        print(
+                            "\r" + data_decoded.replace("\n", ""), end="\r", flush=True
+                        )
 
                 except socket.timeout:
                     continue  # Timeout reached, check stop event and try again
