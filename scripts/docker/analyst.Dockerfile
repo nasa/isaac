@@ -33,11 +33,14 @@ RUN apt-get update \
 RUN pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
     && pip3 install networkx==3.1 \
-    && pip3 install matplotlib opencv-python numpy-quaternion pandas scikit-image \
+    && pip3 install matplotlib opencv-python numpy-quaternion pandas \
     && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu \
-    && pip3 install scikit-image jellyfish lmdb numpy==1.24.4 \
-    && pip3 install ipympl gdown timm nltk pytorch_lightning==1.6.5 \
-    && pip3 install --upgrade ipywidgets
+    # Image STR packages
+    && pip3 install lmdb ipympl gdown timm nltk  \
+    && pip3 install git+https://github.com/marinagmoreira/CRAFT-pytorch.git \
+    && pip3 install git+https://github.com/marinagmoreira/parseq.git@focal#egg=parseq \
+    && cd /src/isaac/src/anomaly/image_str && pip install .
+
 
 EXPOSE 8888
 

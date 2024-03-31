@@ -26,9 +26,3 @@ services:
   isaac-astrobee:
     links:
       - astrobee
-  isaac:
-    links:
-      - isaac-astrobee
-
-    
-

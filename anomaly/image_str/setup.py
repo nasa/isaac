@@ -19,6 +19,7 @@ d = generate_distutils_setup(
         "Pillow>=10.0.0",
         "scikit-image>=0.21.0",
         "torch>=2.0.1",
+        "pytorch_lightning>=1.6.5",
         "tqdm>=4.65.0",
     ],
 )

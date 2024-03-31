@@ -41,3 +41,6 @@ services:
       - type: bind
         source: ${IMG_PATH:-$HOME/data/images}
         target: /home/analyst/data/images
+
+    links:
+      - isaac

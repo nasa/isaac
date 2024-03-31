@@ -18,15 +18,15 @@ libraries and build them as Python packages.
 
 CRAFT-Pytorch
 
-    pip install https://github.com/marinagmoreira/CRAFT-pytorch.git#egg=craft
+    pip install git+https://github.com/marinagmoreira/CRAFT-pytorch.git
 
 PARSeq
 
-	pip install https://github.com/marinagmoreira/parseq.git@focal#egg=parseq
+	pip install git+https://github.com/marinagmoreira/parseq.git@focal#egg=parseq
 
-The Image STR package also contains a requirements file with all the other necessary Python packages. 
+The Image STR package also contains a setup file with all the other necessary Python packages. 
 
-	pip install -r requirements.txt
+	pip install .
 
 Running the Code
 ---------

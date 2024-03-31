@@ -132,14 +132,9 @@ files+=" -f ${thisdir}/docker_compose/isaac.docker-compose.yml"
 
 if [ $REMOTE == "" ]; then
   files+=" -f ${thisdir}/docker_compose/astrobee.docker-compose.build.yml"
+  files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
 fi
-
-if [ "$os" == "focal" ]; then
-  if [ $REMOTE == "" ]; then
-    files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.build.yml"
-  fi
-  files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
-fi
+files+=" -f ${thisdir}/docker_compose/analyst.docker-compose.yml"
 
 if [ $mast == 1 ]; then
 	files+=" -f ${script_dir}/docker_compose/mast.docker-compose.yml"
