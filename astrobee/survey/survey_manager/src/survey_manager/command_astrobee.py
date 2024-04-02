@@ -183,26 +183,27 @@ class ProcessExecutor:
         self.sock_output.close()
 
     def write_output_once(self, output):
-        while not self.sock_output_connected:
+        while not self._stop_event.is_set():
             try:
-                # If socket is not connected try to connect
-                self.sock_output_conn, addr = self.sock_output.accept()
-                self.sock_output_conn.setblocking(False)
+                if not self.sock_output_connected:
+                    # If socket is not connected try to connect
+                    self.sock_output_conn, addr = self.sock_output.accept()
+                    self.sock_output_conn.setblocking(False)
 
-                self.sock_output_connected = True
+                    self.sock_output_connected = True
             except socket.timeout:
                 continue
 
-        try:
-            if self.sock_output_connected:
-                encoded_message = output.encode("ascii", errors="replace")
-                for i in range(0, len(encoded_message), CHUNK_SIZE):
-                    chunk = encoded_message[i : i + CHUNK_SIZE]
-                    self.sock_output_conn.sendall(chunk)
-
-        except (socket.error, BrokenPipeError):
-            loginfo("Error sending data. Receiver may have disconnected.")
-            self.sock_output_connected = False
+            try:
+                if self.sock_output_connected:
+                    encoded_message = output.encode("ascii", errors="replace")
+                    for i in range(0, len(encoded_message), CHUNK_SIZE):
+                        chunk = encoded_message[i : i + CHUNK_SIZE]
+                        self.sock_output_conn.sendall(chunk)
+                break
+            except (socket.error, BrokenPipeError):
+                loginfo("Error sending data. Receiver may have disconnected.")
+                self.sock_output_connected = False
 
     def thread_write_output(self, process):
         # loginfo("starting thread_write_output...")
@@ -218,13 +219,13 @@ class ProcessExecutor:
                 if output == "":
                     continue
                 if output and not output.startswith("pos: x:"):
-                    loginfo(f"writer received: {output}")
                     output_total += output
 
                 try:
                     # If socket is not connected try to connect
                     if not self.sock_output_connected:
-                        # loginfo("trying to connect")
+                        if not output.startswith("pos: x:"):
+                            loginfo(f"writer received: {output}")
                         self.sock_output_conn, addr = self.sock_output.accept()
                         self.sock_output_conn.setblocking(False)
 
@@ -258,9 +259,7 @@ class ProcessExecutor:
             # loginfo("waiting for connection")
             try:
                 self.sock_input_conn, addr = self.sock_input.accept()
-                self.sock_input_conn.settimeout(
-                    1
-                )  # Set a timeout for socket operations
+                self.sock_input_conn.settimeout(1)
                 self.sock_input_connected = True
                 break
             except socket.timeout:
@@ -270,11 +269,17 @@ class ProcessExecutor:
                 request = self.sock_input_conn.recv(CHUNK_SIZE).decode(
                     "ascii", errors="replace"
                 )
-                return request
+                if request:
+                    return request
+                else:
+                    self.sock_input_connected = False
+                    break
+                loginfo("request")
             except socket.timeout:
                 continue
             except ConnectionResetError:
                 # Connection was reset, set sock_input_connected to False
+                loginfo("disconnected")
                 self.sock_input_connected = False
                 break
         return ""
@@ -311,6 +316,8 @@ class ProcessExecutor:
                 # If broken pipe connect
                 if not request:
                     break
+                if request == "stop":
+                    return
                 loginfo("reader sending: " + request)
                 process.stdin.write(request + "\n")
                 process.stdin.flush()
@@ -347,7 +354,11 @@ class ProcessExecutor:
             output_thread.start()
 
             # When the process finishes, te output thread automatically closes
-            while output_thread.is_alive() and process.poll() is None:
+            while (
+                output_thread.is_alive()
+                and input_thread.is_alive()
+                and process.poll() is None
+            ):
                 rospy.sleep(1)
 
         except Exception as e:
@@ -802,11 +813,12 @@ def survey_manager_executor_recursive(
     )
 
     while exit_code != 0 and not rospy.is_shutdown():
+        loginfo(f"Exit code non-zero: Do you want to repeat the survey? (yes/no/skip):")
         process_executor.write_output_once(
             "Exit code non-zero: Do you want to repeat the survey? (yes/no/skip): \n"
         )
         repeat = process_executor.read_input_once().lower()
-
+        loginfo(f"Got response: {repeat}")
         if repeat == "yes":
             run_number += 1
             exit_code = survey_manager_executor_recursive(
