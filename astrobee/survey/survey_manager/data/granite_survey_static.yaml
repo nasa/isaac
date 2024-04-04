@@ -45,13 +45,17 @@ bays_move:
   gra_bay5: ["-pos", "0.1 0.1 -0.68", "-att", "3.14 1 0 0"]
   gra_bay6: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
   gra_bay7: ["-pos", "0.1 -0.5 -0.68", "-att", "3.14 1 0 0"]
-  berth1: ["-pos", "0.1 0.3 -0.68"]
-  berth2: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
+  berth1_g: ["-pos", "0.1 0.3 -0.68"]
+  berth2_g: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
 
 
 bays_pano:
   gra_bay2: "panorama_granite_bsharp.txt"
   gra_bay6: "panorama_granite_wannabee.txt"
+
+berth:
+  berth1_g: "1"
+  berth2_g: "2"
 
 bogus_bays: [gra_bay0, gra_bay8]
 berths: [berth1, berth2]

@@ -482,9 +482,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     pub_guest_sci_.publish(cmd);
   }
 
-  void SendPicture(double focus_distance) {
-    ROS_DEBUG_STREAM("Send picture");
-    // Take picture
+
+  void SendSciCamCommand(std::string command) {
+    // Chnage focus
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
 
@@ -496,7 +496,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd_args.push_back(arg);
 
     arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-    arg.s = "{\"name\": \"takePicture\", \"haz_dist\": " + std::to_string(focus_distance) +"}";
+    arg.s = command;
     cmd_args.push_back(arg);
 
     ff_msgs::CommandStamped cmd;
@@ -508,7 +508,12 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd.args = cmd_args;
 
     pub_guest_sci_.publish(cmd);
+  }
 
+
+  void SendPicture(double focus_distance) {
+    ROS_DEBUG_STREAM("Send picture");
+    SendSciCamCommand("{\"name\": \"takePicture\", \"haz_dist\": " + std::to_string(focus_distance) +"}");
     // Timer for the sci cam camera
     sci_cam_timeout_.start();
   }
@@ -571,6 +576,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
           flashlight_intensity_current_ = cfg_.Get<double>("toggle_flashlight");
           Flashlight(flashlight_intensity_current_);
+          sci_cam_req_ = 1;
+          SendPicture(-1);
         } else {
           // Move on in focus distance iteration
           flashlight_intensity_current_ = 0.0;
@@ -588,9 +595,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
             // When the anomaly detection returns a result it will go to the next inspection
             finished_anomaly_ = true;
           }
+          sci_cam_req_ = 1;
+          SendPicture(focus_distance_current_);
         }
-        sci_cam_req_ = 1;
-        SendPicture(focus_distance_current_);
       } else {
         return fsm_.Update(NEXT_INSPECT);
       }
@@ -748,14 +755,22 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_DEBUG("Received Goal Geometry");
-      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses))
+      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses)) {
+        // Reset the focus distance
+        SendSciCamCommand("{\"name\": \"setFocusDistance\", \"distance\": " +
+                          std::to_string(cfg_.Get<double>("sci_cam_startup_focus")) + "}");
         return fsm_.Update(GOAL_INSPECT);
+      }
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
       NODELET_DEBUG("Received Goal Panorama");
-      if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses))
+      if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses)) {
+        // Reset the focus distance
+        SendSciCamCommand("{\"name\": \"setFocusDistance\", \"distance\": " +
+                          std::to_string(cfg_.Get<double>("sci_cam_startup_focus")) + "}");
         return fsm_.Update(GOAL_INSPECT);
+      }
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:

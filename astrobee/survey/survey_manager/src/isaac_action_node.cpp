@@ -207,7 +207,8 @@ void IsaacAction::do_work() {
   progress_ = (ros::Time::now() - start_time_).toSec() / action_duration_;
   send_feedback(progress_, command_ + " running");
 
-  printf("\t ** %s [%5.1f%%]  \n", command_.c_str(), progress_ * 100.0);
+  // Status gets printed on terminal
+  // printf("\t ** %s [%5.1f%%]  \n", command_.c_str(), progress_ * 100.0);=
   int status;
   int result = waitpid(-1, &status, WNOHANG);
   // printf("Result: %d %d %d\n", result, pid_, status);

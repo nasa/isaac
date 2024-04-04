@@ -43,7 +43,7 @@ def thread_write_input(input_path):
             sock_client_input.connect(input_path)
         except ConnectionRefusedError:
             # print("Input Connection refused. Retrying in 5 seconds...")
-            time.sleep(5)
+            time.sleep(1)
             continue
 
         try:
@@ -53,6 +53,7 @@ def thread_write_input(input_path):
                 # print("user input: " + user_input)
                 if user_input.lower().strip() == "exit":
                     stop_event.set()
+                if stop_event.is_set():
                     break
                 sock_client_input.send(
                     user_input.encode("ascii", errors="replace")[:CHUNK_SIZE]
@@ -61,8 +62,8 @@ def thread_write_input(input_path):
         except Exception as e:
             # print("Exception in thread_write_input:", e)
             pass
-
         # Close the sockets
+        print("Close input socket")
         sock_client_input.close()
 
 
@@ -73,51 +74,63 @@ def thread_read_output(output_path):
         try:
             # Attempt to connect to the server
             sock_client_output = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock_client_output.settimeout(1)  # Set timeout to 1 second
             sock_client_output.connect(output_path)
 
-        except ConnectionRefusedError:
-            # print("Output Connection refused. Retrying in 5 seconds...")
-            time.sleep(5)
-            continue
-
-        print("connected")
-
-        try:
             while not stop_event.is_set():
-                # print("get data")
-                request = sock_client_output.recv(CHUNK_SIZE)
-                request = request.decode("ascii", errors="replace")
-                print(request, end="")
-                if not request:  # If no data received, it means the server disconnected
-                    print("Server disconnected")
-                    break
-        except Exception as e:
-            # print("Exception in thread_read_output:", e)
-            pass
+                try:
+                    data = sock_client_output.recv(CHUNK_SIZE)
+                    if not data:
+                        print("Server disconnected")
+                        break
 
-        # Close the sockets
+                    data_decoded = data.decode("ascii", errors="replace")
+                    if not data_decoded.startswith("pos: x:"):
+                        print(data_decoded, end="")
+                    else:
+                        print(
+                            "\r" + data_decoded.replace("\n", ""), end="\r", flush=True
+                        )
+
+                except socket.timeout:
+                    continue  # Timeout reached, check stop event and try again
+                except Exception as e:
+                    break  # Handle other exceptions or break
+        except ConnectionRefusedError:
+            time.sleep(5)  # Wait a bit before retrying to connect
+            continue
+        except socket.timeout:
+            continue
+        print("Close output socket")
         sock_client_output.close()
 
 
 def survey_monitor(robot_name):
-    input_path = "/tmp/input_" + robot_name
-    output_path = "/tmp/output_" + robot_name
+    try:
+        input_path = "/tmp/input_" + robot_name
+        output_path = "/tmp/output_" + robot_name
 
-    while not (os.path.exists(input_path) and os.path.exists(output_path)):
-        print("Files don't exist yet. Waiting for 5 seconds...")
-        time.sleep(5)
-        continue
+        while not (os.path.exists(input_path) and os.path.exists(output_path)):
+            print("Files don't exist yet. Waiting for 5 seconds...")
+            time.sleep(5)
+            continue
 
-    # Start input and output threads
-    input_thread = threading.Thread(target=thread_write_input, args=(input_path,))
-    input_thread.start()
-    output_thread = threading.Thread(target=thread_read_output, args=(output_path,))
-    output_thread.start()
+        # Start input and output threads
+        input_thread = threading.Thread(target=thread_write_input, args=(input_path,))
+        output_thread = threading.Thread(target=thread_read_output, args=(output_path,))
+        input_thread.start()
+        output_thread.start()
 
-    # Wait for the threads to finish
-    input_thread.join()
+        # Wait for the threads to finish
+        input_thread.join()
+        output_thread.join()
 
-    output_thread.join()
+    except KeyboardInterrupt:
+        print("\nGracefully shutting down, Press Enter...")
+        stop_event.set()
+        input_thread.join()
+        output_thread.join()
+        print("Shutdown complete.")
 
 
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
