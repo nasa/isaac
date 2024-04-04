@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   astrobee-base:
     image: ${REMOTE:-astrobee}/astrobee:latest-base-ubuntu${UBUNTU_VERSION}

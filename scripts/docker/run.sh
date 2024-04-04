@@ -215,13 +215,13 @@ elif  [ $local_sim -eq 1 ]; then
 
 elif  [ $no_sim -eq 1 ]; then
   echo "NO SIM"
-  files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+  files+=" -f ${script_dir}/docker_compose/isaac.docker-compose.yml"
   export cmd="roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen rviz:=true --wait"
 
 else
 # Start isaac robot software on docker container if needed
 ######################################################################
-  files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+  files+=" -f ${script_dir}/docker_compose/isaac.docker-compose.yml"
 
   # Set up astrobee display
   ######################################################################
