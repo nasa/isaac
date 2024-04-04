@@ -1,5 +1,10 @@
 # Releases
 
+## Release 0.2.9
+
+  * Fixes to survey_manager
+  * Fixes to CI
+
 ## Release 0.2.8
 
   * Improvements to survey_manager output
