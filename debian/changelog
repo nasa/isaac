@@ -1,3 +1,10 @@
+isaac (0.2.9) testing; urgency=medium
+
+  * Fixes to survey_manager
+  * Fixes to CI
+
+ -- ISAAC Flight Software <astrobee-fsw@nx.arc.nasa.gov>  Thu, 04 Apr 2024 09:23:50 -0700
+
 isaac (0.2.8) testing; urgency=medium
 
   * Improvements to survey_manager output
