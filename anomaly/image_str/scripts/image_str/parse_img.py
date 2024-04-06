@@ -173,7 +173,9 @@ class Ocr:
         """
 
         # Load model and image transforms for parseq
-        parseq = torch.hub.load("baudm/parseq", "parseq", pretrained=True).eval()
+        parseq = torch.hub.load(
+            "marinagmoreira/parseq", "parseq", pretrained=True
+        ).eval()
         img_transform = SceneTextDataModule.get_transform(parseq.hparams.img_size)
         return (parseq, img_transform)
 
