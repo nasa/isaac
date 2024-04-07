@@ -23,6 +23,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import rosbag
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
@@ -227,63 +228,27 @@ class Ocr:
 
         timestamp = float(filename)
 
-        bumble_bag_files = {
-            "20220711_1238_survey_usl_bay6_std_panorama_run1.bag": (
-                1657543101.316589,
-                1657543934.13,
-            ),
-            "20220711_1255_survey_usl_bay5_std_panorama_run_1.bag": (
-                1657544120.136949,
-                1657545770.15,
-            ),
-            "20220711_1426_survey_usl_bay4_std_panorama_run_1.bag": (
-                1657549618.634919,
-                1657551283.42,
-            ),
-        }
+        bag_files = [f for f in os.listdir(self.bag_path) if f.endswith(".bag")]
 
-        queen_bag_files = {
-            "20220711_1459_survey_usl_to_jem.bag": (1657551567.745524, 1657552130.3),
-            "20220711_1123_survey_test.bag": (1657538626.193575, 1657538635.45),
-            "20220711_1223_survey_jem_to_usl.bag": (1657542216.747706, 1657544398.74),
-            "20220711_1259_survey_usl_bay3_std_panorama_run1.bag": (
-                1657544400.135549,
-                1657545492.46,
-            ),
-            "20220711_1318_survey_usl_bay2_std_panorama_run1.bag": (
-                1657545494.376898,
-                1657547254.04,
-            ),
-            "20220711_1358_survey_hatch_inspection_usl_fwd_run1.bag": (
-                1657547939.494802,
-                1657548383.24,
-            ),
-            "20220711_1433_survey_usl_bay1_std_panorama_run1.bag": (
-                1657550015.257639,
-                1657550898.37,
-            ),
-            "20220711_1452_survey_hatch_inspection_usl_fwd_close_run_1.bag": (
-                1657551142.474949,
-                1657551422.48,
-            ),
-            "20220711_1407_survey_usl_fwd_stereo_mapping_run_1.bag": (
-                1657548455.916899,
-                1657549490.51,
-            ),
-        }
+        for bag_file in bag_files:
+            bag_path = os.path.join(self.bag_path, bag_file)
 
-        if "queen" in img_file:
-            bag_files = queen_bag_files
-        elif "bumble" in img_file:
-            bag_files = bumble_bag_files
-        else:
-            raise Exception(
-                "Unknown bag files. Is the image within a 'queen' or 'bumble' folder?"
-            )
-
-        for file in bag_files:
-            if bag_files[file][0] <= timestamp and timestamp <= bag_files[file][1]:
-                return file
+            try:
+                with rosbag.Bag(bag_path, "r") as bag:
+                    # Check if the target timestamp is within the bag's start and end time
+                    if (
+                        timestamp >= bag.get_start_time()
+                        and timestamp <= bag.get_end_time()
+                    ):
+                        for topic, msg, t in bag.read_messages():
+                            if t == timestamp and (
+                                topic == "/hw/cam_sci/compressed"
+                                or topic == "/hw/cam_sci_info"
+                            ):
+                                return bag_path
+            except Exception as e:
+                print(f"Error processing bag file {bag_file}: {e}")
+                continue
 
         return None
 
@@ -383,10 +348,9 @@ class Ocr:
         if self.bag_path is not None:
             bag_name = self.__get_bag_file(image_path)
             if bag_name is not None:
-                bag_name = self.bag_path + bag_name
 
                 # Specify the ros command for 3D position
-                json_file = "data.json"
+                json_file = os.path.join(result_folder, "/data.json")
 
                 ros_command = [
                     "rosrun",
@@ -999,24 +963,18 @@ class Ocr:
             pitch = pos[4]
             yaw = pos[5]
             bag = self.__get_bag_file(image_file)
-            if bag is None:
-                print("None bag", image_file)
-            if "bay1" in bag:
-                loc = "usl_bay1"
-            elif "bay2" in bag:
-                loc = "usl_bay2"
-                continue  # Panorama not available
-            elif "bay3" in bag:
-                loc = "usl_bay3"
-                continue  # Panorama not available
-            elif "bay4" in bag:
-                loc = "usl_bay4"
-            elif "bay5" in bag:
-                loc = "usl_bay5"
-            elif "bay6" in bag:
-                loc = "usl_bay6"
-            else:
-                loc = ""
+
+            # Define patterns to the bag file name
+            item_pattern = r"\b(jem|usl|nod2)\b"
+            bayx_pattern = r"`\bbay\d+\b"
+
+            # Search for items in the bag
+            item_match = re.search(item_pattern, bag)
+            bayx_match = re.search(bayx_pattern, bag)
+
+            loc = ""
+            if item_match and bayx_match:
+                loc = f"{item_match.group()}_{bayx_match.group()}"
 
             link = "https://ivr.ndc.nasa.gov/isaac_panos/pannellum.htm?config=tour.json&firstScene={:s}&pitch={:f}&yaw={:f}&hfov=30\n".format(
                 loc, -pitch, yaw
@@ -1040,10 +998,14 @@ class Ocr:
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    os.environ["ASTROBEE_CONFIG_DIR"] = "/home/rlu3/astrobee/src/astrobee/config"
-    os.environ["ASTROBEE_RESOURCE_DIR"] = "/home/rlu3/astrobee/src/astrobee/resources"
-    os.environ["ASTROBEE_ROBOT"] = "queen"
-    os.environ["ASTROBEE_WORLD"] = "iss"
+    if "ASTROBEE_CONFIG_DIR" not in os.environ:
+        raise EnvironmentError(f"ASTROBEE_CONFIG_DIR is not set")
+    if "ASTROBEE_RESOURCE_DIR" not in os.environ:
+        raise EnvironmentError(f"ASTROBEE_RESOURCE_DIR is not set")
+    if "ASTROBEE_ROBOT" not in os.environ:
+        raise EnvironmentError(f"ASTROBEE_ROBOT is not set")
+    if "ASTROBEE_WORLD" not in os.environ:
+        raise EnvironmentError(f"ASTROBEE_WORLD is not set")
 
     import argparse
 
@@ -1093,20 +1055,5 @@ if __name__ == "__main__":
             print(
                 "Created ocr. Finished parsing folder. Use ocr.find_label(label, display) to search for labels.\n"
             )
-
-    """
-    Examples:
-    
-    test_image = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/1657551170.616.jpg"
-    result_folder = "result/test/"
-    bag_path = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/"
-    test_folder = "/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/queen/isaac_sci_cam_image_delayed/"
-    ocr = Ocr(bag_path=bag_path)
-    ocr.parse_image(test_image, result_folder=result_folder, increment=True)
-    ocr.parse_folder(test_folder, result_folder=result_folder, increment=True)
-    ocr = Ocr.df_from_file(
-        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
-    )
-    """
 
     IPython.embed()

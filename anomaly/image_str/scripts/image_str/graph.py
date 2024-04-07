@@ -1,4 +1,5 @@
 import glob
+import os
 import re
 
 import matplotlib.pyplot as plt
@@ -66,12 +67,8 @@ def graph(files):
 
 
 if __name__ == "__main__":
-    files = get_all_files(
-        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/"
-    )
+    # files = get_all_files(os.getcwd())
     # plt = graph(files)
     # plt.show()
-    files = [
-        "/home/rlu3/isaac/src/anomaly/image_str/scripts/image_str/result/beehive/queen/all_locations.csv"
-    ]
+    files = [os.path.join(os.getcwd(), "all_locations.csv")]
     graph(files)
