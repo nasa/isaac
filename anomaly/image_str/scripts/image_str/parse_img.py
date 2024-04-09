@@ -38,6 +38,16 @@ from tqdm import tqdm
 
 class Ocr:
     def __init__(self, df=None, bag_path=None):
+
+        if "ASTROBEE_CONFIG_DIR" not in os.environ:
+            raise EnvironmentError(f"ASTROBEE_CONFIG_DIR is not set")
+        if "ASTROBEE_RESOURCE_DIR" not in os.environ:
+            raise EnvironmentError(f"ASTROBEE_RESOURCE_DIR is not set")
+        if "ASTROBEE_ROBOT" not in os.environ:
+            raise EnvironmentError(f"ASTROBEE_ROBOT is not set")
+        if "ASTROBEE_WORLD" not in os.environ:
+            raise EnvironmentError(f"ASTROBEE_WORLD is not set")
+
         self.net = self.__get_craft()
         self.parseq, self.img_transform = self.__get_parseq()
 
@@ -126,7 +136,7 @@ class Ocr:
                 "image",
                 "location",
             ]
-            final_file = result_folder + "all_locations.csv"
+            final_file = os.path.join(result_folder, "all_locations.csv")
             f = open(final_file, "w")
             writer = csv.writer(f, delimiter=";")
             writer.writerow(header)
@@ -998,15 +1008,6 @@ class Ocr:
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    if "ASTROBEE_CONFIG_DIR" not in os.environ:
-        raise EnvironmentError(f"ASTROBEE_CONFIG_DIR is not set")
-    if "ASTROBEE_RESOURCE_DIR" not in os.environ:
-        raise EnvironmentError(f"ASTROBEE_RESOURCE_DIR is not set")
-    if "ASTROBEE_ROBOT" not in os.environ:
-        raise EnvironmentError(f"ASTROBEE_ROBOT is not set")
-    if "ASTROBEE_WORLD" not in os.environ:
-        raise EnvironmentError(f"ASTROBEE_WORLD is not set")
-
     import argparse
 
     parser = argparse.ArgumentParser()
