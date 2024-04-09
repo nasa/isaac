@@ -353,6 +353,8 @@ class Ocr:
 
         h, w, _ = image.shape
         bag_name = None
+        ros_command = None
+        data = None
 
         # Set up the command to find_point_coordinate
         if self.bag_path is not None:
@@ -538,18 +540,17 @@ class Ocr:
         if increment:
             result_image = self.__display_all(image, df, result_path)
 
-        if bag_name is not None:
-            # Get the locations in the world frame
-            self.__get_all_locations(
-                df,
-                data,
-                ros_command,
-                all_locations,
-                result_path,
-                final_file,
-                image_path,
-                increment,
-            )
+        # Get the locations in the world frame
+        self.__get_all_locations(
+            df,
+            data,
+            ros_command,
+            all_locations,
+            result_path,
+            final_file,
+            image_path,
+            increment,
+        )
 
     def __get_location(self, data, new_location, ros_command):
         """
@@ -612,10 +613,13 @@ class Ocr:
         header = ["label", "PCL Intersection", "Mesh Intersection", "image", "location"]
         f = None
         final = None
-        if result_path is not None and increment:
+        result_positions = None
+        if increment:
             f = open(result_path[:-4] + "_locations.csv", "w")
             writer = csv.writer(f, delimiter=";")
             writer.writerow(header)
+            if f is not None:
+                print("if f is not None")
 
         if final_file is not None:
             final = open(final_file, "a")
@@ -625,33 +629,34 @@ class Ocr:
             label = row["label"]
             new_location = row["location"]
 
-            result_positions = self.__get_location(data, new_location, ros_command)
-            if result_positions is None:
-                continue
-            location = tuple(result_positions["PCL Intersection"].values())
-            duplicate = [loc for loc in all_locations if utils.duplicate(location, loc)]
-            if len(duplicate) != 0:
-                continue
-
-            pcl = result_positions["PCL Intersection"]
             pcl_str = ""
-            if pcl is not None:
-                pcl = list(pcl.values())
-                pcl_str = str(pcl)
-
-            mesh = result_positions["Mesh Intersection"]
             mesh_str = ""
-            if mesh is not None:
-                mesh = list(mesh.values())
-                mesh_str = str(mesh)
+            if data is not None:
+                result_positions = self.__get_location(data, new_location, ros_command)
 
-            self.dataframe.loc[len(self.dataframe)] = [
-                label,
-                new_location,
-                image_path,
-                pcl,
-                mesh,
-            ]
+                location = tuple(result_positions["PCL Intersection"].values())
+                duplicate = [
+                    loc for loc in all_locations if utils.duplicate(location, loc)
+                ]
+                if len(duplicate) != 0:
+                    continue
+
+                if result_positions["PCL Intersection"] is not None:
+                    pcl = list(result_positions["PCL Intersection"].values())
+                    pcl_str = str(pcl)
+
+                if result_positions["Mesh Intersection"] is not None:
+                    mesh = list(result_positions["Mesh Intersection"].values())
+                    mesh_str = str(mesh)
+
+                self.dataframe.loc[len(self.dataframe)] = [
+                    label,
+                    new_location,
+                    image_path,
+                    pcl,
+                    mesh,
+                ]
+                all_locations.add(location)
 
             line = np.array(
                 [
@@ -667,8 +672,6 @@ class Ocr:
 
             if final is not None:
                 writer_final.writerow(line)
-
-            all_locations.add(location)
 
         if f is not None:
             f.close()
@@ -785,7 +788,7 @@ class Ocr:
                 layout=widgets.Layout(height="100%", width="100%"),
             )
 
-        def display_labels(fig, image_file, rect, result, title):
+        def display_labels(fig, image_file, rect, title, result):
             offset = 100
             if display_img:
                 image = cv2.imread(image_file)
@@ -831,7 +834,7 @@ class Ocr:
             if index == 0:
                 return
             index -= 1
-            title = "Image: {:d}/{:d}".format(index + 1, len(results))
+            title = "Image: {:d}/{:d}".format(index + 1, len(rectangles))
             if display_img:
                 fig = plt.gcf()
                 display_labels(
@@ -855,11 +858,11 @@ class Ocr:
             else:
                 display_labels(None, None, None, results[index], title)
 
-        if len(results) == 0:
+        if len(rectangles) == 0:
             print("No results found")
             return
 
-        title = "Image: {:d}/{:d}".format(index + 1, len(results))
+        title = "Image: {:d}/{:d}".format(index + 1, len(rectangles))
         if display_img:
             fig, ax = plt.subplots(1, 2, figsize=(10, 5))
             plt.tight_layout()
@@ -967,6 +970,11 @@ class Ocr:
                 continue
 
             rects.append(rectangles[i])
+            # If no location available
+            if pos is None:
+                locations.append("")
+                continue
+
             all_locations.add(tuple(pos))
 
             # Create panorama link
