@@ -13,5 +13,6 @@ var searchData=
   ['isaacobjmodel_87',['IsaacObjModel',['../classdense__map_1_1IsaacObjModel.html',1,'dense_map']]],
   ['isaactextureatlas_88',['IsaacTextureAtlas',['../classdense__map_1_1IsaacTextureAtlas.html',1,'dense_map']]],
   ['isaactexturepatch_89',['IsaacTexturePatch',['../classdense__map_1_1IsaacTexturePatch.html',1,'dense_map::IsaacTexturePatch'],['../classdense__map_1_1IsaacTexturePatch.html#a957d54efd6124df0a1797792a6b0f825',1,'dense_map::IsaacTexturePatch::IsaacTexturePatch()']]],
-  ['ix_90',['ix',['../structdense__map_1_1InterestPoint.html#a0de012c89b0f9f289802960698e32ab5',1,'dense_map::InterestPoint']]]
+  ['ix_90',['ix',['../structdense__map_1_1InterestPoint.html#a0de012c89b0f9f289802960698e32ab5',1,'dense_map::InterestPoint']]],
+  ['image_20str_91',['Image STR',['../str_anomaly.html',1,'ano']]]
 ];

@@ -7,10 +7,17 @@ var ano =
       [ "Get training data", "ano.html#autotoc_md53", null ],
       [ "Test single picture", "ano.html#autotoc_md54", null ]
     ] ],
-    [ "Anomaly Detectors", "ano.html#autotoc_md55", null ],
+    [ "Anomaly Detectors", "ano.html#autotoc_md59", null ],
     [ "Signal", "signal_anomaly.html", null ],
     [ "Semantic", "semantic_anomaly.html", null ],
     [ "Volumetric", "volumetric_anomaly.html", null ],
+    [ "Image STR", "str_anomaly.html", [
+      [ "Image STR Anomaly Detection Documentation", "str_anomaly.html#autotoc_md55", [
+        [ "Overview", "str_anomaly.html#autotoc_md56", null ],
+        [ "Prerequisites", "str_anomaly.html#autotoc_md57", null ],
+        [ "Running the Code", "str_anomaly.html#autotoc_md58", null ]
+      ] ]
+    ] ],
     [ "GMM Change Detection", "gmm.html", [
       [ "Overview", "gmm.html#autotoc_md46", null ],
       [ "Requirements", "gmm.html#autotoc_md47", [

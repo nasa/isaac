@@ -93,7 +93,8 @@ $(document).ready(function(){initNavTree('analyst.html',''); initResizable(); })
 <div class="textblock"><h1><a class="anchor" id="autotoc_md38"></a>
 Starting the Analyst Notebook</h1>
 <p><b>The jupyter notebooks will be able to access data that is in the <code>$HOME/data</code> and <code>$HOME/data/bags</code>, therefore, make sure all the relevant bag files are there</b></p>
-<p>For the Analyst notebook to be functional, it needs to start side-by-side with the database and the IUI (ISAAC user interface). To do so, the recommended method is to use the remote docker images, as: </p><pre class="fragment">$ISAAC_SRC/scripts/docker/run.sh --analyst --no-sim --remote
+<p><b>If you want to run the OCR, make sure there is a <code>$HOME/data/str</code> folder with all the data</b></p>
+<p>For the Analyst notebook to be functional, it needs to start side-by-side with the database and the IUI (ISAAC user interface). To do so, the recommended method is to use the remote docker images, as: </p><pre class="fragment">$ISAAC_SRC/scripts/docker/run.sh --analyst --mount --no-sim --remote
 </pre><p>The ISAAC UI is hosted in: <a href="http://localhost:8080">http://localhost:8080</a> The ArangoDB database is hosted in: <a href="http://localhost:8529">http://localhost:8529</a> The Analyst Notebook is hosted in: <a href="http://localhost:8888/lab?token=isaac">http://localhost:8888/lab?token=isaac</a></p>
 <h1><a class="anchor" id="autotoc_md39"></a>
 Intro Tutorials</h1>

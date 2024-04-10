@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.20"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ISAAC: Cargo Behavior</title>
+<title>ISAAC: anomaly/image_str Directory Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <link rel="icon" href="favicon.png" type="image/png" />
 <script type="text/javascript" src="jquery.js"></script>
@@ -67,7 +67,7 @@ $(function() {
 </div>
 <script type="text/javascript">
 /* @license magnet:?xt=urn:btih:cf05388f2679ee054f2beb29a391d25f4e673ac3&amp;dn=gpl-2.0.txt GPL-v2 */
-$(document).ready(function(){initNavTree('cargo.html',''); initResizable(); });
+$(document).ready(function(){initNavTree('dir_07e5e8203e7c223df932cb39a212c8f9.html',''); initResizable(); });
 /* @license-end */
 </script>
 <div id="doc-content">
@@ -85,26 +85,12 @@ $(document).ready(function(){initNavTree('cargo.html',''); initResizable(); });
 </iframe>
 </div>
 
-<div class="PageDoc"><div class="header">
+<div class="header">
   <div class="headertitle">
-<div class="title">Cargo Behavior </div>  </div>
+<div class="title">image_str Directory Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>This directory provides the cargo_tool</p>
-<h1><a class="anchor" id="autotoc_md60"></a>
-Using the cargo tool</h1>
-<p>This tool is used to initiate pickup and drop cargo actions.</p>
-<p>To run the tool: </p><pre class="fragment">rosrun cargo cargo_tool -$ACTION [OPTIONS]
-</pre><p>The actions that can be defined are: pick - picks up the cargo drop - drops the cargo</p>
-<p>The options that can be defined are: cargo_pose - a pose defined in quaternions of the cargo bag</p>
-<h1><a class="anchor" id="autotoc_md61"></a>
-Demo example</h1>
-<p>Launch isaac simulation normally</p>
-<p>Spawn cargo: </p><pre class="fragment">roslaunch isaac_gazebo spawn_object.launch spawn:=cargo pose:="11.3 -5.6 5.6 -0.707 0 0 0.707" name:=CTB_05_1070
-</pre><p>Pick up cargo (make sure astrobee is undocked) - the pose is the cargo pose inserted above: </p><pre class="fragment">rosrun cargo cargo_tool -id CTB_05_1070 -pick -pose "11.3 -5.6 5.6 -0.707 0 0 0.707"
-</pre><p>Drop cargo - the pose is the dock pose: </p><pre class="fragment">rosrun cargo cargo_tool -drop -pose "10.4 -5.6 5.855 -0.707 0 0 0.707"
-</pre> </div></div><!-- contents -->
-</div><!-- PageDoc -->
+</div><!-- contents -->
 </div><!-- doc-content -->
 <!-- HTML footer for doxygen 1.9.0-->
 <!-- start footer part -->

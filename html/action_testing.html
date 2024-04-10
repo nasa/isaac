@@ -90,9 +90,9 @@ $(document).ready(function(){initNavTree('action_testing.html',''); initResizabl
 <div class="title">Action Testing </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h2><a class="anchor" id="autotoc_md78"></a>
+<div class="textblock"><h2><a class="anchor" id="autotoc_md82"></a>
 Simulation</h2>
-<h3><a class="anchor" id="autotoc_md79"></a>
+<h3><a class="anchor" id="autotoc_md83"></a>
 Move</h3>
 <pre class="fragment">set instance bumble robot
 set instance jem_bay7 location
@@ -111,7 +111,7 @@ set predicate (location-available jem_bay5)
 
 
 run action (move bumble jem_bay7 jem_bay6 jem_bay5)
-</pre><h3><a class="anchor" id="autotoc_md80"></a>
+</pre><h3><a class="anchor" id="autotoc_md84"></a>
 Dock</h3>
 <pre class="fragment">set instance bumble robot
 set instance jem_bay7 location
@@ -123,7 +123,7 @@ set predicate (dock-connected jem_bay7 berth1)
 set predicate (location-available berth1)
 
 run action (dock bumble jem_bay7 berth1)
-</pre><h3><a class="anchor" id="autotoc_md81"></a>
+</pre><h3><a class="anchor" id="autotoc_md85"></a>
 Undock</h3>
 <pre class="fragment">set instance bumble robot
 set instance jem_bay6 location
@@ -143,7 +143,7 @@ set predicate (location-available jem_bay8)
 set predicate (location-available jem_bay6)
 
 run action (undock bumble berth1 jem_bay7 jem_bay8 jem_bay6)
-</pre><h3><a class="anchor" id="autotoc_md82"></a>
+</pre><h3><a class="anchor" id="autotoc_md86"></a>
 Panorama</h3>
 <pre class="fragment">set instance bumble robot
 set instance jem_bay6 location
@@ -157,7 +157,7 @@ set function (= (robot-order bumble) -1)
 set predicate (robot-at bumble jem_bay6)
 
 run action (panorama bumble o0 jem_bay6)
-</pre><h3><a class="anchor" id="autotoc_md83"></a>
+</pre><h3><a class="anchor" id="autotoc_md87"></a>
 Stereo</h3>
 <pre class="fragment">set instance bumble robot
 set instance jem_bay7 location
@@ -184,9 +184,9 @@ set function (= (robot-order bumble) -1)
 
 
 run action (stereo bumble o0 jem_bay7 jem_bay4 jem_bay5 jem_bay3)
-</pre><h2><a class="anchor" id="autotoc_md84"></a>
+</pre><h2><a class="anchor" id="autotoc_md88"></a>
 Granite table</h2>
-<h3><a class="anchor" id="autotoc_md85"></a>
+<h3><a class="anchor" id="autotoc_md89"></a>
 Move</h3>
 <pre class="fragment">set instance wannabee robot
 set instance gra_p1 location
@@ -205,7 +205,7 @@ set predicate (location-available jem_bay5)
 
 
 run action (move wannabee gra_p1 gra_p2 jem_bay5)
-</pre><h3><a class="anchor" id="autotoc_md86"></a>
+</pre><h3><a class="anchor" id="autotoc_md90"></a>
 Dock</h3>
 <pre class="fragment">set instance wannabee robot
 set instance gra_p1 location
@@ -217,7 +217,7 @@ set predicate (dock-connected gra_p1 berth2)
 set predicate (location-available berth2)
 
 run action (dock wannabee gra_p1 berth2)
-</pre><h3><a class="anchor" id="autotoc_md87"></a>
+</pre><h3><a class="anchor" id="autotoc_md91"></a>
 Undock</h3>
 <pre class="fragment">set instance wannabee robot
 set instance gra_p2 location
@@ -237,7 +237,7 @@ set predicate (location-available gra_p0)
 set predicate (location-available gra_p2)
 
 run action (undock wannabee berth1 gra_p1 gra_p0 gra_p2)
-</pre><h3><a class="anchor" id="autotoc_md88"></a>
+</pre><h3><a class="anchor" id="autotoc_md92"></a>
 Panorama</h3>
 <pre class="fragment">set instance wannabee robot
 set instance gra_p2 location
@@ -251,7 +251,7 @@ set function (= (robot-order wannabee) -1)
 set predicate (robot-at wannabee gra_p2)
 
 run action (panorama wannabee o0 gra_p2)
-</pre><h3><a class="anchor" id="autotoc_md89"></a>
+</pre><h3><a class="anchor" id="autotoc_md93"></a>
 Stereo</h3>
 <pre class="fragment">set instance wannabee robot
 set instance gra_p1 location

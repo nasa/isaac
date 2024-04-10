@@ -90,17 +90,17 @@ $(document).ready(function(){initNavTree('acoustics_camera.html',''); initResiza
 <div class="title">Acoustics camera </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><h3><a class="anchor" id="autotoc_md72"></a>
+<div class="textblock"><h3><a class="anchor" id="autotoc_md76"></a>
 Overview</h3>
 <p>This camera simulates a microphone array, or, in other words, a directional microphone. Its readings are assembled into a spherical pattern, consisting of one floating-point measurement for each direction emerging from the microphone center. It is assumed that the microphone array is mounted on the robot and it takes readings as the robot moves around.</p>
 <p>For visualization purposes, the microphone measurements are converted to an acoustic "image". Hence, a virtual camera is created centered at the microphone and with a certain pose that is ideally facing the direction where all or most of the interesting sounds are coming from. The reading at a pixel of that camera is the value of the microphone measurement in the direction of the ray going from the microphone (and camera) center through that pixel.</p>
-<h3><a class="anchor" id="autotoc_md73"></a>
+<h3><a class="anchor" id="autotoc_md77"></a>
 Installation</h3>
 <p>The acoustics camera depends on the pyroomacoustics package. This package can be installed together with its dependencies in a Python 2.7 environment using the command: </p><pre class="fragment">pip install numpy==1.15.4 scipy==0.18 pillow==6 PyWavelets==0.4.0 \
   networkx==1.8 matplotlib==2.0.0 scikit-image==0.14              \
   pyroomacoustics==0.3.1
 </pre><p>It would normally install itself in: </p><pre class="fragment">$HOME/.local/lib/python2.7/site-packages/pyroomacoustics
-</pre><h3><a class="anchor" id="autotoc_md74"></a>
+</pre><h3><a class="anchor" id="autotoc_md78"></a>
 Running the acoustics camera</h3>
 <p>The acoustics camera ROS node can be run as part of the simulator. For that, first set up the environment along the lines of: </p><pre class="fragment">export ASTROBEE_SOURCE_PATH=$HOME/astrobee/src
 export ASTROBEE_BUILD_PATH=$HOME/astrobee
@@ -115,7 +115,7 @@ source $ISAAC_WS/devel/setup.bash
 roslaunch acoustics_cam acoustics_cam.launch output:=screen
 </pre><p>The acoustics camera can be run without ROS as: </p><pre class="fragment">$ISAAC_WS/src/astrobee/simulation/acoustics_cam/nodes/acoustics_cam debug_mode
 </pre><p>In that case it assumes that the robot pose is the value set in the field "debug_robot_pose" in acoustics_cam.json (see below). In this mode it will only create a plot of the acoustics cam image. The sources of sounds will be represented as crosses in this plot, and the camera (microphone) position will be shown as a star.</p>
-<h3><a class="anchor" id="autotoc_md75"></a>
+<h3><a class="anchor" id="autotoc_md79"></a>
 ROS communication</h3>
 <p>The acoustics camera subscribes to </p><pre class="fragment">/loc/truth/pose
 </pre><p>to get the robot pose. It publishes its image, camera pose, and camera intrinsics on topics: </p><pre class="fragment">/hw/cam_acoustics
@@ -123,7 +123,7 @@ ROS communication</h3>
 /sim/acoustics_cam/info
 </pre><p>By default, the camera takes pictures as often as it can (see the configuration below), which is rarely, in fact, as it is slow. It listens however to the topic: </p><pre class="fragment">/comm/dds/command
 </pre><p>for guest science commands that may tell it to take a single picture at a specific time, or to take pictures continuously. Such a command must use the app name "gov.nasa.arc.irg.astrobee.acoustics_cam_image" (which is the "s" field in the first command argument) for it to be processed.</p>
-<h3><a class="anchor" id="autotoc_md76"></a>
+<h3><a class="anchor" id="autotoc_md80"></a>
 Configuration</h3>
 <p>The behavior of this camera is described in: </p><pre class="fragment"> $ISAAC_WS/src/astrobee/simulation/acoustics_cam/acoustics_cam.json
 </pre><p>It has the following entries:</p>
