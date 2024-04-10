@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   isaac:
     image: ${REMOTE:-isaac}/isaac:latest-ubuntu${UBUNTU_VERSION}

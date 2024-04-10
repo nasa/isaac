@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   astrobee-base:
     image: ${REMOTE:-astrobee}/astrobee:latest-base-ubuntu${UBUNTU_VERSION}
@@ -26,9 +25,3 @@ services:
   isaac-astrobee:
     links:
       - astrobee
-  isaac:
-    links:
-      - isaac-astrobee
-
-    
-
