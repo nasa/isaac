@@ -146,7 +146,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       });
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       DOCK_FAILED, [this](FSM::Event const& event) -> FSM::State {
-        Result(RESPONSE::DOCK_FAILED);
+        Result(RESPONSE::DOCK_FAILED, err_msg_);
         return STATE::WAITING;
       });
     // [3]
@@ -165,7 +165,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       [this](FSM::State const& state, FSM::Event const& event) -> FSM::State {
         switch (event) {
         case MOTION_FAILED:
-          Result(RESPONSE::MOTION_APPROACH_FAILED);
+          Result(RESPONSE::MOTION_APPROACH_FAILED, err_msg_);
           break;
         case INSPECT_FAILED:
           Result(RESPONSE::VISUAL_INSPECTION_FAILED);
@@ -414,6 +414,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
     ROS_DEBUG_STREAM("Motion failed result error: " << result->response);
 
+    err_msg_ = "Result code " + result->response;
     return fsm_.Update(MOTION_FAILED);
   }
 
@@ -450,6 +451,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case ff_util::FreeFlyerActionState::SUCCESS:
       return fsm_.Update(DOCK_SUCCESS);
     default:
+      err_msg_ = "Result code " + result->response;
       return fsm_.Update(DOCK_FAILED);
     }
   }
@@ -611,6 +613,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       ROS_WARN_STREAM("Scicam didn't repond, resending it again");
       // Send the command
       SendPicture(focus_distance_current_);
+      ++sci_cam_req_;
       return;
     } else {
       return fsm_.Update(INSPECT_FAILED);
@@ -926,6 +929,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   std::string i_fsm_substate_;
   isaac_msgs::InspectionResult result_;
   int motion_retry_number_= 0;
+  std::string err_msg_;
+
   // Flag to wait for sci camera
   int sci_cam_req_ = 0;
   bool ground_active_ = false;

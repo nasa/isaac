@@ -835,6 +835,8 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
   isaac_msgs::CargoGoal goal_;
   std::string cargo_id_;
   isaac_msgs::CargoResult result_;
+  std::string err_msg_;
+
   // Flag to wait for sci camera
   bool sci_cam_req_ = false;
   bool ground_active_ = false;
