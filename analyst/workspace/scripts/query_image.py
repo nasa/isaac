@@ -48,10 +48,11 @@ def query_image(
 ):
     # Connect to the database
     addresses = ["http://iui_arangodb:8529", "http://127.0.0.1:8529"]
+    conn = None
     for address in addresses:
         try:
             conn = Connection(
-                arangoURL=address, username="root", password="isaac", max_retries=5
+                arangoURL=address, username="root", password="isaac", max_retries=5, timeout=300
             )
             break  # Connection successful, exit the loop
         except Exception as e:
@@ -62,6 +63,7 @@ def query_image(
         print("There is no isaac database, did you load it?")
     else:
         db = conn["isaac"]
+        print("Connected to isaac database")
 
     # Query pose topic for the closest timestamps to the image topic & only get nearby pairs
     query = (
