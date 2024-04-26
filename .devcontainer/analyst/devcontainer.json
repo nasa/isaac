@@ -48,7 +48,8 @@
 	
 	"mounts": [
 		"source=${localWorkspaceFolder},target=/src/isaac/src,type=bind,consistency=cached",
-		"source=${localWorkspaceFolder}/../../astrobee/src,target=/src/astrobee/src,type=bind,consistency=cached"
+		"source=${localWorkspaceFolder}/../../astrobee/src,target=/src/astrobee/src,type=bind,consistency=cached",
+		"source=${localWorkspaceFolder}/../../data/Sock_example,target=/src/data/vent,type=bind,consistency=cached"
 	],
 	"workspaceFolder": "/src/isaac/src"
 }

@@ -34,7 +34,7 @@ RUN pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
     && pip3 install networkx==3.1 \
     && pip3 install matplotlib opencv-python numpy-quaternion pandas \
-    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu \
+    && pip3 install torch torchvision torchaudio \
     # Image STR packages
     && pip3 install lmdb ipympl gdown timm nltk  \
     && pip3 install git+https://github.com/marinagmoreira/CRAFT-pytorch.git \

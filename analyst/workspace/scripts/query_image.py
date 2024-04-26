@@ -93,6 +93,7 @@ def query_image(
         + str(target_position[2] + max_distance)
         + "\n"
         + "  RETURN {doc_image, closest_pose: closest_pose[0]}"
+        
     )
 
     result = list(db.AQLQuery(query, rawResults=True))
