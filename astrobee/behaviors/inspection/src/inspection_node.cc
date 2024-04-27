@@ -414,7 +414,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
     ROS_DEBUG_STREAM("Motion failed result error: " << result->response);
 
-    err_msg_ = "Result code " + result->response;
+    err_msg_ = "Move Code" + std::to_string(result->response) + ": (" + result->fsm_result + ")";
     return fsm_.Update(MOTION_FAILED);
   }
 
@@ -451,7 +451,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case ff_util::FreeFlyerActionState::SUCCESS:
       return fsm_.Update(DOCK_SUCCESS);
     default:
-      err_msg_ = "Result code " + result->response;
+      err_msg_ = "Dock Code " + std::to_string(result->response) + ": (" + result->fsm_result + ")";
       return fsm_.Update(DOCK_FAILED);
     }
   }
@@ -608,6 +608,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
   void SciCamTimeout(const ros::TimerEvent& event) {
     sci_cam_timeout_.stop();
+    // If the action was cancelled stop taking more pictures
+    if (fsm_.GetState() == STATE::WAITING) return;
+
     // The sci cam image was not received
     if (sci_cam_req_ < cfg_.Get<int>("sci_cam_max_trials")) {
       ROS_WARN_STREAM("Scicam didn't repond, resending it again");
