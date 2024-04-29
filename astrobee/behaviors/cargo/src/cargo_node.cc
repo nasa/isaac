@@ -246,10 +246,10 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
       [this](FSM::State const& state, FSM::Event const& event) -> FSM::State {
         switch (event) {
         case MOTION_FAILED:
-          Result(RESPONSE::MOTION_FAILED);
+          Result(RESPONSE::MOTION_FAILED, err_msg_);
           break;
         case ARM_FAILED:
-          Result(RESPONSE::ARM_FAILED);
+          Result(RESPONSE::ARM_FAILED, err_msg_);
           break;
         case DETECT_FAILED:
           Result(RESPONSE::DETECT_FAILED);
@@ -542,6 +542,7 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
       ROS_ERROR_STREAM("Invalid result received");
     }
 
+    err_msg_ = "Move Code" + std::to_string(result->response) + ": (" + result->fsm_result + ")";
     return fsm_.Update(MOTION_FAILED);
   }
 
@@ -565,6 +566,7 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
     case ff_util::FreeFlyerActionState::SUCCESS:
       return fsm_.Update(ARM_SUCCESS);
     default:
+      err_msg_ = "Arm Code " + std::to_string(result->response) + ": (" + result->fsm_result + ")";
       return fsm_.Update(ARM_FAILED);
     }
   }
@@ -835,6 +837,8 @@ class CargoNode : public ff_util::FreeFlyerNodelet {
   isaac_msgs::CargoGoal goal_;
   std::string cargo_id_;
   isaac_msgs::CargoResult result_;
+  std::string err_msg_;
+
   // Flag to wait for sci camera
   bool sci_cam_req_ = false;
   bool ground_active_ = false;
