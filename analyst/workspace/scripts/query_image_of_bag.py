@@ -66,6 +66,7 @@ def query_image(
         db = conn["isaac"]
         print("Connected to isaac database")
 
+    
     # Query pose topic for the closest timestamps to the image topic & only get nearby pairs
     query = (
         "FOR doc_image IN "
