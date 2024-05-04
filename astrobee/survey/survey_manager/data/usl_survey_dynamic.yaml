@@ -24,11 +24,10 @@
 
 goals:
 
-- {type: panorama, robot: bumble, order: 0, location: jem_bay4}
-- {type: panorama, robot: bumble, order: 1, location: jem_bay3}
-- {type: panorama, robot: bumble, order: 2, location: jem_bay2}
-- {type: panorama, robot: bumble, order: 3, location: jem_bay1}
-- {type: stereo, robot: bumble, order: 4, trajectory: jem_bay1_to_bay3}
+- {type: panorama, robot: bumble, order: 1, location: usl_bay3}
+- {type: panorama, robot: bumble, order: 2, location: usl_bay2}
+- {type: panorama, robot: bumble, order: 3, location: usl_bay1}
+# - {type: stereo, robot: bumble, order: 4, trajectory: usl_bay1_to_bay3}
 # This is one of the goals we previously had to comment out for POPF to return a halfway decent
 # plan. Adding a let_other_robot_reach goal mostly fixed the problem.
 - {type: robot_at, robot: bumble, location: berth1}
@@ -40,15 +39,15 @@ goals:
 # planner doesn't need the hint.)
 # - {type: let_other_robot_reach, robot: honey, order: 0, location: jem_bay5}
 
-- {type: panorama, robot: honey, order: 1, location: jem_bay7}
-- {type: panorama, robot: honey, order: 2, location: jem_bay6}
-- {type: panorama, robot: honey, order: 3, location: jem_bay5}
+- {type: panorama, robot: honey, order: 1, location: usl_bay6}
+- {type: panorama, robot: honey, order: 2, location: usl_bay5}
+- {type: panorama, robot: honey, order: 3, location: usl_bay4}
 # This is the other objective we previously had to comment out for POPF to return a decent plan.
-- {type: stereo, robot: honey, order: 4, trajectory: jem_bay7_to_bay4}
+- {type: stereo, robot: honey, order: 4, trajectory: usl_bay1_to_bay6}
 - {type: robot_at, robot: honey, location: berth2}
 
 init:
   bumble:
-    location: berth1
+    location: usl_bay1
   honey:
-    location: berth2
+    location: usl_bay6

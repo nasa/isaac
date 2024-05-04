@@ -80,7 +80,7 @@ PDDL_DIR = pathlib.Path(
     os.path.relpath(pathlib.Path(rospack.get_path("survey_manager")) / "pddl", CWD)
 )
 DEFAULT_CONFIGS = [
-    DATA_DIR / "jem_survey_static.yaml",
+    DATA_DIR / "iss_survey_static.yaml",
     DATA_DIR / "jem_survey_dynamic.yaml",
 ]
 
@@ -479,8 +479,8 @@ def problem_generator(
     candidates = (
         ("jem_bay7", "berth1"),
         ("jem_bay7", "berth2"),
-        ("gra_bay3", "berth1"),
-        ("gra_bay5", "berth2"),
+        ("gra_bay3", "berth1_g"),
+        ("gra_bay5", "berth2_g"),
     )
     dock_connected_lines = [
         f"(dock-connected {bay} {berth})"
