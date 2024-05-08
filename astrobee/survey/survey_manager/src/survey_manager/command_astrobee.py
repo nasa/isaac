@@ -70,45 +70,23 @@ def first_non_zero(a: int, b: int) -> int:
 
 
 def exposure_change(config_static, bay_origin, bay_destination):
-    # Going to JEM
-    if bay_origin == "nod2_bay1" and bay_destination == "jem_bay0":
-        loginfo("CHANGING EXPOSURE TO JEM")
-        return config_static["exposure"]["jem"]
+    origin_prefix = bay_origin.split("_")[0]
+    destination_prefix = bay_destination.split("_")[0]
 
-    # Going  to NOD2
-    if (
-        bay_origin == "jem_bay0"
-        and bay_destination == "nod2_bay1"
-        or bay_origin == "usl_bay0"
-        and bay_destination == "nod2_bay5"
-    ):
-        loginfo("CHANGING EXPOSURE TO NOD2")
-        return config_static["exposure"]["nod2"]
-
-    # Going to USL
-    if bay_origin == "nod2_bay5" and bay_destination == "usl_bay0":
-        return config_static["exposure"]["usl"]
+    if origin_prefix != destination_prefix:
+        loginfo(f"CHANGING EXPOSURE TO {destination_prefix.upper()}")
+        return config_static["exposure"][destination_prefix]
 
     return 0
 
 
 def map_change(config_static, bay_origin, bay_destination):
-    # Going to JEM
-    if bay_origin == "nod2_bay1" and bay_destination == "jem_bay0":
-        loginfo("CHANGING MAP TO JEM")
-        return config_static["maps"]["jem"]
-    # Going  to NOD2
-    if (
-        bay_origin == "jem_bay0"
-        and bay_destination == "nod2_bay1"
-        or bay_origin == "usl_bay0"
-        and bay_destination == "nod2_bay5"
-    ):
-        loginfo("CHANGING MAP TO NOD2")
-        return config_static["maps"]["nod2"]
-    # Going to USL
-    if bay_origin == "nod2_bay5" and bay_destination == "usl_bay0":
-        return config_static["maps"]["usl"]
+    origin_prefix = bay_origin.split("_")[0]
+    destination_prefix = bay_destination.split("_")[0]
+
+    if origin_prefix != destination_prefix:
+        loginfo(f"CHANGING MAP TO {destination_prefix.upper()}")
+        return config_static["maps"][destination_prefix]
     return ""
 
 
