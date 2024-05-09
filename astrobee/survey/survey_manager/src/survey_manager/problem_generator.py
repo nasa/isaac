@@ -479,8 +479,8 @@ def problem_generator(
     candidates = (
         ("jem_bay7", "berth1"),
         ("jem_bay7", "berth2"),
-        ("gra_bay3", "berth1_g"),
-        ("gra_bay5", "berth2_g"),
+        ("gra_bay4", "berth1_g"),
+        ("gra_bay3", "berth2_g"),
     )
     dock_connected_lines = [
         f"(dock-connected {bay} {berth})"
