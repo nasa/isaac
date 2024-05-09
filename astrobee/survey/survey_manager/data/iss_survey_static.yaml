@@ -94,14 +94,15 @@ bays_pano:
   usl_bay6: "isaac11/usl_bay6_std_panorama.txt"
 
 maps:
-  jem: "iss.map"
-  nod2: "isaac.map"
-  usl: "usl_only.map"
+  jem: "/data/maps/20240320_lam.map"
+  nod2: "/data/maps/20240205_usl_abad.map"
+  usl: "/data/maps/20240205_usl_abad.map"
 
 exposure:
   jem: 175
   nod2: 300
   usl: 300
+
 berth:
   berth1: "1"
   berth2: "2"

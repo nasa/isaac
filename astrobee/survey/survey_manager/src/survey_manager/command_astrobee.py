@@ -70,6 +70,8 @@ def first_non_zero(a: int, b: int) -> int:
 
 
 def exposure_change(config_static, bay_origin, bay_destination):
+    if "berth" in bay_origin or "berth" in bay_destination:
+        return 0
     origin_prefix = bay_origin.split("_")[0]
     destination_prefix = bay_destination.split("_")[0]
 
@@ -81,6 +83,8 @@ def exposure_change(config_static, bay_origin, bay_destination):
 
 
 def map_change(config_static, bay_origin, bay_destination):
+    if "berth" in bay_origin or "berth" in bay_destination:
+        return ""
     origin_prefix = bay_origin.split("_")[0]
     destination_prefix = bay_destination.split("_")[0]
 
@@ -501,8 +505,11 @@ class CommandExecutor:
     def change_exposure(self, val):
         # Arg is exposure value
         arg1 = CommandArg()
-        arg1.data_type = CommandArg.DATA_TYPE_FLOAT
-        arg1.s = val
+        arg1.data_type = CommandArg.DATA_TYPE_STRING
+        arg1.s = CommandConstants.PARAM_NAME_CAMERA_NAME_NAV
+        arg2 = CommandArg()
+        arg2.data_type = CommandArg.DATA_TYPE_FLOAT
+        arg2.f = val
 
         cmd = CommandStamped()
         cmd.header = Header(stamp=rospy.Time.now())
@@ -511,7 +518,7 @@ class CommandExecutor:
         self.unique_cmd_id = cmd.cmd_id
         cmd.cmd_src = "isaac fsw"
         cmd.cmd_origin = "isaac fsw"
-        cmd.args = [arg1]
+        cmd.args = [arg1, arg2]
 
         # Publish the CommandStamped message
         loginfo("Change exposure to " + str(val))
