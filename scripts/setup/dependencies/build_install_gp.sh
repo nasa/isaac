@@ -23,7 +23,7 @@ PACKAGE_NAME=gp
 if [ -d $PACKAGE_NAME ]; then
   rm -rf $PACKAGE_NAME
 fi
-git clone --quiet https://github.com/marinamrr/libgp.git $PACKAGE_NAME 2>&1 || exit 1
+git clone --quiet https://github.com/marinagmoreira/libgp.git $PACKAGE_NAME 2>&1 || exit 1
 cd $PACKAGE_NAME
 mkdir build && cd build
 cmake ..
