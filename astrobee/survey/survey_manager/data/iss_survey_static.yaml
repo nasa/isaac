@@ -36,6 +36,19 @@ bays:
   jem_bay5: [11.0, -8.0, 4.8]
   jem_bay6: [11.0, -9.0, 4.8]
   jem_bay7: [11.0, -9.7, 4.8]
+  jem_bay0: [11.0, -9.7, 4.8]
+  nod2_bay1: [11.0, -9.7, 4.8]
+  nod2_bay2: [11.0, -1.0, 4.8]
+  nod2_bay3: [10.0, 0.0, 4.8]
+  nod2_bay4: [9.0, 0.0, 4.8]
+  nod2_bay5: [7.8, 0.0, 4.8]
+  usl_bay0: [5.3, 0.0, 4.8]
+  usl_bay1: [4.7, 0.0, 4.8]
+  usl_bay2: [3.65, 0.0, 4.8]
+  usl_bay3: [2.6, 0.0, 4.8]
+  usl_bay4: [1.55, 0.0, 4.8]
+  usl_bay5: [0.5, 0.0, 4.8]
+  usl_bay6: [-0.5, 0.0, 4.8]
 
 bays_move:
   jem_bay1: ["-pos", "11 -4 4.8", "-att", "1.5708 0 0 1"]
@@ -45,23 +58,19 @@ bays_move:
   jem_bay5: ["-pos", "11 -8 4.8", "-att", "-1.5708 0 0 1"]
   jem_bay6: ["-pos", "11 -9 4.8", "-att", "-1.5708 0 0 1"]
   jem_bay7: ["-pos", "11 -9.7 4.8", "-att", "-1.5708 0 0 1"]
-  jem_hatch_to_nod2: ["-pos", "11 -3.5 4.8", "-att", "1.5708 0 0 1"]
-  jem_hatch_from_nod2: ["-pos", "11 -3.5 4.8", "-att", "-1.5708 0 0 1"]
-  nod2_hatch_from_jem: ["-pos", "11 -1.0 4.8", "-att", "1.5708 0 0 1"]
-  nod2_hatch_to_jem: ["-pos", "11 -1.0 4.8", "-att", "-1.5708 0 0 1"]
+  jem_bay0: ["-pos", "11 -3.5 4.8", "-att", "-1.5708 0 0 1"]
+  nod2_bay1: ["-pos", "11 -1.0 4.8", "-att", "-1.5708 0 0 1"]
   nod2_bay2: ["-pos", "11 0 4.8", "-att", "0 0 0 1"]
   nod2_bay3: ["-pos", "10 0 4.8", "-att", "0 0 0 1"]
   nod2_bay4: ["-pos", "9 0 4.8", "-att", "0 0 0 1"]
-  nod2_hatch_to_usl: ["-pos", "7.8 -3.5 4.8", "-att", "3.14 0 0 1"]
-  nod2_hatch_from_usl: ["-pos", "7.8 -3.5 4.8", "-att", "0 0 0 1"]
-  usl_hatch_from_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "3.14 0 0 1"]
-  usl_hatch_to_nod2: ["-pos", "5.3 -1.0 4.8", "-att", "0 0 0 1"]
+  nod2_bay5: ["-pos", "7.8 0.0 4.8", "-att", "0 0 0 1"]
+  usl_bay0: ["-pos", "5.3 0.0 4.8", "-att", "0 0 0 1"]
   usl_bay1: ["-pos", "4.7 0 4.8", "-att", "0 0 0 1"]
   usl_bay2: ["-pos", "3.65 0 4.8", "-att", "0 0 0 1"]
   usl_bay3: ["-pos", "2.6 0 4.8", "-att", "0 0 0 1"]
-  usl_bay4: ["-pos", "1.55 0 4.8", "-att", "0 0 0 1"]
-  usl_bay5: ["-pos", "0.5 0 4.8", "-att", "0 0 0 1"]
-  usl_bay6: ["-pos", "-0.5 0 4.8", "-att", "0 0 0 1"]
+  usl_bay4: ["-pos", "1.55 0 4.8", "-att", "3.14 0 0 1"]
+  usl_bay5: ["-pos", "0.5 0 4.8", "-att", "3.14 0 0 1"]
+  usl_bay6: ["-pos", "-0.5 0 4.8", "-att", "3.14 0 0 1"]
   # berth approach points from gds_configs/IssWorld/BookmarksList.json
   berth1: ["-pos", "10.5 -9.25 4.5", "-att", "0 0 0 1"]
   berth2: ["-pos", "10.5 -9.75 4.5", "-att", "3.14 1 0 0"]
@@ -85,19 +94,20 @@ bays_pano:
   usl_bay6: "isaac11/usl_bay6_std_panorama.txt"
 
 maps:
-  jem: "iss.map"
-  nod2: "isaac.map"
-  usl: "usl_only.map"
+  jem: "/data/maps/20240320_lam.map"
+  nod2: "/data/maps/20240205_usl_abad.map"
+  usl: "/data/maps/20240205_usl_abad.map"
 
 exposure:
   jem: 175
   nod2: 300
   usl: 300
+
 berth:
   berth1: "1"
   berth2: "2"
 
-bogus_bays: [jem_bay0, jem_bay8]
+bogus_bays: [jem_bay0, jem_bay8, nod2_bay1, nod2_bay5, usl_bay0, usl_bay7]
 berths: [berth1, berth2]
 robots: [bumble, honey]
 
@@ -116,3 +126,15 @@ stereo:
     fplan: "ISAAC/jem_stereo_mapping_bay7_to_bay4"
     base_location: jem_bay7
     bound_location: jem_bay4
+  usl_bay1_to_bay3:
+    fplan: "ISAAC/usl_stereo_mapping_bay1_to_bay3"
+    base_location: usl_bay1
+    bound_location: usl_bay3
+  usl_bay6_to_bay4:
+    fplan: "ISAAC/usl_stereo_mapping_bay6_to_bay4"
+    base_location: usl_bay6
+    bound_location: usl_bay4
+  usl_bay1_to_bay6:
+    fplan: "ISAAC/usl_stereo_mapping_start_bay1"
+    base_location: usl_bay1
+    bound_location: usl_bay6
