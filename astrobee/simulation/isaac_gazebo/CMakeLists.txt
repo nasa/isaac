@@ -19,8 +19,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(isaac_gazebo)
 
-# Specify C++14 standard
-add_definitions(-std=c++14)
+# Specify C++17 standard
+add_definitions(-std=c++17)
 
 # Find packages
 find_package(catkin REQUIRED COMPONENTS

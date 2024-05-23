@@ -1,5 +1,10 @@
 # Releases
 
+## Release 0.2.10
+
+  * ISAAC 15 prep
+  * Improve action result
+
 ## Release 0.2.9
 
   * Fixes to survey_manager

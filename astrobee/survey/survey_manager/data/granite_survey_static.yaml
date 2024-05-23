@@ -27,6 +27,18 @@
 # Useful reference for positions and stereo survey trajectories:
 # https://babelfish.arc.nasa.gov/confluence/display/FFOPS/ISAAC+Phase+1X+Activity+9+Ground+Procedure
 
+# granite map:
+#
+#           gra_1
+#           gra_2
+#   berth2| gra_3
+#
+#   berth1| gra_4
+#           gra_5
+#           gra_6
+#           gra_7  gro_0  gro_1  gro_2  gro_3
+#
+
 bays:
   # 3D coordinates for symbolic bays in ISS Analysis Coordinate System used by Astrobee
   gra_bay1: [0.1, 0.7, -0.68]
@@ -35,30 +47,47 @@ bays:
   gra_bay4: [0.1, 0.3, -0.68]
   gra_bay5: [0.1, 0.1, -0.68]
   gra_bay6: [0.1, -0.3, -0.68]
-  gra_bay7: [0.1, -0.5, -0.68]
+  gra_bay7: [0.15, -0.5, -0.68]
+  gra_bay8: [0.15, -0.5, -0.68]
+  gro_bay0: [0.20, -0.5, -0.68]
+  gro_bay1: [0.25, -0.5, -0.68]
+  gro_bay2: [0.30, -0.5, -0.68]
+  gro_bay3: [0.35, -0.5, -0.68]
 
 bays_move:
-  gra_bay1: ["-pos", "0.1 0.7 -0.68"]
-  gra_bay2: ["-pos", "0.1 0.6 -0.68"]
-  gra_bay3: ["-pos", "0.1 0.5 -0.68"]
+  gra_bay1: ["-pos", "0.1 -0.5 -0.68", "-att", "3.14 1 0 0"]
+  gra_bay2: ["-pos", "0.1 -0.4 -0.68", "-att", "3.14 1 0 0"]
+  gra_bay3: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
   gra_bay4: ["-pos", "0.1 0.3 -0.68"]
-  gra_bay5: ["-pos", "0.1 0.1 -0.68", "-att", "3.14 1 0 0"]
-  gra_bay6: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
-  gra_bay7: ["-pos", "0.1 -0.5 -0.68", "-att", "3.14 1 0 0"]
+  gra_bay5: ["-pos", "0.1 0.4 -0.68"]
+  gra_bay6: ["-pos", "0.1 0.5 -0.68"]
+  gra_bay7: ["-pos", "0.15 0.7 -0.68"]
+  gra_bay8: ["-pos", "0.20 0.7 -0.68"]
+  gro_bay0: ["-pos", "0.25 0.7 -0.68"]
+  gro_bay1: ["-pos", "0.30 0.7 -0.68"]
+  gro_bay2: ["-pos", "0.35 0.7 -0.68"]
+  gro_bay3: ["-pos", "0.40 0.7 -0.68"]
   berth1_g: ["-pos", "0.1 0.3 -0.68"]
   berth2_g: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
 
+maps:
+  gra: "/data/maps/granite.map"
+  gro: "/data/maps/iss.map"
+
+exposure:
+  gra: 175
+  gro: 300
 
 bays_pano:
-  gra_bay2: "panorama_granite_bsharp.txt"
-  gra_bay6: "panorama_granite_wannabee.txt"
+  gra_bay6: "panorama_granite_bsharp.txt"
+  gra_bay2: "panorama_granite_wannabee.txt"
 
 berth:
   berth1_g: "1"
   berth2_g: "2"
 
-bogus_bays: [gra_bay0, gra_bay8]
-berths: [berth1, berth2]
+bogus_bays: [gra_bay0, gra_bay8, gro_bay0, gro_bay4]
+berths: [berth1_g, berth2_g]
 robots: [bsharp, wannabee]
 
 stereo:
@@ -66,7 +95,7 @@ stereo:
     fplan: "startup"
     base_location: gra_bay1
     bound_location: gra_bay3
-  gra_bay5_to_bay7:
+  gro_bay1_to_bay3:
     fplan: "startup"
-    base_location: gra_bay5
-    bound_location: gra_bay7
+    base_location: gro_bay1
+    bound_location: gro_bay3
