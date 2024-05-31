@@ -31,7 +31,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -e \
-    pip3 install pyArango \
+    && pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
     && pip3 install networkx==3.1 \
     && pip3 install matplotlib opencv-python numpy-quaternion pandas \

@@ -13,7 +13,7 @@ torch.set_grad_enabled(False)
 
 
 # This function matches a query image to the perspective of the base image. It does this using superpoint feature extractor and lightglue feature matcher
-def match_images_and_transform(base_image_path, query_image_path):
+def match_images_and_transform(base_image_path, query_image_path, feats_base_image):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Check if Nvidia CUDA is supported by the gpu otherwise set device to cpu
 
     
@@ -25,7 +25,6 @@ def match_images_and_transform(base_image_path, query_image_path):
     query_image = load_image(query_image_path)
 
     # Extract features in both images and store them on the device
-    feats_base_image = extractor.extract(base_image.to(device))
     feats_query_image = extractor.extract(query_image.to(device))
 
     # Match the features found. Also remove the batch dimention for further processing
@@ -75,13 +74,13 @@ def extract_image(image, corners): # Takes the image and the corners in a numpy 
 
 
 
-def save_images(result, image_path, base_image_path, corners, save_path, bag, total_images_saved, print_info):
+def save_images(result, image_path, base_image_path, corners, save_path, bag, total_images_saved, feats_base_image, print_info):
     amount_images = 0 # Variable for counting the amount of images that have been saved from this bag.
     for idx, element in enumerate(result): # Go though the result one by one
         image = cv.imread(image_path + element['img']) #Load the image file with openCV
     
         # Note: The corners are as follows; C1: bottom right, C2: top right, C3: top left, C4: bottom left
-        transformed_image = match_images_and_transform(base_image_path, image_path + element['img'])
+        transformed_image = match_images_and_transform(base_image_path, image_path + element['img'], feats_base_image)
                                                        
         extracted_image = extract_image(transformed_image, [corners['A'], corners['B'], corners['D'], corners['C']]) # Extract the image patches from the image
         
