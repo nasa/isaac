@@ -41,7 +41,7 @@ import rosbag
 from tf.transformations import euler_from_quaternion
 
 RAD2DEG = 180 / math.pi
-IMAGE_TOPIC = "/hw/cam_sci_info"
+IMAGE_TOPIC = ["/hw/cam_sci/compressed", "/hw/cam_sci_info"]
 POSE_TOPIC = "/loc/pose"
 UNDISTORT_ENV_VARS = [
     "ASTROBEE_RESOURCE_DIR",
@@ -214,8 +214,9 @@ def get_image_meta(inbag_path, images_dir, skip_images_str):
     with rosbag.Bag(inbag_path) as bag:
         need_pose = False
         print("Detecting images:")
-        for topic, msg, t in bag.read_messages([IMAGE_TOPIC, POSE_TOPIC]):
-            if topic == IMAGE_TOPIC:
+        topics = IMAGE_TOPIC + [POSE_TOPIC]
+        for topic, msg, t in bag.read_messages(topics):
+            if topic in IMAGE_TOPIC:
                 img_path = os.path.join(
                     images_dir,
                     str(msg.header.stamp.secs)
@@ -426,14 +427,12 @@ class PathSequence(object):
 
 def read_pto(pano, pto_path):
     print("\nread_pto: %s" % pto_path)
-    ifs = hsi.ifstream(pto_path)
-    pano.readData(ifs)
+    pano.ReadPTOFile(pto_path)
 
 
 def write_pto(pano, pto_path):
     print("\nwrite_pto: %s" % pto_path)
-    ofs = hsi.ofstream(pto_path)
-    pano.writeData(ofs)
+    pano.WritePTOFile(pto_path)
 
 
 def get_timestamp():
@@ -732,7 +731,9 @@ def main():
             "Preserving final metadata %s alongside output pano image"
             % os.path.basename(pto_final)
         )
-        shutil.copyfile(pto_final, output_dir)
+        shutil.copyfile(
+            pto_final, os.path.join(output_dir, os.path.basename(pto_final))
+        )
 
         print("\n=== Final stitched pano in %s ===\n" % final_png_path)
 
