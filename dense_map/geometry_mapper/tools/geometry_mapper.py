@@ -479,14 +479,13 @@ def run_cmd(cmd, log_file, verbose=False):
 
     with open(log_file, "wb", buffering=0) as f:
         f.write((cmd_str + "\n").encode())
-        process = subprocess.Popen(cmd, stderr=subprocess.STDOUT, text=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
-        # for line in iter(process.stdout.readline, ''):
-        #     if verbose:
-        #         sys.stdout.write(line)
-        #     f.write(line.encode())
+        for line in iter(process.stdout.readline, b""):
+            if verbose:
+                sys.stdout.write(line.decode())
+            f.write(line)
 
-        # process.stdout.close()
         # If a certain step failed, do not continue
         process.wait()
 
