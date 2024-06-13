@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+from cnn_object_localization.pointcloud_mask import *
+
+
+if __name__ == "__main__":
+    # Initialize node
+    rospy.init_node("pointcloud_mask_processor_node")
+
+    # Define detector object
+    dm = PerchCamProcess()
+
+    # Spin
+    rospy.spin()

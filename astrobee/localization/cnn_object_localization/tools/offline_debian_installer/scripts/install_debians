@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Base paths
+SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+ASTROBEE_TOOL_DIR=$(dirname "$SCRIPTS_DIR")
+TEMP_DIR_REL="temp"
+DEPS_LIST_FILTERED_REL="${TEMP_DIR_REL}/debian_dependencies_list_filtered.txt"
+DEBIAN_DIR_REL="${TEMP_DIR_REL}/debians"
+
+# Install the downloaded debians in order on Astrobee
+while read package; do
+    debian_file=$(find "${ASTROBEE_TOOL_DIR}/${DEBIAN_DIR_REL}" -type f -name "${package}_*.deb")
+    sudo dpkg -i "$debian_file"
+done < "${ASTROBEE_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}"
+echo "Debians installed on Astrobee. All done."

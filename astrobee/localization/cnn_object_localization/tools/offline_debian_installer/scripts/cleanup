@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# Local system sources.list
+SOURCES_LIST="/etc/apt/sources.list"
+
+# Architecture used by Astrobee
+ARCHITECTURE="armhf"
+
+# =============================================================================
+# CLEANUP
+# =============================================================================
+
+# Base paths
+SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+LOCAL_TOOL_DIR=$(dirname "$SCRIPTS_DIR")
+
+# Relative file/directory paths
+TEMP_DIR_REL="temp"
+FOREIGN_ARCHS_LIST_REL="${TEMP_DIR_REL}/foreign_architectures.txt"
+
+echo "Reverting some stuff."
+
+# Restore original dpkg architecture configuration
+sudo dpkg --remove-architecture ${ARCHITECTURE}
+while read -r architecture_to_restore; do 
+    sudo dpkg --add-architecture "$architecture_to_restore"
+done < "${LOCAL_TOOL_DIR}/${FOREIGN_ARCHS_LIST_REL}"
+
+# Restore original sources.list
+sudo mv ${SOURCES_LIST}.bak ${SOURCES_LIST}
+
+# Remove temporary directory
+rm -rf "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}"
+
