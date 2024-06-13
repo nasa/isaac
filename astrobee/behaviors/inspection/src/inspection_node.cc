@@ -146,7 +146,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       });
     fsm_.Add(STATE::MOVING_TO_APPROACH_POSE,
       DOCK_FAILED, [this](FSM::Event const& event) -> FSM::State {
-        Result(RESPONSE::DOCK_FAILED);
+        Result(RESPONSE::DOCK_FAILED, err_msg_);
         return STATE::WAITING;
       });
     // [3]
@@ -165,7 +165,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       [this](FSM::State const& state, FSM::Event const& event) -> FSM::State {
         switch (event) {
         case MOTION_FAILED:
-          Result(RESPONSE::MOTION_APPROACH_FAILED);
+          Result(RESPONSE::MOTION_APPROACH_FAILED, err_msg_);
           break;
         case INSPECT_FAILED:
           Result(RESPONSE::VISUAL_INSPECTION_FAILED);
@@ -227,7 +227,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       TOPIC_COMMAND, 1, true);
 
     // Subscribe to the sci camera info topic to make sure a picture was taken
-    sub_sci_cam_info_ = nh->subscribe("/hw/cam_sci_info", 1,
+    sub_sci_cam_info_ = nh->subscribe(TOPIC_HARDWARE_SCI_CAM_INFO, 1,
                       &InspectionNode::SciCamInfoCallback, this);
 
 
@@ -368,7 +368,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     ff_msgs::MotionResultConstPtr const& result) {
     // Check for invalid results
     if (result == nullptr) {
-      ROS_ERROR_STREAM("Invalid result received Motion");
+      ROS_INFO_STREAM("Invalid result received Motion");
       return fsm_.Update(MOTION_FAILED);
     }
 
@@ -414,6 +414,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     }
     ROS_DEBUG_STREAM("Motion failed result error: " << result->response);
 
+    err_msg_ = "Move Code" + std::to_string(result->response) + ": (" + result->fsm_result + ")";
     return fsm_.Update(MOTION_FAILED);
   }
 
@@ -450,6 +451,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case ff_util::FreeFlyerActionState::SUCCESS:
       return fsm_.Update(DOCK_SUCCESS);
     default:
+      err_msg_ = "Dock Code " + std::to_string(result->response) + ": (" + result->fsm_result + ")";
       return fsm_.Update(DOCK_FAILED);
     }
   }
@@ -482,9 +484,9 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     pub_guest_sci_.publish(cmd);
   }
 
-  void SendPicture(double focus_distance) {
-    ROS_DEBUG_STREAM("Send picture");
-    // Take picture
+
+  void SendSciCamCommand(std::string command) {
+    // Chnage focus
     ff_msgs::CommandArg arg;
     std::vector<ff_msgs::CommandArg> cmd_args;
 
@@ -496,7 +498,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd_args.push_back(arg);
 
     arg.data_type = ff_msgs::CommandArg::DATA_TYPE_STRING;
-    arg.s = "{\"name\": \"takePicture\", \"haz_dist\": " + std::to_string(focus_distance) +"}";
+    arg.s = command;
     cmd_args.push_back(arg);
 
     ff_msgs::CommandStamped cmd;
@@ -508,7 +510,12 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     cmd.args = cmd_args;
 
     pub_guest_sci_.publish(cmd);
+  }
 
+
+  void SendPicture(double focus_distance) {
+    ROS_DEBUG_STREAM("Send picture");
+    SendSciCamCommand("{\"name\": \"takePicture\", \"haz_dist\": " + std::to_string(focus_distance) +"}");
     // Timer for the sci cam camera
     sci_cam_timeout_.start();
   }
@@ -522,6 +529,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       goal.type = isaac_msgs::ImageInspectionGoal::VENT;
       client_i_.SendGoal(goal);
     }
+    finished_anomaly_ = false;
 
     // Allow image to stabilize
     ros::Duration(cfg_.Get<double>("station_time")).sleep();
@@ -531,7 +539,7 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     flashlight_intensity_current_ = 0.0;
 
     // Signal an imminent sci cam image
-    sci_cam_req_ = sci_cam_req_ + 1;
+    sci_cam_req_ += 1;
 
     // Send the command
     SendPicture(focus_distance_calculated_);
@@ -546,12 +554,23 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
       // Clear local variables
       sci_cam_timeout_.stop();
       sci_cam_req_ = 0;
+
+      // If the action was cancelled stop taking more pictures
+      if (fsm_.GetState() == STATE::WAITING) {
+        // If we stopped inspection while the flashlight was on, turn it off
+        if (flashlight_intensity_current_ != 0) {
+          flashlight_intensity_current_ = 0.0;
+          Flashlight(flashlight_intensity_current_);
+        }
+        return;
+      }
+
       result_.inspection_result.push_back(isaac_msgs::InspectionResult::PIC_ACQUIRED);
       result_.picture_time.push_back(msg->header.stamp);
       ros::Duration(cfg_.Get<double>("station_time")).sleep();
 
       if (goal_.command == isaac_msgs::InspectionGoal::ANOMALY) {
-        ROS_DEBUG_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
+        ROS_INFO_STREAM("Scicam picture acquired - Timestamp: " << msg->header.stamp
                       << ", Focus distance (m): " << focus_distance_current_
                       << ", Focal distance : " << 1.6 * std::pow(focus_distance_current_, -1.41)
                       << ", Flashlight: " << flashlight_intensity_current_);
@@ -559,6 +578,8 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
         if (flashlight_intensity_current_ != cfg_.Get<double>("toggle_flashlight")) {
           flashlight_intensity_current_ = cfg_.Get<double>("toggle_flashlight");
           Flashlight(flashlight_intensity_current_);
+          sci_cam_req_ = 1;
+          SendPicture(-1);
         } else {
           // Move on in focus distance iteration
           flashlight_intensity_current_ = 0.0;
@@ -568,13 +589,17 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
           } else if (focus_distance_current_ <
                        cfg_.Get<double>("target_distance") + cfg_.Get<double>("focus_distance_range") - EPS) {
             focus_distance_current_ += cfg_.Get<double>("focus_distance_step");
-          } else {
-            // Finish inspection
+          } else if (!ground_active_ || finished_anomaly_) {
+            // If no anomaly detectiuon active or if anomaly detection finished, go to next inspection
+            finished_anomaly_ = false;
             return fsm_.Update(NEXT_INSPECT);
+          } else {
+            // When the anomaly detection returns a result it will go to the next inspection
+            finished_anomaly_ = true;
           }
+          sci_cam_req_ = 1;
+          SendPicture(focus_distance_current_);
         }
-        sci_cam_req_ = 1;
-        SendPicture(focus_distance_current_);
       } else {
         return fsm_.Update(NEXT_INSPECT);
       }
@@ -583,11 +608,15 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   }
   void SciCamTimeout(const ros::TimerEvent& event) {
     sci_cam_timeout_.stop();
+    // If the action was cancelled stop taking more pictures
+    if (fsm_.GetState() == STATE::WAITING) return;
+
     // The sci cam image was not received
     if (sci_cam_req_ < cfg_.Get<int>("sci_cam_max_trials")) {
       ROS_WARN_STREAM("Scicam didn't repond, resending it again");
       // Send the command
       SendPicture(focus_distance_current_);
+      ++sci_cam_req_;
       return;
     } else {
       return fsm_.Update(INSPECT_FAILED);
@@ -607,8 +636,17 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     if (result != nullptr)
       result_.anomaly_result.push_back(result->anomaly_result);
     else
-      ROS_ERROR_STREAM("Invalid result received Image Analysis");
-    return fsm_.Update(NEXT_INSPECT);
+      ROS_INFO_STREAM("Invalid result received Image Analysis");
+
+    // If we finished taking pictures, go to next inspection
+    // If not, return and when the pictures are all taken, it go to the next inspection
+    if (finished_anomaly_) {
+      finished_anomaly_ = false;
+      return fsm_.Update(NEXT_INSPECT);
+    } else {
+      finished_anomaly_ = true;
+      return;
+    }
   }
 
   // INSPECTION ACTION SERVER
@@ -723,14 +761,22 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     // Geometry command
     case isaac_msgs::InspectionGoal::GEOMETRY:
       NODELET_DEBUG("Received Goal Geometry");
-      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses))
+      if (inspection_->GenerateGeometrySurvey(goal_.inspect_poses)) {
+        // Reset the focus distance
+        SendSciCamCommand("{\"name\": \"setFocusDistance\", \"distance\": " +
+                          std::to_string(cfg_.Get<double>("sci_cam_startup_focus")) + "}");
         return fsm_.Update(GOAL_INSPECT);
+      }
       break;
     // Panorama command
     case isaac_msgs::InspectionGoal::PANORAMA:
       NODELET_DEBUG("Received Goal Panorama");
-      if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses))
+      if (inspection_->GeneratePanoramaSurvey(goal_.inspect_poses)) {
+        // Reset the focus distance
+        SendSciCamCommand("{\"name\": \"setFocusDistance\", \"distance\": " +
+                          std::to_string(cfg_.Get<double>("sci_cam_startup_focus")) + "}");
         return fsm_.Update(GOAL_INSPECT);
+      }
       break;
     // Volumetric command
     case isaac_msgs::InspectionGoal::VOLUMETRIC:
@@ -826,7 +872,11 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
     case STATE::INIT_INSPECTION:
       msg.fsm_state = "INIT_INSPECTION";                   break;
     case STATE::MOVING_TO_APPROACH_POSE:
-      msg.fsm_state = "MOVING_TO_APPROACH_POSE";           break;
+      msg.fsm_state = "MOVING_TO_APPROACH_POSE ";
+      msg.fsm_state += std::to_string(inspection_->GetCurrentCounter());
+      msg.fsm_state += "/";
+      msg.fsm_state += std::to_string(inspection_->GetSurveySize());
+                                                           break;
     case STATE::VISUAL_INSPECTION:
       msg.fsm_state = "VISUAL_INSPECTION";                 break;
     case STATE::RETURN_INSPECTION:
@@ -882,10 +932,13 @@ class InspectionNode : public ff_util::FreeFlyerNodelet {
   std::string i_fsm_substate_;
   isaac_msgs::InspectionResult result_;
   int motion_retry_number_= 0;
+  std::string err_msg_;
+
   // Flag to wait for sci camera
   int sci_cam_req_ = 0;
   bool ground_active_ = false;
   bool sim_mode_ = false;
+  bool finished_anomaly_ = false;
 
   // Inspection library
   Inspection* inspection_;

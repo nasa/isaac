@@ -36,7 +36,7 @@
   <gazebo reference="body">
     <sensor name="${essid}" type="wireless_transmitter">
       <always_on>1</always_on>
-      <update_rate>62.5</update_rate>
+      <update_rate>5</update_rate>
       <visualize>true</visualize>
       <transceiver>
         <essid>${essid}</essid>
@@ -52,7 +52,7 @@
   <gazebo>
     <static>true</static>
     <plugin name="truth_ros" filename="libgazebo_model_plugin_truth.so">
-      <rate>62.5</rate>
+      <rate>5</rate>
       <parent>world</parent>
       <child>body</child>
       <tf>false</tf>

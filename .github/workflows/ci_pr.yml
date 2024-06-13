@@ -7,27 +7,6 @@ on:
 
 jobs:
 
-  build-xenial:
-
-    runs-on: ubuntu-20.04
-
-    steps:
-
-    - name: Checkout Astrobee
-      uses: actions/checkout@v3
-      with:
-        repository: nasa/astrobee
-        path: astrobee/
-
-    - name: Checkout ISAAC
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-        path: isaac/
-
-    - name: Build code for isaac:astrobee Ubuntu 16
-      run: isaac/scripts/docker/build.sh --remote --xenial --astrobee-source-path astrobee/
-
   build-focal:
 
     runs-on: ubuntu-20.04
@@ -46,5 +25,43 @@ jobs:
         submodules: recursive
         path: isaac/
 
+    # This version is more elegant but currently uses too much space for GitHub CI workers
+    #- name: Build code for isaac:astrobee Ubuntu 20
+    #  run: isaac/scripts/docker/build.sh --remote --focal --astrobee-source-path astrobee/
+
+    # These steps were copied verbatim from ci_push.yml which seems to use less space.
     - name: Build code for isaac:astrobee Ubuntu 20
-      run: isaac/scripts/docker/build.sh --remote --focal --astrobee-source-path astrobee/
+      run: docker build isaac -f isaac/scripts/docker/isaac_astrobee.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=ghcr.io/nasa
+                          -t ghcr.io/${{ github.repository_owner }}/isaac:latest-astrobee-ubuntu20.04
+
+    - name: Build code for isaac:latest Ubuntu 20
+      run: docker build isaac -f isaac/scripts/docker/isaac.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=ghcr.io/nasa
+                          -t ghcr.io/${{ github.repository_owner }}/isaac:latest-ubuntu20.04
+
+    - name: Build messages dockers for Ubuntu 20 (astrobee)
+      run: docker build astrobee -f isaac/scripts/docker/astrobee_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          -t ghcr.io/${{ github.repository_owner }}/isaac:astrobee-msgs-ubuntu20.04
+
+    - name: Build messages dockers for Ubuntu 20 (isaac)
+      run: docker build isaac -f isaac/scripts/docker/isaac_msgs.Dockerfile
+                          --build-arg UBUNTU_VERSION=20.04
+                          --build-arg ROS_VERSION=noetic
+                          --build-arg PYTHON=3
+                          --build-arg REMOTE=ghcr.io/nasa
+                          -t ghcr.io/${{ github.repository_owner }}/isaac:msgs-ubuntu20.04
+
+    - name: Build analyst image isaac/isaac:msgs-ubuntu20.04
+      run: docker build isaac -f isaac/scripts/docker/analyst.Dockerfile
+                         --build-arg REMOTE=ghcr.io/nasa
+                         -t ghcr.io/${{ github.repository_owner }}/isaac_analyst_notebook:latest

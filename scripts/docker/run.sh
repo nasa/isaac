@@ -184,6 +184,12 @@ if [ $analyst -eq 1 ]; then
   export DATA_PATH=${HOME}/data
   export BAGS_PATH=$(readlink -f ${HOME}/data/bags)
 
+  # Check if data folder for OCR exists
+  DIR="/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/"
+  if [ -d "$DIR" ]; then
+    export IMG_PATH=/srv/novus_1/mgouveia/data/bags/20220711_Isaac11/
+  fi
+
   files+=" -f ${script_dir}/docker_compose/analyst.docker-compose.yml"
   echo -e "analyst notebook hosted in: \t http://localhost:8888/lab?token=isaac"
 fi
@@ -209,13 +215,13 @@ elif  [ $local_sim -eq 1 ]; then
 
 elif  [ $no_sim -eq 1 ]; then
   echo "NO SIM"
-  files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+  files+=" -f ${script_dir}/docker_compose/isaac.docker-compose.yml"
   export cmd="roslaunch isaac sim.launch llp:=disabled glp:=disabled gzserver:=false nodes:="framestore,isaac_framestore" output:=screen rviz:=true --wait"
 
 else
 # Start isaac robot software on docker container if needed
 ######################################################################
-  files+=" -f ${script_dir}/docker_compose/astrobee.docker-compose.yml"
+  files+=" -f ${script_dir}/docker_compose/isaac.docker-compose.yml"
 
   # Set up astrobee display
   ######################################################################

@@ -1,0 +1,43 @@
+# Copyright (c) 2023, United States Government, as represented by the
+# Administrator of the National Aeronautics and Space Administration.
+#
+# All rights reserved.
+#
+# The "ISAAC - Integrated System for Autonomous and Adaptive Caretaking
+# platform" software is licensed under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# Second test case for marking goals completed. This case is a copy of the baseline problem instance
+# to be used on ISS, but with the first few actions marked complete to simulate the system state if
+# a replan is needed partway through execution. Let's simulate the state at t=~1700 seconds when
+# each robot should have completed its first two panoramas.
+
+goals:
+
+- {type: panorama, robot: bumble, order: 0, location: jem_bay4, completed: true}
+- {type: panorama, robot: bumble, order: 1, location: jem_bay3, completed: true}
+- {type: panorama, robot: bumble, order: 2, location: jem_bay2}
+- {type: panorama, robot: bumble, order: 3, location: jem_bay1}
+- {type: stereo, robot: bumble, order: 4, trajectory: jem_bay1_to_bay3}
+- {type: robot_at, robot: bumble, location: berth1}
+
+- {type: panorama, robot: honey, order: 1, location: jem_bay7, completed: true}
+- {type: panorama, robot: honey, order: 2, location: jem_bay6, completed: true}
+- {type: panorama, robot: honey, order: 3, location: jem_bay5}
+- {type: stereo, robot: honey, order: 4, trajectory: jem_bay7_to_bay4}
+- {type: robot_at, robot: honey, location: berth2}
+
+init:
+  bumble:
+    location: jem_bay3
+  honey:
+    location: jem_bay6

@@ -1,4 +1,3 @@
-version: "2.1"
 services:
 
   analyst_notebook:
@@ -38,3 +37,9 @@ services:
       - type: bind
         source: ${BAGS_PATH:-$HOME/data/bags}
         target: /home/analyst/data/bags
+      - type: bind
+        source: ${IMG_PATH:-$HOME/data/str}
+        target: /home/analyst/data/str
+
+    links:
+      - isaac

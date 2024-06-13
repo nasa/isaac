@@ -1,5 +1,4 @@
-version: "2.1"
 services:
   analyst_notebook:
-      links:
-        - isaac
+    links:
+      - isaac

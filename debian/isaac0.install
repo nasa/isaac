@@ -5,9 +5,5 @@ opt/isaac/setup.bash
 opt/isaac/setup.zsh
 opt/isaac/_setup_util.py
 opt/isaac/.catkin
-opt/isaac/lib/*.so
-opt/isaac/lib/python*/*
-opt/isaac/lib/isaac/*
-opt/isaac/lib/inspection/*
-opt/isaac/lib/wifi/*
+opt/isaac/lib/*
 opt/isaac/share/*

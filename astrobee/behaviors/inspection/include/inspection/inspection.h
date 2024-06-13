@@ -105,6 +105,9 @@ class Inspection {
   bool RedoInspectionPose();
   geometry_msgs::PoseArray GetInspectionPoses();
 
+  int GetCurrentCounter() {return inspection_counter_ + 1;}
+  int GetSurveySize() {return points_.size();}
+
   // Get distance from camera to target
   double GetDistanceToTarget();
 

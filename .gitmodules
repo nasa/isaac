@@ -1,3 +1,19 @@
 [submodule "isaac_msgs"]
 	path = communications/isaac_msgs
 	url = https://github.com/nasa/isaac_msgs.git
+[submodule "ros2_planning_system"]
+	path = astrobee/survey/survey_dependencies/ros2_planning_system
+	url = https://github.com/bckempa/ros2_planning_system
+	branch = noetic-devel
+[submodule "ros1_lifecycle"]
+	path = astrobee/survey/survey_dependencies/ros1_lifecycle
+	url = https://github.com/bckempa/ros1_lifecycle.git
+	branch = noetic-devel
+[submodule "popf"]
+	path = astrobee/survey/survey_dependencies/popf
+	url = https://github.com/Bckempa/popf.git
+	branch = noetic-devel
+[submodule "optic_planner"]
+	path = astrobee/survey/survey_dependencies/optic_planner
+	url = https://github.com/Bckempa/optic_planner.git
+	branch = noetic-devel

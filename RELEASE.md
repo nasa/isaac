@@ -1,5 +1,28 @@
 # Releases
 
+## Release 0.2.10
+
+  * ISAAC 15 prep
+  * Improve action result
+
+## Release 0.2.9
+
+  * Fixes to survey_manager
+  * Fixes to CI
+
+## Release 0.2.8
+
+  * Improvements to survey_manager output
+  * Bug fixes
+
+## Release 0.2.7
+
+  * Survey manager
+  * Multiple fixes to inspection
+  * GMM anomaly detection
+  * Ubuntu 20 only supported now
+  * Others
+
 ## Release 0.2.6
 
   * Upgrades on inspection tool
