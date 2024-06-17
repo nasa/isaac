@@ -14,16 +14,19 @@ RUN apt-get update \
     hugin \
     libvips-tools \
     python3-pip \
+    gfortran libopenblas-dev libfftw3-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # pandas: pulled in as pyshtools dependency but install breaks if not mentioned explicitly (?)
 # pyshtools: used during Pannellum multires generation
 # snakemake: modern build system based on Python, manages stitching workflows
-RUN pip3 install --no-cache-dir --upgrade pip \
-  && pip3 install --no-cache-dir \
-    pandas \
-    pyshtools \
-    snakemake
+
+# Install Jupyter explicitly first
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir jupyter
+
+# Install other Python packages
+RUN pip3 install --no-cache-dir pandas pyshtools snakemake  pulp==2.7 --ignore-installed PyYAML
 
 # pannellum: library for viewing/navigating panorama tours
 RUN mkdir -p /opt \
