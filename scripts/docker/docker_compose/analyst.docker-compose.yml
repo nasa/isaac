@@ -40,6 +40,13 @@ services:
       - type: bind
         source: ${IMG_PATH:-$HOME/data/str}
         target: /home/analyst/data/str
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]    
 
     links:
       - isaac
