@@ -70,45 +70,27 @@ def first_non_zero(a: int, b: int) -> int:
 
 
 def exposure_change(config_static, bay_origin, bay_destination):
-    # Going to JEM
-    if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
-        loginfo("CHANGING EXPOSURE TO JEM")
-        return config_static["exposure"]["jem"]
+    if "berth" in bay_origin or "berth" in bay_destination:
+        return 0
+    origin_prefix = bay_origin.split("_")[0]
+    destination_prefix = bay_destination.split("_")[0]
 
-    # Going  to NOD2
-    if (
-        bay_origin == "jem_hatch_to_nod2"
-        and bay_destination == "nod2_hatch_from_jem"
-        or bay_origin == "usl_hatch_to_nod2"
-        and bay_destination == "nod2_hatch_from_usl"
-    ):
-        loginfo("CHANGING EXPOSURE TO NOD2")
-        return config_static["exposure"]["nod2"]
-
-    # Going to USL
-    if bay_origin == "nod2_hatch_to_usl" and bay_destination == "usl_hatch_from_nod2":
-        return config_static["exposure"]["usl"]
+    if origin_prefix != destination_prefix:
+        loginfo(f"CHANGING EXPOSURE TO {destination_prefix.upper()}")
+        return config_static["exposure"][destination_prefix]
 
     return 0
 
 
 def map_change(config_static, bay_origin, bay_destination):
-    # Going to JEM
-    if bay_origin == "nod2_hatch_to_jem" and bay_destination == "jem_hatch_from_nod2":
-        loginfo("CHANGING MAP TO JEM")
-        return config_static["maps"]["jem"]
-    # Going  to NOD2
-    if (
-        bay_origin == "jem_hatch_to_nod2"
-        and bay_destination == "nod2_hatch_from_jem"
-        or bay_origin == "usl_hatch_to_nod2"
-        and bay_destination == "nod2_hatch_from_usl"
-    ):
-        loginfo("CHANGING MAP TO NOD2")
-        return config_static["maps"]["nod2"]
-    # Going to USL
-    if bay_origin == "nod2_hatch_to_usl" and bay_destination == "usl_hatch_from_nod2":
-        return config_static["maps"]["usl"]
+    if "berth" in bay_origin or "berth" in bay_destination:
+        return ""
+    origin_prefix = bay_origin.split("_")[0]
+    destination_prefix = bay_destination.split("_")[0]
+
+    if origin_prefix != destination_prefix:
+        loginfo(f"CHANGING MAP TO {destination_prefix.upper()}")
+        return config_static["maps"][destination_prefix]
     return ""
 
 
@@ -423,10 +405,38 @@ class ProcessExecutor:
 # Mostly used for short actions that should be immediate and require no feedback
 # This method is needed on actions that run remotely and are not controlled by topics
 class CommandExecutor:
-    def __init__(self, ns: str):
-        self.ns = ns
+    def __init__(self, robot: str):
+        self.robot = robot
+        self.ns = None  # Initialize ns, will be set later
+
+    def initialize(self):
+
+        # Figure out robot name and whether we are in simulation or hardware
+        current_robot = os.environ.get("ROBOTNAME")
+        if not current_robot:
+            loginfo(
+                "ROBOTNAME was not defined. Inferring robot from ROS topic /robot_name"
+            )
+            # This is a latching messge so it shouldn't take long
+            try:
+                data = rospy.wait_for_message("/robot_name", String, timeout=5)
+                current_robot = data.data.lower()
+            except:
+                current_robot = ""
+            sim = True
+
+        cmd_exec_ns = ""
+        # If we're commanding a robot remotely
+        if current_robot != self.robot:
+            loginfo(
+                f"We're commanding a namespaced robot! From '{current_robot}' to '{self.robot}'"
+            )
+            # Command executor will add namespace for bridge forwarding
+            cmd_exec_ns = "/" + self.robot
+
+        self.ns = cmd_exec_ns
         loginfo(f"command topic: {self.ns}/command")
-        # Declare guest science command publisher
+
         self.sub_ack = rospy.Subscriber(
             self.ns + "/mgt/ack", AckStamped, self.ack_callback
         )
@@ -442,12 +452,21 @@ class CommandExecutor:
         self.pub_command = rospy.Publisher(
             self.ns + "/command", CommandStamped, queue_size=5
         )
+
+        wait_count = 0
         while self.pub_command.get_num_connections() == 0 and not rospy.is_shutdown():
+            wait_count += 1
+            if wait_count > 10:
+                loginfo(f"Restarting initialization")
+                return False
+
             loginfo(
                 f"Waiting for an astrobee executive to subscribe to {self.ns}/command"
             )
             rospy.sleep(1)
+
         self.unique_cmd_id = ""
+        return True
 
     def start_recording(self, bag_description):
         # Arg is bagfile name description
@@ -484,14 +503,47 @@ class CommandExecutor:
         return result
 
     def change_exposure(self, val):
-        # TBD
+        # Arg is exposure value
+        arg1 = CommandArg()
+        arg1.data_type = CommandArg.DATA_TYPE_STRING
+        arg1.s = CommandConstants.PARAM_NAME_CAMERA_NAME_NAV
+        arg2 = CommandArg()
+        arg2.data_type = CommandArg.DATA_TYPE_FLOAT
+        arg2.f = val
+
+        cmd = CommandStamped()
+        cmd.header = Header(stamp=rospy.Time.now())
+        cmd.cmd_name = CommandConstants.CMD_NAME_SET_EXPOSURE
+        cmd.cmd_id = "survey_manager" + str(rospy.Time.now().to_sec())
+        self.unique_cmd_id = cmd.cmd_id
+        cmd.cmd_src = "isaac fsw"
+        cmd.cmd_origin = "isaac fsw"
+        cmd.args = [arg1, arg2]
+
+        # Publish the CommandStamped message
         loginfo("Change exposure to " + str(val))
-        return 0
+        result = self.publish_and_wait_response(cmd)
+        return result
 
     def change_map(self, map_name):
-        # TBD
+        # Arg is map name
+        arg1 = CommandArg()
+        arg1.data_type = CommandArg.DATA_TYPE_STRING
+        arg1.s = map_name
+
+        cmd = CommandStamped()
+        cmd.header = Header(stamp=rospy.Time.now())
+        cmd.cmd_name = CommandConstants.CMD_NAME_SET_MAP
+        cmd.cmd_id = "survey_manager" + str(rospy.Time.now().to_sec())
+        self.unique_cmd_id = cmd.cmd_id
+        cmd.cmd_src = "isaac fsw"
+        cmd.cmd_origin = "isaac fsw"
+        cmd.args = [arg1]
+
+        # Publish the CommandStamped message
         loginfo("Change map to " + map_name)
-        return 0
+        result = self.publish_and_wait_response(cmd)
+        return result
 
     def ack_callback(self, msg):
         if self.ack_needed is True and msg.cmd_id == self.unique_cmd_id:
@@ -636,32 +688,18 @@ def survey_manager_executor(args, run, config_static, process_executor, quick: b
     rospy.init_node("survey_namager_cmd_" + args["robot"], anonymous=True)
 
     sim = False
-    # Figure out robot name and whether we are in simulation or hardware
-    current_robot = os.environ.get("ROBOTNAME")
-    if not current_robot:
-        loginfo("ROBOTNAME was not defined. Inferring robot from ROS topic /robot_name")
-        # This is a latching messge so it shouldn't take long
-        try:
-            data = rospy.wait_for_message("/robot_name", String, timeout=5)
-            current_robot = data.data.lower()
-        except:
-            current_robot = ""
-        sim = True
+    command_executor = CommandExecutor(args["robot"])
+    if not command_executor.initialize():
+        return -1
 
-    ns = []
-    cmd_exec_ns = ""
-    # If we're commanding a robot remotely
-    if current_robot != args["robot"]:
-        loginfo(
-            f"We're commanding a namespaced robot! From '{current_robot}' to '{args['robot']}'"
-        )
-        ns = ["-ns", args["robot"]]
-        # Command executor will add namespace for bridge forwarding
-        cmd_exec_ns = "/" + args["robot"]
-    command_executor = CommandExecutor(cmd_exec_ns)
+    ns = (
+        ["-ns"] + command_executor.ns.lstrip("/").split("/")
+        if command_executor.ns
+        else []
+    )
 
     sm_exec = SurveyManagerExecutor(
-        process_executor, command_executor, config_static, ns, cmd_exec_ns
+        process_executor, command_executor, config_static, ns, command_executor.ns
     )
 
     # Initialize exit code
@@ -874,7 +912,7 @@ class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter):
 def main():
     default_config_paths = [
         os.path.join(
-            rospkg.RosPack().get_path("survey_manager"), "data/jem_survey_static.yaml"
+            rospkg.RosPack().get_path("survey_manager"), "data/iss_survey_static.yaml"
         ),
         os.path.join(
             rospkg.RosPack().get_path("survey_manager"),

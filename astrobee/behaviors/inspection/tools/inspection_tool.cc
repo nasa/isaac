@@ -244,7 +244,7 @@ void ResultCallback(ff_util::FreeFlyerActionState::Enum code,
   // Check that result var is valid
   if (result != nullptr) {
     // If we get there then we have some response data
-    s += result->fsm_result + " (Code " + std::to_string(result->response) + ")";
+    s += result->fsm_result + " (Inspection Code " + std::to_string(result->response) + ")";
   }
   // Limit line to the maximum amout of characters
   if (s.size() < 71) s.append(71 - s.size(), ' ');

@@ -477,18 +477,18 @@ def run_cmd(cmd, log_file, verbose=False):
     cmd_str = format_cmd(cmd)
     print(cmd_str + "\n")
 
-    with open(log_file, "w", buffering=0) as f:  # replace 'w' with 'wb' for Python 3
-        f.write(cmd_str + "\n")
+    with open(log_file, "wb", buffering=0) as f:
+        f.write((cmd_str + "\n").encode())
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        for line in iter(
-            process.stdout.readline, ""
-        ):  # replace '' with b'' for Python 3
+
+        for line in iter(process.stdout.readline, b""):
             if verbose:
-                sys.stdout.write(line)
+                sys.stdout.write(line.decode())
             f.write(line)
 
         # If a certain step failed, do not continue
         process.wait()
+
         if process.returncode != 0:
             print("Failed execution of: " + " ".join(cmd))
             sys.exit(1)
