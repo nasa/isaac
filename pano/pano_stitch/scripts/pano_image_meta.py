@@ -26,7 +26,7 @@ import csv
 import rosbag
 from tf.transformations import euler_from_quaternion
 
-IMAGE_TOPIC = "/hw/cam_sci/compressed"
+IMAGE_TOPIC = ["/hw/cam_sci/compressed", "/hw/cam_sci_info"]
 POSE_TOPIC = "/loc/pose"
 FIELD_NAMES = (
     "timestamp",
@@ -50,8 +50,9 @@ def get_image_meta(inbag_path, num_images=None):
     images = []
     with rosbag.Bag(inbag_path) as bag:
         img_meta = None
-        for topic, msg, t in bag.read_messages([IMAGE_TOPIC, POSE_TOPIC]):
-            if topic == IMAGE_TOPIC:
+        topics = IMAGE_TOPIC + [POSE_TOPIC]
+        for topic, msg, t in bag.read_messages(topics):
+            if topic in IMAGE_TOPIC:
                 if num_images is not None and len(images) == num_images:
                     break
 

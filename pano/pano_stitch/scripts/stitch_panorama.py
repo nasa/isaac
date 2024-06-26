@@ -427,12 +427,26 @@ class PathSequence(object):
 
 def read_pto(pano, pto_path):
     print("\nread_pto: %s" % pto_path)
-    pano.ReadPTOFile(pto_path)
+    # Accomodate hugin changing API
+    try:
+        # Attempt the first method
+        ifs = hsi.ifstream(pto_path)
+        pano.readData(ifs)
+    except AttributeError:
+        # Fallback to the second method if the first method fails
+        pano.ReadPTOFile(pto_path)
 
 
 def write_pto(pano, pto_path):
     print("\nwrite_pto: %s" % pto_path)
-    pano.WritePTOFile(pto_path)
+    # Accomodate hugin changing API
+    try:
+        # Attempt the first method
+        ofs = hsi.ofstream(pto_path)
+        pano.writeData(ofs)
+    except AttributeError:
+        # Fallback to the second method if the first method fails
+        pano.WritePTOFile(pto_path)
 
 
 def get_timestamp():

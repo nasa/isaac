@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     "Directory containing groundtruth poses with timestamps as filenames.")(
     "mesh", po::value<std::string>()->required(), "Mesh used to provide depth data.")(
     "config-path,c", po::value<std::string>()->required(), "Path to astrobee config directory.")(
-    "robot-config-file,r", po::value<std::string>(&robot_config_file)->default_value("config/robots/bumble.config"),
+    "robot-config-file,r", po::value<std::string>(&robot_config_file)->default_value("bumble.config"),
     "Robot config file")("world,w", po::value<std::string>(&world)->default_value("iss"), "World name")(
     "output-file,o", po::value<std::string>(&output_file)->default_value("depths.csv"),
     "Output file containing timestamp, depth, x, y values on each line. Timestamps for which depth data was not "
@@ -84,7 +84,6 @@ int main(int argc, char** argv) {
   const std::string sensor_rays_file = vm["sensor-rays-file"].as<std::string>();
   const std::string groundtruth_directory = vm["groundtruth-directory"].as<std::string>();
   const std::string mesh_file = vm["mesh"].as<std::string>();
-  const std::string config_path = vm["config-path"].as<std::string>();
 
   // Only pass program name to free flyer so that boost command line options
   // are ignored when parsing gflags.
@@ -104,7 +103,7 @@ int main(int argc, char** argv) {
     LOG(FATAL) << "Mesh " << mesh_file << " not found.";
   }
 
-  lc::SetEnvironmentConfigs(config_path, world, robot_config_file);
+  lc::SetEnvironmentConfigs(world, robot_config_file);
   config_reader::ConfigReader config;
   config.AddFile("geometry.config");
   if (!config.ReadFiles()) {
