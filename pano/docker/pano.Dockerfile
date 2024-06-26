@@ -25,7 +25,7 @@ RUN apt-get update \
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir jupyter
 
-# Install other Python packages
+# Install other Python packages: jupyter package needs to be installed before attempting to build pyshtools
 RUN pip3 install --no-cache-dir pandas pyshtools snakemake  pulp==2.7 --ignore-installed PyYAML
 
 # pannellum: library for viewing/navigating panorama tours
