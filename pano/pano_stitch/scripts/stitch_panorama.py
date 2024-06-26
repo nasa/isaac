@@ -427,6 +427,7 @@ class PathSequence(object):
 
 def read_pto(pano, pto_path):
     print("\nread_pto: %s" % pto_path)
+    # Accomodate hugin changing API
     try:
         # Attempt the first method
         ifs = hsi.ifstream(pto_path)
@@ -438,6 +439,7 @@ def read_pto(pano, pto_path):
 
 def write_pto(pano, pto_path):
     print("\nwrite_pto: %s" % pto_path)
+    # Accomodate hugin changing API
     try:
         # Attempt the first method
         ofs = hsi.ofstream(pto_path)
