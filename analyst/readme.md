@@ -58,3 +58,52 @@ With the trained CNN we can run new colledted data through it, namely real image
 
 Open the tutorial
 
+
+# Image patch extraction and classification Tutorials
+
+## Training Pipeline
+
+To gather a training and validation dataset we use the training pipline.
+
+The main pipline along with tutorials for sub-features are detailed down below:
+
+## 1) Import Bagfile data to database (optional if using remote database)
+
+Open the tutorial [here](http://localhost:8888/lab/tree/1_import_bagfiles.ipynb).
+
+This tutorial covers how to upload bag files to a local database. Upload all the bagfiles that contain the training data.
+Be aware that uploading large bag files might take a long time. If possible select only the time intervals/topic names that are required for analysis to speed up the process.
+
+## Extract image patches and split into training and testing dataset for CNN
+
+Open the notebook [here](http://localhost:8888/lab/tree/gather_training_dataset.ipynb).
+
+This is the main pipeline that extracts the image patches of your target used for training the CNN. It also splits it up into training and testing (validation) data. If you want to look into or try some of the featured used in the pipline you can to that in these notebooks.
+
+### Target selection with UI
+
+Open the notebook [here](http://localhost:8888/lab/tree/select_target.ipynb)
+
+This notebook uses a UI for the user to select a target in a specified image. It then gives out the cooridnates for the points in said image.
+
+### Query database for images with target in frame
+
+Open the notebook [here](http://localhost:8888/lab/tree/query_images.ipynb)
+
+This notebook queries the database for images that have the target in frame, note this needs to be specified with the coordinates of the target and is not done using the select_target notebook. It then filters with the help of astrobee's position, camera FOV, intrinsics and extrinsics.
+
+### Saving, warping and extracting images
+
+This is done with a script, you can look at it here [here](http://localhost:8888/lab/tree/scripts/save_patch.py)
+You can look at this notebook for a simple version of this [here](http://localhost:8888/lab/tree/scripts/warp_and_extract_one_patch.ipynb)
+
+### Training CNN
+
+To train the preweighted DenseNet121 use the notebook [here](http://localhost:8888/lab/tree/scripts/switch_classifying_CNN_training.ipynb)
+
+## Classifying Pipline
+
+The clasifying pipeline builds a lot on the same principles as the training pipeline, see the above notebooks for more info on each feature.
+
+If you want to use the classifier to test one image use the notebook [here](http://localhost:8888/lab/tree/scripts/evaluate_image_with_CNN.ipynb)
+If youinstead want to classify all images in one bag you can use the notebook [here](http://localhost:8888/lab/tree/scripts/evaluate_bag_with_CNN.ipynb)
