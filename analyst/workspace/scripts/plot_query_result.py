@@ -32,7 +32,7 @@ def plot_query_result(result, max_images, num_columns, img_size=20):
     for idx, element in enumerate(result):
         if idx >= max_images:
             break
-        image_path = "data/sci_cam_images/" + str(element["img"])
+        image_path = "data/bags/2024-03-21_tim/bsharp/Fixed/isaac_sci_cam_image_delayed/" + str(element["img"])
         image = cv2.imread(image_path)
 
         # Define the vertices for the lines

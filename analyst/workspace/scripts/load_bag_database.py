@@ -93,6 +93,7 @@ def read_bag(bag_file, topics, robot):
         # self.profiler1.enable()
         yaml_msg = yaml.safe_load(str(msg))
         yaml_msg["robot"] = robot
+        yaml_msg["bagfile"] = os.path.basename(bag_file)
         # self.profiler1.disable()
 
         # Insert the YAML data into the collection
