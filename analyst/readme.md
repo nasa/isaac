@@ -95,6 +95,7 @@ This notebook queries the database for images that have the target in frame, not
 ### Saving, warping and extracting images
 
 This is done with a script, you can look at it here [here](http://localhost:8888/lab/tree/scripts/save_patch.py)
+
 You can look at this notebook for a simple version of this [here](http://localhost:8888/lab/tree/scripts/warp_and_extract_one_patch.ipynb)
 
 ### Training CNN
@@ -106,4 +107,5 @@ To train the preweighted DenseNet121 use the notebook [here](http://localhost:88
 The clasifying pipeline builds a lot on the same principles as the training pipeline, see the above notebooks for more info on each feature.
 
 If you want to use the classifier to test one image use the notebook [here](http://localhost:8888/lab/tree/scripts/evaluate_image_with_CNN.ipynb)
-If youinstead want to classify all images in one bag you can use the notebook [here](http://localhost:8888/lab/tree/scripts/evaluate_bag_with_CNN.ipynb)
+
+If you instead want to classify all images in one bag you can use the notebook [here](http://localhost:8888/lab/tree/scripts/evaluate_bag_with_CNN.ipynb)
