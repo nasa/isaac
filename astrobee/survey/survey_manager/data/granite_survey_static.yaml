@@ -71,8 +71,8 @@ bays_move:
   berth2_g: ["-pos", "0.1 -0.3 -0.68", "-att", "3.14 1 0 0"]
 
 maps:
-  gra: "/data/maps/granite.map"
-  gro: "/data/maps/iss.map"
+  gra: "/res/maps/granite.map"
+  gro: "/res/maps/iss.map"
 
 exposure:
   gra: 175

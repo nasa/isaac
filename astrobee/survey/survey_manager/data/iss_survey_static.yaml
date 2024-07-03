@@ -95,8 +95,8 @@ bays_pano:
 
 maps:
   jem: "/data/maps/20240320_lam.map"
-  nod2: "/data/maps/20240205_usl_abad.map"
-  usl: "/data/maps/20240205_usl_abad.map"
+  nod2: "/data/maps/20240531_isaac15_best_teblid.map"
+  usl: "/data/maps/20240531_ISAAC15_USL-ONLY_teblid.map"
 
 exposure:
   jem: 175
