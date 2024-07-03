@@ -49,6 +49,7 @@ from survey_manager.problem_generator import (
     yaml_action_from_pddl,
 )
 
+os.nice(15)
 # Constants
 MAX_COUNTER = 10
 CHUNK_SIZE = 1024
@@ -609,6 +610,7 @@ class CommandExecutor:
             # got message
             if self.plan_status_needed is False:
                 return 0
+            rospy.sleep(1)
         return 1
 
 
