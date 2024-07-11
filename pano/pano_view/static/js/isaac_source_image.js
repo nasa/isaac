@@ -245,6 +245,8 @@ function initIsaacSourceImage() {
 	'undoStack': [],
 	'redoStack': []
     };
+    anno.removeDrawingTool('rect');
+    anno.removeDrawingTool('polygon');
 
     // Export symbols for debugging
     window.configFromUrl = configFromUrl;
@@ -263,11 +265,11 @@ function initIsaacSourceImage() {
     // Configure other button handlers
     var imageStoragePath = [configFromUrl.scene, configFromUrl.imageId];
     document.getElementById('isaac-undo').addEventListener(
-	"click",
+	'click',
 	event => isaacHistoryUndo(history, imageStoragePath, anno)
     );
     document.getElementById('isaac-redo').addEventListener(
-	"click",
+	'click',
 	event => isaacHistoryRedo(history, imageStoragePath, anno)
     );
 
