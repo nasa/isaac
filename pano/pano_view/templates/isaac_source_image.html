@@ -18,6 +18,9 @@
     }
     #isaac-navbar {
 	flex: 0 1 auto;
+	padding-left: 5px;
+	padding-top: 5px;
+	padding-bottom: 5px;
     }
     #isaac-navbar div {
 	display: inline-block;
@@ -33,14 +36,19 @@
     #isaac-load-input {
 	display: none;
     }
+    .a9s-outer {
+	stroke: #844 !important;
+	fill: #f88 !important;
+    }
   </style>
 </head>
 <body>
 <div class="flex-container">
   <div id="isaac-navbar">
+    Target selection:
     <button id="isaac-undo">Undo</button>
     <button id="isaac-redo">Redo</button>
-    <div id="isaac-toolbar-container"></div>
+    <button id="isaac-add">Add</button>
     <button id="isaac-previous">Previous</button>
     <button id="isaac-next">Next</button>
     <input

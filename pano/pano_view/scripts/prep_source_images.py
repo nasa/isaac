@@ -80,7 +80,7 @@ def do_prep_image(job_args):
     if any((os.path.exists(p) for p in partial_paths)):
         dosys("rm -rf %s" % (" ".join(partial_paths)))
 
-    dosys("vips dzsave %s %s_partial" % (image_in, dz_out))
+    dosys("vips dzsave %s %s_partial --suffix .png" % (image_in, dz_out))
     for p in partial_paths:
         dosys("mv %s %s" % (p, p.replace("_partial", "")))
 

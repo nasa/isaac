@@ -23,6 +23,16 @@ body {
     font-family: sans-serif;
 }
 
+.isaac-flex {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+
+.pnlm-container {
+    flex: 1 1 auto;
+}
+
 /**********************************************************************
  * Overview map
  **********************************************************************/
@@ -90,6 +100,7 @@ div.pnlm-tooltip span {
  **********************************************************************/
 
 .isaac-navbar {
+    flex: 0 1;
     padding: 5px;
 }
 
@@ -124,7 +135,7 @@ div.pnlm-tooltip span {
 }
 
 .isaac-dropdown-content .isaac-toggle-entry {
-    font-size: 12px;
+    font-size: 16px;
     color: black;
     padding: 3px 4px;
     text-decoration: none;

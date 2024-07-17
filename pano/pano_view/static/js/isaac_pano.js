@@ -39,10 +39,9 @@ function getClosestScene(pos, config, maxDistance) {
 }
 
 function getMousePos(event) {
-    var mapOriginX = window.overviewMap.offsetLeft;
-    var mapOriginY = window.overviewMap.offsetTop;
-    var offsetX = event.clientX - mapOriginX;
-    var offsetY = event.clientY - mapOriginY;
+    var mapRect = window.overviewMap.getBoundingClientRect();
+    var offsetX = event.clientX - mapRect.x;
+    var offsetY = event.clientY - mapRect.y;
     return [offsetX, offsetY];
 }
 
@@ -125,6 +124,10 @@ function initIsaacPano(event) {
     window.mapCurrent = mapCurrent;
 
     updateMapCurrent();
+
+    // Pannellum's default HFOV bounds of [50, 120] don't allow the
+    // user to zoom in extremely close, which is sometimes useful.
+    window.viewer.setHfovBounds([5, 120]);
 
     window.viewer.on("scenechange", updateMapCurrent);
     window.viewer.on("mouseup", updateYaw);

@@ -19,6 +19,8 @@
 
 /* View source image with OpenSeaDragon */
 
+var ISAAC_STORAGE_ROOT_KEY = 'annotations';
+
 function parseUrlParameters() {
     var url;
     if (window.location.hash.length > 0) {
@@ -55,27 +57,27 @@ function parseUrlParameters() {
 
 function isaacSetDefault(obj, field, defaultValue) {
     if (obj[field] == undefined) {
-	obj[field] = defaultValue;
-	return defaultValue;
+        obj[field] = defaultValue;
+        return defaultValue;
     }
     return obj[field];
 }
 
 function isaacStorageGetRoot() {
-    var storageItemText = window.localStorage.getItem('annotations') || "{}";
+    var storageItemText = window.localStorage.getItem(ISAAC_STORAGE_ROOT_KEY) || "{}";
     return JSON.parse(storageItemText);
 }
 
 function isaacStorageSetRoot(obj) {
-    window.localStorage.setItem('annotations', JSON.stringify(obj));
+    window.localStorage.setItem(ISAAC_STORAGE_ROOT_KEY, JSON.stringify(obj));
 }
 
 function isaacGetFieldPath(obj, fieldPath) {
     for (fieldElt of fieldPath) {
-	obj = obj[fieldElt];
-	if (obj == undefined) {
-	    return undefined;
-	}
+        obj = obj[fieldElt];
+        if (obj == undefined) {
+            return undefined;
+        }
     }
     return obj;
 }
@@ -87,15 +89,15 @@ function isaacStorageGet(fieldPath) {
 
 function isaacStorageSet(fieldPath, value) {
     if (fieldPath.length == 0) {
-	isaacStorageSetRoot(value);
-	return;
+        isaacStorageSetRoot(value);
+        return;
     }
 
     var storageItem = isaacStorageGetRoot();
 
     var obj = storageItem;
     for (fieldElt of fieldPath.slice(0, -1)) {
-	obj = isaacSetDefault(obj, fieldElt, {});
+        obj = isaacSetDefault(obj, fieldElt, {});
     }
     obj[fieldPath[fieldPath.length - 1]] = value;
 
@@ -107,14 +109,14 @@ function isaacStorageSetDefault(fieldPath, defaultValue) {
 
     var obj = storageItem;
     for (fieldElt of fieldPath.slice(0, -1)) {
-	obj = isaacSetDefault(obj, fieldElt, {});
+        obj = isaacSetDefault(obj, fieldElt, {});
     }
 
     var fieldLast = fieldPath[fieldPath.length - 1];
     if (obj[fieldLast] == undefined) {
-	obj[fieldLast] = defaultValue;
-	isaacStorageSetRoot(storageItem);
-	return defaultValue;
+        obj[fieldLast] = defaultValue;
+        isaacStorageSetRoot(storageItem);
+        return defaultValue;
     }
     return obj[fieldLast];
 }
@@ -124,7 +126,7 @@ function isaacStorageDelete(fieldPath) {
 
     var obj = storageItem;
     for (fieldElt of fieldPath.slice(0, -1)) {
-	obj = isaacSetDefault(obj, fieldElt, {});
+        obj = isaacSetDefault(obj, fieldElt, {});
     }
     delete obj[fieldPath[fieldPath.length - 1]];
 
@@ -161,10 +163,10 @@ function isaacHistoryDebug(history) {
 
 function isaacHistorySaveState(history, state) {
     if (history.current != null) {
-	history.undoStack.push(history.current);
+        history.undoStack.push(history.current);
     }
     if (history.undoStack.length > ISAAC_HISTORY_MAX_LENGTH) {
-	history.undoStack.shift();
+        history.undoStack.shift();
     }
     history.current = state;
     history.redoStack = [];
@@ -181,8 +183,8 @@ function isaacRenderState(history, state, imageStoragePath, anno) {
 
 function isaacHistoryUndo(history, imageStoragePath, anno) {
     if (history.undoStack.length == 0) {
-	console.log('got undo request with no undo stack, should never happen');
-	return;
+        console.log('got undo request with no undo stack, should never happen');
+        return;
     }
     history.redoStack.push(history.current);
     history.current = history.undoStack.pop();
@@ -195,8 +197,8 @@ function isaacHistoryUndo(history, imageStoragePath, anno) {
 
 function isaacHistoryRedo(history, imageStoragePath, anno) {
     if (history.redoStack.length == 0) {
-	console.log('got redo request with no redo stack, should never happen');
-	return;
+        console.log('got redo request with no redo stack, should never happen');
+        return;
     }
     history.undoStack.push(history.current);
     history.current = history.redoStack.pop();
@@ -215,17 +217,17 @@ function isaacUpdateAnnotations(fieldPath, value, history) {
 function isaacReadAsText(file) {
     // Always return a Promise
     return new Promise((resolve, reject) => {
-	let content = '';
-	const reader = new FileReader();
-	// Wait till complete
-	reader.onloadend = function(e) {
-	    resolve(e.target.result);
-	};
-	// Make sure to handle error states
-	reader.onerror = function(e) {
-	    reject(e);
-	};
-	reader.readAsText(file);
+        let content = '';
+        const reader = new FileReader();
+        // Wait till complete
+        reader.onloadend = function(e) {
+            resolve(e.target.result);
+        };
+        // Make sure to handle error states
+        reader.onerror = function(e) {
+            reject(e);
+        };
+        reader.readAsText(file);
     });
 }
 
@@ -237,13 +239,14 @@ function initIsaacSourceImage() {
         id: 'container',
         prefixUrl: '../../media/openseadragon/',
         tileSources: '../../source_images/' + configFromUrl['scene'] + '/'
-	    + configFromUrl['imageId'] + '.dzi'
+            + configFromUrl['imageId'] + '.dzi',
+        maxZoomPixelRatio: 5
     });
     var anno = OpenSeadragon.Annotorious(viewer);
     var history = {
-	'current': null,
-	'undoStack': [],
-	'redoStack': []
+        'current': null,
+        'undoStack': [],
+        'redoStack': []
     };
     anno.removeDrawingTool('rect');
     anno.removeDrawingTool('polygon');
@@ -256,58 +259,63 @@ function initIsaacSourceImage() {
 
     // Configure extra point drawing tool (default tools are rect and polygon only)
     Annotorious.SelectorPack(anno, {
-	tools: ['point']
+        tools: ['point']
     });
-
-    // Create toolbar
-    Annotorious.Toolbar(anno, document.getElementById('isaac-toolbar-container'));
 
     // Configure other button handlers
     var imageStoragePath = [configFromUrl.scene, configFromUrl.imageId];
     document.getElementById('isaac-undo').addEventListener(
-	'click',
-	event => isaacHistoryUndo(history, imageStoragePath, anno)
+        'click',
+        event => isaacHistoryUndo(history, imageStoragePath, anno)
     );
     document.getElementById('isaac-redo').addEventListener(
-	'click',
-	event => isaacHistoryRedo(history, imageStoragePath, anno)
+        'click',
+        event => isaacHistoryRedo(history, imageStoragePath, anno)
+    );
+
+    document.getElementById('isaac-add').addEventListener(
+        'click',
+        event => {
+            anno.setDrawingTool('point');
+            anno.setDrawingEnabled(true);
+        }
     );
 
     var isaacLoadInput = document.getElementById('isaac-load-input');
     document.getElementById('isaac-load').addEventListener('click', function(event) {
-	isaacLoadInput.click();
+        isaacLoadInput.click();
     });
     isaacLoadInput.addEventListener('change', async function(event) {
-	console.log('load change event');
-	console.log(isaacLoadInput);
-	if (isaacLoadInput.files.length > 0) {
-	    var loadFile = isaacLoadInput.files[0];
-	    var loadText = await isaacReadAsText(loadFile);
-	    var storageItem = JSON.parse(loadText);
-	    isaacStorageSetRoot(storageItem);
-	    isaacHistorySaveState(history, storageItem);
-	    isaacRenderState(history, storageItem, imageStoragePath, anno);
-	}
+        console.log('load change event');
+        console.log(isaacLoadInput);
+        if (isaacLoadInput.files.length > 0) {
+            var loadFile = isaacLoadInput.files[0];
+            var loadText = await isaacReadAsText(loadFile);
+            var storageItem = JSON.parse(loadText);
+            isaacStorageSetRoot(storageItem);
+            isaacHistorySaveState(history, storageItem);
+            isaacRenderState(history, storageItem, imageStoragePath, anno);
+        }
     });
 
     document.getElementById('isaac-save').addEventListener('click', function(event) {
-	isaacSaveData(isaacStorageGetRoot(), 'annotations.json');
+        isaacSaveData(isaacStorageGetRoot(), 'annotations.json');
     });
     document.getElementById('isaac-clear').addEventListener('click', function(event) {
-	isaacRenderState(history, {}, imageStoragePath, anno);
-	isaacUpdateAnnotations([], {}, history);
+        isaacRenderState(history, {}, imageStoragePath, anno);
+        isaacUpdateAnnotations([], {}, history);
     });
 
     var reviewIndex = 0;
     var reviewUpdater = function(delta) {
-	return function(event) {
-	    var annotations = isaacStorageGet(imageStoragePath);
-	    if (!annotations) return;
-	    reviewIndex = (reviewIndex + delta + annotations.length) % annotations.length;
-	    var annoId = annotations[reviewIndex].id;
-	    anno.selectAnnotation(annoId);
-	    anno.panTo(annoId);
-	}
+        return function(event) {
+            var annotations = isaacStorageGet(imageStoragePath);
+            if (!annotations) return;
+            reviewIndex = (reviewIndex + delta + annotations.length) % annotations.length;
+            var annoId = annotations[reviewIndex].id;
+            anno.selectAnnotation(annoId);
+            anno.panTo(annoId);
+        }
     }
     document.getElementById('isaac-previous').addEventListener('click', reviewUpdater(-1));
     document.getElementById('isaac-next').addEventListener('click', reviewUpdater(1))
@@ -319,13 +327,13 @@ function initIsaacSourceImage() {
 
     // Save subsequent drawing events to HTML5 local storage
     anno.on('createAnnotation', function(annotation) {
-	isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
+        isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
     });
     anno.on('updateAnnotation', function(annotation) {
-	isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
+        isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
     });
     anno.on('deleteAnnotation', function(annotation) {
-	isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
+        isaacUpdateAnnotations(imageStoragePath, anno.getAnnotations(), history);
     });
 }
 
