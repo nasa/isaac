@@ -90,6 +90,10 @@ body {
     background-position: 0 0px !important;
 }
 
+.isaac-source-image.isaac-annotated {
+    background-image: url('../media/camera_highlight.png') !important;
+}
+
 /* make this wider so scene link tooltips don't have to wrap */
 div.pnlm-tooltip span {
     max-width: 300px;
@@ -156,4 +160,8 @@ div.pnlm-tooltip span {
 
 .isaac-dropdown .show {
     display: block;
+}
+
+#isaac-load-input {
+    display: none;
 }

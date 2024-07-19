@@ -342,7 +342,7 @@ def link_source_images(config, tour_scenes, out_folder):
             hot_spots.append(
                 {
                     "type": "info",
-                    "id": i,
+                    "id": img_id,
                     "text": "Image %d" % i,
                     "yaw": img_meta["yaw"] - tour_scene.get("northOffset", 0),
                     "pitch": img_meta["pitch"],
