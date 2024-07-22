@@ -374,7 +374,7 @@ function isaacConfigureLoadSaveClear(storageUpdateHandler) {
     });
 
     document.getElementById('isaac-save').addEventListener('click', function(event) {
-        isaacSaveData(isaacStorageGetRoot(), 'annotations.json');
+        isaacSaveData(isaacStorageGetRoot(), 'isaac_iss_inspection_targets.json');
     });
     document.getElementById('isaac-clear').addEventListener('click', function(event) {
         isaacStorageSetRoot({});
@@ -395,7 +395,10 @@ function initIsaacSourceImage() {
             + configFromUrl['imageId'] + '.dzi',
         maxZoomPixelRatio: 5
     });
-    var anno = OpenSeadragon.Annotorious(viewer);
+    const annoConfig = {
+        allowEmpty: true
+    };
+    var anno = OpenSeadragon.Annotorious(viewer, annoConfig);
     var history = {
         'current': null,
         'undoStack': [],
@@ -416,6 +419,9 @@ function initIsaacSourceImage() {
     });
 
     // Configure other button handlers
+    document.getElementById('isaac-raw-anchor').href = '../../source_images/'
+        + configFromUrl['scene'] + '/'
+        + configFromUrl['imageId'] + '.jpg';
     var imageStoragePath = [configFromUrl.scene, configFromUrl.imageId];
     document.getElementById('isaac-undo').addEventListener(
         'click',
@@ -436,30 +442,6 @@ function initIsaacSourceImage() {
 
     var storageUpdateHandler = () => isaacProcessStorageUpdate(history, imageStoragePath, anno)
     isaacConfigureLoadSaveClear(storageUpdateHandler);
-
-    var isaacLoadInput = document.getElementById('isaac-load-input');
-    document.getElementById('isaac-load').addEventListener('click', function(event) {
-        isaacLoadInput.click();
-    });
-    isaacLoadInput.addEventListener('change', async function(event) {
-        console.log('load change event');
-        console.log(isaacLoadInput);
-        if (isaacLoadInput.files.length > 0) {
-            var loadFile = isaacLoadInput.files[0];
-            var loadText = await isaacReadAsText(loadFile);
-            var storageItem = JSON.parse(loadText);
-            isaacStorageSetRoot(storageItem);
-            isaacProcessStorageUpdate(history, imageStoragePath, anno);
-        }
-    });
-
-    document.getElementById('isaac-save').addEventListener('click', function(event) {
-        isaacSaveData(isaacStorageGetRoot(), 'annotations.json');
-    });
-    document.getElementById('isaac-clear').addEventListener('click', function(event) {
-        isaacRenderState(history, {}, imageStoragePath, anno);
-        isaacUpdateAnnotations([], {}, history);
-    });
 
     var reviewUpdater = delta => (event => isaacReviewUpdater(imageStoragePath, anno, delta));
     document.getElementById('isaac-previous').addEventListener('click', reviewUpdater(-1));

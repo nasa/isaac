@@ -452,6 +452,14 @@ def generate_scene_index(config, out_folder):
     print("wrote to %s" % out_path)
 
 
+def install_pano_images(config, out_folder):
+    for scene_id, config_scene_meta in config["scenes"].items():
+        # Would be more in the spirit of things to not hard-code this input path
+        in_image = os.path.join("/output/stitch", scene_id, "pano.jpg")
+        out_image_folder = os.path.join(out_folder, "scenes", scene_id)
+        install_file(in_image, out_image_folder, "pano.jpg")
+
+
 def generate_tour(config_path, out_folder, package_paths):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
@@ -459,6 +467,7 @@ def generate_tour(config_path, out_folder, package_paths):
     install_static_files(out_folder, package_paths)
     generate_tour_json(config, out_folder)
     generate_scene_index(config, out_folder)
+    install_pano_images(config, out_folder)
     dosys("chmod a+rX %s" % out_folder)
 
 

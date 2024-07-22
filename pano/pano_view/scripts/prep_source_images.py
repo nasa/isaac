@@ -31,6 +31,8 @@ import os
 import hsi
 import yaml
 
+OUTPUT_PNG = False
+
 
 def dosys(cmd, exit_on_error=True):
     print("+ " + cmd)
@@ -80,9 +82,14 @@ def do_prep_image(job_args):
     if any((os.path.exists(p) for p in partial_paths)):
         dosys("rm -rf %s" % (" ".join(partial_paths)))
 
-    dosys("vips dzsave %s %s_partial --suffix .png" % (image_in, dz_out))
+    png_arg = "--suffix .png" if OUTPUT_PNG else ""
+    dosys("vips dzsave %s %s_partial %s" % (image_in, dz_out, png_arg))
     for p in partial_paths:
         dosys("mv %s %s" % (p, p.replace("_partial", "")))
+
+    # Copy original source image to output as well (enables download link)
+    ext = os.path.splitext(image_in)[1]
+    dosys("cp %s %s" % (image_in, dz_out + ext))
 
 
 def write_images_meta(images_meta, meta_out_path):

@@ -80,7 +80,7 @@ function updateMapCurrent() {
 }
 
 function updateYaw() {
-    var yaw = window.viewer.getConfig().yaw;
+    var yaw = window.viewer.getYaw();
     var mapCurrent = window.mapCurrent;
     var northOffset = window.viewer.getConfig().northOffset || 0;
     mapCurrent.style.transform = (
@@ -121,6 +121,8 @@ function isaacShowOverviewMap(visibility) {
 /* Return true if `hotSpot` in `sceneId` has annotations according to
  * `storageItem`.
  *
+ * @param storageItem The JSON-parsed HTML5 local storage object containing annotations.
+ * @param sceneId The sceneId for the current pano scene from the tour config.
  * @param hotSpot A source image hotspot object from the tour config.
  */
 function isaacHasAnnotations(storageItem, sceneId, hotSpot) {
@@ -137,6 +139,7 @@ function isaacHasAnnotations(storageItem, sceneId, hotSpot) {
  * annotated style or not depending on the `isAnnotated` flag.
  *
  * @param hotSpot A source image hotspot object from the tour config.
+ * @param isAnnotated If true, style the hotspot in the annotated style.
  */
 function isaacSetAnnotatedStyle(hotSpot, isAnnotated) {
     const unannotatedCssClass = "isaac-source-image pnlm-hotspot pnlm-sprite";
@@ -250,7 +253,7 @@ function isaacInitViewDropDown() {
 }
 
 /* Return an array of [sceneId, imageid] for images that have annotations. */
-function getImagesWithTargets() {
+function isaacGetImagesWithTargets() {
     var storageItem = isaacStorageGetRoot();
     var result = [];
     for (const [sceneId, imageAnnotationsMap] of Object.entries(storageItem)) {
@@ -268,8 +271,42 @@ function getImagesWithTargets() {
  * the target selection Next/Previous buttons.
  */
 function isaacPanoProcessStorageUpdate() {
-    console.log(getImagesWithTargets());
     isaacRefreshHotSpots();
+}
+
+/* Change the annotation review index by `delta`. Each review index
+ * refers to a sceneId, imageId pair. Changing the index switches to
+ * the scene and pans to the image.
+ *
+ * @param delta Specify delta = 1 for the Next button or -1 for the Previous button.
+ */
+function isaacPanoReviewUpdate(delta) {
+    const reviewImages = isaacGetImagesWithTargets();
+    if (!reviewImages) return;
+    ISAAC_REVIEW_INDEX = (ISAAC_REVIEW_INDEX + delta + reviewImages.length) % reviewImages.length;
+    const [sceneId, imageId] = reviewImages[ISAAC_REVIEW_INDEX];
+    const hotSpot = window.initialConfig.scenes[sceneId].hotSpots.find((hs) => (hs.id == imageId));
+    if (hotSpot == undefined) {
+	console.log("isaacPanoReviewUpdate: invalid sceneId, imageId:", sceneId, imageId);
+	return;
+    }
+    const reviewHfov = 50.0;
+    if (window.viewer.getScene() != sceneId) {
+	window.viewer.loadScene(sceneId, hotSpot.pitch, hotSpot.yaw, reviewHfov);
+    } else {
+	window.viewer.lookAt(hotSpot.pitch, hotSpot.yaw, reviewHfov);
+    }
+}
+
+/* Download the full pano image as a file called '<sceneId>_pano.jpg'. */
+function isaacDownloadPanoImage() {
+    const sceneId = window.viewer.getScene();
+    const a = document.createElement('a');
+    a.href = "scenes/" + sceneId + "/pano.jpg";
+    a.download = sceneId + "_pano.jpg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 /**********************************************************************
@@ -319,9 +356,15 @@ function isaacPanoInit(event) {
     window.viewer.on("scenechange", updateMapCurrent);
     window.viewer.on("mouseup", updateYaw);
     window.viewer.on("touchend", updateYaw);
+    window.viewer.on("animatefinished", updateYaw);
 
     isaacInitViewDropDown();
     isaacConfigureLoadSaveClear(isaacPanoProcessStorageUpdate);
+
+    document.getElementById('isaac-pano-image').addEventListener('click', isaacDownloadPanoImage);
+
+    document.getElementById('isaac-previous').addEventListener('click', event => isaacPanoReviewUpdate(-1));
+    document.getElementById('isaac-next').addEventListener('click', event => isaacPanoReviewUpdate(1));
 
     // Load annotations
     isaacPanoProcessStorageUpdate();
