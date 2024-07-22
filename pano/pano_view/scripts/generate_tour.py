@@ -336,17 +336,22 @@ def link_source_images(config, tour_scenes, out_folder):
         with open(src_images_meta_path, "r") as src_images_meta_stream:
             src_images_meta = json.load(src_images_meta_stream)
 
+        # XYZ
+        scene_meta = get_display_scene_meta(scene_id, config_scene_meta)
+
         img_ids = sorted(src_images_meta.keys())
         for i, img_id in enumerate(img_ids):
+            img_num = i + 1
             img_meta = src_images_meta[img_id]
+            slug = "%s_%s_Image_%s" % (scene_meta["module"], scene_meta["bay"], img_num)
             hot_spots.append(
                 {
                     "type": "info",
                     "id": img_id,
-                    "text": "Image %d" % i,
+                    "text": "Image %d" % img_num,
                     "yaw": img_meta["yaw"] - tour_scene.get("northOffset", 0),
                     "pitch": img_meta["pitch"],
-                    "URL": "src/#scene=%s&imageId=%s" % (scene_id, img_id),
+                    "URL": "src/#scene=%s&imageId=%s&slug=%s" % (scene_id, img_id, slug),
                     "cssClass": "isaac-source-image pnlm-hotspot pnlm-sprite",
                     "attributes": {
                         "target": "_blank",

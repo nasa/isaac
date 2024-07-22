@@ -59,6 +59,7 @@ function parseUrlParameters() {
         switch(option) {
             case 'scene':
             case 'imageId':
+            case 'slug':
                 configFromUrl[option] = decodeURIComponent(value);
                 break;
             default:
@@ -417,6 +418,11 @@ function initIsaacSourceImage() {
     Annotorious.SelectorPack(anno, {
         tools: ['point']
     });
+
+    // Set slug text
+    slugText = configFromUrl['slug'].replaceAll("_", " ");
+    document.getElementById('isaac-slug').textContent = slugText;
+    document.title = slugText + ": ISAAC ISS Tour";
 
     // Configure other button handlers
     document.getElementById('isaac-raw-anchor').href = '../../source_images/'
