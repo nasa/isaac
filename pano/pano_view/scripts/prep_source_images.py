@@ -52,7 +52,7 @@ def read_pto(pto_path):
     return pano
 
 
-def read_scene_source_images_meta(stitch_folder, scene_id):
+def read_scene_source_images_meta(stitch_folder, scene_id, images_dir):
     pto_path = os.path.join(stitch_folder, scene_id, "stitch_final.pto")
     pano = read_pto(pto_path)
     num_images = pano.getNrOfImages()
@@ -63,6 +63,8 @@ def read_scene_source_images_meta(stitch_folder, scene_id):
         images_meta[img_id] = {
             "yaw": img.getYaw(),
             "pitch": img.getPitch(),
+            "image": os.path.join(images_dir, img_id + ".jpg"),
+            "task": "pano",
         }
 
     return images_meta
@@ -102,14 +104,22 @@ def write_images_meta(images_meta, meta_out_path):
     print("wrote %s" % meta_out_path)
 
 
+def get_inspection_results(scene_meta):
+    infos = scene_meta.get("inspection_results", [])
+    for info in infos:
+        info["task"] = "inspection"
+    return {os.path.splitext(os.path.basename(info["image"]))[0]: info for info in infos}
+
+
 def get_scene_q(config, stitch_folder, out_folder, scene_id):
-    images_meta = read_scene_source_images_meta(stitch_folder, scene_id)
     scene_meta = config["scenes"][scene_id]
+    images_meta = read_scene_source_images_meta(stitch_folder, scene_id, scene_meta["images_dir"])
+    images_meta.update(get_inspection_results(scene_meta))
     scene_out = os.path.join(out_folder, "source_images", scene_id)
 
     prep_image_q = []
-    for img_id in images_meta.keys():
-        image_in = os.path.join(scene_meta["images_dir"], img_id + ".jpg")
+    for img_id, img_meta in images_meta.items():
+        image_in = img_meta["image"]
         dz_out = os.path.join(scene_out, img_id)
         if os.path.exists(dz_out + ".dzi"):
             continue

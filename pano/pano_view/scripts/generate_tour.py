@@ -343,16 +343,24 @@ def link_source_images(config, tour_scenes, out_folder):
         for i, img_id in enumerate(img_ids):
             img_num = i + 1
             img_meta = src_images_meta[img_id]
-            slug = "%s_%s_Image_%s" % (scene_meta["module"], scene_meta["bay"], img_num)
+            try:
+                # get manually configured slug for inspection result
+                text = img_meta["slug"]
+                slug = text.replace(" ", "_")
+            except KeyError:
+                # generic fallback for pano images
+                text = "Image %d" % img_num
+                slug = "%s_%s_Image_%s" % (scene_meta["module"], scene_meta["bay"], img_num)
             hot_spots.append(
                 {
                     "type": "info",
                     "id": img_id,
-                    "text": "Image %d" % img_num,
+                    "text": text,
                     "yaw": img_meta["yaw"] - tour_scene.get("northOffset", 0),
                     "pitch": img_meta["pitch"],
+                    "task": img_meta["task"],
                     "URL": "src/#scene=%s&imageId=%s&slug=%s" % (scene_id, img_id, slug),
-                    "cssClass": "isaac-source-image pnlm-hotspot pnlm-sprite",
+                    "cssClass": f"isaac-source-image isaac-{img_meta['task']} pnlm-hotspot pnlm-sprite",
                     "attributes": {
                         "target": "_blank",
                     },
@@ -473,7 +481,7 @@ def generate_tour(config_path, out_folder, package_paths):
     generate_tour_json(config, out_folder)
     generate_scene_index(config, out_folder)
     install_pano_images(config, out_folder)
-    dosys("chmod a+rX %s" % out_folder)
+    dosys("chmod -R a+rX %s" % out_folder)
 
 
 class CustomFormatter(

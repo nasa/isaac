@@ -94,6 +94,10 @@ body {
     background-image: url('../media/camera_highlight.png') !important;
 }
 
+.isaac-source-image.isaac-inspection {
+    background-image: url('../media/inspection.png') !important;
+}
+
 /* make this wider so scene link tooltips don't have to wrap */
 div.pnlm-tooltip span {
     max-width: 300px;

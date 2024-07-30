@@ -142,7 +142,7 @@ function isaacHasAnnotations(storageItem, sceneId, hotSpot) {
  * @param isAnnotated If true, style the hotspot in the annotated style.
  */
 function isaacSetAnnotatedStyle(hotSpot, isAnnotated) {
-    const unannotatedCssClass = "isaac-source-image pnlm-hotspot pnlm-sprite";
+    const unannotatedCssClass = hotSpot.cssClass.replace("isaac-annotated", "");
     const annotateClass = "isaac-annotated";
     let cssClass = unannotatedCssClass;
     if (isAnnotated) {
