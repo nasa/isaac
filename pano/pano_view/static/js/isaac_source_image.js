@@ -398,8 +398,8 @@ function initIsaacSourceImage() {
     // Initialize OpenSeaDragon viewer and Annotorious plugin
     var viewer = OpenSeadragon({
         id: 'container',
-        prefixUrl: '../../media/openseadragon/',
-        tileSources: '../../source_images/' + configFromUrl['scene'] + '/'
+        prefixUrl: '../media/openseadragon/',
+        tileSources: '../source_images/' + configFromUrl['scene'] + '/'
             + configFromUrl['imageId'] + '.dzi',
         maxZoomPixelRatio: 5
     });
