@@ -490,6 +490,7 @@ def reorganize_config(config):
 def generate_tour(config_path, out_folder, package_paths):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
+    reorganize_config(config)
 
     install_static_files(out_folder, package_paths)
     generate_tour_json(config, out_folder)

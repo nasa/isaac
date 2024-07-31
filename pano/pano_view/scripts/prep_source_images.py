@@ -146,9 +146,23 @@ def join_lists(lists):
     return functools.reduce(operator.iadd, lists, [])
 
 
+def reorganize_config(config):
+    """
+    Modify `config` in place. For the top-level inspection_results
+    field: add the value for each scene into the config field of the
+    same name for that scene. (And delete the top-level field.)
+    """
+    scenes = config["scenes"]
+    for field in ["inspection_results"]:
+        value = config.pop(field, {})
+        for scene_id, scene_value in value.items():
+            scenes[scene_id][field] = scene_value
+
+
 def prep_source_images(config_path, stitch_folder, out_folder, num_jobs):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
+    reorganize_config(config)
 
     prep_image_q = join_lists(
         (
