@@ -243,7 +243,7 @@ function isaacRenderState(history, state, imageStoragePath, anno) {
 
 /* Perform an undo operation. This updates the current annotation state, adjusts the history undo/redo stacks,
  * saves the annotation state to the storage object, and updates the UI.
- * 
+ *
  * @param history A history object with fields 'current', 'undoStack', 'redoStack'.
  * @param imageStoragePath A path within the storage object referencing the annotation state for the current image.
  * @param anno A reference to the live instance of the Annotorious viewer.

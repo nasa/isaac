@@ -745,7 +745,9 @@ def main():
             "Preserving final metadata %s alongside output pano image"
             % os.path.basename(pto_final)
         )
-        shutil.copyfile(pto_final, output_dir)
+        shutil.copyfile(
+            pto_final, os.path.join(output_dir, os.path.basename(pto_final))
+        )
 
         print("\n=== Final stitched pano in %s ===\n" % final_png_path)
 

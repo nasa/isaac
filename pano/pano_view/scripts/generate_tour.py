@@ -337,7 +337,6 @@ def link_source_images(config, tour_scenes, out_folder):
         with open(src_images_meta_path, "r") as src_images_meta_stream:
             src_images_meta = json.load(src_images_meta_stream)
 
-        # XYZ
         scene_meta = get_display_scene_meta(scene_id, config_scene_meta)
 
         img_ids = sorted(src_images_meta.keys())

@@ -395,4 +395,3 @@ function isaacPanoInit(event) {
 }
 
 document.addEventListener('pannellumloaded', isaacPanoInit, false);
-

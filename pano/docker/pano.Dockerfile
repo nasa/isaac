@@ -13,17 +13,27 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     apache2 \
     default-jre \
+    gfortran \
     hugin \
+    libfftw3-dev \
+    libopenblas-dev \
     libvips-tools \
     python3-pip \
   && rm -rf /var/lib/apt/lists/*
 
-# pandas: pulled in as pyshtools dependency but install breaks if not mentioned explicitly (?)
-# pyshtools: used during Pannellum multires generation
-# snakemake: modern build system based on Python, manages stitching workflows
+# Install Jupyter explicitly first
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir jupyter
+
+# Install other Python packages: jupyter package needs to be installed before attempting to build pyshtools
+# - pandas: pulled in as pyshtools dependency but install breaks if not mentioned explicitly (?)
+# - pyshtools: used during Pannellum multires generation
+# - snakemake: modern build system based on Python, manages stitching workflows
 RUN pip3 install --no-cache-dir --upgrade pip \
   && pip3 install --no-cache-dir \
+    --ignore-installed PyYAML \
     pandas \
+    pulp==2.7 \
     pyshtools \
     snakemake
 
