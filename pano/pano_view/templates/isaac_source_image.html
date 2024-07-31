@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ISAAC ISS Tour</title>
-  <link rel="stylesheet" href="../css/annotorious.min.css">
+  <link rel="stylesheet" rel="Stylesheet" href="../css/annotorious.min.css">
   <style type="text/css">
     html, body {
 	width: 100%;
 	height: 100%;
 	margin: 0;
+        font-family: sans-serif;
     }
     .flex-container {
 	display: flex;
@@ -48,18 +49,21 @@
         stroke: black !important;
         stroke-width: 8px !important;
     }
-    #isaac-title {
+    .isaac-title {
+        font-size: 1.2em;
         font-weight: bold;
-        padding-right: 10px;
+        vertical-align: middle;
+        margin-right: 0.5em;
     }
   </style>
 </head>
 <body>
 <div class="flex-container">
   <div id="isaac-navbar">
-    <span id="isaac-title">ISAAC ISS Tour:
+    <span class="isaac-title">ISAAC ISS Tour:
       <span id="isaac-slug"></span>
     </span>
+    <a href="../help.html#image" target="_blank"><button id="isaac-help">Help</button></a>
     <a href="dummy" target="_blank" id="isaac-raw-anchor"><button id="isaac-raw">Raw</button></a>
     Annotations:
     <button id="isaac-undo">Undo</button>

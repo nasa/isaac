@@ -33,6 +33,13 @@ body {
     flex: 1 1 auto;
 }
 
+.isaac-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    vertical-align: middle;
+    margin-right: 0.5em;
+}
+
 /**********************************************************************
  * Overview map
  **********************************************************************/

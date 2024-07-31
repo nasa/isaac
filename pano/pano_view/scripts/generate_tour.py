@@ -178,7 +178,7 @@ def install_static_files(out_folder, package_paths):
     # we can just install them; in the future we might replace them
     # with templates to provide greater flexibility, which would require
     # template rendering.
-    install_glob(os.path.join(PANO_VIEW_ROOT, "templates/pannellum.htm"), out_folder)
+    install_glob(os.path.join(PANO_VIEW_ROOT, "templates/pannellum.html"), out_folder)
     install_glob(os.path.join(PANO_VIEW_ROOT, "templates/help.html"), out_folder)
     install_file(
         os.path.join(PANO_VIEW_ROOT, "templates/isaac_source_image.html"),
@@ -445,7 +445,7 @@ def generate_scene_index(config, out_folder):
         index.append(
             fill_field(
                 (
-                    '<li><a href="pannellum.htm#config=tour.json&firstScene={scene_id}">'
+                    '<li><a href="pannellum.html#config=tour.json&firstScene={scene_id}">'
                     "{module} {bay}"
                     "</a></li>"
                 ),
