@@ -350,7 +350,11 @@ def link_source_images(config, tour_scenes, out_folder):
             except KeyError:
                 # generic fallback for pano images
                 text = "Image %d" % img_num
-                slug = "%s_%s_Image_%s" % (scene_meta["module"], scene_meta["bay"], img_num)
+                slug = "%s_%s_Image_%s" % (
+                    scene_meta["module"],
+                    scene_meta["bay"],
+                    img_num,
+                )
             hot_spots.append(
                 {
                     "type": "info",
@@ -359,7 +363,8 @@ def link_source_images(config, tour_scenes, out_folder):
                     "yaw": img_meta["yaw"] - tour_scene.get("northOffset", 0),
                     "pitch": img_meta["pitch"],
                     "task": img_meta["task"],
-                    "URL": "src/#scene=%s&imageId=%s&slug=%s" % (scene_id, img_id, slug),
+                    "URL": "src/#scene=%s&imageId=%s&slug=%s"
+                    % (scene_id, img_id, slug),
                     "cssClass": f"isaac-source-image isaac-{img_meta['task']} pnlm-hotspot pnlm-sprite",
                     "attributes": {
                         "target": "_blank",

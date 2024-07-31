@@ -108,12 +108,16 @@ def get_inspection_results(scene_meta):
     infos = scene_meta.get("inspection_results", [])
     for info in infos:
         info["task"] = "inspection"
-    return {os.path.splitext(os.path.basename(info["image"]))[0]: info for info in infos}
+    return {
+        os.path.splitext(os.path.basename(info["image"]))[0]: info for info in infos
+    }
 
 
 def get_scene_q(config, stitch_folder, out_folder, scene_id):
     scene_meta = config["scenes"][scene_id]
-    images_meta = read_scene_source_images_meta(stitch_folder, scene_id, scene_meta["images_dir"])
+    images_meta = read_scene_source_images_meta(
+        stitch_folder, scene_id, scene_meta["images_dir"]
+    )
     images_meta.update(get_inspection_results(scene_meta))
     scene_out = os.path.join(out_folder, "source_images", scene_id)
 
