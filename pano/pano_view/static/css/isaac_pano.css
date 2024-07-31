@@ -100,7 +100,7 @@ body {
 
 /* make this wider so scene link tooltips don't have to wrap */
 div.pnlm-tooltip span {
-    max-width: 300px;
+    max-width: 400px;
 }
 
 /**********************************************************************

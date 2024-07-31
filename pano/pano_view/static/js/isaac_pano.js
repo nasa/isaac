@@ -112,6 +112,7 @@ function isaacSetVisibility(className, visibility) {
 
 function isaacShowNavControls(visibility) {
     isaacSetVisibility('pnlm-controls-container', visibility);
+    isaacSetVisibility('pnlm-panorama-info', visibility);
 }
 
 function isaacShowOverviewMap(visibility) {
@@ -282,7 +283,7 @@ function isaacPanoProcessStorageUpdate() {
  */
 function isaacPanoReviewUpdate(delta) {
     const reviewImages = isaacGetImagesWithTargets();
-    if (!reviewImages) return;
+    if (reviewImages.length == 0) return;
     ISAAC_REVIEW_INDEX = (ISAAC_REVIEW_INDEX + delta + reviewImages.length) % reviewImages.length;
     const [sceneId, imageId] = reviewImages[ISAAC_REVIEW_INDEX];
     const hotSpot = window.initialConfig.scenes[sceneId].hotSpots.find((hs) => (hs.id == imageId));
@@ -315,6 +316,23 @@ function isaacDownloadPanoImage() {
 
 function isaacPanoInit(event) {
     var config = event.configFromURL;
+
+    if (config.initialAnnotations == null) {
+        config.initialAnnotations = {};
+    }
+    // Initialize default annotation content in local storage, making
+    // it available to source image tabs that don't load the config
+    // from tour.json, just in case they need it. (This seems
+    // unlikely.)
+    window.localStorage.setItem(ISAAC_DEFAULT_CONTENT_KEY, JSON.stringify(config.initialAnnotations));
+
+    // Initialize annotations to the default if none are present.
+    var storageItem = isaacStorageGetRoot();
+    delete storageItem.source_window_id; // ignore this field if present
+    if (Object.keys(storageItem).length == 0) {
+        isaacStorageSetRoot(config.initialAnnotations);
+    }
+
     window.initialConfig = config;
 
     var uiContainer = document.getElementsByClassName('pnlm-ui')[0];

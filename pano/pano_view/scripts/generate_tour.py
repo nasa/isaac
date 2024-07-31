@@ -179,6 +179,7 @@ def install_static_files(out_folder, package_paths):
     # with templates to provide greater flexibility, which would require
     # template rendering.
     install_glob(os.path.join(PANO_VIEW_ROOT, "templates/pannellum.htm"), out_folder)
+    install_glob(os.path.join(PANO_VIEW_ROOT, "templates/help.html"), out_folder)
     install_file(
         os.path.join(PANO_VIEW_ROOT, "templates/isaac_source_image.html"),
         os.path.join(out_folder, "src"),
@@ -375,6 +376,7 @@ def generate_tour_json(config, out_folder):
 
     tour_scenes = {}
     tour["scenes"] = tour_scenes
+    tour["initialAnnotations"] = config["initial_annotations"]
 
     for scene_id, config_scene_meta in config["scenes"].items():
         # Read tiler scene metadata
@@ -471,6 +473,19 @@ def install_pano_images(config, out_folder):
         in_image = os.path.join("/output/stitch", scene_id, "pano.jpg")
         out_image_folder = os.path.join(out_folder, "scenes", scene_id)
         install_file(in_image, out_image_folder, "pano.jpg")
+
+
+def reorganize_config(config):
+    """
+    Modify `config` in place. For the top-level inspection_results
+    field: add the value for each scene into the config field of the
+    same name for that scene. (And delete the top-level field.)
+    """
+    scenes = config["scenes"]
+    for field in ["inspection_results"]:
+        value = config.pop(field, {})
+        for scene_id, scene_value in value.items():
+            scenes[scene_id][field] = scene_value
 
 
 def generate_tour(config_path, out_folder, package_paths):

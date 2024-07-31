@@ -20,6 +20,7 @@
 /* View source image with OpenSeaDragon */
 
 const ISAAC_STORAGE_ROOT_KEY = 'isaac_anno';
+const ISAAC_DEFAULT_CONTENT_KEY = 'isaac_anno_default';
 
 /* The index used to remember what annotation we're reviewing using
  * the Next/Previous buttons. */
@@ -84,7 +85,13 @@ function isaacSetDefault(obj, field, defaultValue) {
 /* Return the application's storage object (parsed from a JSON string stored
  * at the ISAAC_STORAGE_ROOT_KEY in HTML5 window.localStorage). */
 function isaacStorageGetRoot() {
-    var storageItemText = window.localStorage.getItem(ISAAC_STORAGE_ROOT_KEY) || "{}";
+    var storageItemText = window.localStorage.getItem(ISAAC_STORAGE_ROOT_KEY);
+    if (storageItemText == null) {
+        storageItemText = window.localStorage.getItem(ISAAC_DEFAULT_CONTENT_KEY);
+    }
+    if (storageItemText == null) {
+        storageItemText = "{}";
+    }
     return JSON.parse(storageItemText);
 }
 
@@ -375,7 +382,7 @@ function isaacConfigureLoadSaveClear(storageUpdateHandler) {
     });
 
     document.getElementById('isaac-save').addEventListener('click', function(event) {
-        isaacSaveData(isaacStorageGetRoot(), 'isaac_iss_inspection_targets.json');
+        isaacSaveData(isaacStorageGetRoot(), 'isaac_iss_annotations.json');
     });
     document.getElementById('isaac-clear').addEventListener('click', function(event) {
         isaacStorageSetRoot({});
@@ -400,13 +407,14 @@ function initIsaacSourceImage() {
         allowEmpty: true
     };
     var anno = OpenSeadragon.Annotorious(viewer, annoConfig);
+    // anno.setDrawingEnabled(true);
     var history = {
         'current': null,
         'undoStack': [],
         'redoStack': []
     };
-    anno.removeDrawingTool('rect');
-    anno.removeDrawingTool('polygon');
+    // anno.removeDrawingTool('rect');
+    // anno.removeDrawingTool('polygon');
 
     // Export symbols for debugging
     window.configFromUrl = configFromUrl;
@@ -441,7 +449,7 @@ function initIsaacSourceImage() {
     document.getElementById('isaac-add').addEventListener(
         'click',
         event => {
-            anno.setDrawingTool('point');
+            anno.setDrawingTool('rect');
             anno.setDrawingEnabled(true);
         }
     );

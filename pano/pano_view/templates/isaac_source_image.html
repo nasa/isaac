@@ -36,9 +36,17 @@
     #isaac-load-input {
 	display: none;
     }
-    .a9s-outer {
+    .a9s-point .a9s-outer {
 	stroke: #844 !important;
 	fill: #f88 !important;
+    }
+    rect.a9s-inner {
+        stroke: #f88 !important;
+        stroke-width: 2px !important;
+    }
+    rect.a9s-outer {
+        stroke: black !important;
+        stroke-width: 8px !important;
     }
     #isaac-title {
         font-weight: bold;
@@ -53,7 +61,7 @@
       <span id="isaac-slug"></span>
     </span>
     <a href="dummy" target="_blank" id="isaac-raw-anchor"><button id="isaac-raw">Raw</button></a>
-    Target selection:
+    Annotations:
     <button id="isaac-undo">Undo</button>
     <button id="isaac-redo">Redo</button>
     <button id="isaac-add">Add</button>
@@ -67,6 +75,7 @@
     <button id="isaac-load">Load</button>
     <button id="isaac-save">Save</button>
     <button id="isaac-clear">Clear</button>
+    <span id="isaac-toolbar-container"></span>
   </div>
   <div id="container">
     <noscript>
