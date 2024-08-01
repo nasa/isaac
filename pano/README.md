@@ -148,8 +148,11 @@ Note that some of the individual steps within each panorama stitch (e.g., `enble
 
 ### View the tour
 
-TODO
+In the host OS, point a web browser at `http://127.0.0.1:8080/`. The `run.sh` script forwards port 8080 of the host to port 80 of the container, where an Apache server is running to provide a preview of the tour.
 
+### Install the tour
+
+Recursively copy the `$ISAAC_PANO_OUTPUT/html` folder wherever you want on your web server. Make sure permissions are set to enable your users to access files in the folder. No special configuration should be needed as long as the server is configured to serve static files with the appropriate MIME types. None of the application logic runs on the web server; the viewing interfaces run completely in the browser. When users make annotations, they will be stored locally in the user's web browser, not on the web server.
 
 ### Generate target pose from image
 

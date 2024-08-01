@@ -31,6 +31,8 @@ import os
 import hsi
 import yaml
 
+OUTPUT_PNG = False
+
 
 def dosys(cmd, exit_on_error=True):
     print("+ " + cmd)
@@ -50,7 +52,7 @@ def read_pto(pto_path):
     return pano
 
 
-def read_scene_source_images_meta(stitch_folder, scene_id):
+def read_scene_source_images_meta(stitch_folder, scene_id, images_dir):
     pto_path = os.path.join(stitch_folder, scene_id, "stitch_final.pto")
     pano = read_pto(pto_path)
     num_images = pano.getNrOfImages()
@@ -61,6 +63,8 @@ def read_scene_source_images_meta(stitch_folder, scene_id):
         images_meta[img_id] = {
             "yaw": img.getYaw(),
             "pitch": img.getPitch(),
+            "image": os.path.join(images_dir, img_id + ".jpg"),
+            "task": "pano",
         }
 
     return images_meta
@@ -80,9 +84,14 @@ def do_prep_image(job_args):
     if any((os.path.exists(p) for p in partial_paths)):
         dosys("rm -rf %s" % (" ".join(partial_paths)))
 
-    dosys("vips dzsave %s %s_partial" % (image_in, dz_out))
+    png_arg = "--suffix .png" if OUTPUT_PNG else ""
+    dosys("vips dzsave %s %s_partial %s" % (image_in, dz_out, png_arg))
     for p in partial_paths:
         dosys("mv %s %s" % (p, p.replace("_partial", "")))
+
+    # Copy original source image to output as well (enables download link)
+    ext = os.path.splitext(image_in)[1]
+    dosys("cp %s %s" % (image_in, dz_out + ext))
 
 
 def write_images_meta(images_meta, meta_out_path):
@@ -95,14 +104,26 @@ def write_images_meta(images_meta, meta_out_path):
     print("wrote %s" % meta_out_path)
 
 
+def get_inspection_results(scene_meta):
+    infos = scene_meta.get("inspection_results", [])
+    for info in infos:
+        info["task"] = "inspection"
+    return {
+        os.path.splitext(os.path.basename(info["image"]))[0]: info for info in infos
+    }
+
+
 def get_scene_q(config, stitch_folder, out_folder, scene_id):
-    images_meta = read_scene_source_images_meta(stitch_folder, scene_id)
     scene_meta = config["scenes"][scene_id]
+    images_meta = read_scene_source_images_meta(
+        stitch_folder, scene_id, scene_meta["images_dir"]
+    )
+    images_meta.update(get_inspection_results(scene_meta))
     scene_out = os.path.join(out_folder, "source_images", scene_id)
 
     prep_image_q = []
-    for img_id in images_meta.keys():
-        image_in = os.path.join(scene_meta["images_dir"], img_id + ".jpg")
+    for img_id, img_meta in images_meta.items():
+        image_in = img_meta["image"]
         dz_out = os.path.join(scene_out, img_id)
         if os.path.exists(dz_out + ".dzi"):
             continue
@@ -129,9 +150,23 @@ def join_lists(lists):
     return functools.reduce(operator.iadd, lists, [])
 
 
+def reorganize_config(config):
+    """
+    Modify `config` in place. For the top-level inspection_results
+    field: add the value for each scene into the config field of the
+    same name for that scene. (And delete the top-level field.)
+    """
+    scenes = config["scenes"]
+    for field in ["inspection_results"]:
+        value = config.pop(field, {})
+        for scene_id, scene_value in value.items():
+            scenes[scene_id][field] = scene_value
+
+
 def prep_source_images(config_path, stitch_folder, out_folder, num_jobs):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
+    reorganize_config(config)
 
     prep_image_q = join_lists(
         (

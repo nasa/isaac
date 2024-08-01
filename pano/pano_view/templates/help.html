@@ -1,0 +1,112 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Help: ISAAC ISS Tour</title>
+  <style type="text/css">
+    html, body {
+	height: 100%;
+        font-family: sans-serif;
+    }
+    html {
+	width: 100%;
+    }
+    body {
+        margin: 3em;
+    }
+  </style>
+</head>
+<body>
+<h1>ISAAC ISS Tour Help</h1>
+<h2><a name="pano">Panoramic Tour Viewer</a></h2>
+<p>The Panoramic Tour Viewer lets you freely explore the interior of the ISS. Some features include:</p>
+<ul>
+  <li>Throughout the panorama view:
+    <ul>
+      <li>Click/tap and drag to pan your view and look in different directions.</li>
+      <li>Zoom in and out with a pinch gesture on a multitouch display, or mouse wheel scroll if you have a mouse.</li>
+    </ul>
+  </li>
+  <li>The panorama controls at the upper left provide:
+    <ul>
+      <li>The [+] and [-] buttons are another way to zoom in and out.
+      <li>The button with the viewfinder icon toggles full-screen mode for more immersive exploration.</li>
+    </ul>
+  </li>
+  <li>The overview map at the upper right provides:
+    <ul>
+      <li>The map shows the modules of the U.S. Orbital Segment of the ISS where the Astrobee robots are able to operate to collect panoramic survey data. (Only three modules have been surveyed so far.)</li>
+      <li>The red arrow shows the position and orientation (yaw) of the current view so you can stay aware of where you are.</li>
+      <li>The gray dots show the locations of ISS module bays where panorama scenes are available to explore. Click/tap on one of the dots to move to that scene.</li>
+    </ul>
+  </li>
+  <li>The icons scattered throughout the panorama provide:
+    <ul>
+      <li>An upward pointing arrow icon is a hotspot that links to a neighboring panorama scene. Click/tap on the hotspot to move the tour view to that scene.</li>
+      <li>The camera icons are hotspots that link to one of the source images that were stitched together to form the panorama. You may prefer to view these images because they are free from stitching artifacts, or because you want to add annotations. Click/tap on the hotspot to open an Image Viewer window on that image. The camera icon is normally colored grey but is highlighted yellow if the image has been annotated.</li>
+      <li>The blue magnifying glass icons are hotspots that link to a targeted inspection image. You may prefer to view these images because they provide higher resolution than the panorama due to being captured closer up and with optimized lighting. Click/tap on the hotspot to open an Image Viewer window on that image.</li>
+    </ul>
+  </li>
+  <li>The toolbar above the panorama provides:
+    <ul>
+      <li>The "Help" button opens this help.</li>
+      <li>The "View Options" menu lets you toggle hide/show for various elements of the tour interface. You may prefer to hide some elements you don't need in order to minimize distractions, especially when taking screenshots.</li>
+      <li>The "Pano Image" button starts a download of the full stitched panorama image. You may find this image helpful if you want to work with the panorama using other applications. Note that: You can't substitute for the "Pano Image" button using browser features like "Open Image in New Tab" or "Save Image": at best, they will open an image tile rather than the whole panorama. The downloaded panorama image will have very high resolution (typical: 26K x 13K pixels, 60+ MB), so you may have trouble opening it with some applications.</li>
+      <li>The "Annotations" section provides:
+        <ul>
+          <li>The "Previous" and "Next" buttons cycle through the list of annotated images throughout the whole tour. Each time you click/tap one of these buttons, the view will pan to focus on the hotspot for the previous/next annotated image (switching to a new scene if needed). Click/tap on the hotspot to open an Image Viewer window on that image, where you can view its annotations.</li>
+          <li>The "Load" button loads a whole-tour set of annotations that were previously saved. They are loaded into the local storage for your browser and will only be visible to you when you use that browser.</li>
+          <li>The "Save" button saves your current set of whole-tour annotations, downloading them as a file called "isaac_iss_annotations.json". You can share this file with other users, who can load it into the tour interface in their browser, or analyze it using other tools. For example, we have a tool that interprets a set of annotations as requested inspection targets and extracts the 3D target positions to use for commanding Astrobee follow-up inspections during a future ISS activity.</li>
+          <li>The "Clear" button deletes your current whole-tour set of annotations. (Like all annotation edits, this change only affects your view in your current browser.)</li>
+          <li>(The "Load", "Save", and "Clear" buttons have exactly the same behavior in both the Panoramic Tour Viewer and Image Viewer.)</li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ul>
+
+<h2><a name="image">Image Viewer</a></h2>
+<p>The Image Viewer lets you view and annotate an individual image collected by the Astrobee robots. Some features include:</p>
+<ul>
+  <li>Throughout the image view:
+    <ul>
+      <li>Click/tap and drag to pan your view and look at different parts of the image.</li>
+      <li>Zoom in and out with a pinch gesture on a multitouch display, or mouse wheel scroll if you have a mouse.</li>
+      <li>Shift-click and drag to add an annotation if you have a keyboard and mouse.</li>
+    </ul>
+  </li>
+  <li>The view controls at the upper left provide:
+    <ul>
+      <li>The [+] and [-] buttons are another way to zoom in and out.</li>
+      <li>The home button restores the original image view (zooms out to view the whole image).</li>
+      <li>The rectangle+arrow button toggles full-screen mode for more immersive exploration.</li>
+      <li>(These buttons auto-hide themselves after a period of inactivity. You can make them reappear by moving around in the image.)</li>
+    </ul>
+  </li>
+  <li>The rectangular annotations in the image provide:
+    <ul>
+      <li>Click/tap on an annotation to open it. This lets you view or edit the annotation text, move the rectangle corners to adjust its shape and position, or delete the annotation using its trash can button.</li>
+    </ul>
+  </li>
+  <li>The toolbar above the panorama provides:
+    <ul>
+      <li>The "Help" button opens this help.</li>
+      <li>The "Raw" button opens a new browser window displaying the full-size raw image without the Image Viewer interface. From the new window, you can view the raw image using your browser's normal interface, or download it to work with it using other applications. Note that you can't substitute for the "Raw" button by using browser features like "Open Image in New Tab" or "Save Image" in the Image Viewer: at best, they will open an image tile rather than the full-size raw image.</li>
+      <li>The "Annotations" section provides:
+        <ul>
+          <li>The "Undo" and "Redo" buttons undo or redo annotation edits in the current image only.</li>
+          <li>The "Add" button activates add-annotation mode. After you click/tap this button, click/tap and drag anywhere in the image to add a new annotation.</li>
+          <li>The "Previous" and "Next" buttons cycle through the list of annotations on the current image. Each time you click/tap one of these buttons, the view will open the previous/next annotation.</li>
+          <li>The "Load" button loads a whole-tour set of annotations that were previously saved. They are loaded into the local storage for your browser and will only be visible to you when you use that browser.</li>
+          <li>The "Save" button saves your current set of whole-tour annotations, downloading them as a file called "isaac_iss_annotations.json". You can share this file with other users, who can load it into the tour interface in their browser, or analyze it using other tools. For example, we have a tool that interprets a set of annotations as requested inspection targets and extracts the 3D target positions to use for commanding Astrobee follow-up inspections during a future ISS activity.</li>
+          <li>The "Clear" button deletes your current whole-tour set of annotations. (Like all annotation edits, this change only affects your view in your current browser.)</li>
+          <li>(The "Load", "Save", and "Clear" buttons have exactly the same behavior in both the Panoramic Tour Viewer and Image Viewer.)</li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ul>
+
+</body>
+</html>

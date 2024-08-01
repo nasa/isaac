@@ -23,6 +23,23 @@ body {
     font-family: sans-serif;
 }
 
+.isaac-flex {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+
+.pnlm-container {
+    flex: 1 1 auto;
+}
+
+.isaac-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    vertical-align: middle;
+    margin-right: 0.5em;
+}
+
 /**********************************************************************
  * Overview map
  **********************************************************************/
@@ -80,9 +97,17 @@ body {
     background-position: 0 0px !important;
 }
 
+.isaac-source-image.isaac-annotated {
+    background-image: url('../media/camera_highlight.png') !important;
+}
+
+.isaac-source-image.isaac-inspection {
+    background-image: url('../media/inspection.png') !important;
+}
+
 /* make this wider so scene link tooltips don't have to wrap */
 div.pnlm-tooltip span {
-    max-width: 300px;
+    max-width: 400px;
 }
 
 /**********************************************************************
@@ -90,6 +115,7 @@ div.pnlm-tooltip span {
  **********************************************************************/
 
 .isaac-navbar {
+    flex: 0 1;
     padding: 5px;
 }
 
@@ -124,7 +150,7 @@ div.pnlm-tooltip span {
 }
 
 .isaac-dropdown-content .isaac-toggle-entry {
-    font-size: 12px;
+    font-size: 16px;
     color: black;
     padding: 3px 4px;
     text-decoration: none;
@@ -145,4 +171,8 @@ div.pnlm-tooltip span {
 
 .isaac-dropdown .show {
     display: block;
+}
+
+#isaac-load-input {
+    display: none;
 }

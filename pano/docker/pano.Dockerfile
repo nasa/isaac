@@ -4,29 +4,37 @@ ARG REMOTE=ghcr.io/nasa
 
 FROM ${REMOTE}/isaac:latest-ubuntu${UBUNTU_VERSION}
 
+# apache2: Local web server for previewing pano tour interface
 # default-jre: Java runtime needed for minifying Pannellum web files
 # hugin: pano stitching tools (and hsi Python interface)
 # libvips-tools: convert images to multires, zoomable in OpenSeaDragon
 # python3-pip: for installing Python packages later in this Dockerfile
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
+    apache2 \
     default-jre \
+    gfortran \
     hugin \
+    libfftw3-dev \
+    libopenblas-dev \
     libvips-tools \
     python3-pip \
-    gfortran libopenblas-dev libfftw3-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# pandas: pulled in as pyshtools dependency but install breaks if not mentioned explicitly (?)
-# pyshtools: used during Pannellum multires generation
-# snakemake: modern build system based on Python, manages stitching workflows
-
 # Install Jupyter explicitly first
-RUN pip3 install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir jupyter
+RUN pip3 install --no-cache-dir --upgrade pip \
+  && pip3 install --no-cache-dir jupyter
 
 # Install other Python packages: jupyter package needs to be installed before attempting to build pyshtools
-RUN pip3 install --no-cache-dir pandas pyshtools snakemake  pulp==2.7 --ignore-installed PyYAML
+# - pandas: pulled in as pyshtools dependency but install breaks if not mentioned explicitly (?)
+# - pyshtools: used during Pannellum multires generation
+# - snakemake: modern build system based on Python, manages stitching workflows
+RUN pip3 install --no-cache-dir \
+    --ignore-installed PyYAML \
+    pandas \
+    pulp==2.7 \
+    pyshtools \
+    snakemake
 
 # pannellum: library for viewing/navigating panorama tours
 RUN mkdir -p /opt \
@@ -73,3 +81,16 @@ RUN echo 'source "/src/isaac/devel/setup.bash"\nexport ASTROBEE_CONFIG_DIR="/src
 # once new pano folder is merged into develop and official docker
 # images are updated.
 RUN echo 'export ROS_PACKAGE_PATH="${ROS_PACKAGE_PATH}:/src/isaac/src/pano/pano_stitch::/src/isaac/src/pano/pano_view"' >> "${HOME}/.bashrc"
+
+# This is a bit unusual, but starting apache in .bashrc ensures it's
+# running whenever we run an interactive session using
+# run.sh. (Running it multiple times doesn't cause a problem.)
+RUN echo 'apachectl start' >> "${HOME}/.bashrc"
+
+# Make /output/html the DocumentRoot for the apache2 debug web server
+RUN perl -i -ple 's:/var/www:/output:g' \
+    /etc/apache2/apache2.conf \
+    /etc/apache2/sites-available/000-default.conf
+
+# Expose local web server for pano tour preview
+EXPOSE 80

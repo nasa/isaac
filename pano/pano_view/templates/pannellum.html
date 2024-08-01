@@ -1,0 +1,60 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISAAC ISS Tour</title>
+  <link type="text/css" rel="Stylesheet" href="css/pannellum.css"/>
+  <link type="text/css" rel="Stylesheet" href="css/isaac_pano.css"/>
+  <link type="text/css" rel="Stylesheet" href="css/standalone.css"/>
+  <link rel="icon" sizes="16x16" type="image/png" href="media/favicon/favicon-16x16.png" />
+  <link rel="icon" sizes="32x32" type="image/png" href="media/favicon/favicon-32x32.png" />
+  <link rel="icon" sizes="57x57" type="image/png" href="media/favicon/favicon-57x57.png" />
+  <link rel="icon" sizes="76x76" type="image/png" href="media/favicon/favicon-76x76.png" />
+  <link rel="icon" sizes="96x96" type="image/png" href="media/favicon/favicon-96x96.png" />
+  <link rel="icon" sizes="128x128" type="image/png" href="media/favicon/favicon-128x128.png" />
+  <link rel="icon" sizes="192x192" type="image/png" href="media/favicon/favicon-192x192.png" />
+  <link rel="icon" sizes="196x196" type="image/png" href="media/favicon/favicon-196x196.png" />
+  <link rel="icon" sizes="228x228" type="image/png" href="media/favicon/favicon-228x228.png" />
+</head>
+<body>
+<div class="isaac-flex">
+<div class="isaac-navbar">
+  <span class="isaac-title">ISAAC ISS Tour</span>
+  <a href="help.html#pano" target="_blank"><button id="isaac-help">Help</button></a>
+  <div class="isaac-dropdown">
+    <button class="isaac-drop-button">View Options &#x25BC;</button>
+    <div id="isaac-view-dropdown" class="isaac-dropdown-content">
+      <div class="isaac-toggle-entry checked" id="isaac-show-nav-controls"><span class="checkbox"/></span> Navigation controls</div>
+      <div class="isaac-toggle-entry checked" id="isaac-show-overview-map"><span class="checkbox"/></span> Overview map</div>
+      <div class="isaac-toggle-entry checked" id="isaac-show-scene-links"><span class="checkbox"/></span> Scene links</div>
+      <div class="isaac-toggle-entry checked" id="isaac-show-source-image-links"><span class="checkbox"/></span> Image links</div>
+    </div>
+  </div>
+  <button id="isaac-pano-image">Pano Image</button>
+  Annotations:
+  <button id="isaac-previous">Previous</button>
+  <button id="isaac-next">Next</button>
+  <input
+    type="file"
+    id="isaac-load-input"
+    accept="application/json"
+    />
+  <button id="isaac-load">Load</button>
+  <button id="isaac-save">Save</button>
+  <button id="isaac-clear">Clear</button>
+</div>
+<div id="container">
+  <noscript>
+    <div class="pnlm-info-box">
+      <p>Javascript is required to view this panorama.<br>(It could be worse; you could need a plugin.)</p>
+    </div>
+  </noscript>
+</div>
+</div>
+<script type="text/javascript" src="js/pannellum.js"></script>
+<script type="text/javascript" src="js/isaac_source_image.js"></script>
+<script type="text/javascript" src="js/isaac_pano.js"></script>
+<script type="text/javascript" src="js/standalone.js"></script>
+</body>
+</html>

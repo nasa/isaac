@@ -20,4 +20,5 @@ docker run \
        --mount type=bind,source=${ISAAC_PANO_INPUT},target=/input,readonly \
        --mount type=bind,source=${ISAAC_PANO_OUTPUT},target=/output \
        --mount type=bind,source=${ISAAC_SRC},target=/src/isaac/src \
+       -p 127.0.0.1:8080:80 \
        isaac/pano

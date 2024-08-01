@@ -82,7 +82,7 @@ add_dependencies(point_cloud_intersect ${catkin_EXPORTED_TARGETS})
 target_link_libraries(point_cloud_intersect ${catkin_LIBRARIES})
 
 
-## Declare a C++ executable: find_point_coordinate 
+## Declare a C++ executable: find_point_coordinate
 add_executable(find_point_coordinate tools/find_point_coordinate.cc)
 add_dependencies(find_point_coordinate ${catkin_EXPORTED_TARGETS})
 target_link_libraries(find_point_coordinate mesh_intersect point_cloud_intersect

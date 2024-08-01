@@ -178,7 +178,8 @@ def install_static_files(out_folder, package_paths):
     # we can just install them; in the future we might replace them
     # with templates to provide greater flexibility, which would require
     # template rendering.
-    install_glob(os.path.join(PANO_VIEW_ROOT, "templates/pannellum.htm"), out_folder)
+    install_glob(os.path.join(PANO_VIEW_ROOT, "templates/pannellum.html"), out_folder)
+    install_glob(os.path.join(PANO_VIEW_ROOT, "templates/help.html"), out_folder)
     install_file(
         os.path.join(PANO_VIEW_ROOT, "templates/isaac_source_image.html"),
         os.path.join(out_folder, "src"),
@@ -336,18 +337,35 @@ def link_source_images(config, tour_scenes, out_folder):
         with open(src_images_meta_path, "r") as src_images_meta_stream:
             src_images_meta = json.load(src_images_meta_stream)
 
+        scene_meta = get_display_scene_meta(scene_id, config_scene_meta)
+
         img_ids = sorted(src_images_meta.keys())
         for i, img_id in enumerate(img_ids):
+            img_num = i + 1
             img_meta = src_images_meta[img_id]
+            try:
+                # get manually configured slug for inspection result
+                text = img_meta["slug"]
+                slug = text.replace(" ", "_")
+            except KeyError:
+                # generic fallback for pano images
+                text = "Image %d" % img_num
+                slug = "%s_%s_Image_%s" % (
+                    scene_meta["module"],
+                    scene_meta["bay"],
+                    img_num,
+                )
             hot_spots.append(
                 {
                     "type": "info",
-                    "id": i,
-                    "text": "Image %d" % i,
+                    "id": img_id,
+                    "text": text,
                     "yaw": img_meta["yaw"] - tour_scene.get("northOffset", 0),
                     "pitch": img_meta["pitch"],
-                    "URL": "src/#scene=%s&imageId=%s" % (scene_id, img_id),
-                    "cssClass": "isaac-source-image pnlm-hotspot pnlm-sprite",
+                    "task": img_meta["task"],
+                    "URL": "src/#scene=%s&imageId=%s&slug=%s"
+                    % (scene_id, img_id, slug),
+                    "cssClass": f"isaac-source-image isaac-{img_meta['task']} pnlm-hotspot pnlm-sprite",
                     "attributes": {
                         "target": "_blank",
                     },
@@ -362,6 +380,7 @@ def generate_tour_json(config, out_folder):
 
     tour_scenes = {}
     tour["scenes"] = tour_scenes
+    tour["initialAnnotations"] = config["initial_annotations"]
 
     for scene_id, config_scene_meta in config["scenes"].items():
         # Read tiler scene metadata
@@ -430,7 +449,7 @@ def generate_scene_index(config, out_folder):
         index.append(
             fill_field(
                 (
-                    '<li><a href="pannellum.htm#config=tour.json&firstScene={scene_id}">'
+                    '<li><a href="pannellum.html#config=tour.json&firstScene={scene_id}">'
                     "{module} {bay}"
                     "</a></li>"
                 ),
@@ -452,14 +471,37 @@ def generate_scene_index(config, out_folder):
     print("wrote to %s" % out_path)
 
 
+def install_pano_images(config, out_folder):
+    for scene_id, config_scene_meta in config["scenes"].items():
+        # Would be more in the spirit of things to not hard-code this input path
+        in_image = os.path.join("/output/stitch", scene_id, "pano.jpg")
+        out_image_folder = os.path.join(out_folder, "scenes", scene_id)
+        install_file(in_image, out_image_folder, "pano.jpg")
+
+
+def reorganize_config(config):
+    """
+    Modify `config` in place. For the top-level inspection_results
+    field: add the value for each scene into the config field of the
+    same name for that scene. (And delete the top-level field.)
+    """
+    scenes = config["scenes"]
+    for field in ["inspection_results"]:
+        value = config.pop(field, {})
+        for scene_id, scene_value in value.items():
+            scenes[scene_id][field] = scene_value
+
+
 def generate_tour(config_path, out_folder, package_paths):
     with open(config_path, "r") as config_stream:
         config = yaml.safe_load(config_stream)
+    reorganize_config(config)
 
     install_static_files(out_folder, package_paths)
     generate_tour_json(config, out_folder)
     generate_scene_index(config, out_folder)
-    dosys("chmod a+rX %s" % out_folder)
+    install_pano_images(config, out_folder)
+    dosys("chmod -R a+rX %s" % out_folder)
 
 
 class CustomFormatter(
