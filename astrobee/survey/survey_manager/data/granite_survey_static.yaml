@@ -72,7 +72,7 @@ bays_move:
 
 maps:
   gra: "/data/maps/granite.map"
-  gro: "/data/maps/iss.map"
+  gro: "/res/maps/iss.map"
 
 exposure:
   gra: 175

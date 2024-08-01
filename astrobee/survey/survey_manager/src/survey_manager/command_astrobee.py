@@ -49,6 +49,7 @@ from survey_manager.problem_generator import (
     yaml_action_from_pddl,
 )
 
+os.nice(15)
 # Constants
 MAX_COUNTER = 10
 CHUNK_SIZE = 1024
@@ -174,6 +175,7 @@ class ProcessExecutor:
 
                     self.sock_output_connected = True
             except socket.timeout:
+                time.sleep(0.1)  # Add a small sleep interval at the start of the loop
                 continue
 
             try:
@@ -193,6 +195,7 @@ class ProcessExecutor:
         output_total = ""
         try:
             while not self._stop_event.is_set() and process.poll() is None:
+                time.sleep(0.1)  # Add a small sleep interval at the start of the loop
                 # Get output from process
                 # loginfo("waiting for output")
                 output = process.stdout.readline()
@@ -224,6 +227,7 @@ class ProcessExecutor:
                             output.encode("ascii", errors="replace")[:CHUNK_SIZE]
                         )
                 except socket.timeout:
+                    time.sleep(0.1)  # Add a small sleep interval
                     continue
                 except (socket.error, BrokenPipeError):
                     loginfo("writer can't send data. Receiver may have disconnected.")
@@ -238,15 +242,16 @@ class ProcessExecutor:
 
     def read_input_once(self) -> str:
         while not (self.sock_input_connected or self._stop_event.is_set()):
-            # loginfo("waiting for connection")
             try:
                 self.sock_input_conn, addr = self.sock_input.accept()
                 self.sock_input_conn.settimeout(1)
                 self.sock_input_connected = True
                 break
             except socket.timeout:
+                time.sleep(0.1)  # Add a small sleep interval
                 continue
         while not self._stop_event.is_set():
+            time.sleep(0.1)  # Add a small sleep interval at the start of the loop
             try:
                 request = self.sock_input_conn.recv(CHUNK_SIZE).decode(
                     "ascii", errors="replace"
@@ -258,6 +263,7 @@ class ProcessExecutor:
                     break
                 loginfo("request")
             except socket.timeout:
+                time.sleep(0.1)  # Add a small sleep interval
                 continue
             except ConnectionResetError:
                 # Connection was reset, set sock_input_connected to False
@@ -271,22 +277,29 @@ class ProcessExecutor:
         try:
             while not self._stop_event.is_set():
                 while not (self.sock_input_connected or self._stop_event.is_set()):
-                    # loginfo("waiting for connection")
+                    time.sleep(
+                        0.1
+                    )  # Add a small sleep interval at the start of the loop
                     try:
                         self.sock_input_conn, addr = self.sock_input.accept()
                         self.sock_input_conn.settimeout(1)
                         self.sock_input_connected = True
                         break
                     except socket.timeout:
+                        time.sleep(0.1)  # Add a small sleep interval
                         continue
 
                 while not self._stop_event.is_set():
+                    time.sleep(
+                        0.1
+                    )  # Add a small sleep interval at the start of the loop
                     try:
                         request = self.sock_input_conn.recv(CHUNK_SIZE).decode(
                             "ascii", errors="replace"
                         )
                         break
                     except socket.timeout:
+                        time.sleep(0.1)  # Add a small sleep interval
                         continue
                     except ConnectionResetError:
                         # Connection was reset, set sock_input_connected to False
@@ -597,6 +610,7 @@ class CommandExecutor:
             # got message
             if self.plan_status_needed is False:
                 return 0
+            rospy.sleep(1)
         return 1
 
 
