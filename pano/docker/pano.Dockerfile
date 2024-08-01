@@ -22,15 +22,14 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Install Jupyter explicitly first
-RUN pip3 install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir jupyter
+RUN pip3 install --no-cache-dir --upgrade pip \
+  && pip3 install --no-cache-dir jupyter
 
 # Install other Python packages: jupyter package needs to be installed before attempting to build pyshtools
 # - pandas: pulled in as pyshtools dependency but install breaks if not mentioned explicitly (?)
 # - pyshtools: used during Pannellum multires generation
 # - snakemake: modern build system based on Python, manages stitching workflows
-RUN pip3 install --no-cache-dir --upgrade pip \
-  && pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir \
     --ignore-installed PyYAML \
     pandas \
     pulp==2.7 \
