@@ -30,17 +30,18 @@ RUN apt-get update \
         ros-noetic-cv-bridge \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install pyArango \
+RUN set -e \
+    && pip3 install pyArango \
     && pip3 install jupyterlab jupyterhub nbconvert Pygments==2.6.1 jupyros \
     && pip3 install networkx==3.1 \
     && pip3 install matplotlib opencv-python numpy-quaternion pandas \
-    && pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu \
-    # Image STR packages
+    && pip3 install torch torchvision torchaudio \
+    && pip3 install git+https://github.com/cvg/LightGlue.git \
+    && pip3 install jupyter-ui-poll \
     && pip3 install lmdb ipympl gdown timm nltk  \
     && pip3 install git+https://github.com/marinagmoreira/CRAFT-pytorch.git \
     && pip3 install git+https://github.com/marinagmoreira/parseq.git@focal#egg=parseq \
     && cd /src/isaac/src/anomaly/image_str && pip install .
-
 
 EXPOSE 8888
 
