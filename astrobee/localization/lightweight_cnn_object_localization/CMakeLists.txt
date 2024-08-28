@@ -1,0 +1,3 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(lightweight_cnn_object_localization)
+add_subdirectory(tools/libtorch_frcnn_test/src)

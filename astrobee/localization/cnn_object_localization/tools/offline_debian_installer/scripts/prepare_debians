@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# Local system sources.list
+SOURCES_LIST="/etc/apt/sources.list"
+
+# Ubuntu version; must be shared between local system and Astrobee
+UBUNTU_VERSION="focal"
+
+# Architecture used by Astrobee
+ARCHITECTURE="armhf"
+
+# =============================================================================
+# FUNCTION DEFINITIONS
+# =============================================================================
+
+function cleanup {
+
+    echo "Reverting some stuff before exiting."
+
+    # Restore original dpkg architecture configuration
+    sudo dpkg --remove-architecture ${ARCHITECTURE}
+    while read -r architecture_to_restore; do 
+        sudo dpkg --add-architecture "$architecture_to_restore"
+    done < "${LOCAL_TOOL_DIR}/${FOREIGN_ARCHS_LIST_REL}"
+
+    # Restore original sources.list
+    sudo mv ${SOURCES_LIST}.bak ${SOURCES_LIST}
+
+    # Remove temporary directory
+    rm -rf "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}"
+
+}
+
+function confirm_or_continue {
+
+    while true; do
+        read -p "Do you wish to continue? [y/n] " yn
+        case $yn in
+            [Yy]* ) return 0;;
+            [Nn]* ) 
+                cleanup
+                exit;;
+            * ) echo "Please answer yes (y) or no (n).";;
+        esac
+    done
+
+}
+
+# =============================================================================
+# SETUP
+# =============================================================================
+
+# Base paths
+echo "Please enter the directory on Astrobee to copy to (in the form user@address:/path/to/target):"
+read astrobee_address_and_dir
+ASTROBEE_ADDRESS=${astrobee_address_and_dir%%:*}
+ASTROBEE_TOOL_DIR=${astrobee_address_and_dir#*:}
+SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+LOCAL_TOOL_DIR=$(dirname "$SCRIPTS_DIR")
+
+# Relative file/directory paths
+REQUIREMENTS_DIR_REL="requirements"
+PACKAGE_LIST_REL="${REQUIREMENTS_DIR_REL}/debian_requirements.txt"
+TEMP_DIR_REL="temp"
+DEPS_LIST_COMPLETE_REL="${TEMP_DIR_REL}/debian_dependencies_list_complete.txt"
+DEPS_LIST_FILTERED_REL="${TEMP_DIR_REL}/debian_dependencies_list_filtered.txt"
+FOREIGN_ARCHS_LIST_REL="${TEMP_DIR_REL}/foreign_architectures.txt"
+DEBIAN_DIR_REL="${TEMP_DIR_REL}/debians"
+LOGS_DIR_REL="logs"
+
+# Ensure requirements list ends in a newline so parsing doesn't break
+if [ "$(tail -c1 "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}")" != "" ]; then
+    echo "" >> "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}"
+fi
+
+# Ensure temporary directory on the local machine and target directory on Astrobee don't already exist, then create them
+if [ -d "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}" ]; then
+    echo "Error: Temporary directory found on online machine. Please ensure things were cleaned up after the last time this tool was used."
+    exit 1
+fi
+if ssh $ASTROBEE_ADDRESS "[ -d $ASTROBEE_TOOL_DIR ]"; then
+    echo "Error: Install target directory already exists on Astrobee. Please ensure things were cleaned up after the last time this tool was used."
+    exit 1
+fi
+mkdir "${LOCAL_TOOL_DIR}/${TEMP_DIR_REL}"
+scp -r $LOCAL_TOOL_DIR "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}"
+
+# Set up dpkg for target architecture: Back up sources.list
+sudo cp ${SOURCES_LIST} ${SOURCES_LIST}.bak
+
+# Set up dpkg for target architecture: Add target architecture ports to sources.list
+sudo tee -a "$SOURCES_LIST" > /dev/null <<EOF
+deb [arch=${ARCHITECTURE}] http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_VERSION} main restricted universe multiverse
+deb [arch=${ARCHITECTURE}] http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_VERSION}-updates main restricted universe multiverse
+deb [arch=${ARCHITECTURE}] http://ports.ubuntu.com/ubuntu-ports ${UBUNTU_VERSION}-security main restricted universe multiverse
+EOF
+
+# Set up dpkg for target architecture: Back up foreign architectures
+dpkg --print-foreign-architectures > "${LOCAL_TOOL_DIR}/${FOREIGN_ARCHS_LIST_REL}"
+
+# Set up dpkg for target architecture: Set foreign architectures to only target architecture
+while read -r architecture_to_remove; do 
+    sudo dpkg --remove-architecture "$architecture_to_remove"
+done < "${LOCAL_TOOL_DIR}/${FOREIGN_ARCHS_LIST_REL}"
+sudo dpkg --add-architecture ${ARCHITECTURE}
+
+# Set up dpkg for target architecture: Update apt
+sudo apt-get update
+
+# User confirmation
+echo "Local system configured for downloading ${ARCHITECTURE} packages. About to collect dependency list on local system."
+confirm_or_continue
+
+# =============================================================================
+# COLLECT FULL DEPENDENCY TREE FOR DEBIAN PACKAGES
+# =============================================================================
+
+# Get the recursive dependencies for each package, reverse the order, and append to the complete dependencies file
+while read package; do
+    apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances ${package} | grep "^\w" | tac >> "${LOCAL_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}"
+done < "${LOCAL_TOOL_DIR}/${PACKAGE_LIST_REL}"
+
+# Remove everything after the colon on each line
+sed -i 's/:.*//' "${LOCAL_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}"
+
+# Remove duplicate dependencies
+awk '!a[$0]++' "${LOCAL_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}" > awk_temporary && mv awk_temporary "${LOCAL_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}"
+
+# User confirmation
+echo "Debian dependency list collected on local system. About to copy to Astrobee and filter."
+confirm_or_continue
+
+# =============================================================================
+# FILTER DEPENDENCY TREE FOR DEBIAN PACKAGES
+# =============================================================================
+
+# Transfer the collected dependency list to Astrobee
+scp "${LOCAL_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}" "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}"
+
+# Filter dependencies based on if they're installed on Astrobee
+ssh ${ASTROBEE_ADDRESS} <<EOT
+while read package; do
+    if ! dpkg-query -W -f='\${Status}' \$package 2>/dev/null | grep -q "ok installed"; then
+        echo \$package >> "${ASTROBEE_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}"
+    fi
+done < ${ASTROBEE_TOOL_DIR}/${DEPS_LIST_COMPLETE_REL}
+EOT
+
+# Transfer the filtered dependency list from Astrobee
+scp "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}" "${LOCAL_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}"
+
+# User confirmation
+echo "Debian dependency list filtered on Astrobee. About to download on local system."
+confirm_or_continue
+
+# =============================================================================
+# DOWNLOAD DEBIAN PACKAGES
+# =============================================================================
+
+# Read each package from the filtered dependencies file and download it
+acceptable_architectures=("${ARCHITECTURE}" "all")
+mkdir "${LOCAL_TOOL_DIR}/${DEBIAN_DIR_REL}"
+pushd "${LOCAL_TOOL_DIR}/${DEBIAN_DIR_REL}"
+while read package; do
+    download_success=false
+    for acceptable_architecture in "${acceptable_architectures[@]}"; do
+        apt-get download "${package}:${acceptable_architecture}"
+        if [ $? -eq 0 ]; then
+            download_success=true
+            break
+        fi
+    done
+    if [ "$download_success" = false ]; then
+        echo "Warning: Unable to download any architecture for package $package".
+    fi
+done < "${LOCAL_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}"
+popd
+
+# User confirmation
+echo "Debians downloaded on local system. About to copy to Astrobee."
+confirm_or_continue
+
+# =============================================================================
+# INSTALL DEBIAN PACKAGES
+# =============================================================================
+
+# Transfer the downloaded debians to Astrobee
+scp -r "${LOCAL_TOOL_DIR}/${DEBIAN_DIR_REL}" "${ASTROBEE_ADDRESS}:${ASTROBEE_TOOL_DIR}/${DEBIAN_DIR_REL}"
+
+# # Install the downloaded debians in order on Astrobee
+# ssh ${ASTROBEE_ADDRESS} <<EOF
+# while read package; do
+#     debian_file=\$(find "${ASTROBEE_TOOL_DIR}/${DEBIAN_DIR_REL}" -type f -name "\${package}_*.deb")
+#     sudo dpkg -i "\$debian_file"
+# done < "${ASTROBEE_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}"
+# EOF
+
+# Clean up
+echo "Debians transferred on Astrobee. You'll need to install them there."
+mkdir -p "${LOCAL_TOOL_DIR}/${LOGS_DIR_REL}"
+date
+mv "${LOCAL_TOOL_DIR}/${DEPS_LIST_FILTERED_REL}" "${LOCAL_TOOL_DIR}/${LOGS_DIR_REL}/$(date +"%Y%m%d_%H%M%S").log"
+cleanup
